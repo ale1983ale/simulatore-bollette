@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import jsPDF from "jspdf";
 import { supabase } from "./supabase";
 
 type MonthlyRow = {
@@ -170,7 +171,15 @@ function energyPdfTipologia(tipo: string) {
   return tipo || "-";
 }
 
-function printHtmlDocument(title: string, html: string) {
+function sanitizeFileName(name: string) {
+  const cleaned = (name || "Cliente")
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "Cliente";
+}
+
+function printHtmlDocument(title: string, html: string, fileName?: string) {
   const win = window.open("", "_blank", "width=1000,height=900");
   if (!win) return;
 
@@ -337,7 +346,59 @@ function printHtmlDocument(title: string, html: string) {
 
   win.document.close();
   win.focus();
-  setTimeout(() => win.print(), 400);
+
+  const finalFileName = sanitizeFileName(fileName || title);
+
+  setTimeout(async () => {
+    try {
+      const doc = win.document;
+      const page = doc.querySelector(".page") as HTMLElement | null;
+
+      if (!page) {
+        win.print();
+        return;
+      }
+
+      const html2canvasModule = await import("html2canvas");
+      const html2canvas = html2canvasModule.default;
+
+      const canvas = await html2canvas(page, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+      const margin = 8;
+      const usableWidth = pdfWidth - margin * 2;
+      const usableHeight = pdfHeight - margin * 2;
+
+      const imgWidth = usableWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = margin;
+
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= usableHeight;
+
+      while (heightLeft > 0) {
+        pdf.addPage();
+        position = margin - (imgHeight - heightLeft);
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        heightLeft -= usableHeight;
+      }
+
+      pdf.save(`${finalFileName}.pdf`);
+      win.close();
+    } catch {
+      win.print();
+    }
+  }, 400);
 }
 
 function field(label: string, value: string, setValue: (v: string) => void, type = "text") {
@@ -1061,7 +1122,8 @@ function Energia({
       </div>
     `;
 
-    printHtmlDocument("Preventivo Energia", html);
+    const cleanName = sanitizeFileName(s.nome || "Cliente");
+    printHtmlDocument("Preventivo Energia", html, `${cleanName} - Energia`);
   };
 
   return (
@@ -1522,7 +1584,8 @@ function Gas({
       </div>
     `;
 
-    printHtmlDocument("Preventivo Gas", html);
+    const cleanName = sanitizeFileName(s.nome || "Cliente");
+    printHtmlDocument("Preventivo Gas", html, `${cleanName} - Gas`);
   };
 
   return (
@@ -1969,7 +2032,6 @@ export default function App() {
     nonAgevolata: 0.18,
   });
 
- 
   const [session, setSession] = useState<any>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
