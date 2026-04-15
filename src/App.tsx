@@ -1323,14 +1323,14 @@ function Energia({
           </>
         )}
 
-        {(r.H39 !== 0 || r.H38 !== 0) &&
-          previewBox(
-            <>
-              {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
-              {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
-            </>
-          )}
-
+{(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
+  previewBox(
+    <>
+      {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
+      {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
+      {r.H40 !== 0 && row("Canone RAI", money(r.H40))}
+    </>
+  )}
         {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
 
         {isSi(s.confrontoFlag) &&
