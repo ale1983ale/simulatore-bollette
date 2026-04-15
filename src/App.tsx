@@ -568,12 +568,6 @@ function calcEnergia(
   const m2 = monthlyRows.find((x) => x.mese === d.mese2) || monthlyRows[0];
   const fissoRow = monthlyRows.find((x) => x.mese === "FISSO") || monthlyRows[0];
 
-  const meseTabella1 = d.mese1 === "FISSO" ? d.meseRifTabella1 : d.mese1;
-  const meseTabella2 = d.mese2 === "FISSO" ? d.meseRifTabella2 : d.mese2;
-
-  const dispRow1 = dispCpRows.find((x) => x.mese === meseTabella1) || dispCpRows[0];
-  const dispRow2 = dispCpRows.find((x) => x.mese === meseTabella2) || dispCpRows[0];
-
   const prezzoFisso = n(fissoRow.mono);
   const mesi = energyMonths(d.fatturazione);
 
@@ -594,7 +588,25 @@ function calcEnergia(
     n(d.f1Mese1) + n(d.f2Mese1) + n(d.f3Mese1) + n(d.monoMese1);
   const consumiMese2 =
     n(d.f1Mese2) + n(d.f2Mese2) + n(d.f3Mese2) + n(d.monoMese2);
+
   const consumiTot = consumiMese1 + consumiMese2;
+
+  // 🔥 PERCENTUALE PERDITE
+  const perditaPercentuale =
+    ["MTA1", "MTA2", "MTA3"].includes(d.tipo) ? 0.038 : 0.1;
+
+  // 🔥 PERDITE CALCOLATE PER FASCIA
+  const perditeEnergia =
+    n(d.f1Mese1) * perditaPercentuale * (prezzoF11 + spreadEff) +
+    n(d.f1Mese2) * perditaPercentuale * (prezzoF12 + spreadEff) +
+    n(d.f2Mese1) * perditaPercentuale * (prezzoF21 + spreadEff) +
+    n(d.f2Mese2) * perditaPercentuale * (prezzoF22 + spreadEff) +
+    n(d.f3Mese1) * perditaPercentuale * (prezzoF31 + spreadEff) +
+    n(d.f3Mese2) * perditaPercentuale * (prezzoF32 + spreadEff) +
+    n(d.monoMese1) * perditaPercentuale * (prezzoMono1 + spreadEff) +
+    n(d.monoMese2) * perditaPercentuale * (prezzoMono2 + spreadEff);
+
+  const consumiTotConPerdite = consumiTot * (1 + perditaPercentuale);
 
   const H22_base =
     n(d.f1Mese1) * (prezzoF11 + spreadEff) +
@@ -606,27 +618,17 @@ function calcEnergia(
     n(d.monoMese1) * (prezzoMono1 + spreadEff) +
     n(d.monoMese2) * (prezzoMono2 + spreadEff);
 
-  const dispCpTotale = consumiTot * (n(d.dispacciamentoCapacityMarket) + cmEff);
-  const H22 = H22_base + dispCpTotale;
+  // 🔥 DISP+CP aumentato
+  const dispCpTotale = consumiTotConPerdite * (n(d.dispacciamentoCapacityMarket) + cmEff);
+
+  // 🔥 NUOVA VENDITA ENERGIA
+  const H22 = H22_base + perditeEnergia + dispCpTotale;
+
   const H25 = n(d.quotaConsumiRete);
   const H24 = n(d.reattivaImmessa) + n(d.reattivaPrelevata);
   const H28 = n(d.numeroPod) * quotaFissaEff * mesi;
   const H29 = n(d.quotaFissaRete);
   const H30 = n(d.quotaPotenzaRete);
-
-  const totDispCp1 = n(dispRow1.dispacciamento) + n(dispRow1.cpMarket);
-  const totDispCp2 = n(dispRow2.dispacciamento) + n(dispRow2.cpMarket);
-
-  let dispCpBase = 0;
-  if (sLikeBimestrale(d.fatturazione)) {
-    const denom = consumiMese1 + consumiMese2;
-    dispCpBase =
-      denom > 0
-        ? (consumiMese1 * totDispCp1 + consumiMese2 * totDispCp2) / denom
-        : 0;
-  } else {
-    dispCpBase = totDispCp1;
-  }
 
   const H35 = isSi(d.acciseManualiFlag) ? n(d.acciseManualiValore) : consumiTot * 0.0125;
   const H38 = isSi(d.ricalcoloFlag) ? n(d.ricalcoloValore) : 0;
@@ -638,9 +640,6 @@ function calcEnergia(
 
   const H37 = H35 + H36;
   const H41 = H22 + H25 + H24 + H28 + H29 + H30 + H37 + H38 - H39 + H40;
-
-  const risparmioFattura = isSi(d.confrontoFlag) ? H41 - n(d.confrontoValore) : 0;
-  const risparmioAnnuo = isSi(d.confrontoFlag) ? (risparmioFattura * 12) / mesi : 0;
 
   return {
     H22_base,
@@ -657,16 +656,10 @@ function calcEnergia(
     H39,
     H40,
     H41,
-    risparmioFattura,
-    risparmioAnnuo,
     consumiTot,
-    consumiMese1,
-    consumiMese2,
-    cmEff,
-    spreadEff,
-    quotaFissaEff,
     dispCpTotale,
-    dispCpBase,
+    perditaPercentuale,
+    perditeEnergia,
   };
 }
 
@@ -1155,15 +1148,15 @@ function Energia({
         </div>
 
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto auto auto",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 12,
-            }}
-          >
+        <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "1fr auto auto auto auto",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  }}
+>
             <h3 style={{ margin: 0 }}>Mesi e consumi</h3>
 
             <div
@@ -1186,7 +1179,26 @@ function Energia({
                   : "-"}
               </div>
             </div>
-
+            <div
+  style={{
+    border: "1px solid #cbd5e1",
+    borderRadius: 10,
+    padding: "8px 12px",
+    background: "#f8fafc",
+    minWidth: 170,
+    textAlign: "right",
+  }}
+>
+  <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
+  <div style={{ fontSize: 16, fontWeight: 700 }}>
+    {r.consumiTot > 0
+      ? `${r.consumiTot.toLocaleString("it-IT", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })} kWh`
+      : "-"}
+  </div>
+</div>
             <div style={{ minWidth: 190 }}>
               {readonlyField("DISP+CP.Mrk Base", numFormat(r.dispCpBase, 6))}
             </div>
@@ -1250,8 +1262,10 @@ function Energia({
           </div>
           <div style={{ height: 12 }} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
-            {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
-            {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
+  {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
+  {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
+</div>
           </div>
           <div style={{ height: 12 }} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
@@ -1277,6 +1291,7 @@ function Energia({
         {previewBox(
           <>
             {row("Pun+Spread", money(r.H22_base))}
+{row("Perdite di rete", money(r.perditeEnergia))}
             {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
             {row("Reattiva", money(r.H24))}
           </>
