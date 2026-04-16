@@ -967,6 +967,10 @@ function Energia({
   const consumoAnnuoEnergia =
     r.consumiTot *
     (s.fatturazione === "MENSILE" || s.fatturazione === "MULTI POD MENSILE" ? 12 : 6);
+    const prezzoMedioEnergiaScheda =
+  r.consumiTot > 0
+    ? `${((r.H22 + r.H25 + r.H24) / r.consumiTot).toFixed(6).replace(".", ",")} €/kWh`
+    : "-";
 
   const boxStyle: React.CSSProperties = {
     border: "1px solid #cbd5e1",
@@ -1235,9 +1239,9 @@ function Energia({
             <div style={boxStyle}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>
-                {r.consumiTot > 0
-                  ? `${(r.H41 / r.consumiTot).toFixed(4).replace(".", ",")} €/kWh`
-                  : "-"}
+              {r.consumiTot > 0
+  ? `${((r.H22 + r.H25 + r.H24) / r.consumiTot).toFixed(6).replace(".", ",")} €/kWh`
+  : "-"}
               </div>
             </div>
 
@@ -1498,6 +1502,10 @@ function Gas({
       : s.fatturazione === "TRIMESTRALE"
       ? 4
       : 3);
+      const prezzoMedioGasScheda =
+  r.consumoTotale > 0
+    ? `${(r.H24 / r.consumoTotale).toFixed(6).replace(".", ",")} €/Smc`
+    : "-";
 
   const boxStyle: React.CSSProperties = {
     border: "1px solid #cbd5e1",
@@ -1722,9 +1730,9 @@ function Gas({
             <div style={boxStyle}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>
-                {r.consumoTotale > 0
-                  ? `${(r.H37 / r.consumoTotale).toFixed(4).replace(".", ",")} €/Smc`
-                  : "-"}
+              {r.consumoTotale > 0
+  ? `${(r.H24 / r.consumoTotale).toFixed(6).replace(".", ",")} €/Smc`
+  : "-"}
               </div>
             </div>
 
