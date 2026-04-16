@@ -602,14 +602,14 @@ const prezzoFisso = n(isDomestico ? fissoDomesticoRow.mono : fissoBusinessRow.mo
   const quotaFissaEff =
     d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
 
-  const prezzoMono1 = d.mese1 === "FISSO" ? prezzoFisso : n(m1.mono);
-  const prezzoMono2 = d.mese2 === "FISSO" ? prezzoFisso : n(m2.mono);
-  const prezzoF11 = d.mese1 === "FISSO" ? prezzoFisso : n(m1.f1);
-  const prezzoF12 = d.mese2 === "FISSO" ? prezzoFisso : n(m2.f1);
-  const prezzoF21 = d.mese1 === "FISSO" ? prezzoFisso : n(m1.f2);
-  const prezzoF22 = d.mese2 === "FISSO" ? prezzoFisso : n(m2.f2);
-  const prezzoF31 = d.mese1 === "FISSO" ? prezzoFisso : n(m1.f3);
-  const prezzoF32 = d.mese2 === "FISSO" ? prezzoFisso : n(m2.f3);
+    const prezzoMono1 = mese1IsFisso ? prezzoFisso : n(m1.mono);
+    const prezzoMono2 = mese2IsFisso ? prezzoFisso : n(m2.mono);
+    const prezzoF11 = mese1IsFisso ? prezzoFisso : n(m1.f1);
+    const prezzoF12 = mese2IsFisso ? prezzoFisso : n(m2.f1);
+    const prezzoF21 = mese1IsFisso ? prezzoFisso : n(m1.f2);
+    const prezzoF22 = mese2IsFisso ? prezzoFisso : n(m2.f2);
+    const prezzoF31 = mese1IsFisso ? prezzoFisso : n(m1.f3);
+    const prezzoF32 = mese2IsFisso ? prezzoFisso : n(m2.f3);
 
   const consumiMese1 =
     n(d.f1Mese1) + n(d.f2Mese1) + n(d.f3Mese1) + n(d.monoMese1);
@@ -1239,10 +1239,8 @@ function Energia({
             <div style={boxStyle}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>
-              {r.consumiTot > 0
-  ? `${((r.H22 + r.H25 + r.H24) / r.consumiTot).toFixed(6).replace(".", ",")} €/kWh`
-  : "-"}
-              </div>
+  {prezzoMedioEnergiaScheda}
+</div>
             </div>
 
             <div style={boxStyle}>
@@ -1272,28 +1270,28 @@ function Energia({
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 12 }}>
             {selectField("Mese 1", s.mese1, (v) => set("mese1", v), monthlyRows.map((m) => m.mese))}
-            {s.mese1 === "FISSO"
-              ? selectField(
-                  "Mese rif. tabella 1",
-                  s.meseRifTabella1,
-                  (v) => set("meseRifTabella1", v),
-                  dispCpRows.map((m) => m.mese)
-                )
-              : <div />}
+            {(s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS")
+  ? selectField(
+      "Mese rif. tabella 1",
+      s.meseRifTabella1,
+      (v) => set("meseRifTabella1", v),
+      dispCpRows.map((m) => m.mese)
+    )
+  : <div />}
             {field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
             {field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
             {field("F3 mese 1", s.f3Mese1, (v) => set("f3Mese1", v), "number")}
             {field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
 
             {selectField("Mese 2", s.mese2, (v) => set("mese2", v), ["", ...monthlyRows.map((m) => m.mese)])}
-            {s.mese2 === "FISSO"
-              ? selectField(
-                  "Mese rif. tabella 2",
-                  s.meseRifTabella2,
-                  (v) => set("meseRifTabella2", v),
-                  dispCpRows.map((m) => m.mese)
-                )
-              : <div />}
+            {(s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS")
+  ? selectField(
+      "Mese rif. tabella 2",
+      s.meseRifTabella2,
+      (v) => set("meseRifTabella2", v),
+      dispCpRows.map((m) => m.mese)
+    )
+  : <div />}
             {field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
             {field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
             {field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
@@ -1474,6 +1472,9 @@ function Gas({
   });
 
   const r = useMemo(() => calcGas(s, monthlyRows, gasOffers), [s, monthlyRows, gasOffers]);
+  const gasMonthOptions = monthlyRows
+  .filter((m) => m.mese !== "FISSO DOMESTICO" && m.mese !== "FISSO BUSINESS")
+  .map((m) => m.mese);
 
   const set = (k: string, v: string) =>
     setS((prev) => {
@@ -1730,10 +1731,8 @@ function Gas({
             <div style={boxStyle}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>
-              {r.consumoTotale > 0
-  ? `${(r.H24 / r.consumoTotale).toFixed(6).replace(".", ",")} €/Smc`
-  : "-"}
-              </div>
+  {prezzoMedioGasScheda}
+</div>
             </div>
 
             <div style={boxStyle}>
@@ -1762,10 +1761,10 @@ function Gas({
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
-            {selectField("Mese 1", s.periodo1, (v) => set("periodo1", v), monthlyRows.map((m) => m.mese))}
-            {selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...monthlyRows.map((m) => m.mese)])}
-            {selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...monthlyRows.map((m) => m.mese)])}
-            {selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...monthlyRows.map((m) => m.mese)])}
+          {selectField("Mese 1", s.periodo1, (v) => set("periodo1", v), gasMonthOptions)}
+{selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasMonthOptions])}
+{selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasMonthOptions])}
+{selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasMonthOptions])}
             {field("Consumo 1", s.consumo1, (v) => set("consumo1", v), "number")}
             {field("Consumo 2", s.consumo2, (v) => set("consumo2", v), "number")}
             {field("Consumo 3", s.consumo3, (v) => set("consumo3", v), "number")}
@@ -2733,10 +2732,10 @@ function ReportAgent() {
           <h2 style={{ marginTop: 0 }}>I miei report</h2>
 
           {loading ? (
-            <div>Caricamento...</div>
-          ) : reports.length === 0 ? (
-            <div>Nessun report</div>
-          ) : (
+  <div>Caricamento...</div>
+) : reports.length === 0 ? (
+  <div>Nessun report</div>
+) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
@@ -3184,37 +3183,36 @@ export default function App() {
 
         if (Array.isArray(map.monthlyRows) && map.monthlyRows.length > 0) {
           const loadedMonthlyRows = [...map.monthlyRows];
-        
-          const hasFissoDomestico = loadedMonthlyRows.some((r: any) => r.mese === "FISSO DOMESTICO");
-          const hasFissoBusiness = loadedMonthlyRows.some((r: any) => r.mese === "FISSO BUSINESS");
-        
+
           const oldFisso = loadedMonthlyRows.find((r: any) => r.mese === "FISSO");
-        
-          let finalMonthlyRows = loadedMonthlyRows.filter((r: any) => r.mese !== "FISSO");
-        
-          if (!hasFissoDomestico) {
-            finalMonthlyRows.push({
+
+          const withoutOldFisso = loadedMonthlyRows.filter((r: any) => r.mese !== "FISSO");
+
+          const baseRows = withoutOldFisso.filter(
+            (r: any) => r.mese !== "FISSO DOMESTICO" && r.mese !== "FISSO BUSINESS"
+          );
+
+          const fissoDomestico =
+            withoutOldFisso.find((r: any) => r.mese === "FISSO DOMESTICO") || {
               mese: "FISSO DOMESTICO",
               mono: oldFisso?.mono ?? 0,
               f1: oldFisso?.f1 ?? 0,
               f2: oldFisso?.f2 ?? 0,
               f3: oldFisso?.f3 ?? 0,
               psv: oldFisso?.psv ?? 0,
-            });
-          }
-        
-          if (!hasFissoBusiness) {
-            finalMonthlyRows.push({
+            };
+
+          const fissoBusiness =
+            withoutOldFisso.find((r: any) => r.mese === "FISSO BUSINESS") || {
               mese: "FISSO BUSINESS",
               mono: oldFisso?.mono ?? 0,
               f1: oldFisso?.f1 ?? 0,
               f2: oldFisso?.f2 ?? 0,
               f3: oldFisso?.f3 ?? 0,
               psv: oldFisso?.psv ?? 0,
-            });
-          }
-        
-          setMonthlyRows(finalMonthlyRows);
+            };
+
+          setMonthlyRows([...baseRows, fissoDomestico, fissoBusiness]);
         }
 
         if (Array.isArray(map.dispCpRows) && map.dispCpRows.length > 0) {
