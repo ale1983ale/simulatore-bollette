@@ -36,6 +36,14 @@ type GasAcciseSettings = {
   nonAgevolata: number;
 };
 
+type Agent = {
+  id?: number;
+  nome: string;
+  cognome: string;
+  username: string;
+  password: string;
+};
+
 const INITIAL_MONTHLY: MonthlyRow[] = [
   { mese: "GENNAIO", mono: 0.132665, f1: 0.15126, f2: 0.1374, f3: 0.11829, psv: 0.55769 },
   { mese: "FEBBRAIO", mono: 0.114405, f1: 0.12228, f2: 0.11984, f3: 0.1053, psv: 0.376788 },
@@ -49,7 +57,8 @@ const INITIAL_MONTHLY: MonthlyRow[] = [
   { mese: "OTTOBRE", mono: 0.11104, f1: 0.11783, f2: 0.12166, f3: 0.09948, psv: 0.35395 },
   { mese: "NOVEMBRE", mono: 0.11709, f1: 0.12959, f2: 0.12402, f3: 0.10551, psv: 0.3453 },
   { mese: "DICEMBRE", mono: 0.11549, f1: 0.12959, f2: 0.12402, f3: 0.10551, psv: 0.37798 },
-  { mese: "FISSO", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "FISSO DOMESTICO", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+{ mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
 ];
 
 const INITIAL_DISP_CP_ROWS: DispCpRow[] = [
@@ -566,14 +575,32 @@ function calcEnergia(
   const off = energyOffers.find((x) => x.nome === d.offerta) || energyOffers[0];
   const m1 = monthlyRows.find((x) => x.mese === d.mese1) || monthlyRows[0];
   const m2 = monthlyRows.find((x) => x.mese === d.mese2) || monthlyRows[0];
-  const fissoRow = monthlyRows.find((x) => x.mese === "FISSO") || monthlyRows[0];
+  const fissoDomesticoRow =
+  monthlyRows.find((x) => x.mese === "FISSO DOMESTICO") || monthlyRows[0];
 
-  const prezzoFisso = n(fissoRow.mono);
+const fissoBusinessRow =
+  monthlyRows.find((x) => x.mese === "FISSO BUSINESS") || monthlyRows[0];
+
+  const mese1IsFisso = d.mese1 === "FISSO DOMESTICO" || d.mese1 === "FISSO BUSINESS";
+const mese2IsFisso = d.mese2 === "FISSO DOMESTICO" || d.mese2 === "FISSO BUSINESS";
+
+const meseTabella1 = mese1IsFisso ? d.meseRifTabella1 : d.mese1;
+const meseTabella2 = mese2IsFisso ? d.meseRifTabella2 : d.mese2;
+
+  const dispRow1 = dispCpRows.find((x) => x.mese === meseTabella1);
+  const dispRow2 = dispCpRows.find((x) => x.mese === meseTabella2);
+
+  const isDomestico = ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(d.tipo);
+const prezzoFisso = n(isDomestico ? fissoDomesticoRow.mono : fissoBusinessRow.mono);
   const mesi = energyMonths(d.fatturazione);
 
   const spreadEff = d.offerta === "DEDICATA" ? n(d.dedicataSpread) : n(off.spread);
-  const cmEff = d.offerta === "DEDICATA" ? n(d.dedicataCapacityMarket) : n(off.maggiorazioneCapacityMarket);
-  const quotaFissaEff = d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
+  const cmEff =
+    d.offerta === "DEDICATA"
+      ? n(d.dedicataCapacityMarket)
+      : n(off.maggiorazioneCapacityMarket);
+  const quotaFissaEff =
+    d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
 
   const prezzoMono1 = d.mese1 === "FISSO" ? prezzoFisso : n(m1.mono);
   const prezzoMono2 = d.mese2 === "FISSO" ? prezzoFisso : n(m2.mono);
@@ -588,25 +615,10 @@ function calcEnergia(
     n(d.f1Mese1) + n(d.f2Mese1) + n(d.f3Mese1) + n(d.monoMese1);
   const consumiMese2 =
     n(d.f1Mese2) + n(d.f2Mese2) + n(d.f3Mese2) + n(d.monoMese2);
-
   const consumiTot = consumiMese1 + consumiMese2;
 
-  // 🔥 PERCENTUALE PERDITE
   const perditaPercentuale =
     ["MTA1", "MTA2", "MTA3"].includes(d.tipo) ? 0.038 : 0.1;
-
-  // 🔥 PERDITE CALCOLATE PER FASCIA
-  const perditeEnergia =
-    n(d.f1Mese1) * perditaPercentuale * (prezzoF11 + spreadEff) +
-    n(d.f1Mese2) * perditaPercentuale * (prezzoF12 + spreadEff) +
-    n(d.f2Mese1) * perditaPercentuale * (prezzoF21 + spreadEff) +
-    n(d.f2Mese2) * perditaPercentuale * (prezzoF22 + spreadEff) +
-    n(d.f3Mese1) * perditaPercentuale * (prezzoF31 + spreadEff) +
-    n(d.f3Mese2) * perditaPercentuale * (prezzoF32 + spreadEff) +
-    n(d.monoMese1) * perditaPercentuale * (prezzoMono1 + spreadEff) +
-    n(d.monoMese2) * perditaPercentuale * (prezzoMono2 + spreadEff);
-
-  const consumiTotConPerdite = consumiTot * (1 + perditaPercentuale);
 
   const H22_base =
     n(d.f1Mese1) * (prezzoF11 + spreadEff) +
@@ -618,12 +630,39 @@ function calcEnergia(
     n(d.monoMese1) * (prezzoMono1 + spreadEff) +
     n(d.monoMese2) * (prezzoMono2 + spreadEff);
 
-  // 🔥 DISP+CP aumentato
-  const dispCpTotale = consumiTotConPerdite * (n(d.dispacciamentoCapacityMarket) + cmEff);
+  const perditeEnergia =
+    n(d.f1Mese1) * perditaPercentuale * (prezzoF11 + spreadEff) +
+    n(d.f1Mese2) * perditaPercentuale * (prezzoF12 + spreadEff) +
+    n(d.f2Mese1) * perditaPercentuale * (prezzoF21 + spreadEff) +
+    n(d.f2Mese2) * perditaPercentuale * (prezzoF22 + spreadEff) +
+    n(d.f3Mese1) * perditaPercentuale * (prezzoF31 + spreadEff) +
+    n(d.f3Mese2) * perditaPercentuale * (prezzoF32 + spreadEff) +
+    n(d.monoMese1) * perditaPercentuale * (prezzoMono1 + spreadEff) +
+    n(d.monoMese2) * perditaPercentuale * (prezzoMono2 + spreadEff);
 
-  // 🔥 NUOVA VENDITA ENERGIA
+  const totDispCp1 = n(dispRow1?.dispacciamento) + n(dispRow1?.cpMarket);
+  const totDispCp2 = n(dispRow2?.dispacciamento) + n(dispRow2?.cpMarket);
+
+  let dispCpBase = 0;
+  if (sLikeBimestrale(d.fatturazione) && d.mese2) {
+    if (consumiMese1 > 0 || consumiMese2 > 0) {
+      const denom = consumiMese1 + consumiMese2;
+      dispCpBase =
+        denom > 0
+          ? (consumiMese1 * totDispCp1 + consumiMese2 * totDispCp2) / denom
+          : 0;
+    } else {
+      dispCpBase = (totDispCp1 + totDispCp2) / 2;
+    }
+  } else {
+    dispCpBase = totDispCp1;
+  }
+
+  const consumiTotConPerdite = consumiTot * (1 + perditaPercentuale);
+  const dispCpTotale =
+    consumiTotConPerdite * (n(d.dispacciamentoCapacityMarket) + cmEff);
+
   const H22 = H22_base + perditeEnergia + dispCpTotale;
-
   const H25 = n(d.quotaConsumiRete);
   const H24 = n(d.reattivaImmessa) + n(d.reattivaPrelevata);
   const H28 = n(d.numeroPod) * quotaFissaEff * mesi;
@@ -637,9 +676,11 @@ function calcEnergia(
 
   const imponibileIva = H22 + H25 + H24 + H28 + H29 + H30 + H35 + H38;
   const H36 = (imponibileIva * energyVatRate(d.tipo, d.iva)) / 100;
-
   const H37 = H35 + H36;
   const H41 = H22 + H25 + H24 + H28 + H29 + H30 + H37 + H38 - H39 + H40;
+
+  const risparmioFattura = isSi(d.confrontoFlag) ? H41 - n(d.confrontoValore) : 0;
+  const risparmioAnnuo = isSi(d.confrontoFlag) ? (risparmioFattura * 12) / mesi : 0;
 
   return {
     H22_base,
@@ -656,8 +697,16 @@ function calcEnergia(
     H39,
     H40,
     H41,
+    risparmioFattura,
+    risparmioAnnuo,
     consumiTot,
+    consumiMese1,
+    consumiMese2,
+    spreadEff,
+    cmEff,
+    quotaFissaEff,
     dispCpTotale,
+    dispCpBase,
     perditaPercentuale,
     perditeEnergia,
   };
@@ -733,7 +782,13 @@ function calcGas(d: any, monthlyRows: MonthlyRow[], gasOffers: GasOffer[]) {
   };
 }
 
-function LoginView({ onLogin }: { onLogin: () => void }) {
+function LoginView({
+  onLogin,
+  title = "Accesso Admin",
+}: {
+  onLogin: () => void;
+  title?: string;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -774,7 +829,7 @@ function LoginView({ onLogin }: { onLogin: () => void }) {
         padding: 20,
       }}
     >
-      <h2 style={{ marginTop: 0 }}>Accesso Listini</h2>
+      <h2 style={{ marginTop: 0 }}>{title}</h2>
 
       <div style={{ display: "grid", gap: 12 }}>
         <div>
@@ -885,6 +940,15 @@ function Energia({
     [s, monthlyRows, energyOffers, dispCpRows]
   );
 
+  useEffect(() => {
+    if (!s.dispacciamentoCapacityMarket || s.dispacciamentoCapacityMarket === "0") {
+      setS((prev) => ({
+        ...prev,
+        dispacciamentoCapacityMarket: String(r.dispCpBase),
+      }));
+    }
+  }, [r.dispCpBase]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const set = (k: string, v: string) =>
     setS((prev) => {
       const newState = { ...prev, [k]: v };
@@ -903,6 +967,15 @@ function Energia({
   const consumoAnnuoEnergia =
     r.consumiTot *
     (s.fatturazione === "MENSILE" || s.fatturazione === "MULTI POD MENSILE" ? 12 : 6);
+
+  const boxStyle: React.CSSProperties = {
+    border: "1px solid #cbd5e1",
+    borderRadius: 10,
+    padding: "8px 12px",
+    background: "#f8fafc",
+    minWidth: 170,
+    textAlign: "right",
+  };
 
   const printEnergyPdf = () => {
     const periodo = [s.mese1, s.mese2].filter(Boolean).join(" / ") || "-";
@@ -1148,27 +1221,27 @@ function Energia({
         </div>
 
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-        <div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "1fr auto auto auto auto",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  }}
->
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto auto auto",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 12,
+            }}
+          >
             <h3 style={{ margin: 0 }}>Mesi e consumi</h3>
 
-            <div
-              style={{
-                border: "1px solid #cbd5e1",
-                borderRadius: 10,
-                padding: "8px 12px",
-                background: "#f8fafc",
-                minWidth: 170,
-                textAlign: "right",
-              }}
-            >
+            <div style={boxStyle}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                {r.consumiTot > 0
+                  ? `${(r.H41 / r.consumiTot).toFixed(4).replace(".", ",")} €/kWh`
+                  : "-"}
+              </div>
+            </div>
+
+            <div style={boxStyle}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>
                 {r.consumiTot > 0
@@ -1179,45 +1252,18 @@ function Energia({
                   : "-"}
               </div>
             </div>
-            <div
-  style={{
-    border: "1px solid #cbd5e1",
-    borderRadius: 10,
-    padding: "8px 12px",
-    background: "#f8fafc",
-    minWidth: 170,
-    textAlign: "right",
-  }}
->
-  <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
-  <div style={{ fontSize: 16, fontWeight: 700 }}>
-    {r.consumiTot > 0
-      ? `${r.consumiTot.toLocaleString("it-IT", {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-        })} kWh`
-      : "-"}
-  </div>
-</div>
-            <div style={{ minWidth: 190 }}>
-              {readonlyField("DISP+CP.Mrk Base", numFormat(r.dispCpBase, 6))}
-            </div>
 
-            <button
-              type="button"
-              onClick={() => set("dispacciamentoCapacityMarket", String(r.dispCpBase))}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: "#ffffff",
-                cursor: "pointer",
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-              }}
-            >
-              Usa valore base
-            </button>
+            <div style={boxStyle}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                {r.consumiTot > 0
+                  ? `${r.consumiTot.toLocaleString("it-IT", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })} kWh`
+                  : "-"}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 12 }}>
@@ -1251,6 +1297,27 @@ function Energia({
 
             {field("DISP+CP.Mrk", s.dispacciamentoCapacityMarket, (v) => set("dispacciamentoCapacityMarket", v), "number")}
           </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ minWidth: 220 }}>
+              {readonlyField("DISP+CP.Mrk Base", numFormat(r.dispCpBase, 6))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => set("dispacciamentoCapacityMarket", String(r.dispCpBase))}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: "#ffffff",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              Usa valore base
+            </button>
+          </div>
         </div>
 
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
@@ -1262,10 +1329,8 @@ function Energia({
           </div>
           <div style={{ height: 12 }} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
-  {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
-  {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
-</div>
+            {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
+            {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
           </div>
           <div style={{ height: 12 }} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
@@ -1291,7 +1356,7 @@ function Energia({
         {previewBox(
           <>
             {row("Pun+Spread", money(r.H22_base))}
-{row("Perdite di rete", money(r.perditeEnergia))}
+            {row("Perdite di rete", money(r.perditeEnergia))}
             {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
             {row("Reattiva", money(r.H24))}
           </>
@@ -1323,14 +1388,15 @@ function Energia({
           </>
         )}
 
-{(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
-  previewBox(
-    <>
-      {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
-      {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
-      {r.H40 !== 0 && row("Canone RAI", money(r.H40))}
-    </>
-  )}
+        {(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
+          previewBox(
+            <>
+              {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
+              {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
+              {r.H40 !== 0 && row("Canone RAI", money(r.H40))}
+            </>
+          )}
+
         {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
 
         {isSi(s.confrontoFlag) &&
@@ -1432,6 +1498,15 @@ function Gas({
       : s.fatturazione === "TRIMESTRALE"
       ? 4
       : 3);
+
+  const boxStyle: React.CSSProperties = {
+    border: "1px solid #cbd5e1",
+    borderRadius: 10,
+    padding: "8px 12px",
+    background: "#f8fafc",
+    minWidth: 170,
+    textAlign: "right",
+  };
 
   const printGasPdf = () => {
     const periodo = [s.periodo1, s.periodo2, s.periodo3, s.periodo4].filter(Boolean).join(" / ") || "-";
@@ -1635,28 +1710,41 @@ function Gas({
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
+              display: "grid",
+              gridTemplateColumns: "1fr auto auto auto",
               alignItems: "center",
               gap: 12,
               marginBottom: 12,
             }}
           >
             <h3 style={{ margin: 0 }}>Mesi e consumi</h3>
-            <div
-              style={{
-                border: "1px solid #cbd5e1",
-                borderRadius: 10,
-                padding: "8px 12px",
-                background: "#f8fafc",
-                minWidth: 170,
-                textAlign: "right",
-              }}
-            >
+
+            <div style={boxStyle}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                {r.consumoTotale > 0
+                  ? `${(r.H37 / r.consumoTotale).toFixed(4).replace(".", ",")} €/Smc`
+                  : "-"}
+              </div>
+            </div>
+
+            <div style={boxStyle}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>
                 {r.consumoTotale > 0
                   ? `${consumoAnnuoGas.toLocaleString("it-IT", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })} Smc`
+                  : "-"}
+              </div>
+            </div>
+
+            <div style={boxStyle}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                {r.consumoTotale > 0
+                  ? `${r.consumoTotale.toLocaleString("it-IT", {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 2,
                     })} Smc`
@@ -1680,7 +1768,7 @@ function Gas({
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
           <h3 style={{ marginTop: 0 }}>Rete e corrispettivi</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
-            {field("Quota variabile rete", s.quotaVariabileAggiuntiva, (v) => set("quotaVariabileAggiuntiva", v), "number")}
+            {field("Quota consumi rete", s.quotaVariabileAggiuntiva, (v) => set("quotaVariabileAggiuntiva", v), "number")}
             {field("Quota fissa rete", s.quotaFissaAggiuntiva, (v) => set("quotaFissaAggiuntiva", v), "number")}
           </div>
         </div>
@@ -2036,6 +2124,997 @@ function Listini({
   );
 }
 
+function AgentsAdmin() {
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [nome, setNome] = useState("");
+  const [cognome, setCognome] = useState("");
+
+  const loadAgents = async () => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("agents")
+      .select("*")
+      .order("nome", { ascending: true });
+
+    if (!error && data) {
+      setAgents(data as Agent[]);
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadAgents();
+  }, []);
+
+  const saveAgent = async () => {
+    if (!nome || !cognome) {
+      alert("Inserisci nome e cognome");
+      return;
+    }
+
+    const username = nome.toLowerCase().trim();
+const password = cognome.toLowerCase().trim();
+
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("agents")
+      .insert([
+        {
+          nome,
+          cognome,
+          username,
+          password,
+        },
+      ]);
+
+    setSaving(false);
+
+    if (error) {
+      console.error("SAVE AGENT ERROR:", error);
+      alert("Errore salvataggio agente: " + (error.message || JSON.stringify(error)));
+      return;
+    }
+
+    alert("Agente salvato");
+
+    setNome("");
+    setCognome("");
+
+    await loadAgents();
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Agent (admin)</h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              Nome
+            </div>
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              style={{
+                width: "100%",
+                padding: 8,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              Cognome
+            </div>
+            <input
+              value={cognome}
+              onChange={(e) => setCognome(e.target.value)}
+              style={{
+                width: "100%",
+                padding: 8,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+
+        <div style={{ height: 12 }} />
+
+        <button
+          type="button"
+          onClick={saveAgent}
+          disabled={saving}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "none",
+            background: "#0f172a",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          {saving ? "Salvataggio..." : "Salva agente"}
+        </button>
+      </div>
+
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Elenco agenti</h2>
+
+        {loading ? (
+          <div>Caricamento...</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["Nome", "Cognome", "Username", "Password"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: "left",
+                        padding: 8,
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {agents.map((a, i) => (
+                  <tr key={a.id || i}>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    {a.nome?.toUpperCase()}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    {a.cognome?.toUpperCase()}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {a.username}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {a.password}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReportAgent() {
+  const [agentSession, setAgentSession] = useState<any>(null);
+  const [agentUsername, setAgentUsername] = useState("");
+  const [agentPassword, setAgentPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [reports, setReports] = useState<any[]>([]);
+  const [form, setForm] = useState<any>({
+    report_date: "",
+    agent_id: 0,
+    contracts_energia: "",
+    consumi_energia: "",
+    contracts_gas: "",
+    consumi_gas: "",
+    notes: "",
+  });
+
+  const loadReportsByAgent = async (agentId: number) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("reports")
+      .select("*")
+      .eq("agent_id", agentId)
+      .order("report_date", { ascending: false });
+
+    if (!error && data) setReports(data);
+    setLoading(false);
+  };
+
+  const loginAgent = async () => {
+    const username = agentUsername.trim().toLowerCase();
+    const password = agentPassword.trim().toLowerCase();
+
+    if (!username || !password) {
+      setLoginError("Inserisci username e password");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("agents")
+      .select("*")
+      .eq("username", username)
+      .eq("password", password)
+      .maybeSingle();
+
+    if (error || !data) {
+      setLoginError("Credenziali non valide");
+      return;
+    }
+
+    if (data.username === "admin") {
+      setLoginError("Usa Report Admin per questo accesso");
+      return;
+    }
+
+    setAgentSession(data);
+    setLoginError("");
+    setForm((prev: any) => ({ ...prev, agent_id: data.id || 0 }));
+    await loadReportsByAgent(data.id || 0);
+  };
+
+  const saveReport = async () => {
+    if (!agentSession) {
+      alert("Non autenticato");
+      return;
+    }
+  
+    if (!form.report_date) {
+      alert("Seleziona la data report");
+      return;
+    }
+  
+    setSaving(true);
+  
+    const payload = {
+      report_date: form.report_date,
+      agent_id: agentSession.id,
+      contracts_energia: Number(form.contracts_energia || 0),
+      consumi_energia: Number(form.consumi_energia || 0),
+      contracts_gas: Number(form.contracts_gas || 0),
+      consumi_gas: Number(form.consumi_gas || 0),
+      notes: form.notes || "",
+    };
+  
+    const { error } = await supabase
+      .from("reports")
+      .upsert(payload, { onConflict: "agent_id,report_date" });
+  
+    setSaving(false);
+  
+    if (error) {
+      alert("Errore salvataggio report: " + error.message);
+      return;
+    }
+  
+    alert("Report salvato");
+    await loadReportsByAgent(agentSession.id || 0);
+  };
+  
+  const deleteReport = async (reportId: number) => {
+    if (!agentSession) return;
+  
+    const ok = window.confirm("Vuoi davvero cancellare questo report?");
+    if (!ok) return;
+  
+    const { error } = await supabase
+      .from("reports")
+      .delete()
+      .eq("id", reportId)
+      .eq("agent_id", agentSession.id);
+  
+    if (error) {
+      alert("Errore cancellazione report: " + error.message);
+      return;
+    }
+  
+    alert("Report cancellato");
+    await loadReportsByAgent(agentSession.id || 0);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Report</h2>
+
+        {!agentSession ? (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+                gap: 12,
+                maxWidth: 500,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Username
+                </div>
+                <input
+                  value={agentUsername}
+                  onChange={(e) => setAgentUsername(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Password
+                </div>
+                <input
+                  type="password"
+                  value={agentPassword}
+                  onChange={(e) => setAgentPassword(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ height: 12 }} />
+
+            {loginError && (
+              <div style={{ color: "#dc2626", marginBottom: 12 }}>
+                {loginError}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={loginAgent}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: "none",
+                background: "#0f172a",
+                color: "white",
+                cursor: "pointer",
+              }}
+            >
+              Entra
+            </button>
+          </>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <strong>Agente:</strong> {agentSession.nome} {agentSession.cognome}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Data report
+                </div>
+                <input
+                  type="date"
+                  value={form.report_date}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({ ...prev, report_date: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Contratti energia
+                </div>
+                <input
+                  type="number"
+                  value={form.contracts_energia}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      contracts_energia: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Consumi energia
+                </div>
+                <input
+                  type="number"
+                  value={form.consumi_energia}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      consumi_energia: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Contratti gas
+                </div>
+                <input
+                  type="number"
+                  value={form.contracts_gas}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      contracts_gas: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Consumi gas
+                </div>
+                <input
+                  type="number"
+                  value={form.consumi_gas}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      consumi_gas: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Note
+                </div>
+                <input
+                  type="text"
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({ ...prev, notes: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 8,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={saveReport}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#0f172a",
+                  color: "white",
+                  cursor: "pointer",
+                }}
+              >
+                {saving ? "Salvataggio..." : "Salva report"}
+              </button>
+
+              <button
+                onClick={() => {
+                  setAgentSession(null);
+                  setAgentUsername("");
+                  setAgentPassword("");
+                  setLoginError("");
+                  setReports([]);
+                  setForm({
+                    report_date: "",
+                    agent_id: 0,
+                    contracts_energia: "",
+                    consumi_energia: "",
+                    contracts_gas: "",
+                    consumi_gas: "",
+                    notes: "",
+                  });
+                }}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Esci
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {agentSession && (
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: 16,
+          }}
+        >
+          <h2 style={{ marginTop: 0 }}>I miei report</h2>
+
+          {loading ? (
+            <div>Caricamento...</div>
+          ) : reports.length === 0 ? (
+            <div>Nessun report</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                  {[
+  "Data",
+  "Contratti energia",
+  "Consumi energia",
+  "Contratti gas",
+  "Consumi gas",
+  "Note",
+  "Azioni",
+].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: "left",
+                          padding: 8,
+                          borderBottom: "1px solid #e2e8f0",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+  {reports.map((r, i) => (
+    <tr key={r.id || i}>
+      <td style={{ padding: 8 }}>{r.report_date}</td>
+      <td style={{ padding: 8 }}>{r.contracts_energia}</td>
+      <td style={{ padding: 8 }}>{r.consumi_energia}</td>
+      <td style={{ padding: 8 }}>{r.contracts_gas}</td>
+      <td style={{ padding: 8 }}>{r.consumi_gas}</td>
+      <td style={{ padding: 8 }}>{r.notes}</td>
+
+{/* 👇 QUESTO È IL CESTINO */}
+<td style={{ padding: 8 }}>
+  <button
+    onClick={() => deleteReport(r.id)}
+    style={{
+      padding: "6px 10px",
+      borderRadius: 8,
+      border: "1px solid #dc2626",
+      background: "white",
+      color: "#dc2626",
+      cursor: "pointer",
+      fontWeight: 700,
+    }}
+  >
+    🗑
+  </button>
+</td>
+    </tr>
+  ))}
+</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportAdmin() {
+  const [agents, setAgents] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"ALL" | "PERIODO">("ALL");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const loadAgents = async () => {
+    const { data } = await supabase
+      .from("agents")
+      .select("*")
+      .neq("username", "admin")
+      .order("nome", { ascending: true });
+
+    setAgents(data || []);
+  };
+
+  const loadReports = async (agentId?: number | null) => {
+    setLoading(true);
+
+    let query = supabase.from("reports").select("*").order("report_date", { ascending: false });
+
+    if (agentId) {
+      query = query.eq("agent_id", agentId);
+    }
+
+    const { data } = await query;
+    setReports(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadAgents();
+    loadReports(null);
+  }, []);
+  const deleteReportAdmin = async (reportId: number) => {
+    const ok = window.confirm("Vuoi davvero cancellare questo report?");
+    if (!ok) return;
+  
+    const { error } = await supabase
+      .from("reports")
+      .delete()
+      .eq("id", reportId);
+  
+    if (error) {
+      alert("Errore cancellazione report: " + error.message);
+      return;
+    }
+  
+    alert("Report cancellato");
+    await loadReports(selectedAgentId);
+  };
+  const filteredReports =
+  mode === "ALL"
+    ? reports
+    : reports.filter((r) => {
+        if (!r.report_date) return false;
+
+        const d = r.report_date;
+
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+
+        return true;
+      });
+      const totals = filteredReports.reduce(
+    (acc, r) => {
+      acc.contracts_energia += Number(r.contracts_energia || 0);
+      acc.consumi_energia += Number(r.consumi_energia || 0);
+      acc.contracts_gas += Number(r.contracts_gas || 0);
+      acc.consumi_gas += Number(r.consumi_gas || 0);
+      return acc;
+    },
+    {
+      contracts_energia: 0,
+      consumi_energia: 0,
+      contracts_gas: 0,
+      consumi_gas: 0,
+    }
+  );
+
+  const getAgentName = (agentId: number) => {
+    const agent = agents.find((a) => a.id === agentId);
+    return agent
+      ? `${agent.nome} ${agent.cognome}`.toUpperCase()
+      : `ID ${agentId}`;
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Report Admin</h2>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={async () => {
+              setSelectedAgentId(null);
+              await loadReports(null);
+            }}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: selectedAgentId === null ? "#0f172a" : "white",
+              color: selectedAgentId === null ? "white" : "#0f172a",
+              cursor: "pointer",
+            }}
+          >
+            Tutti
+          </button>
+
+          {agents.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={async () => {
+                setSelectedAgentId(a.id);
+                await loadReports(a.id);
+              }}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: selectedAgentId === a.id ? "#0f172a" : "white",
+                color: selectedAgentId === a.id ? "white" : "#0f172a",
+                cursor: "pointer",
+              }}
+            >
+              {(a.nome + " " + a.cognome).toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+    flexWrap: "wrap",
+    gap: 12,
+  }}
+>
+  {/* SINISTRA */}
+  <div>
+    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+      Modalità
+    </div>
+    <select
+      value={mode}
+      onChange={(e) => setMode(e.target.value as any)}
+      style={{
+        padding: 8,
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+      }}
+    >
+      <option value="ALL">TOTALE</option>
+      <option value="PERIODO">PERIODO SCELTO</option>
+    </select>
+  </div>
+
+  {/* DESTRA */}
+  {mode === "PERIODO" && (
+    <div style={{ display: "flex", gap: 8 }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+          Da
+        </div>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          style={{
+            padding: 8,
+            borderRadius: 8,
+            border: "1px solid #cbd5e1",
+          }}
+        />
+      </div>
+
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+          A
+        </div>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          style={{
+            padding: 8,
+            borderRadius: 8,
+            border: "1px solid #cbd5e1",
+          }}
+        />
+      </div>
+    </div>
+  )}
+</div>
+        <h3 style={{ marginTop: 0 }}>Riepilogo totali</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
+          {previewBox(<>{row("Contratti energia", String(totals.contracts_energia), true)}</>)}
+          {previewBox(<>{row("Consumi energia", numFormat(totals.consumi_energia, 2), true)}</>)}
+          {previewBox(<>{row("Contratti gas", String(totals.contracts_gas), true)}</>)}
+          {previewBox(<>{row("Consumi gas", numFormat(totals.consumi_gas, 2), true)}</>)}
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h3 style={{ marginTop: 0 }}>Storico report</h3>
+
+        {loading ? (
+          <div>Caricamento...</div>
+        ) : reports.length === 0 ? (
+          <div>Nessun report</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {[
+                    "Agente",
+                    "Data",
+                    "Contratti energia",
+                    "Consumi energia",
+                    "Contratti gas",
+                    "Consumi gas",
+                    "Note",
+                    "Azioni",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: "left",
+                        padding: 8,
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+              {filteredReports.map((r, i) => (
+                  <tr key={r.id || i}>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    {getAgentName(r.agent_id)?.toUpperCase()}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {r.report_date}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {r.contracts_energia}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {numFormat(r.consumi_energia, 2)}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {r.contracts_gas}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {numFormat(r.consumi_gas, 2)}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      {r.notes}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+  <button
+    type="button"
+    onClick={() => deleteReportAdmin(r.id)}
+    style={{
+      padding: "6px 10px",
+      borderRadius: 8,
+      border: "1px solid #dc2626",
+      background: "white",
+      color: "#dc2626",
+      cursor: "pointer",
+      fontWeight: 700,
+    }}
+    title="Cancella report"
+  >
+    🗑
+  </button>
+</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState("energia");
   const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
@@ -2050,6 +3129,10 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+
+  const adminTabs = ["reportAdmin", "listini", "agents"];
+  const isAdminTab = adminTabs.includes(tab);
+  const isAdminLogged = !!session;
 
   useEffect(() => {
     const loadSession = async () => {
@@ -2092,7 +3175,38 @@ export default function App() {
         );
 
         if (Array.isArray(map.monthlyRows) && map.monthlyRows.length > 0) {
-          setMonthlyRows(map.monthlyRows);
+          const loadedMonthlyRows = [...map.monthlyRows];
+        
+          const hasFissoDomestico = loadedMonthlyRows.some((r: any) => r.mese === "FISSO DOMESTICO");
+          const hasFissoBusiness = loadedMonthlyRows.some((r: any) => r.mese === "FISSO BUSINESS");
+        
+          const oldFisso = loadedMonthlyRows.find((r: any) => r.mese === "FISSO");
+        
+          let finalMonthlyRows = loadedMonthlyRows.filter((r: any) => r.mese !== "FISSO");
+        
+          if (!hasFissoDomestico) {
+            finalMonthlyRows.push({
+              mese: "FISSO DOMESTICO",
+              mono: oldFisso?.mono ?? 0,
+              f1: oldFisso?.f1 ?? 0,
+              f2: oldFisso?.f2 ?? 0,
+              f3: oldFisso?.f3 ?? 0,
+              psv: oldFisso?.psv ?? 0,
+            });
+          }
+        
+          if (!hasFissoBusiness) {
+            finalMonthlyRows.push({
+              mese: "FISSO BUSINESS",
+              mono: oldFisso?.mono ?? 0,
+              f1: oldFisso?.f1 ?? 0,
+              f2: oldFisso?.f2 ?? 0,
+              f3: oldFisso?.f3 ?? 0,
+              psv: oldFisso?.psv ?? 0,
+            });
+          }
+        
+          setMonthlyRows(finalMonthlyRows);
         }
 
         if (Array.isArray(map.dispCpRows) && map.dispCpRows.length > 0) {
@@ -2145,81 +3259,137 @@ export default function App() {
     alert("Listini salvati online");
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20, fontFamily: "Arial, sans-serif" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        <h1 style={{ marginTop: 0 }}>Simulatore Bollette</h1>
-        <p style={{ color: "#475569" }}>Versione con Energia, Gas e Listini modificabili.</p>
+  const renderAdminContent = () => {
+    if (!isAdminLogged) {
+      return (
+        <LoginView
+          title="Accesso Admin"
+          onLogin={() => {
+            if (!adminTabs.includes(tab)) {
+              setTab("reportAdmin");
+            }
+          }}
+        />
+      );
+    }
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <button
-            onClick={() => setTab("energia")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: tab === "energia" ? "#0f172a" : "white",
-              color: tab === "energia" ? "white" : "#0f172a",
-            }}
-          >
-            Energia
-          </button>
-          <button
-            onClick={() => setTab("gas")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: tab === "gas" ? "#0f172a" : "white",
-              color: tab === "gas" ? "white" : "#0f172a",
-            }}
-          >
-            Gas
-          </button>
-          <button
-            onClick={() => setTab("listini")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: tab === "listini" ? "#0f172a" : "white",
-              color: tab === "listini" ? "white" : "#0f172a",
-            }}
-          >
-            Listini
-          </button>
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <strong>Area Admin</strong>
+            <div style={{ fontSize: 13, color: "#475569" }}>
+              Da qui puoi gestire Report Admin, Listini e Agent admin con un unico accesso.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => setTab("reportAdmin")}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: tab === "reportAdmin" ? "#0f172a" : "white",
+                color: tab === "reportAdmin" ? "white" : "#0f172a",
+                cursor: "pointer",
+              }}
+            >
+              Report Admin
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTab("listini")}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: tab === "listini" ? "#0f172a" : "white",
+                color: tab === "listini" ? "white" : "#0f172a",
+                cursor: "pointer",
+              }}
+            >
+              Listini
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTab("agents")}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: tab === "agents" ? "#0f172a" : "white",
+                color: tab === "agents" ? "white" : "#0f172a",
+                cursor: "pointer",
+              }}
+            >
+              Agent Admin
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                setTab("energia");
+              }}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: "white",
+                cursor: "pointer",
+              }}
+            >
+              Esci
+            </button>
+          </div>
         </div>
 
-        {tab === "energia" ? (
-          <Energia monthlyRows={monthlyRows} energyOffers={energyOffers} dispCpRows={dispCpRows} />
-        ) : tab === "gas" ? (
-          <Gas monthlyRows={monthlyRows} gasOffers={gasOffers} gasAcciseSettings={gasAcciseSettings} />
-        ) : !session ? (
-          <LoginView onLogin={() => setTab("listini")} />
-        ) : loadingSettings ? (
-          <div style={{ padding: 20 }}>Caricamento listini...</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {tab === "reportAdmin" && <ReportAdmin />}
+
+        {tab === "agents" && <AgentsAdmin />}
+
+        {tab === "listini" &&
+          (loadingSettings ? (
             <div
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 12,
+                padding: 20,
                 background: "white",
                 border: "1px solid #e2e8f0",
                 borderRadius: 12,
-                padding: 16,
               }}
             >
-              <div>
-                <strong>Area Listini protetta</strong>
-                <div style={{ fontSize: 13, color: "#475569" }}>
-                  Le modifiche vengono salvate online e restano disponibili su tutti i dispositivi.
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 8 }}>
+              Caricamento listini...
+            </div>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  gap: 12,
+                  background: "white",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  padding: 16,
+                }}
+              >
                 <button
                   type="button"
                   onClick={saveSettings}
@@ -2235,39 +3405,98 @@ export default function App() {
                 >
                   {savingSettings ? "Salvataggio..." : "Salva listini online"}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    setTab("energia");
-                  }}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 8,
-                    border: "1px solid #cbd5e1",
-                    background: "white",
-                    cursor: "pointer",
-                  }}
-                >
-                  Esci
-                </button>
               </div>
-            </div>
 
-            <Listini
-              monthlyRows={monthlyRows}
-              setMonthlyRows={setMonthlyRows}
-              dispCpRows={dispCpRows}
-              setDispCpRows={setDispCpRows}
-              energyOffers={energyOffers}
-              setEnergyOffers={setEnergyOffers}
-              gasOffers={gasOffers}
-              setGasOffers={setGasOffers}
-              gasAcciseSettings={gasAcciseSettings}
-              setGasAcciseSettings={setGasAcciseSettings}
-            />
-          </div>
+              <Listini
+                monthlyRows={monthlyRows}
+                setMonthlyRows={setMonthlyRows}
+                dispCpRows={dispCpRows}
+                setDispCpRows={setDispCpRows}
+                energyOffers={energyOffers}
+                setEnergyOffers={setEnergyOffers}
+                gasOffers={gasOffers}
+                setGasOffers={setGasOffers}
+                gasAcciseSettings={gasAcciseSettings}
+                setGasAcciseSettings={setGasAcciseSettings}
+              />
+            </>
+          ))}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20, fontFamily: "Arial, sans-serif" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <h1 style={{ marginTop: 0 }}>Simulatore Bollette</h1>
+        <p style={{ color: "#475569" }}>Versione con Energia, Gas e Listini modificabili.</p>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setTab("energia")}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: tab === "energia" ? "#0f172a" : "white",
+              color: tab === "energia" ? "white" : "#0f172a",
+              cursor: "pointer",
+            }}
+          >
+            Energia
+          </button>
+
+          <button
+            onClick={() => setTab("gas")}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: tab === "gas" ? "#0f172a" : "white",
+              color: tab === "gas" ? "white" : "#0f172a",
+              cursor: "pointer",
+            }}
+          >
+            Gas
+          </button>
+
+          <button
+            onClick={() => setTab("report")}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: tab === "report" ? "#0f172a" : "white",
+              color: tab === "report" ? "white" : "#0f172a",
+              cursor: "pointer",
+            }}
+          >
+            Report
+          </button>
+
+          <button
+            onClick={() => setTab("reportAdmin")}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: isAdminTab ? "#0f172a" : "white",
+              color: isAdminTab ? "white" : "#0f172a",
+              cursor: "pointer",
+            }}
+          >
+            Area Admin
+          </button>
+        </div>
+
+        {tab === "energia" ? (
+          <Energia monthlyRows={monthlyRows} energyOffers={energyOffers} dispCpRows={dispCpRows} />
+        ) : tab === "gas" ? (
+          <Gas monthlyRows={monthlyRows} gasOffers={gasOffers} gasAcciseSettings={gasAcciseSettings} />
+        ) : tab === "report" ? (
+          <ReportAgent />
+        ) : (
+          renderAdminContent()
         )}
       </div>
     </div>
