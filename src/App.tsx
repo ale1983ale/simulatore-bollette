@@ -1364,14 +1364,15 @@ function Energia({
           </>
         )}
 
-        {previewBox(
-          <>
-            {row("Vendita energia", money(r.H22), true, 16)}
-            {row("Quota consumi rete", money(r.H25))}
-            {row("Quota consumi totale", money(r.H22 + r.H25))}
-          </>,
-          "#fed7aa"
-        )}
+{previewBox(
+  <>
+    {row("Vendita energia", money(r.H22), true, 16)}
+    {row("Quota consumi rete", money(r.H25))}
+    {row("Reattiva", money(r.H24))}
+    {row("Quota consumi totale", money(r.H22 + r.H25 + r.H24))}
+  </>,
+  "#fed7aa"
+)}
 
         {previewBox(
           <>
