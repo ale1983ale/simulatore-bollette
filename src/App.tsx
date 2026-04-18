@@ -42,6 +42,14 @@ type Agent = {
   cognome: string;
   username: string;
   password: string;
+  owner_auth_id?: string;
+};
+
+type AdminProfile = {
+  id?: number;
+  auth_id: string;
+  email?: string;
+  role: "super_admin" | "admin";
 };
 
 const INITIAL_MONTHLY: MonthlyRow[] = [
@@ -783,36 +791,98 @@ function calcGas(d: any, monthlyRows: MonthlyRow[], gasOffers: GasOffer[]) {
 }
 
 function LoginView({
-  onLogin,
   title = "Accesso Admin",
 }: {
-  onLogin: () => void;
   title?: string;
 }) {
+  const [mode, setMode] = useState<"login" | "activate">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const normalizedEmail = email.trim().toLowerCase();
 
   const handleLogin = async () => {
     setLoading(true);
     setErrorMsg("");
+    setSuccessMsg("");
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
       if (error) {
-        setErrorMsg(error.message);
+        setErrorMsg(error.message || "Errore login");
         setLoading(false);
         return;
       }
 
-      onLogin();
+      setSuccessMsg("Accesso eseguito.");
     } catch (err: any) {
       setErrorMsg(err?.message || "Errore login");
+    }
+
+    setLoading(false);
+  };
+
+  const handleActivateAdmin = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      if (!normalizedEmail || !password) {
+        setErrorMsg("Inserisci email e password");
+        setLoading(false);
+        return;
+      }
+
+      const { data: preAuthAdmin, error: adminCheckError } = await supabase
+        .from("admin_users")
+        .select("id, email, auth_id, role")
+        .eq("email", normalizedEmail)
+        .maybeSingle();
+
+      if (adminCheckError) {
+        setErrorMsg(adminCheckError.message || "Errore controllo admin");
+        setLoading(false);
+        return;
+      }
+
+      if (!preAuthAdmin) {
+        setErrorMsg("Questa email non è abilitata come admin.");
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (error) {
+        setErrorMsg(error.message || "Errore attivazione accesso");
+        setLoading(false);
+        return;
+      }
+
+      if (data?.user?.id && !preAuthAdmin.auth_id) {
+        await supabase
+          .from("admin_users")
+          .update({ auth_id: data.user.id })
+          .eq("id", preAuthAdmin.id);
+      }
+
+      setSuccessMsg(
+        "Accesso admin creato. Se richiesto da Supabase, conferma la mail e poi accedi."
+      );
+      setMode("login");
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Errore attivazione accesso");
     }
 
     setLoading(false);
@@ -821,7 +891,7 @@ function LoginView({
   return (
     <div
       style={{
-        maxWidth: 420,
+        maxWidth: 460,
         margin: "40px auto",
         background: "white",
         border: "1px solid #e2e8f0",
@@ -830,6 +900,46 @@ function LoginView({
       }}
     >
       <h2 style={{ marginTop: 0 }}>{title}</h2>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button
+          type="button"
+          onClick={() => {
+            setMode("login");
+            setErrorMsg("");
+            setSuccessMsg("");
+          }}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "1px solid #cbd5e1",
+            background: mode === "login" ? "#0f172a" : "white",
+            color: mode === "login" ? "white" : "#0f172a",
+            cursor: "pointer",
+          }}
+        >
+          Login admin
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMode("activate");
+            setErrorMsg("");
+            setSuccessMsg("");
+          }}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "1px solid #cbd5e1",
+            background: mode === "activate" ? "#0f172a" : "white",
+            color: mode === "activate" ? "white" : "#0f172a",
+            cursor: "pointer",
+          }}
+        >
+          Attiva accesso admin
+        </button>
+      </div>
 
       <div style={{ display: "grid", gap: 12 }}>
         <div>
@@ -865,10 +975,11 @@ function LoginView({
         </div>
 
         {errorMsg && <div style={{ color: "#dc2626", fontSize: 13 }}>{errorMsg}</div>}
+        {successMsg && <div style={{ color: "#16a34a", fontSize: 13 }}>{successMsg}</div>}
 
         <button
           type="button"
-          onClick={handleLogin}
+          onClick={mode === "login" ? handleLogin : handleActivateAdmin}
           disabled={loading}
           style={{
             padding: "10px 14px",
@@ -879,7 +990,13 @@ function LoginView({
             cursor: "pointer",
           }}
         >
-          {loading ? "Accesso..." : "Entra"}
+          {loading
+            ? mode === "login"
+              ? "Accesso..."
+              : "Attivazione..."
+            : mode === "login"
+            ? "Entra"
+            : "Crea accesso admin"}
         </button>
       </div>
     </div>
@@ -935,6 +1052,78 @@ function Energia({
     canoneRaiGiaPagato: "0",
   });
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [openSections, setOpenSections] = useState({
+    dati: true,
+    mesi: true,
+    rete: !window.innerWidth || window.innerWidth >= 768,
+    anteprima: true,
+  });
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+
+      if (!mobile) {
+        setOpenSections({
+          dati: true,
+          mesi: true,
+          rete: true,
+          anteprima: true,
+        });
+      }
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const toggleSection = (key: "dati" | "mesi" | "rete" | "anteprima") => {
+    if (!isMobile) return;
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const sectionCard = (
+    key: "dati" | "mesi" | "rete" | "anteprima",
+    title: string,
+    children: React.ReactNode
+  ) => (
+    <div
+      style={{
+        background: "white",
+        border: "1px solid #e2e8f0",
+        borderRadius: 12,
+        padding: isMobile ? 14 : 16,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => toggleSection(key)}
+        style={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          marginBottom: !isMobile || openSections[key] ? 12 : 0,
+          cursor: isMobile ? "pointer" : "default",
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: isMobile ? 18 : 20 }}>{title}</h3>
+        {isMobile && (
+          <span style={{ fontSize: 18, color: "#475569", fontWeight: 700 }}>
+            {openSections[key] ? "−" : "+"}
+          </span>
+        )}
+      </button>
+
+      {(!isMobile || openSections[key]) && children}
+    </div>
+  );
+
   const r = useMemo(
     () => calcEnergia(s, monthlyRows, energyOffers, dispCpRows),
     [s, monthlyRows, energyOffers, dispCpRows]
@@ -956,7 +1145,9 @@ function Energia({
       if (k === "tipo") {
         if (["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(v)) {
           newState.iva = "10";
-        } else if (["BTA1", "BTA2", "BTA3", "BTA4", "BTA5", "BTA6", "MTA1", "MTA2", "MTA3"].includes(v)) {
+        } else if (
+          ["BTA1", "BTA2", "BTA3", "BTA4", "BTA5", "BTA6", "MTA1", "MTA2", "MTA3"].includes(v)
+        ) {
           newState.iva = "22";
         }
       }
@@ -967,17 +1158,18 @@ function Energia({
   const consumoAnnuoEnergia =
     r.consumiTot *
     (s.fatturazione === "MENSILE" || s.fatturazione === "MULTI POD MENSILE" ? 12 : 6);
-    const prezzoMedioEnergiaScheda =
-  r.consumiTot > 0
-    ? `${((r.H22 + r.H25 + r.H24) / r.consumiTot).toFixed(6).replace(".", ",")} €/kWh`
-    : "-";
+
+  const prezzoMedioEnergiaScheda =
+    r.consumiTot > 0
+      ? `${((r.H22 + r.H25 + r.H24) / r.consumiTot).toFixed(6).replace(".", ",")} €/kWh`
+      : "-";
 
   const boxStyle: React.CSSProperties = {
     border: "1px solid #cbd5e1",
     borderRadius: 10,
     padding: "8px 12px",
     background: "#f8fafc",
-    minWidth: 170,
+    minWidth: isMobile ? 0 : 170,
     textAlign: "right",
   };
 
@@ -1008,14 +1200,18 @@ function Energia({
       r.H38 !== 0 ? `<tr><td>Ricalcoli/Sconti</td><td style="text-align:right">${money(r.H38)}</td></tr>` : "",
       r.H39 !== 0 ? `<tr><td>Bonus sociale</td><td style="text-align:right">- ${money(r.H39)}</td></tr>` : "",
       r.H40 !== 0 ? `<tr><td>Canone RAI</td><td style="text-align:right">${money(r.H40)}</td></tr>` : "",
-    ].filter(Boolean).join("");
+    ]
+      .filter(Boolean)
+      .join("");
 
     const altrePartiteTot = [r.H38, -r.H39, r.H40].reduce((a, b) => a + b, 0);
 
     const acciseIvaRows = [
       r.H35 !== 0 ? `<tr><td>Accise</td><td style="text-align:right">${money(r.H35)}</td></tr>` : "",
       r.H36 !== 0 ? `<tr><td>IVA</td><td style="text-align:right">${money(r.H36)}</td></tr>` : "",
-    ].filter(Boolean).join("");
+    ]
+      .filter(Boolean)
+      .join("");
 
     const acciseIvaTot = [r.H35, r.H36].reduce((a, b) => a + b, 0);
 
@@ -1197,234 +1393,339 @@ function Energia({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
+        gap: 16,
+        alignItems: "start",
+      }}
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <h2 style={{ marginTop: 0 }}>Energia</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
-            {field("Nome", s.nome, (v) => set("nome", v))}
-            {field("POD", s.pod, (v) => set("pod", v))}
-            {field("IVA %", s.iva, (v) => set("iva", v), "number")}
-            {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
-            {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
-            {selectField("Tipo", s.tipo, (v) => set("tipo", v), energyTypes)}
-            {selectField("Offerta", s.offerta, (v) => set("offerta", v), energyOffers.map((x) => x.nome))}
-            {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
-          </div>
-
-          {s.offerta === "DEDICATA" && (
-            <>
-              <div style={{ height: 12 }} />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12 }}>
-                {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
-                {field("Maggiorazione Capacity Market", s.dedicataCapacityMarket, (v) => set("dedicataCapacityMarket", v), "number")}
-                {field("Quota Fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto auto auto",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 12,
-            }}
-          >
-            <h3 style={{ margin: 0 }}>Mesi e consumi</h3>
-
-            <div style={boxStyle}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>
-  {prezzoMedioEnergiaScheda}
-</div>
-            </div>
-
-            <div style={boxStyle}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>
-                {r.consumiTot > 0
-                  ? `${consumoAnnuoEnergia.toLocaleString("it-IT", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 2,
-                    })} kWh`
-                  : "-"}
-              </div>
-            </div>
-
-            <div style={boxStyle}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>
-                {r.consumiTot > 0
-                  ? `${r.consumiTot.toLocaleString("it-IT", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 2,
-                    })} kWh`
-                  : "-"}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 12 }}>
-            {selectField("Mese 1", s.mese1, (v) => set("mese1", v), monthlyRows.map((m) => m.mese))}
-            {(s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS")
-  ? selectField(
-      "Mese rif. tabella 1",
-      s.meseRifTabella1,
-      (v) => set("meseRifTabella1", v),
-      dispCpRows.map((m) => m.mese)
-    )
-  : <div />}
-            {field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
-            {field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
-            {field("F3 mese 1", s.f3Mese1, (v) => set("f3Mese1", v), "number")}
-            {field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
-
-            {selectField("Mese 2", s.mese2, (v) => set("mese2", v), ["", ...monthlyRows.map((m) => m.mese)])}
-            {(s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS")
-  ? selectField(
-      "Mese rif. tabella 2",
-      s.meseRifTabella2,
-      (v) => set("meseRifTabella2", v),
-      dispCpRows.map((m) => m.mese)
-    )
-  : <div />}
-            {field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
-            {field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
-            {field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
-            {field("Mono mese 2", s.monoMese2, (v) => set("monoMese2", v), "number")}
-
-            {field("DISP+CP.Mrk", s.dispacciamentoCapacityMarket, (v) => set("dispacciamentoCapacityMarket", v), "number")}
-          </div>
-
-          <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ minWidth: 220 }}>
-              {readonlyField("DISP+CP.Mrk Base", numFormat(r.dispCpBase, 6))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => set("dispacciamentoCapacityMarket", String(r.dispCpBase))}
+        {sectionCard(
+          "dati",
+          "Energia",
+          <>
+            <div
               style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: "#ffffff",
-                cursor: "pointer",
-                fontWeight: 700,
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,minmax(0,1fr))",
+                gap: 12,
               }}
             >
-              Usa valore base
-            </button>
-          </div>
-        </div>
+              {field("Nome", s.nome, (v) => set("nome", v))}
+              {field("POD", s.pod, (v) => set("pod", v))}
+              {field("IVA %", s.iva, (v) => set("iva", v), "number")}
+              {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
+              {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
+              {selectField("Tipo", s.tipo, (v) => set("tipo", v), energyTypes)}
+              {selectField("Offerta", s.offerta, (v) => set("offerta", v), energyOffers.map((x) => x.nome))}
+              {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
+            </div>
 
-        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <h3 style={{ marginTop: 0 }}>Rete, oneri, rettifiche</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12 }}>
-            {field("Quota consumi rete", s.quotaConsumiRete, (v) => set("quotaConsumiRete", v), "number")}
-            {field("Quota fissa rete", s.quotaFissaRete, (v) => set("quotaFissaRete", v), "number")}
-            {field("Quota potenza rete", s.quotaPotenzaRete, (v) => set("quotaPotenzaRete", v), "number")}
-          </div>
-          <div style={{ height: 12 }} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
-            {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
-            {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
-          </div>
-          <div style={{ height: 12 }} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
-            {toggleAmount("Confronto Fornitore Precedente", s.confrontoFlag, (v) => set("confrontoFlag", v), s.confrontoValore, (v) => set("confrontoValore", v))}
-            {toggleAmount("Ricalcoli/Sconti", s.ricalcoloFlag, (v) => set("ricalcoloFlag", v), s.ricalcoloValore, (v) => set("ricalcoloValore", v))}
-            {toggleAmount("Bonus sociale", s.bonusFlag, (v) => set("bonusFlag", v), s.bonusValore, (v) => set("bonusValore", v))}
-            {toggleAmount("Accise manuali", s.acciseManualiFlag, (v) => set("acciseManualiFlag", v), s.acciseManualiValore, (v) => set("acciseManualiValore", v))}
-          </div>
-        </div>
+            {s.offerta === "DEDICATA" && (
+              <>
+                <div style={{ height: 12 }} />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                  {field(
+                    "Maggiorazione Capacity Market",
+                    s.dedicataCapacityMarket,
+                    (v) => set("dedicataCapacityMarket", v),
+                    "number"
+                  )}
+                  {field("Quota Fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {sectionCard(
+          "mesi",
+          "Mesi e consumi",
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto auto",
+                alignItems: "stretch",
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ minWidth: 0 }} />
+
+              <div style={boxStyle}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{prezzoMedioEnergiaScheda}</div>
+              </div>
+
+              <div style={boxStyle}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {r.consumiTot > 0
+                    ? `${consumoAnnuoEnergia.toLocaleString("it-IT", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })} kWh`
+                    : "-"}
+                </div>
+              </div>
+
+              <div style={boxStyle}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {r.consumiTot > 0
+                    ? `${r.consumiTot.toLocaleString("it-IT", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })} kWh`
+                    : "-"}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(6,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {selectField("Mese 1", s.mese1, (v) => set("mese1", v), monthlyRows.map((m) => m.mese))}
+              {s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS"
+                ? selectField(
+                    "Mese rif. tabella 1",
+                    s.meseRifTabella1,
+                    (v) => set("meseRifTabella1", v),
+                    dispCpRows.map((m) => m.mese)
+                  )
+                : <div />}
+
+              {field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
+              {field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
+              {field("F3 mese 1", s.f3Mese1, (v) => set("f3Mese1", v), "number")}
+              {field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
+
+              {selectField("Mese 2", s.mese2, (v) => set("mese2", v), ["", ...monthlyRows.map((m) => m.mese)])}
+              {s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS"
+                ? selectField(
+                    "Mese rif. tabella 2",
+                    s.meseRifTabella2,
+                    (v) => set("meseRifTabella2", v),
+                    dispCpRows.map((m) => m.mese)
+                  )
+                : <div />}
+
+              {field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
+              {field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
+              {field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
+              {field("Mono mese 2", s.monoMese2, (v) => set("monoMese2", v), "number")}
+
+              {field(
+                "DISP+CP.Mrk",
+                s.dispacciamentoCapacityMarket,
+                (v) => set("dispacciamentoCapacityMarket", v),
+                "number"
+              )}
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                gap: 12,
+                alignItems: isMobile ? "stretch" : "center",
+                flexWrap: "wrap",
+                flexDirection: isMobile ? "column" : "row",
+              }}
+            >
+              <div style={{ minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined }}>
+                {readonlyField("DISP+CP.Mrk Base", numFormat(r.dispCpBase, 6))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => set("dispacciamentoCapacityMarket", String(r.dispCpBase))}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  width: isMobile ? "100%" : "auto",
+                }}
+              >
+                Usa valore base
+              </button>
+            </div>
+          </>
+        )}
+
+        {sectionCard(
+          "rete",
+          "Rete, oneri, rettifiche",
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {field("Quota consumi rete", s.quotaConsumiRete, (v) => set("quotaConsumiRete", v), "number")}
+              {field("Quota fissa rete", s.quotaFissaRete, (v) => set("quotaFissaRete", v), "number")}
+              {field("Quota potenza rete", s.quotaPotenzaRete, (v) => set("quotaPotenzaRete", v), "number")}
+            </div>
+
+            <div style={{ height: 12 }} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
+              {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
+            </div>
+
+            <div style={{ height: 12 }} />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(4,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {toggleAmount(
+                "Confronto Fornitore Precedente",
+                s.confrontoFlag,
+                (v) => set("confrontoFlag", v),
+                s.confrontoValore,
+                (v) => set("confrontoValore", v)
+              )}
+              {toggleAmount(
+                "Ricalcoli/Sconti",
+                s.ricalcoloFlag,
+                (v) => set("ricalcoloFlag", v),
+                s.ricalcoloValore,
+                (v) => set("ricalcoloValore", v)
+              )}
+              {toggleAmount(
+                "Bonus sociale",
+                s.bonusFlag,
+                (v) => set("bonusFlag", v),
+                s.bonusValore,
+                (v) => set("bonusValore", v)
+              )}
+              {toggleAmount(
+                "Accise manuali",
+                s.acciseManualiFlag,
+                (v) => set("acciseManualiFlag", v),
+                s.acciseManualiValore,
+                (v) => set("acciseManualiValore", v)
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Anteprima Energia</h3>
-
-        {previewBox(
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {sectionCard(
+          "anteprima",
+          "Anteprima Energia",
           <>
-            {row("Spread usato", numFormat(r.spreadEff, 3))}
-            {row("Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
-            {row("Quota fissa usata", money(r.quotaFissaEff))}
+            {previewBox(
+              <>
+                {row("Spread usato", numFormat(r.spreadEff, 3))}
+                {row("Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
+                {row("Quota fissa usata", money(r.quotaFissaEff))}
+              </>
+            )}
+
+            {previewBox(
+              <>
+                {row("Pun+Spread", money(r.H22_base))}
+                {row("Perdite di rete", money(r.perditeEnergia))}
+                {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
+                {row("Reattiva", money(r.H24))}
+              </>
+            )}
+
+            {previewBox(
+              <>
+                {row("Vendita energia", money(r.H22), true, 16)}
+                {row("Quota consumi rete", money(r.H25))}
+                {row("Reattiva", money(r.H24))}
+                {row("Quota consumi totale", money(r.H22 + r.H25 + r.H24))}
+              </>,
+              "#fed7aa"
+            )}
+
+            {previewBox(
+              <>
+                {row("Quota fissa offerta/dedicata", money(r.H28))}
+                {row("Quota fissa rete", money(r.H29))}
+              </>
+            )}
+
+            {previewBox(<>{row("Quota potenza rete", money(r.H30))}</>)}
+
+            {previewBox(
+              <>
+                {row("Accise", money(r.H35))}
+                {row("IVA", money(r.H36))}
+                {row("Totale Imposte", money(r.H37))}
+              </>
+            )}
+
+            {(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
+              previewBox(
+                <>
+                  {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
+                  {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
+                  {r.H40 !== 0 && row("Canone RAI", money(r.H40))}
+                </>
+              )}
+
+            {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
+
+            {isSi(s.confrontoFlag) &&
+              previewBox(
+                <>
+                  {row("Risparmio in fattura", money(r.risparmioFattura))}
+                  {row("Risparmio annuo", money(r.risparmioAnnuo))}
+                </>
+              )}
+
+            <button
+              onClick={printEnergyPdf}
+              style={{
+                marginTop: 14,
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "#0f172a",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              Crea PDF Energia
+            </button>
           </>
         )}
-
-        {previewBox(
-          <>
-            {row("Pun+Spread", money(r.H22_base))}
-            {row("Perdite di rete", money(r.perditeEnergia))}
-            {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
-            {row("Reattiva", money(r.H24))}
-          </>
-        )}
-
-{previewBox(
-  <>
-    {row("Vendita energia", money(r.H22), true, 16)}
-    {row("Quota consumi rete", money(r.H25))}
-    {row("Reattiva", money(r.H24))}
-    {row("Quota consumi totale", money(r.H22 + r.H25 + r.H24))}
-  </>,
-  "#fed7aa"
-)}
-
-        {previewBox(
-          <>
-            {row("Quota fissa offerta/dedicata", money(r.H28))}
-            {row("Quota fissa rete", money(r.H29))}
-          </>
-        )}
-
-        {previewBox(<>{row("Quota potenza rete", money(r.H30))}</>)}
-
-        {previewBox(
-          <>
-            {row("Accise", money(r.H35))}
-            {row("IVA", money(r.H36))}
-            {row("Totale Imposte", money(r.H37))}
-          </>
-        )}
-
-        {(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
-          previewBox(
-            <>
-              {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
-              {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
-              {r.H40 !== 0 && row("Canone RAI", money(r.H40))}
-            </>
-          )}
-
-        {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
-
-        {isSi(s.confrontoFlag) &&
-          previewBox(
-            <>
-              {row("Risparmio in fattura", money(r.risparmioFattura))}
-              {row("Risparmio annuo", money(r.risparmioAnnuo))}
-            </>
-          )}
-
-        <button
-          onClick={printEnergyPdf}
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            borderRadius: 8,
-            background: "#0f172a",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-            width: "100%",
-          }}
-        >
-          Crea PDF Energia
-        </button>
       </div>
     </div>
   );
@@ -1472,10 +1773,83 @@ function Gas({
     ricalcoloValore: "",
   });
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [openSections, setOpenSections] = useState({
+    dati: true,
+    mesi: true,
+    rete: !window.innerWidth || window.innerWidth >= 768,
+    anteprima: true,
+  });
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+
+      if (!mobile) {
+        setOpenSections({
+          dati: true,
+          mesi: true,
+          rete: true,
+          anteprima: true,
+        });
+      }
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const toggleSection = (key: "dati" | "mesi" | "rete" | "anteprima") => {
+    if (!isMobile) return;
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const sectionCard = (
+    key: "dati" | "mesi" | "rete" | "anteprima",
+    title: string,
+    children: React.ReactNode
+  ) => (
+    <div
+      style={{
+        background: "white",
+        border: "1px solid #e2e8f0",
+        borderRadius: 12,
+        padding: isMobile ? 14 : 16,
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => toggleSection(key)}
+        style={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          marginBottom: !isMobile || openSections[key] ? 12 : 0,
+          cursor: isMobile ? "pointer" : "default",
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: isMobile ? 18 : 20 }}>{title}</h3>
+        {isMobile && (
+          <span style={{ fontSize: 18, color: "#475569", fontWeight: 700 }}>
+            {openSections[key] ? "−" : "+"}
+          </span>
+        )}
+      </button>
+
+      {(!isMobile || openSections[key]) && children}
+    </div>
+  );
+
   const r = useMemo(() => calcGas(s, monthlyRows, gasOffers), [s, monthlyRows, gasOffers]);
+
   const gasMonthOptions = monthlyRows
-  .filter((m) => m.mese !== "FISSO DOMESTICO" && m.mese !== "FISSO BUSINESS")
-  .map((m) => m.mese);
+    .filter((m) => m.mese !== "FISSO DOMESTICO" && m.mese !== "FISSO BUSINESS")
+    .map((m) => m.mese);
 
   const set = (k: string, v: string) =>
     setS((prev) => {
@@ -1504,17 +1878,18 @@ function Gas({
       : s.fatturazione === "TRIMESTRALE"
       ? 4
       : 3);
-      const prezzoMedioGasScheda =
-  r.consumoTotale > 0
-    ? `${(r.H24 / r.consumoTotale).toFixed(6).replace(".", ",")} €/Smc`
-    : "-";
+
+  const prezzoMedioGasScheda =
+    r.consumoTotale > 0
+      ? `${(r.H24 / r.consumoTotale).toFixed(6).replace(".", ",")} €/Smc`
+      : "-";
 
   const boxStyle: React.CSSProperties = {
     border: "1px solid #cbd5e1",
     borderRadius: 10,
     padding: "8px 12px",
     background: "#f8fafc",
-    minWidth: 170,
+    minWidth: isMobile ? 0 : 170,
     textAlign: "right",
   };
 
@@ -1533,14 +1908,18 @@ function Gas({
     const altrePartiteRows = [
       r.H35 !== 0 ? `<tr><td>Ricalcoli/Sconti</td><td style="text-align:right">${money(r.H35)}</td></tr>` : "",
       r.H36 !== 0 ? `<tr><td>Bonus sociale</td><td style="text-align:right">- ${money(r.H36)}</td></tr>` : "",
-    ].filter(Boolean).join("");
+    ]
+      .filter(Boolean)
+      .join("");
 
     const altrePartiteTot = [r.H35, -r.H36].reduce((a, b) => a + b, 0);
 
     const acciseIvaRows = [
       r.H32 !== 0 ? `<tr><td>Accise</td><td style="text-align:right">${money(r.H32)}</td></tr>` : "",
       r.H33 !== 0 ? `<tr><td>IVA</td><td style="text-align:right">${money(r.H33)}</td></tr>` : "",
-    ].filter(Boolean).join("");
+    ]
+      .filter(Boolean)
+      .join("");
 
     const acciseIvaTot = [r.H32, r.H33].reduce((a, b) => a + b, 0);
 
@@ -1689,185 +2068,257 @@ function Gas({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
+        gap: 16,
+        alignItems: "start",
+      }}
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <h2 style={{ marginTop: 0 }}>Gas</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
-            {field("Nome", s.nome, (v) => set("nome", v))}
-            {field("PDR", s.pdr, (v) => set("pdr", v))}
-            {selectField("Uso", s.uso, (v) => set("uso", v), ["DOMESTICO", "BUSINESS"])}
-            {field("IVA %", s.iva, (v) => set("iva", v), "number")}
-            {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), gasBilling)}
-            {selectField("Offerta", s.offerta, (v) => set("offerta", v), gasOffers.map((x) => x.nome))}
-            {selectField("Accisa agevolata", s.accisaAgevolata, (v) => set("accisaAgevolata", v), ["NO", "SI"])}
-            {field("Valore accisa", s.accisaValore, (v) => set("accisaValore", v), "number")}
-            {field("Adeguamento parametro", s.adeguamentoParametro, (v) => set("adeguamentoParametro", v), "number")}
-          </div>
-
-          {s.offerta === "DEDICATA" && (
-            <>
-              <div style={{ height: 12 }} />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12 }}>
-                {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
-                {field("Quota variabile", s.dedicataQuotaVariabile, (v) => set("dedicataQuotaVariabile", v), "number")}
-                {field("Quota fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto auto auto",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 12,
-            }}
-          >
-            <h3 style={{ margin: 0 }}>Mesi e consumi</h3>
-
-            <div style={boxStyle}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>
-  {prezzoMedioGasScheda}
-</div>
+        {sectionCard(
+          "dati",
+          "Gas",
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {field("Nome", s.nome, (v) => set("nome", v))}
+              {field("PDR", s.pdr, (v) => set("pdr", v))}
+              {selectField("Uso", s.uso, (v) => set("uso", v), ["DOMESTICO", "BUSINESS"])}
+              {field("IVA %", s.iva, (v) => set("iva", v), "number")}
+              {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), gasBilling)}
+              {selectField("Offerta", s.offerta, (v) => set("offerta", v), gasOffers.map((x) => x.nome))}
+              {selectField("Accisa agevolata", s.accisaAgevolata, (v) => set("accisaAgevolata", v), ["NO", "SI"])}
+              {field("Valore accisa", s.accisaValore, (v) => set("accisaValore", v), "number")}
+              {field("Adeguamento parametro", s.adeguamentoParametro, (v) => set("adeguamentoParametro", v), "number")}
             </div>
 
-            <div style={boxStyle}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>
-                {r.consumoTotale > 0
-                  ? `${consumoAnnuoGas.toLocaleString("it-IT", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 2,
-                    })} Smc`
-                  : "-"}
+            {s.offerta === "DEDICATA" && (
+              <>
+                <div style={{ height: 12 }} />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                  {field("Quota variabile", s.dedicataQuotaVariabile, (v) => set("dedicataQuotaVariabile", v), "number")}
+                  {field("Quota fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {sectionCard(
+          "mesi",
+          "Mesi e consumi",
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto auto",
+                alignItems: "stretch",
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ minWidth: 0 }} />
+
+              <div style={boxStyle}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{prezzoMedioGasScheda}</div>
+              </div>
+
+              <div style={boxStyle}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {r.consumoTotale > 0
+                    ? `${consumoAnnuoGas.toLocaleString("it-IT", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })} Smc`
+                    : "-"}
+                </div>
+              </div>
+
+              <div style={boxStyle}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {r.consumoTotale > 0
+                    ? `${r.consumoTotale.toLocaleString("it-IT", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })} Smc`
+                    : "-"}
+                </div>
               </div>
             </div>
 
-            <div style={boxStyle}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>
-                {r.consumoTotale > 0
-                  ? `${r.consumoTotale.toLocaleString("it-IT", {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 2,
-                    })} Smc`
-                  : "-"}
-              </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {selectField("Mese 1", s.periodo1, (v) => set("periodo1", v), gasMonthOptions)}
+              {selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasMonthOptions])}
+              {selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasMonthOptions])}
+              {selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasMonthOptions])}
+              {field("Consumo 1", s.consumo1, (v) => set("consumo1", v), "number")}
+              {field("Consumo 2", s.consumo2, (v) => set("consumo2", v), "number")}
+              {field("Consumo 3", s.consumo3, (v) => set("consumo3", v), "number")}
+              {field("Consumo 4", s.consumo4, (v) => set("consumo4", v), "number")}
             </div>
-          </div>
+          </>
+        )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
-          {selectField("Mese 1", s.periodo1, (v) => set("periodo1", v), gasMonthOptions)}
-{selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasMonthOptions])}
-{selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasMonthOptions])}
-{selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasMonthOptions])}
-            {field("Consumo 1", s.consumo1, (v) => set("consumo1", v), "number")}
-            {field("Consumo 2", s.consumo2, (v) => set("consumo2", v), "number")}
-            {field("Consumo 3", s.consumo3, (v) => set("consumo3", v), "number")}
-            {field("Consumo 4", s.consumo4, (v) => set("consumo4", v), "number")}
-          </div>
-        </div>
+        {sectionCard(
+          "rete",
+          "Rete e corrispettivi",
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {field("Quota consumi rete", s.quotaVariabileAggiuntiva, (v) => set("quotaVariabileAggiuntiva", v), "number")}
+              {field("Quota fissa rete", s.quotaFissaAggiuntiva, (v) => set("quotaFissaAggiuntiva", v), "number")}
+            </div>
 
-        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <h3 style={{ marginTop: 0 }}>Rete e corrispettivi</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 }}>
-            {field("Quota consumi rete", s.quotaVariabileAggiuntiva, (v) => set("quotaVariabileAggiuntiva", v), "number")}
-            {field("Quota fissa rete", s.quotaFissaAggiuntiva, (v) => set("quotaFissaAggiuntiva", v), "number")}
-          </div>
-        </div>
+            <div style={{ height: 12 }} />
 
-        <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <h3 style={{ marginTop: 0 }}>Rettifiche e imposte</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
-            {toggleAmount("Accise manuali", s.overrideAcciseFlag, (v) => set("overrideAcciseFlag", v), s.overrideAcciseValore, (v) => set("overrideAcciseValore", v))}
-            {toggleAmount("Confronto fornitore precedente", s.confrontoFlag, (v) => set("confrontoFlag", v), s.confrontoValore, (v) => set("confrontoValore", v))}
-            {toggleAmount("Bonus sociale", s.bonusFlag, (v) => set("bonusFlag", v), s.bonusValore, (v) => set("bonusValore", v))}
-            {toggleAmount("Ricalcoli/Sconti", s.ricalcoloFlag, (v) => set("ricalcoloFlag", v), s.ricalcoloValore, (v) => set("ricalcoloValore", v))}
-          </div>
-        </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(4,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {toggleAmount(
+                "Accise manuali",
+                s.overrideAcciseFlag,
+                (v) => set("overrideAcciseFlag", v),
+                s.overrideAcciseValore,
+                (v) => set("overrideAcciseValore", v)
+              )}
+              {toggleAmount(
+                "Confronto fornitore precedente",
+                s.confrontoFlag,
+                (v) => set("confrontoFlag", v),
+                s.confrontoValore,
+                (v) => set("confrontoValore", v)
+              )}
+              {toggleAmount(
+                "Bonus sociale",
+                s.bonusFlag,
+                (v) => set("bonusFlag", v),
+                s.bonusValore,
+                (v) => set("bonusValore", v)
+              )}
+              {toggleAmount(
+                "Ricalcoli/Sconti",
+                s.ricalcoloFlag,
+                (v) => set("ricalcoloFlag", v),
+                s.ricalcoloValore,
+                (v) => set("ricalcoloValore", v)
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Anteprima Gas</h3>
-
-        {previewBox(
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {sectionCard(
+          "anteprima",
+          "Anteprima Gas",
           <>
-            {row("Spread usato", numFormat(r.spreadEff, 2))}
-            {row("Quota variabile usata", numFormat(r.quotaVarEff, 2))}
-            {row("Quota fissa usata", money(r.quotaFissaEff))}
+            {previewBox(
+              <>
+                {row("Spread usato", numFormat(r.spreadEff, 2))}
+                {row("Quota variabile usata", numFormat(r.quotaVarEff, 2))}
+                {row("Quota fissa usata", money(r.quotaFissaEff))}
+              </>
+            )}
+
+            {previewBox(
+              <>
+                {row("PSV+Spread", money(r.X55))}
+                {row("Quota variabile offerta", money(r.X56))}
+              </>
+            )}
+
+            {previewBox(
+              <>
+                {row("Vendita materia + Adeguamento Parametro", money(r.H22), true, 16)}
+                {row("Quota consumi rete", money(r.H23))}
+                {row("Quota consumi totale", money(r.H24))}
+              </>,
+              "#bfdbfe"
+            )}
+
+            {previewBox(
+              <>
+                {row("Quota fissa vendita", money(r.H27))}
+                {row("Quota fissa rete", money(r.H28))}
+                {row("Quota fissa totale", money(r.H29))}
+              </>
+            )}
+
+            {previewBox(
+              <>
+                {row("Accise", money(r.H32))}
+                {row("IVA", money(r.H33))}
+                {row("Totale Imposte", money(r.H34))}
+              </>
+            )}
+
+            {(r.H35 !== 0 || r.H36 !== 0) &&
+              previewBox(
+                <>
+                  {r.H35 !== 0 && row("Ricalcoli/Sconti", money(r.H35))}
+                  {r.H36 !== 0 && row("Bonus sociale", `- ${money(r.H36)}`)}
+                </>
+              )}
+
+            {previewBox(<>{row("Totale preventivo", money(r.H37), true, 16)}</>, "#93c5fd")}
+
+            {isSi(s.confrontoFlag) &&
+              previewBox(
+                <>
+                  {row("Risparmio fattura", money(r.risparmioFattura))}
+                  {row("Risparmio annuo", money(r.risparmioAnnuo))}
+                </>
+              )}
+
+            <button
+              onClick={printGasPdf}
+              style={{
+                marginTop: 14,
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "#0f172a",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              Crea PDF Gas
+            </button>
           </>
         )}
-
-        {previewBox(
-          <>
-            {row("PSV+Spread", money(r.X55))}
-            {row("Quota variabile offerta", money(r.X56))}
-          </>
-        )}
-
-        {previewBox(
-          <>
-            {row("Vendita materia + Adeguamento Parametro", money(r.H22), true, 16)}
-            {row("Quota consumi rete", money(r.H23))}
-            {row("Quota consumi totale", money(r.H24))}
-          </>,
-          "#bfdbfe"
-        )}
-
-        {previewBox(
-          <>
-            {row("Quota fissa vendita", money(r.H27))}
-            {row("Quota fissa rete", money(r.H28))}
-            {row("Quota fissa totale", money(r.H29))}
-          </>
-        )}
-
-        {previewBox(
-          <>
-            {row("Accise", money(r.H32))}
-            {row("IVA", money(r.H33))}
-            {row("Totale Imposte", money(r.H34))}
-          </>
-        )}
-
-        {(r.H35 !== 0 || r.H36 !== 0) &&
-          previewBox(
-            <>
-              {r.H35 !== 0 && row("Ricalcoli/Sconti", money(r.H35))}
-              {r.H36 !== 0 && row("Bonus sociale", `- ${money(r.H36)}`)}
-            </>
-          )}
-
-        {previewBox(<>{row("Totale preventivo", money(r.H37), true, 16)}</>, "#93c5fd")}
-
-        {isSi(s.confrontoFlag) &&
-          previewBox(
-            <>
-              {row("Risparmio fattura", money(r.risparmioFattura))}
-              {row("Risparmio annuo", money(r.risparmioAnnuo))}
-            </>
-          )}
-
-        <button
-          onClick={printGasPdf}
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            borderRadius: 8,
-            background: "#0f172a",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-            width: "100%",
-          }}
-        >
-          Crea PDF Gas
-        </button>
       </div>
     </div>
   );
@@ -2132,7 +2583,11 @@ function Listini({
   );
 }
 
-function AgentsAdmin() {
+function AgentsAdmin(props: {
+  session: any;
+  adminProfile: AdminProfile | null;
+}) {
+  const { session, adminProfile } = props;
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2142,10 +2597,16 @@ function AgentsAdmin() {
   const loadAgents = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("agents")
-      .select("*")
-      .order("nome", { ascending: true });
+    let query = supabase
+  .from("agents")
+  .select("*")
+  .order("nome", { ascending: true });
+
+if (adminProfile?.role !== "super_admin") {
+  query = query.eq("owner_auth_id", session.user.id);
+}
+
+const { data, error } = await query;
 
     if (!error && data) {
       setAgents(data as Agent[]);
@@ -2170,15 +2631,16 @@ const password = cognome.toLowerCase().trim();
     setSaving(true);
 
     const { error } = await supabase
-      .from("agents")
-      .insert([
-        {
-          nome,
-          cognome,
-          username,
-          password,
-        },
-      ]);
+  .from("agents")
+  .insert([
+    {
+      nome,
+      cognome,
+      username,
+      password,
+      owner_auth_id: session.user.id,
+    },
+  ]);
 
     setSaving(false);
 
@@ -2346,16 +2808,23 @@ function ReportAgent() {
 
   const loadReportsByAgent = async (agentId: number) => {
     setLoading(true);
-    const { data, error } = await supabase
+  
+    let query = supabase
       .from("reports")
       .select("*")
       .eq("agent_id", agentId)
       .order("report_date", { ascending: false });
-
+  
+    if (agentSession?.owner_auth_id) {
+      query = query.eq("owner_auth_id", agentSession.owner_auth_id);
+    }
+  
+    const { data, error } = await query;
+  
     if (!error && data) setReports(data);
     setLoading(false);
   };
-
+  
   const loginAgent = async () => {
     const username = agentUsername.trim().toLowerCase();
     const password = agentPassword.trim().toLowerCase();
@@ -2386,6 +2855,7 @@ function ReportAgent() {
     setLoginError("");
     setForm((prev: any) => ({ ...prev, agent_id: data.id || 0 }));
     await loadReportsByAgent(data.id || 0);
+    
   };
 
   const saveReport = async () => {
@@ -2404,6 +2874,7 @@ function ReportAgent() {
     const payload = {
       report_date: form.report_date,
       agent_id: agentSession.id,
+      owner_auth_id: agentSession.owner_auth_id,
       contracts_energia: Number(form.contracts_energia || 0),
       consumi_energia: Number(form.consumi_energia || 0),
       contracts_gas: Number(form.contracts_gas || 0),
@@ -2802,7 +3273,13 @@ function ReportAgent() {
   );
 }
 
-function ReportAdmin() {
+function ReportAdmin({
+  session,
+  adminProfile,
+}: {
+  session: any;
+  adminProfile: AdminProfile | null;
+}) {
   const [agents, setAgents] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
@@ -2811,28 +3288,41 @@ function ReportAdmin() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const loadAgents = async () => {
-    const { data } = await supabase
-      .from("agents")
-      .select("*")
-      .neq("username", "admin")
-      .order("nome", { ascending: true });
+    let query = supabase
+  .from("agents")
+  .select("*")
+  .neq("username", "admin")
+  .order("nome", { ascending: true });
 
-    setAgents(data || []);
+if (adminProfile?.role !== "super_admin") {
+  query = query.eq("owner_auth_id", session.user.id);
+}
+
+const { data } = await query;
+setAgents(data || []);
   };
 
   const loadReports = async (agentId?: number | null) => {
     setLoading(true);
-
-    let query = supabase.from("reports").select("*").order("report_date", { ascending: false });
-
+  
+    let query = supabase
+      .from("reports")
+      .select("*")
+      .order("report_date", { ascending: false });
+  
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_auth_id", session.user.id);
+    }
+  
     if (agentId) {
       query = query.eq("agent_id", agentId);
     }
-
+  
     const { data } = await query;
     setReports(data || []);
     setLoading(false);
   };
+    
 
   useEffect(() => {
     loadAgents();
@@ -2842,10 +3332,13 @@ function ReportAdmin() {
     const ok = window.confirm("Vuoi davvero cancellare questo report?");
     if (!ok) return;
   
-    const { error } = await supabase
-      .from("reports")
-      .delete()
-      .eq("id", reportId);
+    let query = supabase.from("reports").delete().eq("id", reportId);
+  
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_auth_id", session.user.id);
+    }
+  
+    const { error } = await query;
   
     if (error) {
       alert("Errore cancellazione report: " + error.message);
@@ -3124,7 +3617,11 @@ function ReportAdmin() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState("energia");
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
+  const [loadingAdminProfile, setLoadingAdminProfile] = useState(false);
+  const [tab, setTab] = useState(() => {
+    return localStorage.getItem("app_tab") || "energia";
+  });
   const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
   const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
   const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
@@ -3135,38 +3632,129 @@ export default function App() {
   });
 
   const [session, setSession] = useState<any>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  useEffect(() => {
+    localStorage.setItem("app_tab", tab);
+  }, [tab]);
 
-  const adminTabs = ["reportAdmin", "listini", "agents"];
+  const adminTabs = ["reportAdmin", "listini", "agents", "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
-  const isAdminLogged = !!session;
 
   useEffect(() => {
-    const loadSession = async () => {
+    let mounted = true;
+  
+    const loadAdminProfile = async (currentSession: any) => {
+      if (!mounted) return;
+    
+      if (!currentSession?.user?.id) {
+        setAdminProfile(null);
+        setLoadingAdminProfile(false);
+        setAuthReady(true);
+        return;
+      }
+  
+      setLoadingAdminProfile(true);
+  
       try {
-        const { data, error } = await supabase.auth.getSession();
-
-        if (error) {
-          setSession(null);
-          return;
+        const userId = currentSession.user.id;
+        const userEmail = (currentSession.user.email || "").toLowerCase().trim();
+  
+        let { data, error } = await supabase
+          .from("admin_users")
+          .select("id, auth_id, role, email")
+          .eq("auth_id", userId)
+          .maybeSingle();
+  
+        if (!data && userEmail) {
+          const byEmail = await supabase
+            .from("admin_users")
+            .select("id, auth_id, role, email")
+            .eq("email", userEmail)
+            .maybeSingle();
+  
+          data = byEmail.data;
+          error = byEmail.error;
+  
+          if (data && !data.auth_id) {
+            const { error: updateError } = await supabase
+              .from("admin_users")
+              .update({ auth_id: userId })
+              .eq("id", data.id);
+  
+            if (!updateError) {
+              data = {
+                ...data,
+                auth_id: userId,
+              };
+            }
+          }
         }
-
-        setSession(data?.session ?? null);
-      } catch {
-        setSession(null);
+  
+        if (!mounted) return;
+  
+        if (error || !data) {
+          setAdminProfile(null);
+        } else {
+          setAdminProfile({
+            id: data.id,
+            auth_id: data.auth_id,
+            email: data.email,
+            role: data.role === "super_admin" ? "super_admin" : "admin",
+          });
+        }
+      } catch (err) {
+        console.error("loadAdminProfile catch:", err);
+        if (mounted) setAdminProfile(null);
+      } finally {
+        if (mounted) {
+          setLoadingAdminProfile(false);
+          setAuthReady(true);
+        }
       }
     };
-
-    loadSession();
-
+  
+    const initAuth = async () => {
+      try {
+        setAuthReady(false);
+  
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
+  
+        if (!mounted) return;
+  
+        setSession(currentSession ?? null);
+setAuthReady(true);
+await loadAdminProfile(currentSession ?? null);
+      } catch (err) {
+        console.error("initAuth error:", err);
+        if (!mounted) return;
+        setSession(null);
+        setAdminProfile(null);
+        setLoadingAdminProfile(false);
+        setAuthReady(true);
+      }
+    };
+  
+    initAuth();
+  
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session ?? null);
+    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      if (!mounted) return;
+    
+      setSession(currentSession ?? null);
+      setAuthReady(true);
+    
+      await loadAdminProfile(currentSession ?? null);
     });
-
-    return () => subscription.unsubscribe();
+  
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -3267,19 +3855,34 @@ export default function App() {
   };
 
   const renderAdminContent = () => {
-    if (!isAdminLogged) {
+    if (!authReady) {
       return (
-        <LoginView
-          title="Accesso Admin"
-          onLogin={() => {
-            if (!adminTabs.includes(tab)) {
-              setTab("reportAdmin");
-            }
-          }}
-        />
+        <div style={{ padding: 20, background: "white", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+          Verifica sessione admin...
+        </div>
       );
     }
-
+  
+    if (!session) {
+      return <LoginView title="Accesso Admin" />;
+    }
+  
+    if (loadingAdminProfile && !adminProfile) {
+      return (
+        <div style={{ padding: 20, background: "white", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+          Caricamento profilo admin...
+        </div>
+      );
+    }
+  
+    if (!adminProfile) {
+      return (
+        <div style={{ padding: 20, background: "white", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+          Questo utente non è abilitato come admin.
+        </div>
+      );
+    }
+  
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div
@@ -3295,217 +3898,174 @@ export default function App() {
             flexWrap: "wrap",
           }}
         >
-          <div>
-            <strong>Area Admin</strong>
-            <div style={{ fontSize: 13, color: "#475569" }}>
-              Da qui puoi gestire Report Admin, Listini e Agent admin con un unico accesso.
-            </div>
-          </div>
-
+          <strong>Area Admin</strong>
+  
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => setTab("reportAdmin")}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: tab === "reportAdmin" ? "#0f172a" : "white",
-                color: tab === "reportAdmin" ? "white" : "#0f172a",
-                cursor: "pointer",
-              }}
-            >
-              Report Admin
-            </button>
+  <button
+    type="button"
+    onClick={() => setTab("reportAdmin")}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #cbd5e1",
+      background: tab === "reportAdmin" ? "#0f172a" : "white",
+      color: tab === "reportAdmin" ? "white" : "#0f172a",
+      cursor: "pointer",
+    }}
+  >
+    Report Admin
+  </button>
 
-            <button
-              type="button"
-              onClick={() => setTab("listini")}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: tab === "listini" ? "#0f172a" : "white",
-                color: tab === "listini" ? "white" : "#0f172a",
-                cursor: "pointer",
-              }}
-            >
-              Listini
-            </button>
+  <button
+    type="button"
+    onClick={() => setTab("agents")}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #cbd5e1",
+      background: tab === "agents" ? "#0f172a" : "white",
+      color: tab === "agents" ? "white" : "#0f172a",
+      cursor: "pointer",
+    }}
+  >
+    Agent Admin
+  </button>
 
-            <button
-              type="button"
-              onClick={() => setTab("agents")}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: tab === "agents" ? "#0f172a" : "white",
-                color: tab === "agents" ? "white" : "#0f172a",
-                cursor: "pointer",
-              }}
-            >
-              Agent Admin
-            </button>
+  {adminProfile?.role === "super_admin" && (
+    <button
+      type="button"
+      onClick={() => setTab("listini")}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+        background: tab === "listini" ? "#0f172a" : "white",
+        color: tab === "listini" ? "white" : "#0f172a",
+        cursor: "pointer",
+      }}
+    >
+      Listini
+    </button>
+  )}
 
-            <button
-              type="button"
-              onClick={async () => {
-                await supabase.auth.signOut();
-                setTab("energia");
-              }}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: "white",
-                cursor: "pointer",
-              }}
-            >
-              Esci
-            </button>
-          </div>
+  <button
+    type="button"
+    onClick={async () => {
+      await supabase.auth.signOut();
+      setTab("energia");
+      localStorage.removeItem("app_tab");
+    }}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #cbd5e1",
+      background: "white",
+      color: "#0f172a",
+      cursor: "pointer",
+    }}
+  >
+    Esci
+  </button>
+</div>
         </div>
-
-        {tab === "reportAdmin" && <ReportAdmin />}
-
-        {tab === "agents" && <AgentsAdmin />}
-
-        {tab === "listini" &&
-          (loadingSettings ? (
-            <div
-              style={{
-                padding: 20,
-                background: "white",
-                border: "1px solid #e2e8f0",
-                borderRadius: 12,
-              }}
-            >
-              Caricamento listini...
-            </div>
-          ) : (
-            <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  alignItems: "center",
-                  gap: 12,
-                  background: "white",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 12,
-                  padding: 16,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={saveSettings}
-                  disabled={savingSettings}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#0f172a",
-                    color: "white",
-                    cursor: "pointer",
-                  }}
-                >
-                  {savingSettings ? "Salvataggio..." : "Salva listini online"}
-                </button>
-              </div>
-
-              <Listini
-                monthlyRows={monthlyRows}
-                setMonthlyRows={setMonthlyRows}
-                dispCpRows={dispCpRows}
-                setDispCpRows={setDispCpRows}
-                energyOffers={energyOffers}
-                setEnergyOffers={setEnergyOffers}
-                gasOffers={gasOffers}
-                setGasOffers={setGasOffers}
-                gasAcciseSettings={gasAcciseSettings}
-                setGasAcciseSettings={setGasAcciseSettings}
-              />
-            </>
-          ))}
+  
+        {tab === "reportAdmin" && (
+          <ReportAdmin session={session} adminProfile={adminProfile} />
+        )}
+  
+        {tab === "agents" && (
+          <AgentsAdmin session={session} adminProfile={adminProfile} />
+        )}
+  
+        {tab === "listini" && (
+          <Listini
+            monthlyRows={monthlyRows}
+            setMonthlyRows={setMonthlyRows}
+            dispCpRows={dispCpRows}
+            setDispCpRows={setDispCpRows}
+            energyOffers={energyOffers}
+            setEnergyOffers={setEnergyOffers}
+            gasOffers={gasOffers}
+            setGasOffers={setGasOffers}
+            gasAcciseSettings={gasAcciseSettings}
+            setGasAcciseSettings={setGasAcciseSettings}
+          />
+        )}
       </div>
     );
   };
-
+  
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20, fontFamily: "Arial, sans-serif" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        <h1 style={{ marginTop: 0 }}>Simulatore Bollette</h1>
-        <p style={{ color: "#475569" }}>Versione con Energia, Gas e Listini modificabili.</p>
+    <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20 }}>
+      <h1>Simulatore Bollette</h1>
+  
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+  <button
+    onClick={() => setTab("energia")}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #cbd5e1",
+      background: tab === "energia" ? "#0f172a" : "white",
+      color: tab === "energia" ? "white" : "#0f172a",
+      cursor: "pointer",
+    }}
+  >
+    Energia
+  </button>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          <button
-            onClick={() => setTab("energia")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: tab === "energia" ? "#0f172a" : "white",
-              color: tab === "energia" ? "white" : "#0f172a",
-              cursor: "pointer",
-            }}
-          >
-            Energia
-          </button>
+  <button
+    onClick={() => setTab("gas")}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #cbd5e1",
+      background: tab === "gas" ? "#0f172a" : "white",
+      color: tab === "gas" ? "white" : "#0f172a",
+      cursor: "pointer",
+    }}
+  >
+    Gas
+  </button>
 
-          <button
-            onClick={() => setTab("gas")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: tab === "gas" ? "#0f172a" : "white",
-              color: tab === "gas" ? "white" : "#0f172a",
-              cursor: "pointer",
-            }}
-          >
-            Gas
-          </button>
+  <button
+    onClick={() => setTab("report")}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #cbd5e1",
+      background: tab === "report" ? "#0f172a" : "white",
+      color: tab === "report" ? "white" : "#0f172a",
+      cursor: "pointer",
+    }}
+  >
+    Report
+  </button>
 
-          <button
-            onClick={() => setTab("report")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: tab === "report" ? "#0f172a" : "white",
-              color: tab === "report" ? "white" : "#0f172a",
-              cursor: "pointer",
-            }}
-          >
-            Report
-          </button>
-
-          <button
-            onClick={() => setTab("reportAdmin")}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: isAdminTab ? "#0f172a" : "white",
-              color: isAdminTab ? "white" : "#0f172a",
-              cursor: "pointer",
-            }}
-          >
-            Area Admin
-          </button>
-        </div>
-
-        {tab === "energia" ? (
-          <Energia monthlyRows={monthlyRows} energyOffers={energyOffers} dispCpRows={dispCpRows} />
-        ) : tab === "gas" ? (
-          <Gas monthlyRows={monthlyRows} gasOffers={gasOffers} gasAcciseSettings={gasAcciseSettings} />
-        ) : tab === "report" ? (
-          <ReportAgent />
-        ) : (
-          renderAdminContent()
-        )}
-      </div>
+  <button
+    onClick={() => setTab("reportAdmin")}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "1px solid #cbd5e1",
+      background: isAdminTab ? "#0f172a" : "white",
+      color: isAdminTab ? "white" : "#0f172a",
+      cursor: "pointer",
+    }}
+  >
+    Area Admin
+  </button>
+</div>
+  
+      {tab === "energia" ? (
+        <Energia monthlyRows={monthlyRows} energyOffers={energyOffers} dispCpRows={dispCpRows} />
+      ) : tab === "gas" ? (
+        <Gas monthlyRows={monthlyRows} gasOffers={gasOffers} gasAcciseSettings={gasAcciseSettings} />
+      ) : tab === "report" ? (
+        <ReportAgent />
+      ) : (
+        renderAdminContent()
+      )}
     </div>
-  );
+);
 }
