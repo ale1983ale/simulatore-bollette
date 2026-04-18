@@ -3634,7 +3634,23 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [authReady, setAuthReady] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
+  const [savingSettings, 
+    setSavingSettings] = useState(false);
+    useEffect(() => {
+      if (!loadingAdminProfile) return;
+    
+      const timer = setTimeout(async () => {
+        if (loadingAdminProfile && !adminProfile) {
+          await supabase.auth.signOut();
+          setSession(null);
+          setAdminProfile(null);
+          setLoadingAdminProfile(false);
+          setAuthReady(true);
+        }
+      }, 4000);
+    
+      return () => clearTimeout(timer);
+    }, [loadingAdminProfile, adminProfile]);
   useEffect(() => {
     localStorage.setItem("app_tab", tab);
   }, [tab]);
@@ -3869,8 +3885,40 @@ await loadAdminProfile(currentSession ?? null);
   
     if (loadingAdminProfile && !adminProfile) {
       return (
-        <div style={{ padding: 20, background: "white", border: "1px solid #e2e8f0", borderRadius: 12 }}>
-          Caricamento profilo admin...
+        <div
+          style={{
+            padding: 20,
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <div>Caricamento profilo admin...</div>
+    
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setSession(null);
+              setAdminProfile(null);
+              setLoadingAdminProfile(false);
+              setAuthReady(true);
+              setTab("reportAdmin");
+            }}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: "white",
+              cursor: "pointer",
+              width: "fit-content",
+            }}
+          >
+            Torna al login admin
+          </button>
         </div>
       );
     }
