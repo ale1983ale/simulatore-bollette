@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 
 type MonthlyRow = {
   mese: string;
+  anno: number;
   mono: number;
   f1: number;
   f2: number;
@@ -52,22 +53,151 @@ type AdminProfile = {
   password: string;
   role: "super_admin" | "admin";
 };
+type PunPsvRow = {
+  mese: string;
+  mono: number;
+  f1: number;
+  f2: number;
+  f3: number;
+  psv: number;
+};
+
+const PUN_PSV_MONTHS = [
+  "GENNAIO 2025",
+  "FEBBRAIO 2025",
+  "MARZO 2025",
+  "APRILE 2025",
+  "MAGGIO 2025",
+  "GIUGNO 2025",
+  "LUGLIO 2025",
+  "AGOSTO 2025",
+  "SETTEMBRE 2025",
+  "OTTOBRE 2025",
+  "NOVEMBRE 2025",
+  "DICEMBRE 2025",
+  "GENNAIO 2026",
+  "FEBBRAIO 2026",
+  "MARZO 2026",
+  "APRILE 2026",
+  "MAGGIO 2026",
+  "GIUGNO 2026",
+  "LUGLIO 2026",
+  "AGOSTO 2026",
+  "SETTEMBRE 2026",
+  "OTTOBRE 2026",
+  "NOVEMBRE 2026",
+  "DICEMBRE 2026",
+  "GENNAIO 2027",
+  "FEBBRAIO 2027",
+  "MARZO 2027",
+  "APRILE 2027",
+  "MAGGIO 2027",
+  "GIUGNO 2027",
+  "LUGLIO 2027",
+  "AGOSTO 2027",
+  "SETTEMBRE 2027",
+  "OTTOBRE 2027",
+  "NOVEMBRE 2027",
+  "DICEMBRE 2027",
+  "GENNAIO 2028",
+  "FEBBRAIO 2028",
+  "MARZO 2028",
+  "APRILE 2028",
+  "MAGGIO 2028",
+  "GIUGNO 2028",
+  "LUGLIO 2028",
+  "AGOSTO 2028",
+  "SETTEMBRE 2028",
+  "OTTOBRE 2028",
+  "NOVEMBRE 2028",
+  "DICEMBRE 2028",
+  "GENNAIO 2029",
+  "FEBBRAIO 2029",
+  "MARZO 2029",
+  "APRILE 2029",
+  "MAGGIO 2029",
+  "GIUGNO 2029",
+  "LUGLIO 2029",
+  "AGOSTO 2029",
+  "SETTEMBRE 2029",
+  "OTTOBRE 2029",
+  "NOVEMBRE 2029",
+  "DICEMBRE 2029",
+];
+
+const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
+  { mese: "FISSO DOMESTICO", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  ...PUN_PSV_MONTHS.map((mese) => ({
+    mese,
+    mono: 0,
+    f1: 0,
+    f2: 0,
+    f3: 0,
+    psv: 0,
+  })),
+];
+
+function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
+  const index = rows.findIndex(r => r.mese === selectedMonth);
+  if (index === -1) return [];
+
+  return rows.slice(Math.max(0, index - 11), index + 1);
+}
+
+function getSvgPoints(values: number[], width: number, height: number) {
+  if (values.length === 0) return "";
+
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = max - min || 1;
+
+  return values
+    .map((v, i) => {
+      const x = (i / Math.max(values.length - 1, 1)) * width;
+      const y = height - ((v - min) / range) * height;
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+const MESI = [
+  "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
+  "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
+];
+
+const ANNI = [2025, 2026, 2027, 2028, 2029];
+
+function getMonthYearSortValue(label: string) {
+  if (label === "FISSO DOMESTICO") return Number.MAX_SAFE_INTEGER;
+  if (label === "FISSO BUSINESS") return Number.MAX_SAFE_INTEGER - 1;
+
+  const parts = String(label).trim().split(" ");
+  if (parts.length < 2) return -1;
+
+  const mese = parts[0];
+  const anno = Number(parts[1]);
+  const meseIndex = MESI.indexOf(mese);
+
+  if (!Number.isFinite(anno) || meseIndex === -1) return -1;
+
+  return anno * 100 + meseIndex;
+}
 
 const INITIAL_MONTHLY: MonthlyRow[] = [
-  { mese: "GENNAIO", mono: 0.132665, f1: 0.15126, f2: 0.1374, f3: 0.11829, psv: 0.55769 },
-  { mese: "FEBBRAIO", mono: 0.114405, f1: 0.12228, f2: 0.11984, f3: 0.1053, psv: 0.376788 },
-  { mese: "MARZO", mono: 0.1434, f1: 0.14302, f2: 0.15391, f3: 0.13809, psv: 0.45542 },
-  { mese: "APRILE", mono: 0.099853, f1: 0.09584, f2: 0.115078, f3: 0.09505, psv: 0.402741 },
-  { mese: "MAGGIO", mono: 0.093575, f1: 0.089087, f2: 0.110635, f3: 0.087114, psv: 0.403277 },
-  { mese: "GIUGNO", mono: 0.11178, f1: 0.11306, f2: 0.12676, f3: 0.10363, psv: 0.419181 },
-  { mese: "LUGLIO", mono: 0.112, f1: 0.108, f2: 0.13, f3: 0.104, psv: 0.392803 },
-  { mese: "AGOSTO", mono: 0.10879, f1: 0.10558, f2: 0.11797, f3: 0.10604, psv: 0.38133 },
-  { mese: "SETTEMBRE", mono: 0.10907, f1: 0.10959, f2: 0.120931, f3: 0.10187, psv: 0.373593 },
-  { mese: "OTTOBRE", mono: 0.11104, f1: 0.11783, f2: 0.12166, f3: 0.09948, psv: 0.35395 },
-  { mese: "NOVEMBRE", mono: 0.11709, f1: 0.12959, f2: 0.12402, f3: 0.10551, psv: 0.3453 },
-  { mese: "DICEMBRE", mono: 0.11549, f1: 0.12959, f2: 0.12402, f3: 0.10551, psv: 0.37798 },
-  { mese: "FISSO DOMESTICO", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
-{ mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "FISSO DOMESTICO", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "FISSO BUSINESS", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+
+  ...ANNI.flatMap((anno) =>
+    MESI.map((mese) => ({
+      mese,
+      anno,
+      mono: 0,
+      f1: 0,
+      f2: 0,
+      f3: 0,
+      psv: 0,
+    }))
+  ),
 ];
 
 const INITIAL_DISP_CP_ROWS: DispCpRow[] = [
@@ -577,30 +707,33 @@ function sLikeBimestrale(fatturazione: string) {
 
 function calcEnergia(
   d: any,
-  monthlyRows: MonthlyRow[],
+  punPsvRows: PunPsvRow[],
   energyOffers: EnergyOffer[],
   dispCpRows: DispCpRow[]
 ) {
   const off = energyOffers.find((x) => x.nome === d.offerta) || energyOffers[0];
-  const m1 = monthlyRows.find((x) => x.mese === d.mese1) || monthlyRows[0];
-  const m2 = monthlyRows.find((x) => x.mese === d.mese2) || monthlyRows[0];
-  const fissoDomesticoRow =
-  monthlyRows.find((x) => x.mese === "FISSO DOMESTICO") || monthlyRows[0];
 
-const fissoBusinessRow =
-  monthlyRows.find((x) => x.mese === "FISSO BUSINESS") || monthlyRows[0];
+  const row1 = punPsvRows.find((x) => x.mese === d.mese1) || punPsvRows[0];
+  const row2 = punPsvRows.find((x) => x.mese === d.mese2) || punPsvRows[0];
+
+  const fissoDomesticoRow =
+    punPsvRows.find((x) => x.mese === "FISSO DOMESTICO") || punPsvRows[0];
+
+  const fissoBusinessRow =
+    punPsvRows.find((x) => x.mese === "FISSO BUSINESS") || punPsvRows[0];
 
   const mese1IsFisso = d.mese1 === "FISSO DOMESTICO" || d.mese1 === "FISSO BUSINESS";
-const mese2IsFisso = d.mese2 === "FISSO DOMESTICO" || d.mese2 === "FISSO BUSINESS";
+  const mese2IsFisso = d.mese2 === "FISSO DOMESTICO" || d.mese2 === "FISSO BUSINESS";
 
-const meseTabella1 = mese1IsFisso ? d.meseRifTabella1 : d.mese1;
-const meseTabella2 = mese2IsFisso ? d.meseRifTabella2 : d.mese2;
+  const meseTabella1 = mese1IsFisso ? d.meseRifTabella1 : String(d.mese1 || "").split(" ")[0];
+  const meseTabella2 = mese2IsFisso ? d.meseRifTabella2 : String(d.mese2 || "").split(" ")[0];
 
   const dispRow1 = dispCpRows.find((x) => x.mese === meseTabella1);
   const dispRow2 = dispCpRows.find((x) => x.mese === meseTabella2);
 
   const isDomestico = ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(d.tipo);
-const prezzoFisso = n(isDomestico ? fissoDomesticoRow.mono : fissoBusinessRow.mono);
+  const fissoRow = isDomestico ? fissoDomesticoRow : fissoBusinessRow;
+
   const mesi = energyMonths(d.fatturazione);
 
   const spreadEff = d.offerta === "DEDICATA" ? n(d.dedicataSpread) : n(off.spread);
@@ -611,14 +744,17 @@ const prezzoFisso = n(isDomestico ? fissoDomesticoRow.mono : fissoBusinessRow.mo
   const quotaFissaEff =
     d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
 
-    const prezzoMono1 = mese1IsFisso ? prezzoFisso : n(m1.mono);
-    const prezzoMono2 = mese2IsFisso ? prezzoFisso : n(m2.mono);
-    const prezzoF11 = mese1IsFisso ? prezzoFisso : n(m1.f1);
-    const prezzoF12 = mese2IsFisso ? prezzoFisso : n(m2.f1);
-    const prezzoF21 = mese1IsFisso ? prezzoFisso : n(m1.f2);
-    const prezzoF22 = mese2IsFisso ? prezzoFisso : n(m2.f2);
-    const prezzoF31 = mese1IsFisso ? prezzoFisso : n(m1.f3);
-    const prezzoF32 = mese2IsFisso ? prezzoFisso : n(m2.f3);
+  const prezzoMono1 = mese1IsFisso ? n(fissoRow.mono) : n(row1.mono);
+  const prezzoMono2 = mese2IsFisso ? n(fissoRow.mono) : n(row2.mono);
+
+  const prezzoF11 = mese1IsFisso ? n(fissoRow.f1) : n(row1.f1);
+  const prezzoF12 = mese2IsFisso ? n(fissoRow.f1) : n(row2.f1);
+
+  const prezzoF21 = mese1IsFisso ? n(fissoRow.f2) : n(row1.f2);
+  const prezzoF22 = mese2IsFisso ? n(fissoRow.f2) : n(row2.f2);
+
+  const prezzoF31 = mese1IsFisso ? n(fissoRow.f3) : n(row1.f3);
+  const prezzoF32 = mese2IsFisso ? n(fissoRow.f3) : n(row2.f3);
 
   const consumiMese1 =
     n(d.f1Mese1) + n(d.f2Mese1) + n(d.f3Mese1) + n(d.monoMese1);
@@ -672,8 +808,8 @@ const prezzoFisso = n(isDomestico ? fissoDomesticoRow.mono : fissoBusinessRow.mo
     consumiTotConPerdite * (n(d.dispacciamentoCapacityMarket) + cmEff);
 
   const H22 = H22_base + perditeEnergia + dispCpTotale;
-  const H25 = n(d.quotaConsumiRete);
   const H24 = n(d.reattivaImmessa) + n(d.reattivaPrelevata);
+  const H25 = n(d.quotaConsumiRete);
   const H28 = n(d.numeroPod) * quotaFissaEff * mesi;
   const H29 = n(d.quotaFissaRete);
   const H30 = n(d.quotaPotenzaRete);
@@ -721,18 +857,25 @@ const prezzoFisso = n(isDomestico ? fissoDomesticoRow.mono : fissoBusinessRow.mo
   };
 }
 
-function calcGas(d: any, monthlyRows: MonthlyRow[], gasOffers: GasOffer[]) {
+function calcGas(d: any, punPsvRows: PunPsvRow[], gasOffers: GasOffer[]) {
   const off = gasOffers.find((x) => x.nome === d.offerta) || gasOffers[0];
   const mesi = gasMonths(d.fatturazione);
 
-  const spreadEff = d.offerta === "DEDICATA" ? n(d.dedicataSpread) : n(off.spread);
-  const quotaVarEff = d.offerta === "DEDICATA" ? n(d.dedicataQuotaVariabile) : n(off.quotaVariabile);
-  const quotaFissaEff = d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
+  const spreadEff =
+    d.offerta === "DEDICATA" ? n(d.dedicataSpread) : n(off.spread);
 
-  const p1 = n((monthlyRows.find((x) => x.mese === d.periodo1) || monthlyRows[0]).psv);
-  const p2 = n((monthlyRows.find((x) => x.mese === d.periodo2) || { psv: 0 }).psv);
-  const p3 = n((monthlyRows.find((x) => x.mese === d.periodo3) || { psv: 0 }).psv);
-  const p4 = n((monthlyRows.find((x) => x.mese === d.periodo4) || { psv: 0 }).psv);
+  const quotaVarEff =
+    d.offerta === "DEDICATA"
+      ? n(d.dedicataQuotaVariabile)
+      : n(off.quotaVariabile);
+
+  const quotaFissaEff =
+    d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
+
+  const p1 = n((punPsvRows.find((x) => x.mese === d.periodo1) || { psv: 0 }).psv);
+  const p2 = n((punPsvRows.find((x) => x.mese === d.periodo2) || { psv: 0 }).psv);
+  const p3 = n((punPsvRows.find((x) => x.mese === d.periodo3) || { psv: 0 }).psv);
+  const p4 = n((punPsvRows.find((x) => x.mese === d.periodo4) || { psv: 0 }).psv);
 
   const consumoTotale =
     n(d.consumo1) +
@@ -756,7 +899,9 @@ function calcGas(d: any, monthlyRows: MonthlyRow[], gasOffers: GasOffer[]) {
   const H28 = n(d.quotaFissaAggiuntiva);
   const H29 = H27 + H28;
   const accisaCoeff = n(d.accisaValore);
-  const H32 = isSi(d.overrideAcciseFlag) ? n(d.overrideAcciseValore) : consumoTotale * accisaCoeff;
+  const H32 = isSi(d.overrideAcciseFlag)
+    ? n(d.overrideAcciseValore)
+    : consumoTotale * accisaCoeff;
   const H35 = isSi(d.ricalcoloFlag) ? n(d.ricalcoloValore) : 0;
   const H33 = ((H24 + H29 + H32 + H35) / 100) * n(d.iva);
   const H34 = H32 + H33;
@@ -788,15 +933,19 @@ function calcGas(d: any, monthlyRows: MonthlyRow[], gasOffers: GasOffer[]) {
     quotaFissaEff,
     consumoTotale,
     accisaCoeff,
+    p1,
+    p2,
+    p3,
+    p4,
   };
 }
 
 function Energia({
-  monthlyRows,
+  punPsvRows,
   energyOffers,
   dispCpRows,
 }: {
-  monthlyRows: MonthlyRow[];
+  punPsvRows: PunPsvRow[];
   energyOffers: EnergyOffer[];
   dispCpRows: DispCpRow[];
 }) {
@@ -808,7 +957,7 @@ function Energia({
     numeroPod: "1",
     tipo: "BTA2",
     offerta: energyOffers[0]?.nome || "",
-    mese1: "GENNAIO",
+    mese1: "GENNAIO 2025",
     mese2: "",
     meseRifTabella1: "GENNAIO",
     meseRifTabella2: "GENNAIO",
@@ -838,6 +987,40 @@ function Energia({
     acciseManualiFlag: "NO",
     acciseManualiValore: "",
     canoneRaiGiaPagato: "0",
+  });
+  
+  const mesiOrdinati = [...punPsvRows]
+  .filter((m) => {
+    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+    return (
+      n(m.mono) !== 0 ||
+      n(m.f1) !== 0 ||
+      n(m.f2) !== 0 ||
+      n(m.f3) !== 0
+    );
+  })
+  .sort((a, b) => {
+    if (a.mese === "FISSO DOMESTICO") return -1;
+    if (b.mese === "FISSO DOMESTICO") return 1;
+    if (a.mese === "FISSO BUSINESS") return -1;
+    if (b.mese === "FISSO BUSINESS") return 1;
+
+    const getAnno = (m: string) => Number(m.split(" ")[1] || 0);
+
+    const getMeseNumero = (m: string) => {
+      const mesi = [
+        "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
+        "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
+      ];
+      return mesi.findIndex(x => m.startsWith(x));
+    };
+
+    const annoA = getAnno(a.mese);
+    const annoB = getAnno(b.mese);
+
+    if (annoA !== annoB) return annoB - annoA;
+
+    return getMeseNumero(b.mese) - getMeseNumero(a.mese);
   });
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -913,8 +1096,8 @@ function Energia({
   );
 
   const r = useMemo(
-    () => calcEnergia(s, monthlyRows, energyOffers, dispCpRows),
-    [s, monthlyRows, energyOffers, dispCpRows]
+    () => calcEnergia(s, punPsvRows, energyOffers, dispCpRows),
+    [s, punPsvRows, energyOffers, dispCpRows]
   );
 
   useEffect(() => {
@@ -946,7 +1129,11 @@ function Energia({
   const consumoAnnuoEnergia =
     r.consumiTot *
     (s.fatturazione === "MENSILE" || s.fatturazione === "MULTI POD MENSILE" ? 12 : 6);
-
+    const getPunByMonth = (mese: string, anno: number) => {
+      const key = `${mese} ${anno}`;
+      const row = punPsvRows.find((r) => r.mese === key);
+      return row?.pun || 0;
+    };
   const prezzoMedioEnergiaScheda =
     r.consumiTot > 0
       ? `${((r.H22 + r.H25 + r.H24) / r.consumiTot).toFixed(6).replace(".", ",")} €/kWh`
@@ -1287,35 +1474,44 @@ function Energia({
                 gap: 12,
               }}
             >
-              {selectField("Mese 1", s.mese1, (v) => set("mese1", v), monthlyRows.map((m) => m.mese))}
-              {s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS"
-                ? selectField(
-                    "Mese rif. tabella 1",
-                    s.meseRifTabella1,
-                    (v) => set("meseRifTabella1", v),
-                    dispCpRows.map((m) => m.mese)
-                  )
-                : <div />}
+              {selectField("Mese 1", s.mese1, (v) => set("mese1", v),
+  mesiOrdinati
+    .filter((m) => {
+      if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+      return (
+        n(m.mono) !== 0 ||
+        n(m.f1) !== 0 ||
+        n(m.f2) !== 0 ||
+        n(m.f3) !== 0
+      );
+    })
+    .map((m) => m.mese)
+)}
 
-              {field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
-              {field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
-              {field("F3 mese 1", s.f3Mese1, (v) => set("f3Mese1", v), "number")}
-              {field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
+{field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
+{field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
+{field("F3 mese 1", s.f3Mese1, (v) => set("f3Mese1", v), "number")}
+{field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
 
-              {selectField("Mese 2", s.mese2, (v) => set("mese2", v), ["", ...monthlyRows.map((m) => m.mese)])}
-              {s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS"
-                ? selectField(
-                    "Mese rif. tabella 2",
-                    s.meseRifTabella2,
-                    (v) => set("meseRifTabella2", v),
-                    dispCpRows.map((m) => m.mese)
-                  )
-                : <div />}
+{selectField("Mese 2", s.mese2, (v) => set("mese2", v),
+  ["", ...mesiOrdinati
+    .filter((m) => {
+      if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+      return (
+        n(m.mono) !== 0 ||
+        n(m.f1) !== 0 ||
+        n(m.f2) !== 0 ||
+        n(m.f3) !== 0
+      );
+    })
+    .map((m) => m.mese)
+  ]
+)}
 
-              {field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
-              {field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
-              {field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
-              {field("Mono mese 2", s.monoMese2, (v) => set("monoMese2", v), "number")}
+{field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
+{field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
+{field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
+{field("Mono mese 2", s.monoMese2, (v) => set("monoMese2", v), "number")}
 
               {field(
                 "DISP+CP.Mrk",
@@ -1520,11 +1716,11 @@ function Energia({
 }
 
 function Gas({
-  monthlyRows,
+  punPsvRows,
   gasOffers,
   gasAcciseSettings,
 }: {
-  monthlyRows: MonthlyRow[];
+  punPsvRows: PunPsvRow[];
   gasOffers: GasOffer[];
   gasAcciseSettings: GasAcciseSettings;
 }) {
@@ -1535,7 +1731,7 @@ function Gas({
     uso: "DOMESTICO",
     fatturazione: "MENSILE",
     offerta: gasOffers[0]?.nome || "",
-    periodo1: "GENNAIO",
+    periodo1: "GENNAIO 2025",
     periodo2: "",
     periodo3: "",
     periodo4: "",
@@ -1561,7 +1757,7 @@ function Gas({
     ricalcoloValore: "",
   });
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [openSections, setOpenSections] = useState({
     dati: true,
     mesi: true,
@@ -1592,6 +1788,35 @@ function Gas({
     if (!isMobile) return;
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const mesiOrdinati = [...punPsvRows]
+  .filter((m) => {
+    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+    return n(m.psv) !== 0;
+  })
+  .sort((a, b) => {
+    if (a.mese === "FISSO DOMESTICO") return -1;
+    if (b.mese === "FISSO DOMESTICO") return 1;
+    if (a.mese === "FISSO BUSINESS") return -1;
+    if (b.mese === "FISSO BUSINESS") return 1;
+
+    const getAnno = (m: string) => Number(m.split(" ")[1] || 0);
+
+    const getMeseNumero = (m: string) => {
+      const mesi = [
+        "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
+        "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
+      ];
+      return mesi.findIndex(x => m.startsWith(x));
+    };
+
+    const annoA = getAnno(a.mese);
+    const annoB = getAnno(b.mese);
+
+    if (annoA !== annoB) return annoB - annoA;
+
+    return getMeseNumero(b.mese) - getMeseNumero(a.mese);
+  });
 
   const sectionCard = (
     key: "dati" | "mesi" | "rete" | "anteprima",
@@ -1633,11 +1858,14 @@ function Gas({
     </div>
   );
 
-  const r = useMemo(() => calcGas(s, monthlyRows, gasOffers), [s, monthlyRows, gasOffers]);
+  const r = useMemo(() => calcGas(s, punPsvRows, gasOffers), [s, punPsvRows, gasOffers]);
 
-  const gasMonthOptions = monthlyRows
-    .filter((m) => m.mese !== "FISSO DOMESTICO" && m.mese !== "FISSO BUSINESS")
-    .map((m) => m.mese);
+  const gasMonthOptions = mesiOrdinati
+  .filter((m) => {
+    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+    return m.psv && m.psv !== 0;
+  })
+  .map((m) => m.mese);
 
   const set = (k: string, v: string) =>
     setS((prev) => {
@@ -2113,8 +2341,6 @@ function Gas({
 }
 
 function Listini({
-  monthlyRows,
-  setMonthlyRows,
   dispCpRows,
   setDispCpRows,
   energyOffers,
@@ -2124,8 +2350,6 @@ function Listini({
   gasAcciseSettings,
   setGasAcciseSettings,
 }: {
-  monthlyRows: MonthlyRow[];
-  setMonthlyRows: React.Dispatch<React.SetStateAction<MonthlyRow[]>>;
   dispCpRows: DispCpRow[];
   setDispCpRows: React.Dispatch<React.SetStateAction<DispCpRow[]>>;
   energyOffers: EnergyOffer[];
@@ -2135,12 +2359,6 @@ function Listini({
   gasAcciseSettings: GasAcciseSettings;
   setGasAcciseSettings: React.Dispatch<React.SetStateAction<GasAcciseSettings>>;
 }) {
-  const updateMonthly = (index: number, key: keyof MonthlyRow, value: string) => {
-    setMonthlyRows((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: key === "mese" ? value : n(value) } : row))
-    );
-  };
-
   const updateDispCp = (index: number, key: keyof DispCpRow, value: string) => {
     setDispCpRows((prev) =>
       prev.map((row, i) =>
@@ -2151,57 +2369,41 @@ function Listini({
 
   const updateEnergyOffer = (index: number, key: keyof EnergyOffer, value: string) => {
     setEnergyOffers((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row))
+      prev.map((row, i) =>
+        i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
+      )
     );
   };
 
   const updateGasOffer = (index: number, key: keyof GasOffer, value: string) => {
     setGasOffers((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row))
+      prev.map((row, i) =>
+        i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
+      )
     );
+  };
+
+  const thStyle: React.CSSProperties = {
+    textAlign: "left",
+    padding: 10,
+    borderBottom: "1px solid #e2e8f0",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: 10,
+    borderBottom: "1px solid #f1f5f9",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: 6,
+    borderRadius: 6,
+    border: "1px solid #cbd5e1",
+    boxSizing: "border-box",
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Listini mensili</h2>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Mese", "PUN Mono", "PUN F1", "PUN F2", "PUN F3", "PSV"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e2e8f0" }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {monthlyRows.map((row, i) => (
-                <tr key={row.mese}>
-                  <td style={{ padding: 8 }}>{row.mese}</td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 100, padding: 6 }} value={row.mono} onChange={(e) => updateMonthly(i, "mono", e.target.value)} />
-                  </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 100, padding: 6 }} value={row.f1} onChange={(e) => updateMonthly(i, "f1", e.target.value)} />
-                  </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 100, padding: 6 }} value={row.f2} onChange={(e) => updateMonthly(i, "f2", e.target.value)} />
-                  </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 100, padding: 6 }} value={row.f3} onChange={(e) => updateMonthly(i, "f3", e.target.value)} />
-                  </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 100, padding: 6 }} value={row.psv} onChange={(e) => updateMonthly(i, "psv", e.target.value)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
         <h2 style={{ marginTop: 0 }}>Dispacciamento + CP Market Energia</h2>
         <div style={{ overflowX: "auto" }}>
@@ -2209,7 +2411,7 @@ function Listini({
             <thead>
               <tr>
                 {["Mese", "Dispacciam", "CP Market", "Tot"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e2e8f0" }}>
+                  <th key={h} style={thStyle}>
                     {h}
                   </th>
                 ))}
@@ -2220,30 +2422,30 @@ function Listini({
                 const tot = n(row.dispacciamento) + n(row.cpMarket);
                 return (
                   <tr key={row.mese}>
-                    <td style={{ padding: 8 }}>{row.mese}</td>
-                    <td style={{ padding: 8 }}>
+                    <td style={tdStyle}>{row.mese}</td>
+                    <td style={tdStyle}>
                       <input
                         type="number"
                         step="0.000001"
-                        style={{ width: 110, padding: 6 }}
+                        style={inputStyle}
                         value={row.dispacciamento}
                         onChange={(e) => updateDispCp(i, "dispacciamento", e.target.value)}
                       />
                     </td>
-                    <td style={{ padding: 8 }}>
+                    <td style={tdStyle}>
                       <input
                         type="number"
                         step="0.000001"
-                        style={{ width: 110, padding: 6 }}
+                        style={inputStyle}
                         value={row.cpMarket}
                         onChange={(e) => updateDispCp(i, "cpMarket", e.target.value)}
                       />
                     </td>
-                    <td style={{ padding: 8 }}>
+                    <td style={tdStyle}>
                       <input
                         type="number"
                         step="0.000001"
-                        style={{ width: 110, padding: 6, background: "#f8fafc" }}
+                        style={{ ...inputStyle, background: "#f8fafc" }}
                         value={tot}
                         readOnly
                       />
@@ -2305,7 +2507,7 @@ function Listini({
             <thead>
               <tr>
                 {["Nome offerta", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e2e8f0" }}>
+                  <th key={h} style={thStyle}>
                     {h}
                   </th>
                 ))}
@@ -2314,17 +2516,39 @@ function Listini({
             <tbody>
               {energyOffers.map((row, i) => (
                 <tr key={row.nome + i}>
-                  <td style={{ padding: 8 }}>
-                    <input style={{ width: 180, padding: 6 }} value={row.nome} onChange={(e) => updateEnergyOffer(i, "nome", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      style={{ ...inputStyle, width: 180 }}
+                      value={row.nome}
+                      onChange={(e) => updateEnergyOffer(i, "nome", e.target.value)}
+                    />
                   </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 100, padding: 6 }} value={row.spread} onChange={(e) => updateEnergyOffer(i, "spread", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      style={{ ...inputStyle, width: 100 }}
+                      value={row.spread}
+                      onChange={(e) => updateEnergyOffer(i, "spread", e.target.value)}
+                    />
                   </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 120, padding: 6 }} value={row.maggiorazioneCapacityMarket} onChange={(e) => updateEnergyOffer(i, "maggiorazioneCapacityMarket", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      style={{ ...inputStyle, width: 120 }}
+                      value={row.maggiorazioneCapacityMarket}
+                      onChange={(e) => updateEnergyOffer(i, "maggiorazioneCapacityMarket", e.target.value)}
+                    />
                   </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.01" style={{ width: 100, padding: 6 }} value={row.canone} onChange={(e) => updateEnergyOffer(i, "canone", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      style={{ ...inputStyle, width: 100 }}
+                      value={row.canone}
+                      onChange={(e) => updateEnergyOffer(i, "canone", e.target.value)}
+                    />
                   </td>
                 </tr>
               ))}
@@ -2340,7 +2564,7 @@ function Listini({
             <thead>
               <tr>
                 {["Nome offerta", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e2e8f0" }}>
+                  <th key={h} style={thStyle}>
                     {h}
                   </th>
                 ))}
@@ -2349,17 +2573,39 @@ function Listini({
             <tbody>
               {gasOffers.map((row, i) => (
                 <tr key={row.nome + i}>
-                  <td style={{ padding: 8 }}>
-                    <input style={{ width: 180, padding: 6 }} value={row.nome} onChange={(e) => updateGasOffer(i, "nome", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      style={{ ...inputStyle, width: 180 }}
+                      value={row.nome}
+                      onChange={(e) => updateGasOffer(i, "nome", e.target.value)}
+                    />
                   </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 100, padding: 6 }} value={row.spread} onChange={(e) => updateGasOffer(i, "spread", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      style={{ ...inputStyle, width: 100 }}
+                      value={row.spread}
+                      onChange={(e) => updateGasOffer(i, "spread", e.target.value)}
+                    />
                   </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.000001" style={{ width: 120, padding: 6 }} value={row.quotaVariabile} onChange={(e) => updateGasOffer(i, "quotaVariabile", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      style={{ ...inputStyle, width: 120 }}
+                      value={row.quotaVariabile}
+                      onChange={(e) => updateGasOffer(i, "quotaVariabile", e.target.value)}
+                    />
                   </td>
-                  <td style={{ padding: 8 }}>
-                    <input type="number" step="0.01" style={{ width: 100, padding: 6 }} value={row.canone} onChange={(e) => updateGasOffer(i, "canone", e.target.value)} />
+                  <td style={tdStyle}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      style={{ ...inputStyle, width: 100 }}
+                      value={row.canone}
+                      onChange={(e) => updateGasOffer(i, "canone", e.target.value)}
+                    />
                   </td>
                 </tr>
               ))}
@@ -2370,6 +2616,7 @@ function Listini({
     </div>
   );
 }
+
 function AgentsAdmin({
   adminProfile,
 }: {
@@ -3850,12 +4097,65 @@ function AdminUsersManager({
 
 
 export default function App() {
+  const baseBtn = {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid #cbd5e1",
+    background: "white",
+    color: "#0f172a",
+    cursor: "pointer",
+    fontWeight: 600,
+    transition: "all 0.2s ease",
+  };
+  
+  const activeBtn = {
+    background: "#0f172a",
+    color: "white",
+    border: "1px solid #0f172a",
+  };
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
 
+  const [punPsvRows, setPunPsvRows] = useState<PunPsvRow[]>(INITIAL_PUN_PSV_ROWS);
+  const [selectedPunPsvMonth, setSelectedPunPsvMonth] = useState<string>("DICEMBRE 2026");
+
+  const updatePunPsvValue = (
+    mese: string,
+    field: "mono" | "f1" | "f2" | "f3" | "psv",
+    value: string
+  ) => {
+    const parsed = Number(String(value).replace(",", "."));
+  
+    setPunPsvRows((prev) =>
+      prev.map((row) =>
+        row.mese === mese
+          ? {
+              ...row,
+              [field]: Number.isFinite(parsed) ? parsed : 0,
+            }
+          : row
+      )
+    );
+  };
+  
   const [tab, setTab] = useState(() => {
     return localStorage.getItem("app_tab") || "energia";
   });
+  
+  const [selectedMonthPUN, setSelectedMonthPUN] = useState("GENNAIO 2025");
+  
+  function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
+    const index = rows.findIndex(r => r.mese === selectedMonth);
+    if (index === -1) return [];
+  
+    return rows.slice(Math.max(0, index - 11), index + 1);
+  }
+  
+  const visiblePunPsvRows = getLast12PunPsvRows(punPsvRows, selectedMonthPUN);
+const punValues = visiblePunPsvRows.map(r => r.pun);
+const psvValues = visiblePunPsvRows.map(r => r.psv);
+const punPolyline = getSvgPoints(punValues, 760, 220);
+const psvPolyline = getSvgPoints(psvValues, 760, 220);
 
   useEffect(() => {
     const savedAdmin = localStorage.getItem("admin_session");
@@ -3873,6 +4173,26 @@ export default function App() {
   const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
   const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
   const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
+  const updateMonthlyRow = (
+    index: number,
+    field: keyof MonthlyRow,
+    value: string
+  ) => {
+    setMonthlyRows((prev) =>
+      prev.map((row, i) =>
+        i === index
+          ? {
+              ...row,
+              [field]:
+                field === "mese"
+                  ? value.toUpperCase()
+                  : Number(String(value).replace(",", ".")) || 0,
+            }
+          : row
+      )
+    );
+  };
+  
   const [gasOffers, setGasOffers] = useState<GasOffer[]>(INITIAL_GAS_OFFERS);
   const [gasAcciseSettings, setGasAcciseSettings] = useState<GasAcciseSettings>({
     agevolata: 0.012498,
@@ -3880,8 +4200,15 @@ export default function App() {
   });
 
   const [session, setSession] = useState<any>(null);
-  const [loadingSettings, setLoadingSettings] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
+const [loadingSettings, setLoadingSettings] = useState(true);
+const [savingSettings, setSavingSettings] = useState(false);
+
+// ✅ STEP 3 QUI
+const [selectedYear, setSelectedYear] = useState(2025);
+
+// STEP 4
+const fixedRows = monthlyRows.filter(r => r.anno === 0);
+const yearRows = monthlyRows.filter(r => r.anno === selectedYear);
 
 useEffect(() => {
   localStorage.setItem("app_tab", tab);
@@ -3889,247 +4216,348 @@ useEffect(() => {
 
   const adminTabs = ["reportAdmin", "listini", "agents", "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
+  const isSuperAdmin = true;
 
-  
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      setLoadingSettings(true);
-
-      const { data, error } = await supabase
-        .from("app_settings")
-        .select("key, value_json");
-
-      if (!error && data) {
-        const map = Object.fromEntries(
-          data.map((row: any) => [row.key, row.value_json])
-        );
-
-        if (Array.isArray(map.monthlyRows) && map.monthlyRows.length > 0) {
-          const loadedMonthlyRows = [...map.monthlyRows];
-
-          const oldFisso = loadedMonthlyRows.find((r: any) => r.mese === "FISSO");
-
-          const withoutOldFisso = loadedMonthlyRows.filter((r: any) => r.mese !== "FISSO");
-
-          const baseRows = withoutOldFisso.filter(
-            (r: any) => r.mese !== "FISSO DOMESTICO" && r.mese !== "FISSO BUSINESS"
-          );
-
-          const fissoDomestico =
-            withoutOldFisso.find((r: any) => r.mese === "FISSO DOMESTICO") || {
-              mese: "FISSO DOMESTICO",
-              mono: oldFisso?.mono ?? 0,
-              f1: oldFisso?.f1 ?? 0,
-              f2: oldFisso?.f2 ?? 0,
-              f3: oldFisso?.f3 ?? 0,
-              psv: oldFisso?.psv ?? 0,
-            };
-
-          const fissoBusiness =
-            withoutOldFisso.find((r: any) => r.mese === "FISSO BUSINESS") || {
-              mese: "FISSO BUSINESS",
-              mono: oldFisso?.mono ?? 0,
-              f1: oldFisso?.f1 ?? 0,
-              f2: oldFisso?.f2 ?? 0,
-              f3: oldFisso?.f3 ?? 0,
-              psv: oldFisso?.psv ?? 0,
-            };
-
-          setMonthlyRows([...baseRows, fissoDomestico, fissoBusiness]);
-        }
-
-        if (Array.isArray(map.dispCpRows) && map.dispCpRows.length > 0) {
-          setDispCpRows(map.dispCpRows);
-        }
-
-        if (Array.isArray(map.energyOffers) && map.energyOffers.length > 0) {
-          setEnergyOffers(map.energyOffers);
-        }
-
-        if (Array.isArray(map.gasOffers) && map.gasOffers.length > 0) {
-          setGasOffers(map.gasOffers);
-        }
-
-        if (
-          map.gasAcciseSettings &&
-          typeof map.gasAcciseSettings === "object" &&
-          Object.keys(map.gasAcciseSettings).length > 0
-        ) {
-          setGasAcciseSettings(map.gasAcciseSettings);
-        }
-      }
-
-      setLoadingSettings(false);
-    };
-
-    loadSettings();
-  }, []);
-
-  const saveSettings = async () => {
-    setSavingSettings(true);
-
-    const payload = [
-      { key: "monthlyRows", value_json: monthlyRows },
-      { key: "dispCpRows", value_json: dispCpRows },
-      { key: "energyOffers", value_json: energyOffers },
-      { key: "gasOffers", value_json: gasOffers },
-      { key: "gasAcciseSettings", value_json: gasAcciseSettings },
-    ];
-
-    const { error } = await supabase.from("app_settings").upsert(payload);
-
-    setSavingSettings(false);
-
-    if (error) {
-      alert("Errore nel salvataggio online");
-      return;
-    }
-
-    alert("Listini salvati online");
+  const thStyle = {
+    padding: "10px",
+    borderBottom: "1px solid #ddd",
+    textAlign: "left" as const,
   };
   
-  const renderAdminContent = () => {
-    if (!adminSession || !adminProfile) {
-      return (
-        <LoginView
-          setSession={setAdminSession}
-          setAdminProfile={setAdminProfile}
-        />
+  const tdStyle = {
+    padding: "10px",
+    borderBottom: "1px solid #eee",
+  };
+  
+  
+  const inputStyle = {
+    width: "100%",
+    padding: "6px",
+    borderRadius: 6,
+    border: "1px solid #ccc",
+  };
+  
+  const punPolylinePoints = getSvgPoints(punValues, 760, 220);
+const psvPolylinePoints = getSvgPoints(psvValues, 760, 220);
+
+useEffect(() => {
+  const loadSettings = async () => {
+    setLoadingSettings(true);
+
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("key, value_json");
+
+    if (!error && data) {
+      const map = Object.fromEntries(
+        data.map((row: any) => [row.key, row.value_json])
       );
+
+      if (Array.isArray(map.monthlyRows)) {
+        const normalizedSavedRows: MonthlyRow[] = map.monthlyRows.map((row: any) => {
+          if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
+            return {
+              mese: row.mese,
+              anno: 0,
+              mono: Number(row.mono || 0),
+              f1: Number(row.f1 || 0),
+              f2: Number(row.f2 || 0),
+              f3: Number(row.f3 || 0),
+              psv: Number(row.psv || 0),
+            };
+          }
+      
+          return {
+            mese: row.mese,
+            anno: Number(row.anno || 2025),
+            mono: Number(row.mono || 0),
+            f1: Number(row.f1 || 0),
+            f2: Number(row.f2 || 0),
+            f3: Number(row.f3 || 0),
+            psv: Number(row.psv || 0),
+          };
+        });
+      
+        const mergedMonthlyRows: MonthlyRow[] = INITIAL_MONTHLY.map((baseRow) => {
+          const savedRow = normalizedSavedRows.find(
+            (r) => r.mese === baseRow.mese && r.anno === baseRow.anno
+          );
+      
+          return savedRow ? savedRow : baseRow;
+        });
+      
+        setMonthlyRows(mergedMonthlyRows);
+      }
+
+      if (Array.isArray(map.dispCpRows)) {
+        setDispCpRows(map.dispCpRows);
+      }
+
+      if (Array.isArray(map.energyOffers)) {
+        setEnergyOffers(map.energyOffers);
+      }
+
+      if (Array.isArray(map.gasOffers)) {
+        setGasOffers(map.gasOffers);
+      }
+
+      if (map.gasAcciseSettings) {
+        setGasAcciseSettings(map.gasAcciseSettings);
+      }
     }
 
-  
-  
-    
-  
-    if (!adminProfile) {
-      return (
-        <div style={{ padding: 20, background: "white", border: "1px solid #e2e8f0", borderRadius: 12 }}>
-          Questo utente non è abilitato come admin.
-        </div>
-      );
-    }
-  
+    setLoadingSettings(false);
+  };
+
+  loadSettings();
+}, []);
+
+const saveSettings = async () => {
+  setSavingSettings(true);
+
+  const payload = [
+    { key: "monthlyRows", value_json: monthlyRows },
+    { key: "dispCpRows", value_json: dispCpRows },
+    { key: "energyOffers", value_json: energyOffers },
+    { key: "gasOffers", value_json: gasOffers },
+    { key: "gasAcciseSettings", value_json: gasAcciseSettings },
+  ];
+
+  const { error } = await supabase.from("app_settings").upsert(payload);
+
+  setSavingSettings(false);
+
+  if (error) {
+    alert("Errore nel salvataggio online");
+    return;
+  }
+
+  alert("Listini salvati online");
+};
+
+const renderAdminContent = () => {
+  if (!adminSession || !adminProfile) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <LoginView
+        setSession={setAdminSession}
+        setAdminProfile={setAdminProfile}
+      />
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <strong>Area Admin</strong>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setTab("reportAdmin")}
+            style={{
+              ...baseBtn,
+              ...(tab === "reportAdmin" ? activeBtn : {}),
+            }}
+          >
+            Report Admin
+          </button>
+
+          <button
+            onClick={() => setTab("agents")}
+            style={{
+              ...baseBtn,
+              ...(tab === "agents" ? activeBtn : {}),
+            }}
+          >
+            Agent Admin
+          </button>
+
+          {adminProfile?.role === "super_admin" && (
+            <button
+              onClick={() => setTab("listini")}
+              style={{
+                ...baseBtn,
+                ...(tab === "listini" ? activeBtn : {}),
+              }}
+            >
+              Listini
+            </button>
+          )}
+
+          {adminProfile?.role === "super_admin" && (
+            <button
+              onClick={() => setTab("punpsvAdmin")}
+              style={{
+                ...baseBtn,
+                ...(tab === "punpsvAdmin" ? activeBtn : {}),
+              }}
+            >
+              PUN / PSV Admin
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              localStorage.removeItem("admin_session");
+              setAdminSession(null);
+              setAdminProfile(null);
+              setSession(null);
+              setTab("energia");
+              localStorage.removeItem("app_tab");
+            }}
+            style={{
+              ...baseBtn,
+              background: "#ef4444",
+              color: "white",
+              border: "1px solid #ef4444",
+            }}
+          >
+            Esci
+          </button>
+        </div>
+      </div>
+
+      {tab === "reportAdmin" && <ReportAdmin adminProfile={adminProfile} />}
+
+      {tab === "agents" && (
+        <>
+          <AgentsAdmin adminProfile={adminProfile} />
+          {adminProfile?.role === "super_admin" && (
+            <AdminUsersManager adminProfile={adminProfile} />
+          )}
+        </>
+      )}
+
+      {tab === "listini" && (
+        <Listini
+          dispCpRows={dispCpRows}
+          setDispCpRows={setDispCpRows}
+          energyOffers={energyOffers}
+          setEnergyOffers={setEnergyOffers}
+          gasOffers={gasOffers}
+          setGasOffers={setGasOffers}
+          gasAcciseSettings={gasAcciseSettings}
+          setGasAcciseSettings={setGasAcciseSettings}
+        />
+      )}
+
+      {tab === "punpsvAdmin" && (
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
             background: "white",
             border: "1px solid #e2e8f0",
             borderRadius: 12,
             padding: 16,
-            flexWrap: "wrap",
           }}
         >
-          <strong>Area Admin</strong>
-  
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-  <button
-    type="button"
-    onClick={() => setTab("reportAdmin")}
-    style={{
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #cbd5e1",
-      background: tab === "reportAdmin" ? "#0f172a" : "white",
-      color: tab === "reportAdmin" ? "white" : "#0f172a",
-      cursor: "pointer",
-    }}
-  >
-    Report Admin
-  </button>
+          <h2 style={{ marginTop: 0 }}>PUN / PSV Admin</h2>
 
-  <button
-    type="button"
-    onClick={() => setTab("agents")}
-    style={{
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #cbd5e1",
-      background: tab === "agents" ? "#0f172a" : "white",
-      color: tab === "agents" ? "white" : "#0f172a",
-      cursor: "pointer",
-    }}
-  >
-    Agent Admin
-  </button>
+          <div style={{ marginBottom: 12 }}>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: "white",
+              }}
+            >
+              {ANNI.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
 
-  {adminProfile?.role === "super_admin" && (
-    <button
-      type="button"
-      onClick={() => setTab("listini")}
-      style={{
-        padding: "10px 14px",
-        borderRadius: 8,
-        border: "1px solid #cbd5e1",
-        background: tab === "listini" ? "#0f172a" : "white",
-        color: tab === "listini" ? "white" : "#0f172a",
-        cursor: "pointer",
-      }}
-    >
-      Listini
-    </button>
-  )}
-
-  <button
-    type="button"
-    onClick={() => {
-      localStorage.removeItem("admin_session");
-      setAdminSession(null);
-      setAdminProfile(null);
-      setSession(null);
-      setTab("energia");
-      localStorage.removeItem("app_tab");
-    }}
-    style={{
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #cbd5e1",
-      background: "white",
-      color: "#0f172a",
-      cursor: "pointer",
-    }}
-  >
-    Esci
-  </button>
+          <div style={{ overflowX: "auto" }}>
+  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+    <thead>
+      <tr>
+        <th style={thStyle}>Mese</th>
+        <th style={thStyle}>Mono</th>
+        <th style={thStyle}>F1</th>
+        <th style={thStyle}>F2</th>
+        <th style={thStyle}>F3</th>
+        <th style={thStyle}>PSV</th>
+      </tr>
+    </thead>
+    <tbody>
+      {punPsvRows
+        .filter((row) => {
+          if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") return true;
+          return row.mese.endsWith(String(selectedYear));
+        })
+        .map((row) => (
+          <tr key={row.mese}>
+            <td style={tdStyle}>{row.mese}</td>
+            <td style={tdStyle}>
+              <input
+                type="number"
+                step="0.000001"
+                value={row.mono}
+                onChange={(e) => updatePunPsvValue(row.mese, "mono", e.target.value)}
+                style={inputStyle}
+              />
+            </td>
+            <td style={tdStyle}>
+              <input
+                type="number"
+                step="0.000001"
+                value={row.f1}
+                onChange={(e) => updatePunPsvValue(row.mese, "f1", e.target.value)}
+                style={inputStyle}
+              />
+            </td>
+            <td style={tdStyle}>
+              <input
+                type="number"
+                step="0.000001"
+                value={row.f2}
+                onChange={(e) => updatePunPsvValue(row.mese, "f2", e.target.value)}
+                style={inputStyle}
+              />
+            </td>
+            <td style={tdStyle}>
+              <input
+                type="number"
+                step="0.000001"
+                value={row.f3}
+                onChange={(e) => updatePunPsvValue(row.mese, "f3", e.target.value)}
+                style={inputStyle}
+              />
+            </td>
+            <td style={tdStyle}>
+              <input
+                type="number"
+                step="0.000001"
+                value={row.psv}
+                onChange={(e) => updatePunPsvValue(row.mese, "psv", e.target.value)}
+                style={inputStyle}
+              />
+            </td>
+          </tr>
+        ))}
+    </tbody>
+  </table>
 </div>
         </div>
-  
-        {tab === "reportAdmin" && (
-  <ReportAdmin adminProfile={adminProfile} />
-)}
-  
-  {tab === "agents" && (
-  <>
-    <AgentsAdmin adminProfile={adminProfile} />
-    {adminProfile?.role === "super_admin" && (
-  <AdminUsersManager adminProfile={adminProfile} />
-)}
-  </>
-)}
-  
-        {tab === "listini" && (
-          <Listini
-            monthlyRows={monthlyRows}
-            setMonthlyRows={setMonthlyRows}
-            dispCpRows={dispCpRows}
-            setDispCpRows={setDispCpRows}
-            energyOffers={energyOffers}
-            setEnergyOffers={setEnergyOffers}
-            gasOffers={gasOffers}
-            setGasOffers={setGasOffers}
-            gasAcciseSettings={gasAcciseSettings}
-            setGasAcciseSettings={setGasAcciseSettings}
-          />
-        )}
-      </div>
-    );
-  };
+      )}
+    </div>
+  );
+};
   
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20 }}>
@@ -4139,12 +4567,8 @@ useEffect(() => {
   <button
     onClick={() => setTab("energia")}
     style={{
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #cbd5e1",
-      background: tab === "energia" ? "#0f172a" : "white",
-      color: tab === "energia" ? "white" : "#0f172a",
-      cursor: "pointer",
+      ...baseBtn,
+      ...(tab === "energia" ? activeBtn : {}),
     }}
   >
     Energia
@@ -4153,12 +4577,8 @@ useEffect(() => {
   <button
     onClick={() => setTab("gas")}
     style={{
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #cbd5e1",
-      background: tab === "gas" ? "#0f172a" : "white",
-      color: tab === "gas" ? "white" : "#0f172a",
-      cursor: "pointer",
+      ...baseBtn,
+      ...(tab === "gas" ? activeBtn : {}),
     }}
   >
     Gas
@@ -4167,26 +4587,28 @@ useEffect(() => {
   <button
     onClick={() => setTab("report")}
     style={{
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #cbd5e1",
-      background: tab === "report" ? "#0f172a" : "white",
-      color: tab === "report" ? "white" : "#0f172a",
-      cursor: "pointer",
+      ...baseBtn,
+      ...(tab === "report" ? activeBtn : {}),
     }}
   >
     Report
   </button>
 
   <button
+    onClick={() => setTab("punpsvPublic")}
+    style={{
+      ...baseBtn,
+      ...(tab === "punpsvPublic" ? activeBtn : {}),
+    }}
+  >
+    PUN / PSV
+  </button>
+
+  <button
     onClick={() => setTab("reportAdmin")}
     style={{
-      padding: "10px 14px",
-      borderRadius: 8,
-      border: "1px solid #cbd5e1",
-      background: isAdminTab ? "#0f172a" : "white",
-      color: isAdminTab ? "white" : "#0f172a",
-      cursor: "pointer",
+      ...baseBtn,
+      ...(tab === "reportAdmin" ? activeBtn : {}),
     }}
   >
     Area Admin
@@ -4195,21 +4617,206 @@ useEffect(() => {
   
 {tab === "energia" ? (
   <Energia
-    monthlyRows={monthlyRows}
+    punPsvRows={punPsvRows}
     energyOffers={energyOffers}
     dispCpRows={dispCpRows}
   />
 ) : tab === "gas" ? (
   <Gas
-    monthlyRows={monthlyRows}
-    gasOffers={gasOffers}
-    gasAcciseSettings={gasAcciseSettings}
-  />
+  punPsvRows={punPsvRows}
+  gasOffers={gasOffers}
+  gasAcciseSettings={gasAcciseSettings}
+/>
 ) : tab === "report" ? (
-  <ReportAgent />
-  ) : (
-    renderAdminContent()
-  )}
+        <ReportAgent />
+        ) : tab === "punpsvPublic" ? (
+          <div
+            style={{
+              background: "white",
+              padding: 24,
+              borderRadius: 16,
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: 20 }}>Andamento PUN / PSV</h2>
+        
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                marginBottom: 24,
+                maxWidth: 280,
+              }}
+            >
+              <label style={{ fontWeight: 600, color: "#0f172a" }}>
+                Mese selezionato
+              </label>
+        
+              <select
+                value={selectedMonthPUN}
+                onChange={(e) => setSelectedMonthPUN(e.target.value)}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #cbd5e1",
+                  background: "white",
+                  color: "#0f172a",
+                  fontSize: 16,
+                }}
+              >
+                {punPsvRows.map((row) => (
+                  <option key={row.mese} value={row.mese}>
+                    {row.mese}
+                  </option>
+                ))}
+              </select>
+            </div>
+        
+            <div
+              style={{
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 14,
+                padding: 16,
+                marginBottom: 24,
+              }}
+            >
+              <svg
+                viewBox="0 0 760 220"
+                style={{ width: "100%", height: 260, display: "block" }}
+              >
+                <polyline
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="3"
+                  points={punPolyline}
+                />
+                <polyline
+                  fill="none"
+                  stroke="#16a34a"
+                  strokeWidth="3"
+                  points={psvPolyline}
+                />
+              </svg>
+        
+              <div
+                style={{
+                  display: "flex",
+                  gap: 20,
+                  marginTop: 12,
+                  fontWeight: 600,
+                  color: "#0f172a",
+                }}
+              >
+                <div style={{ color: "#2563eb" }}>● PUN</div>
+                <div style={{ color: "#16a34a" }}>● PSV</div>
+              </div>
+            </div>
+        
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  tableLayout: "fixed",
+                  background: "white",
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "14px 16px",
+                        borderBottom: "1px solid #e2e8f0",
+                        fontWeight: 700,
+                        color: "#0f172a",
+                        width: "50%",
+                      }}
+                    >
+                      Mese
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "right",
+                        padding: "14px 16px",
+                        borderBottom: "1px solid #e2e8f0",
+                        fontWeight: 700,
+                        color: "#0f172a",
+                        width: "25%",
+                      }}
+                    >
+                      PUN
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "right",
+                        padding: "14px 16px",
+                        borderBottom: "1px solid #e2e8f0",
+                        fontWeight: 700,
+                        color: "#0f172a",
+                        width: "25%",
+                      }}
+                    >
+                      PSV
+                    </th>
+                  </tr>
+                </thead>
+        
+                <tbody>
+                  {visiblePunPsvRows.map((row, index) => (
+                    <tr
+                      key={row.mese}
+                      style={{
+                        background: index % 2 === 0 ? "white" : "#fcfdff",
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "14px 16px",
+                          borderBottom: "1px solid #e2e8f0",
+                          textAlign: "left",
+                          color: "#0f172a",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {row.mese}
+                      </td>
+        
+                      <td
+                        style={{
+                          padding: "14px 16px",
+                          borderBottom: "1px solid #e2e8f0",
+                          textAlign: "right",
+                          color: "#0f172a",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {Number(row.pun).toFixed(6)}
+                      </td>
+        
+                      <td
+                        style={{
+                          padding: "14px 16px",
+                          borderBottom: "1px solid #e2e8f0",
+                          textAlign: "right",
+                          color: "#0f172a",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {Number(row.psv).toFixed(6)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          renderAdminContent()
+        )}
     </div>
-);
-}
+  );
+  }
