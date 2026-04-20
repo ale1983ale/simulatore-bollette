@@ -47,8 +47,9 @@ type Agent = {
 
 type AdminProfile = {
   id?: number;
-  auth_id: string;
-  email?: string;
+  nome?: string;
+  username: string;
+  password: string;
   role: "super_admin" | "admin";
 };
 
@@ -788,219 +789,6 @@ function calcGas(d: any, monthlyRows: MonthlyRow[], gasOffers: GasOffer[]) {
     consumoTotale,
     accisaCoeff,
   };
-}
-
-function LoginView({
-  title = "Accesso Admin",
-}: {
-  title?: string;
-}) {
-  const [mode, setMode] = useState<"login" | "activate">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-
-  const normalizedEmail = email.trim().toLowerCase();
-
-  const handleLogin = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password,
-      });
-
-      if (error) {
-        setErrorMsg(error.message || "Errore login");
-        setLoading(false);
-        return;
-      }
-
-      setSuccessMsg("Accesso eseguito.");
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Errore login");
-    }
-
-    setLoading(false);
-  };
-
-  const handleActivateAdmin = async () => {
-    setLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      if (!normalizedEmail || !password) {
-        setErrorMsg("Inserisci email e password");
-        setLoading(false);
-        return;
-      }
-
-      const { data: preAuthAdmin, error: adminCheckError } = await supabase
-        .from("admin_users")
-        .select("id, email, auth_id, role")
-        .eq("email", normalizedEmail)
-        .maybeSingle();
-
-      if (adminCheckError) {
-        setErrorMsg(adminCheckError.message || "Errore controllo admin");
-        setLoading(false);
-        return;
-      }
-
-      if (!preAuthAdmin) {
-        setErrorMsg("Questa email non è abilitata come admin.");
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password,
-      });
-
-      if (error) {
-        setErrorMsg(error.message || "Errore attivazione accesso");
-        setLoading(false);
-        return;
-      }
-
-      if (data?.user?.id && !preAuthAdmin.auth_id) {
-        await supabase
-          .from("admin_users")
-          .update({ auth_id: data.user.id })
-          .eq("id", preAuthAdmin.id);
-      }
-
-      setSuccessMsg(
-        "Accesso admin creato. Se richiesto da Supabase, conferma la mail e poi accedi."
-      );
-      setMode("login");
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Errore attivazione accesso");
-    }
-
-    setLoading(false);
-  };
-
-  return (
-    <div
-      style={{
-        maxWidth: 460,
-        margin: "40px auto",
-        background: "white",
-        border: "1px solid #e2e8f0",
-        borderRadius: 12,
-        padding: 20,
-      }}
-    >
-      <h2 style={{ marginTop: 0 }}>{title}</h2>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("login");
-            setErrorMsg("");
-            setSuccessMsg("");
-          }}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
-            background: mode === "login" ? "#0f172a" : "white",
-            color: mode === "login" ? "white" : "#0f172a",
-            cursor: "pointer",
-          }}
-        >
-          Login admin
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setMode("activate");
-            setErrorMsg("");
-            setSuccessMsg("");
-          }}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
-            background: mode === "activate" ? "#0f172a" : "white",
-            color: mode === "activate" ? "white" : "#0f172a",
-            cursor: "pointer",
-          }}
-        >
-          Attiva accesso admin
-        </button>
-      </div>
-
-      <div style={{ display: "grid", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Email</div>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: "100%",
-              padding: 10,
-              border: "1px solid #cbd5e1",
-              borderRadius: 8,
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Password</div>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              width: "100%",
-              padding: 10,
-              border: "1px solid #cbd5e1",
-              borderRadius: 8,
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        {errorMsg && <div style={{ color: "#dc2626", fontSize: 13 }}>{errorMsg}</div>}
-        {successMsg && <div style={{ color: "#16a34a", fontSize: 13 }}>{successMsg}</div>}
-
-        <button
-          type="button"
-          onClick={mode === "login" ? handleLogin : handleActivateAdmin}
-          disabled={loading}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 8,
-            background: "#0f172a",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          {loading
-            ? mode === "login"
-              ? "Accesso..."
-              : "Attivazione..."
-            : mode === "login"
-            ? "Entra"
-            : "Crea accesso admin"}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function Energia({
@@ -2582,12 +2370,11 @@ function Listini({
     </div>
   );
 }
-
-function AgentsAdmin(props: {
-  session: any;
+function AgentsAdmin({
+  adminProfile,
+}: {
   adminProfile: AdminProfile | null;
 }) {
-  const { session, adminProfile } = props;
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2598,18 +2385,21 @@ function AgentsAdmin(props: {
     setLoading(true);
 
     let query = supabase
-  .from("agents")
-  .select("*")
-  .order("nome", { ascending: true });
+      .from("agents")
+      .select("*")
+      .order("nome", { ascending: true });
 
-if (adminProfile?.role !== "super_admin") {
-  query = query.eq("owner_auth_id", session.user.id);
-}
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_admin_id", adminProfile?.id);
+    }
 
-const { data, error } = await query;
+    const { data, error } = await query;
 
-    if (!error && data) {
-      setAgents(data as Agent[]);
+    if (error) {
+      console.error("LOAD AGENTS ERROR:", error);
+      setAgents([]);
+    } else {
+      setAgents((data as Agent[]) || []);
     }
 
     setLoading(false);
@@ -2625,22 +2415,25 @@ const { data, error } = await query;
       return;
     }
 
+    if (!adminProfile?.id) {
+      alert("Sessione admin non valida");
+      return;
+    }
+
     const username = nome.toLowerCase().trim();
-const password = cognome.toLowerCase().trim();
+    const password = cognome.toLowerCase().trim();
 
     setSaving(true);
 
-    const { error } = await supabase
-  .from("agents")
-  .insert([
-    {
-      nome,
-      cognome,
-      username,
-      password,
-      owner_auth_id: session.user.id,
-    },
-  ]);
+    const { error } = await supabase.from("agents").insert([
+      {
+        nome,
+        cognome,
+        username,
+        password,
+        owner_admin_id: adminProfile.id,
+      },
+    ]);
 
     setSaving(false);
 
@@ -2651,9 +2444,29 @@ const password = cognome.toLowerCase().trim();
     }
 
     alert("Agente salvato");
-
     setNome("");
     setCognome("");
+    await loadAgents();
+  };
+
+  const deleteAgent = async (agentId?: number) => {
+    if (!agentId) return;
+
+    const ok = window.confirm("Vuoi eliminare questo agente?");
+    if (!ok) return;
+
+    let query = supabase.from("agents").delete().eq("id", agentId);
+
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_admin_id", adminProfile?.id);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+      alert("Errore eliminazione agente: " + error.message);
+      return;
+    }
 
     await loadAgents();
   };
@@ -2668,7 +2481,7 @@ const password = cognome.toLowerCase().trim();
           padding: 16,
         }}
       >
-        <h2 style={{ marginTop: 0 }}>Agent (admin)</h2>
+        <h2 style={{ marginTop: 0 }}>Agent Admin</h2>
 
         <div
           style={{
@@ -2748,7 +2561,7 @@ const password = cognome.toLowerCase().trim();
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Nome", "Cognome", "Username", "Password"].map((h) => (
+                  {["Nome", "Cognome", "Username", "Password", "Azioni"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -2766,10 +2579,10 @@ const password = cognome.toLowerCase().trim();
                 {agents.map((a, i) => (
                   <tr key={a.id || i}>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                    {a.nome?.toUpperCase()}
+                      {a.nome?.toUpperCase()}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                    {a.cognome?.toUpperCase()}
+                      {a.cognome?.toUpperCase()}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       {a.username}
@@ -2777,12 +2590,154 @@ const password = cognome.toLowerCase().trim();
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       {a.password}
                     </td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                      <button
+                        type="button"
+                        onClick={() => deleteAgent(a.id)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid #dc2626",
+                          background: "white",
+                          color: "#dc2626",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                        title="Elimina agente"
+                      >
+                        🗑
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function LoginView({
+  setSession,
+  setAdminProfile,
+}: {
+  setSession: React.Dispatch<React.SetStateAction<any>>;
+  setAdminProfile: React.Dispatch<React.SetStateAction<AdminProfile | null>>;
+}) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleLogin = async () => {
+    setLoading(true);
+    setErrorMsg("");
+
+    try {
+      const user = username.trim().toLowerCase();
+      const pass = password.trim();
+
+      if (!user || !pass) {
+        setErrorMsg("Inserisci username e password");
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+  .from("admin_users")
+  .select("id, nome, username, password, role")
+  .ilike("username", user)
+  .eq("password", pass)
+  .maybeSingle();
+
+if (error || !data) {
+  setErrorMsg("Credenziali non valide");
+  setLoading(false);
+  return;
+}
+
+            localStorage.setItem("admin_session", JSON.stringify(data));
+
+      setSession(data);
+      setAdminProfile(data);
+    } catch (err) {
+      setErrorMsg("Errore durante il login");
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        marginTop: 40,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 16,
+          padding: 24,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        <h2 style={{ margin: 0 }}>Accesso Admin</h2>
+
+        <input
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #cbd5e1",
+            fontSize: 14,
+          }}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #cbd5e1",
+            fontSize: 14,
+          }}
+        />
+
+        {errorMsg && (
+          <div style={{ color: "red", fontSize: 13 }}>{errorMsg}</div>
+        )}
+
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          style={{
+            marginTop: 6,
+            padding: "12px",
+            borderRadius: 10,
+            border: "none",
+            background: "#0f172a",
+            color: "white",
+            cursor: "pointer",
+            fontWeight: 500,
+          }}
+        >
+          {loading ? "Accesso..." : "Entra"}
+        </button>
       </div>
     </div>
   );
@@ -2809,19 +2764,19 @@ function ReportAgent() {
   const loadReportsByAgent = async (agentId: number) => {
     setLoading(true);
   
-    let query = supabase
+    const { data, error } = await supabase
       .from("reports")
       .select("*")
       .eq("agent_id", agentId)
       .order("report_date", { ascending: false });
   
-    if (agentSession?.owner_auth_id) {
-      query = query.eq("owner_auth_id", agentSession.owner_auth_id);
+    if (error) {
+      console.error("LOAD REPORTS BY AGENT ERROR:", error);
+      setReports([]);
+    } else {
+      setReports(data || []);
     }
   
-    const { data, error } = await query;
-  
-    if (!error && data) setReports(data);
     setLoading(false);
   };
   
@@ -2851,7 +2806,11 @@ function ReportAgent() {
       return;
     }
 
-    setAgentSession(data);
+    console.log("LOGIN AGENTE DATA:", data);
+    setAgentSession({
+      ...data,
+      owner_admin_id: data.owner_admin_id,
+    });
     setLoginError("");
     setForm((prev: any) => ({ ...prev, agent_id: data.id || 0 }));
     await loadReportsByAgent(data.id || 0);
@@ -2874,13 +2833,15 @@ function ReportAgent() {
     const payload = {
       report_date: form.report_date,
       agent_id: agentSession.id,
-      owner_auth_id: agentSession.owner_auth_id,
+      owner_admin_id: agentSession.owner_admin_id,
       contracts_energia: Number(form.contracts_energia || 0),
       consumi_energia: Number(form.consumi_energia || 0),
       contracts_gas: Number(form.contracts_gas || 0),
       consumi_gas: Number(form.consumi_gas || 0),
       notes: form.notes || "",
     };
+
+    console.log("REPORT PAYLOAD:", payload);
   
     const { error } = await supabase
       .from("reports")
@@ -3274,10 +3235,8 @@ function ReportAgent() {
 }
 
 function ReportAdmin({
-  session,
   adminProfile,
 }: {
-  session: any;
   adminProfile: AdminProfile | null;
 }) {
   const [agents, setAgents] = useState<any[]>([]);
@@ -3294,9 +3253,9 @@ function ReportAdmin({
   .neq("username", "admin")
   .order("nome", { ascending: true });
 
-if (adminProfile?.role !== "super_admin") {
-  query = query.eq("owner_auth_id", session.user.id);
-}
+  if (adminProfile?.role !== "super_admin") {
+    query = query.eq("owner_admin_id", adminProfile?.id);
+  }
 
 const { data } = await query;
 setAgents(data || []);
@@ -3310,18 +3269,26 @@ setAgents(data || []);
       .select("*")
       .order("report_date", { ascending: false });
   
-    if (adminProfile?.role !== "super_admin") {
-      query = query.eq("owner_auth_id", session.user.id);
-    }
+      if (adminProfile?.role !== "super_admin") {
+        query = query.eq("owner_admin_id", adminProfile?.id);
+      }
   
     if (agentId) {
       query = query.eq("agent_id", agentId);
     }
   
-    const { data } = await query;
-    setReports(data || []);
-    setLoading(false);
+    const { data, error } = await query;
+
+if (error) {
+  console.error("LOAD REPORTS ERROR:", error);
+  setReports([]);
+} else {
+  setReports(data || []);
+}
+
+setLoading(false);
   };
+  
     
 
   useEffect(() => {
@@ -3333,10 +3300,10 @@ setAgents(data || []);
     if (!ok) return;
   
     let query = supabase.from("reports").delete().eq("id", reportId);
-  
-    if (adminProfile?.role !== "super_admin") {
-      query = query.eq("owner_auth_id", session.user.id);
-    }
+
+if (adminProfile?.role !== "super_admin") {
+  query = query.eq("owner_admin_id", adminProfile?.id);
+}
   
     const { error } = await query;
   
@@ -3616,12 +3583,293 @@ setAgents(data || []);
   );
 }
 
+function AdminUsersManager({
+  adminProfile,
+}: {
+  adminProfile: any;
+}) {
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [newNome, setNewNome] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const loadAdmins = async () => {
+    if (adminProfile?.role !== "super_admin") return;
+
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("id, nome, username, password, role")
+      .order("username", { ascending: true });
+
+    if (!error && data) {
+      setAdmins(data);
+    }
+  };
+
+  useEffect(() => {
+    loadAdmins();
+  }, []);
+
+  const createAdmin = async () => {
+    const nome = newNome.trim();
+    const username = newUsername.trim().toLowerCase();
+    const password = newPassword.trim();
+
+    if (!nome || !username || !password) {
+      alert("Compila tutti i campi");
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.from("admin_users").insert([
+      {
+        nome,
+        username,
+        password,
+        auth_id: crypto.randomUUID(),
+        role: "admin",
+      },
+    ]);
+
+    setLoading(false);
+
+    if (error) {
+      alert("Errore creazione admin: " + error.message);
+      return;
+    }
+
+    setNewNome("");
+    setNewUsername("");
+    setNewPassword("");
+
+    loadAdmins();
+  };
+
+  const deleteAdmin = async (id: number) => {
+    if (!confirm("Eliminare admin?")) return;
+
+    await supabase.from("admin_users").delete().eq("id", id);
+    loadAdmins();
+  };
+
+  if (adminProfile?.role !== "super_admin") return null;
+
+  return (
+    <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 18 }}>
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 16,
+          padding: 20,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.05)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <h2 style={{ margin: 0 }}>Admin web app</h2>
+          <div style={{ fontSize: 13, color: "#64748b" }}>
+            Crea nuovi admin con accesso diretto via username e password
+          </div>
+        </div>
+  
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+            gap: 12,
+          }}
+        >
+          <input
+            placeholder="Nome"
+            value={newNome}
+            onChange={(e) => setNewNome(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              border: "1px solid #cbd5e1",
+              borderRadius: 10,
+              boxSizing: "border-box",
+              fontSize: 14,
+            }}
+          />
+          <input
+            placeholder="Username"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              border: "1px solid #cbd5e1",
+              borderRadius: 10,
+              boxSizing: "border-box",
+              fontSize: 14,
+            }}
+          />
+          <input
+            placeholder="Password"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              border: "1px solid #cbd5e1",
+              borderRadius: 10,
+              boxSizing: "border-box",
+              fontSize: 14,
+            }}
+          />
+          <button
+            onClick={createAdmin}
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: "none",
+              background: "#0f172a",
+              color: "white",
+              cursor: "pointer",
+              fontWeight: 700,
+              fontSize: 14,
+            }}
+          >
+            {loading ? "Creazione..." : "Crea admin"}
+          </button>
+        </div>
+      </div>
+  
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 16,
+          padding: 20,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.05)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <h2 style={{ margin: 0 }}>Elenco admin</h2>
+          <div style={{ fontSize: 13, color: "#64748b" }}>
+            Gestione amministratori della web app
+          </div>
+        </div>
+  
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["Nome", "Username", "Password", "Ruolo", "Azioni"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: "left",
+                      padding: "10px 8px",
+                      borderBottom: "1px solid #e2e8f0",
+                      fontSize: 13,
+                      color: "#475569",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {admins.map((a) => (
+                <tr key={a.id}>
+                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
+                    {a.nome || "-"}
+                  </td>
+                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
+                    {a.username}
+                  </td>
+                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
+                    {a.password}
+                  </td>
+                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        background: a.role === "super_admin" ? "#dbeafe" : "#f1f5f9",
+                        color: a.role === "super_admin" ? "#1d4ed8" : "#334155",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {a.role}
+                    </span>
+                  </td>
+                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
+                    <button
+                      onClick={() => deleteAdmin(a.id)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "1px solid #dc2626",
+                        background: "white",
+                        color: "#dc2626",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Elimina
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
+  const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
-  const [loadingAdminProfile, setLoadingAdminProfile] = useState(false);
+
   const [tab, setTab] = useState(() => {
     return localStorage.getItem("app_tab") || "energia";
   });
+
+  useEffect(() => {
+    const savedAdmin = localStorage.getItem("admin_session");
+
+    if (savedAdmin) {
+      try {
+        const parsed = JSON.parse(savedAdmin) as AdminProfile;
+        setAdminSession(parsed);
+        setAdminProfile(parsed);
+      } catch {
+        localStorage.removeItem("admin_session");
+      }
+    }
+  }, []);
   const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
   const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
   const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
@@ -3632,146 +3880,17 @@ export default function App() {
   });
 
   const [session, setSession] = useState<any>(null);
-  const [authReady, setAuthReady] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
-  const [savingSettings, 
-    setSavingSettings] = useState(false);
-    useEffect(() => {
-      if (!loadingAdminProfile) return;
-    
-      const timer = setTimeout(async () => {
-        if (loadingAdminProfile && !adminProfile) {
-          await supabase.auth.signOut();
-          setSession(null);
-          setAdminProfile(null);
-          setLoadingAdminProfile(false);
-          setAuthReady(true);
-        }
-      }, 4000);
-    
-      return () => clearTimeout(timer);
-    }, [loadingAdminProfile, adminProfile]);
-  useEffect(() => {
-    localStorage.setItem("app_tab", tab);
-  }, [tab]);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+useEffect(() => {
+  localStorage.setItem("app_tab", tab);
+}, [tab]);
 
   const adminTabs = ["reportAdmin", "listini", "agents", "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
 
-  useEffect(() => {
-    let mounted = true;
   
-    const loadAdminProfile = async (currentSession: any) => {
-      if (!mounted) return;
-    
-      if (!currentSession?.user?.id) {
-        setAdminProfile(null);
-        setLoadingAdminProfile(false);
-        setAuthReady(true);
-        return;
-      }
-  
-      setLoadingAdminProfile(true);
-  
-      try {
-        const userId = currentSession.user.id;
-        const userEmail = (currentSession.user.email || "").toLowerCase().trim();
-  
-        let { data, error } = await supabase
-          .from("admin_users")
-          .select("id, auth_id, role, email")
-          .eq("auth_id", userId)
-          .maybeSingle();
-  
-        if (!data && userEmail) {
-          const byEmail = await supabase
-            .from("admin_users")
-            .select("id, auth_id, role, email")
-            .eq("email", userEmail)
-            .maybeSingle();
-  
-          data = byEmail.data;
-          error = byEmail.error;
-  
-          if (data && !data.auth_id) {
-            const { error: updateError } = await supabase
-              .from("admin_users")
-              .update({ auth_id: userId })
-              .eq("id", data.id);
-  
-            if (!updateError) {
-              data = {
-                ...data,
-                auth_id: userId,
-              };
-            }
-          }
-        }
-  
-        if (!mounted) return;
-  
-        if (error || !data) {
-          setAdminProfile(null);
-        } else {
-          setAdminProfile({
-            id: data.id,
-            auth_id: data.auth_id,
-            email: data.email,
-            role: data.role === "super_admin" ? "super_admin" : "admin",
-          });
-        }
-      } catch (err) {
-        console.error("loadAdminProfile catch:", err);
-        if (mounted) setAdminProfile(null);
-      } finally {
-        if (mounted) {
-          setLoadingAdminProfile(false);
-          setAuthReady(true);
-        }
-      }
-    };
-  
-    const initAuth = async () => {
-      try {
-        setAuthReady(false);
-  
-        const {
-          data: { session: currentSession },
-        } = await supabase.auth.getSession();
-  
-        if (!mounted) return;
-  
-        setSession(currentSession ?? null);
-setAuthReady(true);
-await loadAdminProfile(currentSession ?? null);
-      } catch (err) {
-        console.error("initAuth error:", err);
-        if (!mounted) return;
-        setSession(null);
-        setAdminProfile(null);
-        setLoadingAdminProfile(false);
-        setAuthReady(true);
-      }
-    };
-  
-    initAuth();
-  
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
-      if (!mounted) return;
-    
-      setSession(currentSession ?? null);
-      setAuthReady(true);
-    
-      await loadAdminProfile(currentSession ?? null);
-    });
-  
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -3869,59 +3988,20 @@ await loadAdminProfile(currentSession ?? null);
 
     alert("Listini salvati online");
   };
-
+  
   const renderAdminContent = () => {
-    if (!authReady) {
+    if (!adminSession || !adminProfile) {
       return (
-        <div style={{ padding: 20, background: "white", border: "1px solid #e2e8f0", borderRadius: 12 }}>
-          Verifica sessione admin...
-        </div>
+        <LoginView
+          setSession={setAdminSession}
+          setAdminProfile={setAdminProfile}
+        />
       );
     }
+
   
-    if (!session) {
-      return <LoginView title="Accesso Admin" />;
-    }
   
-    if (loadingAdminProfile && !adminProfile) {
-      return (
-        <div
-          style={{
-            padding: 20,
-            background: "white",
-            border: "1px solid #e2e8f0",
-            borderRadius: 12,
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          <div>Caricamento profilo admin...</div>
     
-          <button
-            type="button"
-            onClick={async () => {
-              await supabase.auth.signOut();
-              setSession(null);
-              setAdminProfile(null);
-              setLoadingAdminProfile(false);
-              setAuthReady(true);
-              setTab("reportAdmin");
-            }}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: "white",
-              cursor: "pointer",
-              width: "fit-content",
-            }}
-          >
-            Torna al login admin
-          </button>
-        </div>
-      );
-    }
   
     if (!adminProfile) {
       return (
@@ -3998,8 +4078,11 @@ await loadAdminProfile(currentSession ?? null);
 
   <button
     type="button"
-    onClick={async () => {
-      await supabase.auth.signOut();
+    onClick={() => {
+      localStorage.removeItem("admin_session");
+      setAdminSession(null);
+      setAdminProfile(null);
+      setSession(null);
       setTab("energia");
       localStorage.removeItem("app_tab");
     }}
@@ -4018,12 +4101,17 @@ await loadAdminProfile(currentSession ?? null);
         </div>
   
         {tab === "reportAdmin" && (
-          <ReportAdmin session={session} adminProfile={adminProfile} />
-        )}
+  <ReportAdmin adminProfile={adminProfile} />
+)}
   
-        {tab === "agents" && (
-          <AgentsAdmin session={session} adminProfile={adminProfile} />
-        )}
+  {tab === "agents" && (
+  <>
+    <AgentsAdmin adminProfile={adminProfile} />
+    {adminProfile?.role === "super_admin" && (
+  <AdminUsersManager adminProfile={adminProfile} />
+)}
+  </>
+)}
   
         {tab === "listini" && (
           <Listini
@@ -4105,15 +4193,23 @@ await loadAdminProfile(currentSession ?? null);
   </button>
 </div>
   
-      {tab === "energia" ? (
-        <Energia monthlyRows={monthlyRows} energyOffers={energyOffers} dispCpRows={dispCpRows} />
-      ) : tab === "gas" ? (
-        <Gas monthlyRows={monthlyRows} gasOffers={gasOffers} gasAcciseSettings={gasAcciseSettings} />
-      ) : tab === "report" ? (
-        <ReportAgent />
-      ) : (
-        renderAdminContent()
-      )}
+{tab === "energia" ? (
+  <Energia
+    monthlyRows={monthlyRows}
+    energyOffers={energyOffers}
+    dispCpRows={dispCpRows}
+  />
+) : tab === "gas" ? (
+  <Gas
+    monthlyRows={monthlyRows}
+    gasOffers={gasOffers}
+    gasAcciseSettings={gasAcciseSettings}
+  />
+) : tab === "report" ? (
+  <ReportAgent />
+  ) : (
+    renderAdminContent()
+  )}
     </div>
 );
 }
