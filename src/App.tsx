@@ -150,11 +150,14 @@ const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
 ];
 
 function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
-  const index = rows.findIndex((r) => r.mese === selectedMonth);
+  const index = rows.findIndex(
+    (r) => `${r.mese} ${r.anno}` === selectedMonth
+  );
+ 
   if (index === -1) return [];
-
+ 
   return rows.slice(Math.max(0, index - 11), index + 1);
-}
+ }
 
 function getSvgPoints(values: number[], width: number, height: number) {
   if (values.length === 0) return "";
@@ -163,9 +166,13 @@ function getSvgPoints(values: number[], width: number, height: number) {
   const min = Math.min(...values);
   const range = max - min || 1;
 
+  const paddingX = 28;
+  const usableWidth = width - paddingX * 2;
+
   return values
     .map((v, i) => {
-      const x = (i / Math.max(values.length - 1, 1)) * width;
+      const x =
+        paddingX + (i / Math.max(values.length - 1, 1)) * usableWidth;
       const y = height - ((v - min) / range) * height;
       return `${x},${y}`;
     })
@@ -178,8 +185,12 @@ function getChartCoords(values: number[], width: number, height: number) {
   const min = Math.min(...values);
   const range = max - min || 1;
 
+  const paddingX = 28; // margine laterale per non tagliare i mesi
+  const usableWidth = width - paddingX * 2;
+
   return values.map((v, i) => {
-    const x = (i / Math.max(values.length - 1, 1)) * width;
+    const x =
+      paddingX + (i / Math.max(values.length - 1, 1)) * usableWidth;
     const y = height - ((v - min) / range) * height;
     return { x, y, value: v };
   });
@@ -4167,6 +4178,7 @@ export default function App() {
   });
   
   const [selectedMonthPUN, setSelectedMonthPUN] = useState("GENNAIO 2025");
+  const [punPsvView, setPunPsvView] = useState<"both" | "pun" | "psv">("both");
   
   function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
     const index = rows.findIndex(r => r.mese === selectedMonth);
@@ -4199,65 +4211,136 @@ const latestPsv =
         visiblePunPsvRows[visiblePunPsvRows.length - 1].psv || 0
       ).toFixed(6)
     : "-";
-const publicPunPsvOptions = [...punPsvRows]
+       
+    function getRowMonthScore(row: any) {
+      const mesi = [
+        "GENNAIO",
+        "FEBBRAIO",
+        "MARZO",
+        "APRILE",
+        "MAGGIO",
+        "GIUGNO",
+        "LUGLIO",
+        "AGOSTO",
+        "SETTEMBRE",
+        "OTTOBRE",
+        "NOVEMBRE",
+        "DICEMBRE",
+      ];
+    
+      const anno = Number(row.anno || 0);
+      const meseIndex = mesi.indexOf(String(row.mese).toUpperCase());
+    
+      if (!anno || meseIndex === -1) return -1;
+    
+      return anno * 100 + meseIndex;
+    }
+    
+    const publicPunPsvOptions = [...punPsvRows]
   .filter((row) => {
     if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
       return false;
-          }
-          return (
-            Number(row.mono || 0) !== 0 ||
-            Number(row.f1 || 0) !== 0 ||
-            Number(row.f2 || 0) !== 0 ||
-            Number(row.f3 || 0) !== 0 ||
-            Number(row.psv || 0) !== 0
-          );
-  })
-  .sort((a, b) => getMonthYearSortValue(b.mese) - getMonthYearSortValue(a.mese));
-
-  useEffect(() => {
-    if (
-      publicPunPsvOptions.length > 0 &&
-      !publicPunPsvOptions.some((row) => row.mese === selectedMonthPUN)
-    ) {
-      setSelectedMonthPUN(publicPunPsvOptions[0].mese);
     }
-  }, [publicPunPsvOptions, selectedMonthPUN]);
 
-  useEffect(() => {
-    const savedAdmin = localStorage.getItem("admin_session");
-
-    if (savedAdmin) {
-      try {
-        const parsed = JSON.parse(savedAdmin) as AdminProfile;
-        setAdminSession(parsed);
-        setAdminProfile(parsed);
-      } catch {
-        localStorage.removeItem("admin_session");
-      }
-    }
-  }, []);
-  const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
-  const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
-  const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
-  const updateMonthlyRow = (
-    index: number,
-    field: keyof MonthlyRow,
-    value: string
-  ) => {
-    setMonthlyRows((prev) =>
-      prev.map((row, i) =>
-        i === index
-          ? {
-              ...row,
-              [field]:
-                field === "mese"
-                  ? value.toUpperCase()
-                  : Number(String(value).replace(",", ".")) || 0,
-            }
-          : row
-      )
+    return (
+      Number(row.mono || 0) !== 0 ||
+      Number(row.f1 || 0) !== 0 ||
+      Number(row.f2 || 0) !== 0 ||
+      Number(row.f3 || 0) !== 0 ||
+      Number(row.psv || 0) !== 0
     );
-  };
+  })
+  .sort((a, b) => {
+    const mesi = [
+      "GENNAIO",
+      "FEBBRAIO",
+      "MARZO",
+      "APRILE",
+      "MAGGIO",
+      "GIUGNO",
+      "LUGLIO",
+      "AGOSTO",
+      "SETTEMBRE",
+      "OTTOBRE",
+      "NOVEMBRE",
+      "DICEMBRE",
+    ];
+
+    const annoA = Number(a.anno || 0);
+    const annoB = Number(b.anno || 0);
+    const meseA = mesi.indexOf(String(a.mese).toUpperCase());
+    const meseB = mesi.indexOf(String(b.mese).toUpperCase());
+
+    if (annoA !== annoB) return annoB - annoA;
+    return meseB - meseA;
+  });
+
+console.log(
+  "PRIMO MESE PUBBLICO:",
+  publicPunPsvOptions[0]?.mese,
+  publicPunPsvOptions[0]?.anno
+);
+
+console.log(
+  "PUBLIC OPTIONS COMPLETE:",
+  publicPunPsvOptions.map((r) => ({
+    mese: r.mese,
+    anno: r.anno,
+    mono: r.mono,
+    f1: r.f1,
+    f2: r.f2,
+    f3: r.f3,
+    psv: r.psv,
+  }))
+);
+
+useEffect(() => {
+  if (tab === "punpsv" && publicPunPsvOptions.length > 0) {
+    const ultimoMeseDisponibile = `${publicPunPsvOptions[0].mese} ${publicPunPsvOptions[0].anno}`;
+
+    if (selectedMonthPUN !== ultimoMeseDisponibile) {
+      setSelectedMonthPUN(ultimoMeseDisponibile);
+    }
+  }
+}, [tab, publicPunPsvOptions, selectedMonthPUN]);
+
+useEffect(() => {
+  const savedAdmin = localStorage.getItem("admin_session");
+
+  if (savedAdmin) {
+    try {
+      const parsed = JSON.parse(savedAdmin) as AdminProfile;
+      setAdminSession(parsed);
+      setAdminProfile(parsed);
+    } catch {
+      localStorage.removeItem("admin_session");
+    }
+  }
+}, []);
+
+const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
+const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
+const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
+
+const updateMonthlyRow = (
+  index: number,
+  field: keyof MonthlyRow,
+  value: string
+) => {
+  setMonthlyRows((prev) =>
+    prev.map((row, i) =>
+      i === index
+        ? {
+            ...row,
+            [field]:
+              field === "mese"
+                ? value.toUpperCase()
+                : Number(String(value).replace(",", ".")) || 0,
+          }
+        : row
+    )
+  );
+};
   
   const [gasOffers, setGasOffers] = useState<GasOffer[]>(INITIAL_GAS_OFFERS);
   const [gasAcciseSettings, setGasAcciseSettings] = useState<GasAcciseSettings>({
@@ -4758,181 +4841,240 @@ const renderAdminContent = () => {
                 }}
               >
                 {publicPunPsvOptions.map((row) => (
-  <option key={row.mese} value={row.mese}>
-    {row.mese}
-  </option>
+  <option
+  key={`${row.mese}-${row.anno}`}
+  value={`${row.mese} ${row.anno}`}
+ >
+  {row.mese} {row.anno}
+ </option>
 ))}
               </select>
             </div>
 
             <div
+ style={{
+   display:"flex",
+   gap:10,
+   flexWrap:"wrap",
+   marginBottom:20
+ }}
+>
+<button
+onClick={()=>setPunPsvView("both")}
+style={{
+padding:"10px 14px",
+borderRadius:10,
+background: punPsvView==="both" ? "#0f172a":"white",
+color: punPsvView==="both" ? "white":"#0f172a",
+fontWeight:700
+}}
+>
+PUN-PSV
+</button>
+
+<button
+onClick={()=>setPunPsvView("pun")}
+style={{
+padding:"10px 14px",
+borderRadius:10,
+background: punPsvView==="pun" ? "#2563eb":"white",
+color: punPsvView==="pun" ? "white":"#0f172a",
+fontWeight:700
+}}
+>
+PUN
+</button>
+
+<button
+onClick={()=>setPunPsvView("psv")}
+style={{
+padding:"10px 14px",
+borderRadius:10,
+background: punPsvView==="psv" ? "#16a34a":"white",
+color: punPsvView==="psv" ? "white":"#0f172a",
+fontWeight:700
+}}
+>
+PSV
+</button>
+</div>
+
+            <div
   style={{
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: punPsvView === "both" ? "1fr 1fr" : "1fr",
     gap: 20,
     marginBottom: 24
   }}
 >
 
 {/* PUN */}
-<div
- style={{
-   background:"#f8fafc",
-   border:"1px solid #e2e8f0",
-   borderRadius:16,
-   padding:20
- }}
->
-<h3 style={{marginTop:0}}>Andamento PUN</h3>
+{(punPsvView === "both" || punPsvView === "pun") && (
+  <div
+    style={{
+      background: "#f8fafc",
+      border: "1px solid #e2e8f0",
+      borderRadius: 16,
+      padding: 20,
+    }}
+  >
+    <h3 style={{ marginTop: 0 }}>Andamento PUN</h3>
 
-<div style={{
-display:"flex",
-justifyContent:"space-between",
-marginBottom:12,
-fontWeight:700
-}}>
-<span>Ultimo:</span>
-<span>{latestPun}</span>
-</div>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        marginBottom: 12,
+        fontWeight: 700,
+      }}
+    >
+      <span>Ultimo:</span>
+      <span>{latestPun}</span>
+    </div>
 
-<svg viewBox="0 0 760 220" style={{width:"100%",height:240}}>
-{[40,80,120,160].map(y=>(
-<line
-key={y}
-x1="0"
-x2="760"
-y1={y}
-y2={y}
-stroke="#dbe3ea"
-/>
-))}
+    <svg viewBox="0 0 760 220" style={{ width: "100%", height: 240 }}>
+      {[40, 80, 120, 160].map((y) => (
+        <line
+          key={y}
+          x1="0"
+          x2="760"
+          y1={y}
+          y2={y}
+          stroke="#dbe3ea"
+        />
+      ))}
 
-<polyline
-fill="none"
-stroke="#2563eb"
-strokeWidth="5"
-strokeLinecap="round"
-strokeLinejoin="round"
-points={punPolyline}
-/>
+      <polyline
+        fill="none"
+        stroke="#f59e0b"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={punPolyline}
+      />
 
-{punCoords.map((p,i)=>(
-<circle
-key={i}
-cx={p.x}
-cy={p.y}
-r="6"
-fill="#2563eb"
-/>
-))}
+      {punCoords.map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r="6"
+          fill="#f59e0b"
+        />
+      ))}
 
-{punCoords.map((p,i)=>(
-<text
- key={"m"+i}
- x={p.x}
- y="205"
- textAnchor="middle"
- fontSize="14"
- fill="#64748b"
->
-{["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][i % 12]}
-</text>
-))}
-{punCoords.map((p,i)=>(
-<text
- key={"v"+i}
- x={p.x}
- y={p.y-12}
- textAnchor="middle"
- fontSize="11"
- fill="#2563eb"
- fontWeight="700"
->
- {punValues[i].toFixed(3)}
-</text>
-))}
-</svg>
-</div>
+      {punCoords.map((p, i) => (
+        <text
+          key={"m" + i}
+          x={p.x}
+          y="205"
+          textAnchor="middle"
+          fontSize="14"
+          fill="#64748b"
+        >
+          {["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"][i % 12]}
+        </text>
+      ))}
 
+      {punCoords.map((p, i) => (
+        <text
+          key={"v" + i}
+          x={p.x}
+          y={p.y - 12}
+          textAnchor="middle"
+          fontSize="11"
+          fill="#2563eb"
+          fontWeight="700"
+        >
+          {punValues[i].toFixed(3)}
+        </text>
+      ))}
+    </svg>
+  </div>
+)}
 
 {/* PSV */}
-<div
- style={{
-   background:"#f8fafc",
-   border:"1px solid #e2e8f0",
-   borderRadius:16,
-   padding:20
- }}
->
-<h3 style={{marginTop:0}}>Andamento PSV</h3>
+{(punPsvView === "both" || punPsvView === "psv") && (
+  <div
+    style={{
+      background:"#f8fafc",
+      border:"1px solid #e2e8f0",
+      borderRadius:16,
+      padding:20
+    }}
+  >
+    <h3 style={{marginTop:0}}>Andamento PSV</h3>
 
-<div style={{
-display:"flex",
-justifyContent:"space-between",
-marginBottom:12,
-fontWeight:700
-}}>
-<span>Ultimo:</span>
-<span>{latestPsv}</span>
-</div>
+    <div style={{
+      display:"flex",
+      justifyContent:"space-between",
+      marginBottom:12,
+      fontWeight:700
+    }}>
+      <span>Ultimo:</span>
+      <span>{latestPsv}</span>
+    </div>
 
-<svg viewBox="0 0 760 220" style={{width:"100%",height:240}}>
-{[40,80,120,160].map(y=>(
-<line
-key={y}
-x1="0"
-x2="760"
-y1={y}
-y2={y}
-stroke="#dbe3ea"
-/>
-))}
+    <svg viewBox="0 0 760 220" style={{width:"100%",height:240}}>
+      {[40,80,120,160].map(y=>(
+        <line
+          key={y}
+          x1="0"
+          x2="760"
+          y1={y}
+          y2={y}
+          stroke="#dbe3ea"
+        />
+      ))}
 
-<polyline
-fill="none"
-stroke="#16a34a"
-strokeWidth="5"
-strokeLinecap="round"
-strokeLinejoin="round"
-points={psvPolyline}
-/>
+      <polyline
+        fill="none"
+        stroke="#2563eb"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={psvPolyline}
+      />
 
-{psvCoords.map((p,i)=>(
-<circle
-key={i}
-cx={p.x}
-cy={p.y}
-r="6"
-fill="#16a34a"
-/>
-))}
-{psvCoords.map((p,i)=>(
-<text
- key={"psv"+i}
- x={p.x}
- y="205"
- textAnchor="middle"
- fontSize="14"
- fill="#64748b"
->
-{["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][i % 12]}
-</text>
-))}
-{psvCoords.map((p,i)=>(
-<text
- key={"psv-v"+i}
- x={p.x}
- y={p.y-12}
- textAnchor="middle"
- fontSize="11"
- fill="#16a34a"
- fontWeight="700"
->
- {psvValues[i].toFixed(3)}
-</text>
-))}
-</svg>
-</div>
+      {psvCoords.map((p,i)=>(
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r="6"
+          fill="#2563eb"
+        />
+      ))}
+
+      {psvCoords.map((p,i)=>(
+        <text
+          key={"psv"+i}
+          x={p.x}
+          y="205"
+          textAnchor="middle"
+          fontSize="14"
+          fill="#64748b"
+        >
+          {["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][i % 12]}
+        </text>
+      ))}
+
+      {psvCoords.map((p,i)=>(
+        <text
+          key={"psv-v"+i}
+          x={p.x}
+          y={p.y-12}
+          textAnchor="middle"
+          fontSize="11"
+          fill="#2563eb"
+          fontWeight="700"
+        >
+          {psvValues[i].toFixed(3)}
+        </text>
+      ))}
+    </svg>
+  </div>
+)}
 
 </div>
 
@@ -4946,92 +5088,176 @@ fill="#16a34a"
                 }}
               >
                 <thead>
-                  <tr style={{ background: "#f8fafc" }}>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "14px 16px",
-                        borderBottom: "1px solid #e2e8f0",
-                        fontWeight: 700,
-                        color: "#0f172a",
-                        width: "50%",
-                      }}
-                    >
-                      Mese
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "right",
-                        padding: "14px 16px",
-                        borderBottom: "1px solid #e2e8f0",
-                        fontWeight: 700,
-                        color: "#0f172a",
-                        width: "25%",
-                      }}
-                    >
-                      PUN
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "right",
-                        padding: "14px 16px",
-                        borderBottom: "1px solid #e2e8f0",
-                        fontWeight: 700,
-                        color: "#0f172a",
-                        width: "25%",
-                      }}
-                    >
-                      PSV
-                    </th>
-                  </tr>
-                </thead>
 
-                <tbody>
-                {tablePunPsvRows.map((row, index) => (
-                    <tr
-                      key={row.mese}
-                      style={{
-                        background: index % 2 === 0 ? "white" : "#fcfdff",
-                      }}
-                    >
-                      <td
-                        style={{
-                          padding: "14px 16px",
-                          borderBottom: "1px solid #e2e8f0",
-                          textAlign: "left",
-                          color: "#0f172a",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {row.mese}
-                      </td>
+{punPsvView==="both" && (
+<tr style={{background:"#fff7ed"}}>
+<th style={{textAlign:"left",padding:"14px 16px"}}>Mese</th>
+<th style={{textAlign:"right",padding:"14px 16px",color:"#f59e0b"}}>
+PUN
+</th>
+<th style={{textAlign:"right",padding:"14px 16px",color:"#2563eb"}}>
+PSV
+</th>
+</tr>
+)}
 
-                      <td
-                        style={{
-                          padding: "14px 16px",
-                          borderBottom: "1px solid #e2e8f0",
-                          textAlign: "right",
-                          color: "#0f172a",
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {Number(row.mono).toFixed(6)}
-                      </td>
+{punPsvView==="pun" && (
+<tr style={{background:"#f8fafc"}}>
+<th style={{textAlign:"left",padding:"14px 16px"}}>Mese</th>
+<th style={{
+textAlign:"right",
+padding:"14px 16px",
+background:"#ffedd5",
+color:"#c2410c",
+fontWeight:800,
 
-                      <td
-                        style={{
-                          padding: "14px 16px",
-                          borderBottom: "1px solid #e2e8f0",
-                          textAlign: "right",
-                          color: "#0f172a",
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {Number(row.psv).toFixed(6)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+}}>
+Mono
+</th>
+<th style={{
+textAlign:"right",
+padding:"14px 16px",
+background:"#fff7ed",
+color:"#d97706",
+fontWeight:700
+}}>
+F1
+</th>
+<th style={{
+textAlign:"right",
+padding:"14px 16px",
+background:"#fffbeb",
+color:"#ea580c",
+fontWeight:700
+}}>
+F2
+</th>
+<th style={{
+textAlign:"right",
+padding:"14px 16px",
+background:"#fef9c3",
+color:"#ca8a04",
+fontWeight:700
+}}>
+F3
+</th>
+</tr>
+)}
+
+{punPsvView==="psv" && (
+<tr style={{background:"#eff6ff"}}>
+<th style={{textAlign:"left",padding:"14px 16px"}}>Mese</th>
+<th style={{textAlign:"right",padding:"14px 16px"}}>PSV</th>
+</tr>
+)}
+
+</thead>
+
+<tbody>
+{tablePunPsvRows.map((row,index)=>(
+<tr
+ key={row.mese}
+ style={{
+  background:
+    punPsvView==="pun"
+      ? (index%2===0 ? "#fffaf0" : "#fff7ed")
+      : punPsvView==="psv"
+      ? (index%2===0 ? "#f8fbff" : "#eff6ff")
+      : (index%2===0 ? "white" : "#fcfdff")
+ }}
+>
+
+<td style={{
+ padding:"14px 16px",
+ borderBottom:"1px solid #e2e8f0"
+}}>
+{row.mese}
+</td>
+
+{punPsvView==="both" && (
+<>
+<td style={{
+  textAlign:"right",
+  padding:"14px 16px",
+  borderBottom:"1px solid #e2e8f0",
+  color:"#d97706",
+  fontWeight:600
+}}>
+{Number(row.mono).toFixed(6)}
+</td>
+
+<td style={{
+  textAlign:"right",
+  padding:"14px 16px",
+  borderBottom:"1px solid #e2e8f0",
+  color:"#2563eb",
+  fontWeight:600
+}}>
+{Number(row.psv).toFixed(6)}
+</td>
+</>
+)}
+
+{punPsvView==="pun" && (
+<>
+<td style={{
+  textAlign:"right",
+  padding:"14px 16px",
+  borderBottom:"1px solid #e2e8f0",
+  color:"#c2410c",
+  fontWeight:700,
+  background:"#ffedd5"
+}}>
+{Number(row.mono).toFixed(6)}
+</td>
+
+<td style={{
+  textAlign:"right",
+  padding:"14px 16px",
+  borderBottom:"1px solid #e2e8f0",
+  color:"#d97706",
+  fontWeight:600
+}}>
+{Number(row.f1).toFixed(6)}
+</td>
+
+<td style={{
+  textAlign:"right",
+  padding:"14px 16px",
+  borderBottom:"1px solid #e2e8f0",
+  color:"#ea580c",
+  fontWeight:600
+}}>
+{Number(row.f2).toFixed(6)}
+</td>
+
+<td style={{
+  textAlign:"right",
+  padding:"14px 16px",
+  borderBottom:"1px solid #e2e8f0",
+  color:"#ca8a04",
+  fontWeight:600
+}}>
+{Number(row.f3).toFixed(6)}
+</td>
+</>
+)}
+
+{punPsvView==="psv" && (
+<td style={{
+  textAlign:"right",
+  padding:"14px 16px",
+  borderBottom:"1px solid #e2e8f0",
+  color:"#2563eb",
+  fontWeight:600
+}}>
+{Number(row.psv).toFixed(6)}
+</td>
+)}
+
+</tr>
+))}
+</tbody>
               </table>
             </div>
           </div>
