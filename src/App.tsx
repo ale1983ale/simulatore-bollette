@@ -4274,16 +4274,15 @@ const latestPsv =
     return score(b.mese) - score(a.mese);
   });
 
-console.log(
-  publicPunPsvOptions[0]?.mese,
-  publicPunPsvOptions[0]?.anno
-);
-
 useEffect(() => {
   if (tab === "punpsv" && publicPunPsvOptions.length > 0) {
-    setSelectedMonthPUN(publicPunPsvOptions[0].mese);
+    const ultimo = publicPunPsvOptions[0].mese;
+
+    if (selectedMonthPUN !== ultimo) {
+      setSelectedMonthPUN(ultimo);
+    }
   }
-}, [tab]);
+}, [tab, publicPunPsvOptions[0]?.mese]);
 
 useEffect(() => {
   const savedAdmin = localStorage.getItem("admin_session");
