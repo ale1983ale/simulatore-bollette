@@ -171,6 +171,19 @@ function getSvgPoints(values: number[], width: number, height: number) {
     })
     .join(" ");
 }
+function getChartCoords(values: number[], width: number, height: number) {
+  if (!values.length) return [];
+
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = max - min || 1;
+
+  return values.map((v, i) => {
+    const x = (i / Math.max(values.length - 1, 1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return { x, y, value: v };
+  });
+}
 const MESI = [
   "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
   "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
@@ -4167,6 +4180,22 @@ export default function App() {
 const psvValues = visiblePunPsvRows.map(r => r.psv);
 const punPolyline = getSvgPoints(punValues, 760, 220);
 const psvPolyline = getSvgPoints(psvValues, 760, 220);
+const punCoords = getChartCoords(punValues, 760, 220);
+const psvCoords = getChartCoords(psvValues, 760, 220);
+
+const latestPun =
+  visiblePunPsvRows.length > 0
+    ? Number(
+        visiblePunPsvRows[visiblePunPsvRows.length - 1].mono || 0
+      ).toFixed(6)
+    : "-";
+
+const latestPsv =
+  visiblePunPsvRows.length > 0
+    ? Number(
+        visiblePunPsvRows[visiblePunPsvRows.length - 1].psv || 0
+      ).toFixed(6)
+    : "-";
 const publicPunPsvOptions = [...punPsvRows]
   .filter((row) => {
     if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
@@ -4732,48 +4761,178 @@ const renderAdminContent = () => {
 ))}
               </select>
             </div>
-        
+
             <div
-              style={{
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                borderRadius: 14,
-                padding: 16,
-                marginBottom: 24,
-              }}
-            >
-              <svg
-                viewBox="0 0 760 220"
-                style={{ width: "100%", height: 260, display: "block" }}
-              >
-                <polyline
-                  fill="none"
-                  stroke="#2563eb"
-                  strokeWidth="3"
-                  points={punPolyline}
-                />
-                <polyline
-                  fill="none"
-                  stroke="#16a34a"
-                  strokeWidth="3"
-                  points={psvPolyline}
-                />
-              </svg>
-        
-              <div
-                style={{
-                  display: "flex",
-                  gap: 20,
-                  marginTop: 12,
-                  fontWeight: 600,
-                  color: "#0f172a",
-                }}
-              >
-                <div style={{ color: "#2563eb" }}>● PUN</div>
-                <div style={{ color: "#16a34a" }}>● PSV</div>
-              </div>
-            </div>
-        
+  style={{
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 20,
+    marginBottom: 24
+  }}
+>
+
+{/* PUN */}
+<div
+ style={{
+   background:"#f8fafc",
+   border:"1px solid #e2e8f0",
+   borderRadius:16,
+   padding:20
+ }}
+>
+<h3 style={{marginTop:0}}>Andamento PUN</h3>
+
+<div style={{
+display:"flex",
+justifyContent:"space-between",
+marginBottom:12,
+fontWeight:700
+}}>
+<span>Ultimo:</span>
+<span>{latestPun}</span>
+</div>
+
+<svg viewBox="0 0 760 220" style={{width:"100%",height:240}}>
+{[40,80,120,160].map(y=>(
+<line
+key={y}
+x1="0"
+x2="760"
+y1={y}
+y2={y}
+stroke="#dbe3ea"
+/>
+))}
+
+<polyline
+fill="none"
+stroke="#2563eb"
+strokeWidth="5"
+strokeLinecap="round"
+strokeLinejoin="round"
+points={punPolyline}
+/>
+
+{punCoords.map((p,i)=>(
+<circle
+key={i}
+cx={p.x}
+cy={p.y}
+r="6"
+fill="#2563eb"
+/>
+))}
+
+{punCoords.map((p,i)=>(
+<text
+ key={"m"+i}
+ x={p.x}
+ y="205"
+ textAnchor="middle"
+ fontSize="14"
+ fill="#64748b"
+>
+{["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][i % 12]}
+</text>
+))}
+{punCoords.map((p,i)=>(
+<text
+ key={"v"+i}
+ x={p.x}
+ y={p.y-12}
+ textAnchor="middle"
+ fontSize="11"
+ fill="#2563eb"
+ fontWeight="700"
+>
+ {punValues[i].toFixed(3)}
+</text>
+))}
+</svg>
+</div>
+
+
+{/* PSV */}
+<div
+ style={{
+   background:"#f8fafc",
+   border:"1px solid #e2e8f0",
+   borderRadius:16,
+   padding:20
+ }}
+>
+<h3 style={{marginTop:0}}>Andamento PSV</h3>
+
+<div style={{
+display:"flex",
+justifyContent:"space-between",
+marginBottom:12,
+fontWeight:700
+}}>
+<span>Ultimo:</span>
+<span>{latestPsv}</span>
+</div>
+
+<svg viewBox="0 0 760 220" style={{width:"100%",height:240}}>
+{[40,80,120,160].map(y=>(
+<line
+key={y}
+x1="0"
+x2="760"
+y1={y}
+y2={y}
+stroke="#dbe3ea"
+/>
+))}
+
+<polyline
+fill="none"
+stroke="#16a34a"
+strokeWidth="5"
+strokeLinecap="round"
+strokeLinejoin="round"
+points={psvPolyline}
+/>
+
+{psvCoords.map((p,i)=>(
+<circle
+key={i}
+cx={p.x}
+cy={p.y}
+r="6"
+fill="#16a34a"
+/>
+))}
+{psvCoords.map((p,i)=>(
+<text
+ key={"psv"+i}
+ x={p.x}
+ y="205"
+ textAnchor="middle"
+ fontSize="14"
+ fill="#64748b"
+>
+{["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][i % 12]}
+</text>
+))}
+{psvCoords.map((p,i)=>(
+<text
+ key={"psv-v"+i}
+ x={p.x}
+ y={p.y-12}
+ textAnchor="middle"
+ fontSize="11"
+ fill="#16a34a"
+ fontWeight="700"
+>
+ {psvValues[i].toFixed(3)}
+</text>
+))}
+</svg>
+</div>
+
+</div>
+
             <div style={{ overflowX: "auto" }}>
               <table
                 style={{
@@ -4823,7 +4982,7 @@ const renderAdminContent = () => {
                     </th>
                   </tr>
                 </thead>
-        
+
                 <tbody>
                   {visiblePunPsvRows.map((row, index) => (
                     <tr
@@ -4843,7 +5002,7 @@ const renderAdminContent = () => {
                       >
                         {row.mese}
                       </td>
-        
+
                       <td
                         style={{
                           padding: "14px 16px",
@@ -4855,7 +5014,7 @@ const renderAdminContent = () => {
                       >
                         {Number(row.mono).toFixed(6)}
                       </td>
-        
+
                       <td
                         style={{
                           padding: "14px 16px",
@@ -4878,4 +5037,4 @@ const renderAdminContent = () => {
         )}
     </div>
   );
-  }
+}
