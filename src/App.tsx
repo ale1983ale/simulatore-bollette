@@ -150,14 +150,11 @@ const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
 ];
 
 function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
-  const index = rows.findIndex(
-    (r) => `${r.mese} ${r.anno}` === selectedMonth
-  );
- 
+  const index = rows.findIndex((r) => r.mese === selectedMonth);
   if (index === -1) return [];
- 
+
   return rows.slice(Math.max(0, index - 11), index + 1);
- }
+}
 
 function getSvgPoints(values: number[], width: number, height: number) {
   if (values.length === 0) return "";
@@ -4266,37 +4263,25 @@ const latestPsv =
       "DICEMBRE",
     ];
 
-    const annoA = Number(a.anno || 0);
-    const annoB = Number(b.anno || 0);
-    const meseA = mesi.indexOf(String(a.mese).toUpperCase());
-    const meseB = mesi.indexOf(String(b.mese).toUpperCase());
+    const score = (label: string) => {
+      const parts = String(label).trim().split(" ");
+      const mese = parts[0]?.toUpperCase() || "";
+      const anno = parseInt(parts[1] || "0", 10);
+      const meseIndex = mesi.indexOf(mese);
+      return anno * 100 + meseIndex;
+    };
 
-    if (annoA !== annoB) return annoB - annoA;
-    return meseB - meseA;
+    return score(b.mese) - score(a.mese);
   });
 
 console.log(
-  "PRIMO MESE PUBBLICO:",
   publicPunPsvOptions[0]?.mese,
   publicPunPsvOptions[0]?.anno
 );
 
-console.log(
-  "PUBLIC OPTIONS COMPLETE:",
-  publicPunPsvOptions.map((r) => ({
-    mese: r.mese,
-    anno: r.anno,
-    mono: r.mono,
-    f1: r.f1,
-    f2: r.f2,
-    f3: r.f3,
-    psv: r.psv,
-  }))
-);
-
 useEffect(() => {
   if (tab === "punpsv" && publicPunPsvOptions.length > 0) {
-    const ultimoMeseDisponibile = `${publicPunPsvOptions[0].mese} ${publicPunPsvOptions[0].anno}`;
+    const ultimoMeseDisponibile = publicPunPsvOptions[0].mese;
 
     if (selectedMonthPUN !== ultimoMeseDisponibile) {
       setSelectedMonthPUN(ultimoMeseDisponibile);
@@ -4841,12 +4826,9 @@ const renderAdminContent = () => {
                 }}
               >
                 {publicPunPsvOptions.map((row) => (
-  <option
-  key={`${row.mese}-${row.anno}`}
-  value={`${row.mese} ${row.anno}`}
- >
-  {row.mese} {row.anno}
- </option>
+  <option key={row.mese} value={row.mese}>
+    {row.mese}
+  </option>
 ))}
               </select>
             </div>
