@@ -4281,13 +4281,9 @@ console.log(
 
 useEffect(() => {
   if (tab === "punpsv" && publicPunPsvOptions.length > 0) {
-    const ultimoMeseDisponibile = publicPunPsvOptions[0].mese;
-
-    if (selectedMonthPUN !== ultimoMeseDisponibile) {
-      setSelectedMonthPUN(ultimoMeseDisponibile);
-    }
+    setSelectedMonthPUN(publicPunPsvOptions[0].mese);
   }
-}, [tab, publicPunPsvOptions, selectedMonthPUN]);
+}, [tab]);
 
 useEffect(() => {
   const savedAdmin = localStorage.getItem("admin_session");
