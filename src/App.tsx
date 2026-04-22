@@ -5456,40 +5456,47 @@ PSV
                 }}
               >
                 <thead>
-  {punPsvView === "both" && (
-    <tr style={{ background: "#fff7ed" }}>
-      <th
-        style={{
-          textAlign: "left",
-          padding: "14px 16px",
-          width: "50%",
-        }}
-      >
-        Mese
-      </th>
-      <th
-        style={{
-          textAlign: "right",
-          padding: "14px 16px",
-          paddingRight: "220px",
-          width: "25%",
-          color: "#f59e0b",
-        }}
-      >
-        PUN
-      </th>
-      <th
-        style={{
-          textAlign: "right",
-          padding: "14px 16px",
-          width: "25%",
-          color: "#2563eb",
-        }}
-      >
-        PSV
-      </th>
-    </tr>
-  )}
+                {punPsvView === "both" && (
+  <tr style={{ background: "#fff7ed" }}>
+    <th
+      style={{
+        textAlign: "left",
+        padding: "14px 16px",
+        width: "38%",
+      }}
+    >
+      Mese
+    </th>
+    <th
+      style={{
+        textAlign: "right",
+        padding: "14px 16px",
+        width: "20%",
+        color: "#f59e0b",
+      }}
+    >
+      PUN
+    </th>
+    <th
+      style={{
+        width: "18%",
+        padding: 0,
+      }}
+    >
+      <span style={{ visibility: "hidden" }}>spazio</span>
+    </th>
+    <th
+      style={{
+        textAlign: "right",
+        padding: "14px 16px",
+        width: "28%",
+        color: "#2563eb",
+      }}
+    >
+      PSV
+    </th>
+  </tr>
+)}
 
   {punPsvView === "pun" && (
     <tr style={{ background: "#f8fafc" }}>
@@ -5579,34 +5586,46 @@ PSV
         {row.mese}
       </td>
 
+      
       {punPsvView === "both" && (
-        <>
-          <td
-            style={{
-              textAlign: "right",
-              padding: "14px 16px",
-              paddingRight: "220px",
-              borderBottom: "1px solid #e2e8f0",
-              color: "#d97706",
-              fontWeight: 600,
-            }}
-          >
-            {Number(row.mono).toFixed(6)}
-          </td>
+  <>
+    <td
+      style={{
+        textAlign: "right",
+        padding: "14px 16px",
+        borderBottom: "1px solid #e2e8f0",
+        color: "#d97706",
+        fontWeight: 600,
+        width: "16%",
+      }}
+    >
+      {Number(row.mono).toFixed(6)}
+    </td>
 
-          <td
-            style={{
-              textAlign: "right",
-              padding: "14px 16px",
-              borderBottom: "1px solid #e2e8f0",
-              color: "#2563eb",
-              fontWeight: 600,
-            }}
-          >
-            {Number(row.psv).toFixed(6)}
-          </td>
-        </>
-      )}
+    <td
+      style={{
+        width: "18%",
+        padding: 0,
+        borderBottom: "1px solid #e2e8f0",
+      }}
+    >
+      <span style={{ visibility: "hidden" }}>spazio</span>
+    </td>
+
+    <td
+      style={{
+        textAlign: "right",
+        padding: "14px 16px",
+        borderBottom: "1px solid #e2e8f0",
+        color: "#2563eb",
+        fontWeight: 600,
+        width: "28%",
+      }}
+    >
+      {Number(row.psv).toFixed(6)}
+    </td>
+  </>
+)}
 
       {punPsvView === "pun" && (
         <>
