@@ -4315,6 +4315,10 @@ useEffect(() => {
       if (map.gasAcciseSettings) {
         setGasAcciseSettings(map.gasAcciseSettings);
       }
+
+      if (Array.isArray(map.punPsvRows)) {
+        setPunPsvRows(map.punPsvRows);
+      }
     }
 
     setLoadingSettings(false);
@@ -4332,6 +4336,8 @@ const saveSettings = async () => {
     { key: "energyOffers", value_json: energyOffers },
     { key: "gasOffers", value_json: gasOffers },
     { key: "gasAcciseSettings", value_json: gasAcciseSettings },
+    { key: "punPsvRows", value_json: punPsvRows },
+    
   ];
 
   const { error } = await supabase.from("app_settings").upsert(payload);
@@ -4464,6 +4470,7 @@ const renderAdminContent = () => {
       )}
 
       {tab === "punpsvAdmin" && (
+        
         <div
           style={{
             background: "white",
@@ -4492,6 +4499,24 @@ const renderAdminContent = () => {
               ))}
             </select>
           </div>
+          <div style={{ marginBottom: 16 }}>
+  <button
+    type="button"
+    onClick={saveSettings}
+    disabled={savingSettings}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 8,
+      border: "none",
+      background: "#0f172a",
+      color: "white",
+      cursor: "pointer",
+      fontWeight: 700,
+    }}
+  >
+    {savingSettings ? "Salvataggio..." : "Salva PUN / PSV"}
+  </button>
+</div>
 
           <div style={{ overflowX: "auto" }}>
   <table style={{ width: "100%", borderCollapse: "collapse" }}>
