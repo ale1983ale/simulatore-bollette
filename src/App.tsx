@@ -63,7 +63,18 @@ type PunPsvRow = {
 };
 
 const PUN_PSV_MONTHS = [
-  "GENNAIO 2025",
+"GENNAIO 2024",
+"FEBBRAIO 2024",
+"MARZO 2024",
+"APRILE 2024",
+"MAGGIO 2024",
+"GIUGNO 2024",
+"LUGLIO 2024",
+"AGOSTO 2024",
+"SETTEMBRE 2024",
+"OTTOBRE 2024",
+"NOVEMBRE 2024",
+"DICEMBRE 2024","GENNAIO 2025",
   "FEBBRAIO 2025",
   "MARZO 2025",
   "APRILE 2025",
@@ -165,7 +176,7 @@ const MESI = [
   "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
 ];
 
-const ANNI = [2025, 2026, 2027, 2028, 2029];
+const ANNI = [2024,2025, 2026, 2027, 2028, 2029];
 
 function getMonthYearSortValue(label: string) {
   if (label === "FISSO DOMESTICO") return Number.MAX_SAFE_INTEGER;
@@ -4152,7 +4163,7 @@ export default function App() {
   }
   
   const visiblePunPsvRows = getLast12PunPsvRows(punPsvRows, selectedMonthPUN);
-const punValues = visiblePunPsvRows.map(r => r.pun);
+  const punValues = visiblePunPsvRows.map(r => Number(r.mono || 0));
 const psvValues = visiblePunPsvRows.map(r => r.psv);
 const punPolyline = getSvgPoints(punValues, 760, 220);
 const psvPolyline = getSvgPoints(psvValues, 760, 220);
@@ -4794,7 +4805,7 @@ const renderAdminContent = () => {
                           fontVariantNumeric: "tabular-nums",
                         }}
                       >
-                        {Number(row.pun).toFixed(6)}
+                        {Number(row.mono).toFixed(6)}
                       </td>
         
                       <td
