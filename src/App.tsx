@@ -5456,182 +5456,233 @@ PSV
                 }}
               >
                 <thead>
+  {punPsvView === "both" && (
+    <tr style={{ background: "#fff7ed" }}>
+      <th
+        style={{
+          textAlign: "left",
+          padding: "14px 16px",
+          width: "50%",
+        }}
+      >
+        Mese
+      </th>
+      <th
+        style={{
+          textAlign: "right",
+          padding: "14px 16px",
+          paddingRight: "220px",
+          width: "25%",
+          color: "#f59e0b",
+        }}
+      >
+        PUN
+      </th>
+      <th
+        style={{
+          textAlign: "right",
+          padding: "14px 16px",
+          width: "25%",
+          color: "#2563eb",
+        }}
+      >
+        PSV
+      </th>
+    </tr>
+  )}
 
-{punPsvView==="both" && (
-<tr style={{background:"#fff7ed"}}>
-<th style={{textAlign:"left",padding:"14px 16px"}}>Mese</th>
-<th style={{textAlign:"right",padding:"14px 16px",color:"#f59e0b"}}>
-PUN
-</th>
-<th style={{textAlign:"right",padding:"14px 16px",color:"#2563eb"}}>
-PSV
-</th>
-</tr>
-)}
+  {punPsvView === "pun" && (
+    <tr style={{ background: "#f8fafc" }}>
+      <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
+      <th
+        style={{
+          textAlign: "right",
+          padding: "14px 16px",
+          background: "#ffedd5",
+          color: "#c2410c",
+          fontWeight: 800,
+        }}
+      >
+        Mono
+      </th>
+      <th
+        style={{
+          textAlign: "right",
+          padding: "14px 16px",
+          background: "#fff7ed",
+          color: "#d97706",
+          fontWeight: 700,
+        }}
+      >
+        F1
+      </th>
+      <th
+        style={{
+          textAlign: "right",
+          padding: "14px 16px",
+          background: "#fffbeb",
+          color: "#ea580c",
+          fontWeight: 700,
+        }}
+      >
+        F2
+      </th>
+      <th
+        style={{
+          textAlign: "right",
+          padding: "14px 16px",
+          background: "#fef9c3",
+          color: "#ca8a04",
+          fontWeight: 700,
+        }}
+      >
+        F3
+      </th>
+    </tr>
+  )}
 
-{punPsvView==="pun" && (
-<tr style={{background:"#f8fafc"}}>
-<th style={{textAlign:"left",padding:"14px 16px"}}>Mese</th>
-<th style={{
-textAlign:"right",
-padding:"14px 16px",
-background:"#ffedd5",
-color:"#c2410c",
-fontWeight:800,
-
-}}>
-Mono
-</th>
-<th style={{
-textAlign:"right",
-padding:"14px 16px",
-background:"#fff7ed",
-color:"#d97706",
-fontWeight:700
-}}>
-F1
-</th>
-<th style={{
-textAlign:"right",
-padding:"14px 16px",
-background:"#fffbeb",
-color:"#ea580c",
-fontWeight:700
-}}>
-F2
-</th>
-<th style={{
-textAlign:"right",
-padding:"14px 16px",
-background:"#fef9c3",
-color:"#ca8a04",
-fontWeight:700
-}}>
-F3
-</th>
-</tr>
-)}
-
-{punPsvView==="psv" && (
-<tr style={{background:"#eff6ff"}}>
-<th style={{textAlign:"left",padding:"14px 16px"}}>Mese</th>
-<th style={{textAlign:"right",padding:"14px 16px"}}>PSV</th>
-</tr>
-)}
-
+  {punPsvView === "psv" && (
+    <tr style={{ background: "#eff6ff" }}>
+      <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
+      <th style={{ textAlign: "right", padding: "14px 16px", color: "#2563eb" }}>
+        PSV
+      </th>
+    </tr>
+  )}
 </thead>
 
 <tbody>
-{tablePunPsvRows.map((row,index)=>(
-<tr
- key={row.mese}
- style={{
-  background:
-    punPsvView==="pun"
-      ? (index%2===0 ? "#fffaf0" : "#fff7ed")
-      : punPsvView==="psv"
-      ? (index%2===0 ? "#f8fbff" : "#eff6ff")
-      : (index%2===0 ? "white" : "#fcfdff")
- }}
->
+  {tablePunPsvRows.map((row, index) => (
+    <tr
+      key={row.mese}
+      style={{
+        background:
+          punPsvView === "pun"
+            ? index % 2 === 0
+              ? "#fffaf0"
+              : "#fff7ed"
+            : punPsvView === "psv"
+            ? index % 2 === 0
+              ? "#f8fbff"
+              : "#eff6ff"
+            : index % 2 === 0
+            ? "white"
+            : "#fcfdff",
+      }}
+    >
+      <td
+        style={{
+          padding: "14px 16px",
+          borderBottom: "1px solid #e2e8f0",
+        }}
+      >
+        {row.mese}
+      </td>
 
-<td style={{
- padding:"14px 16px",
- borderBottom:"1px solid #e2e8f0"
-}}>
-{row.mese}
-</td>
+      {punPsvView === "both" && (
+        <>
+          <td
+            style={{
+              textAlign: "right",
+              padding: "14px 16px",
+              paddingRight: "220px",
+              borderBottom: "1px solid #e2e8f0",
+              color: "#d97706",
+              fontWeight: 600,
+            }}
+          >
+            {Number(row.mono).toFixed(6)}
+          </td>
 
-{punPsvView==="both" && (
-<>
-<td style={{
-  textAlign:"right",
-  padding:"14px 16px",
-  borderBottom:"1px solid #e2e8f0",
-  color:"#d97706",
-  fontWeight:600
-}}>
-{Number(row.mono).toFixed(6)}
-</td>
+          <td
+            style={{
+              textAlign: "right",
+              padding: "14px 16px",
+              borderBottom: "1px solid #e2e8f0",
+              color: "#2563eb",
+              fontWeight: 600,
+            }}
+          >
+            {Number(row.psv).toFixed(6)}
+          </td>
+        </>
+      )}
 
-<td style={{
-  textAlign:"right",
-  padding:"14px 16px",
-  borderBottom:"1px solid #e2e8f0",
-  color:"#2563eb",
-  fontWeight:600
-}}>
-{Number(row.psv).toFixed(6)}
-</td>
-</>
-)}
+      {punPsvView === "pun" && (
+        <>
+          <td
+            style={{
+              textAlign: "right",
+              padding: "14px 16px",
+              borderBottom: "1px solid #e2e8f0",
+              color: "#c2410c",
+              fontWeight: 700,
+              background: "#ffedd5",
+            }}
+          >
+            {Number(row.mono).toFixed(6)}
+          </td>
 
-{punPsvView==="pun" && (
-<>
-<td style={{
-  textAlign:"right",
-  padding:"14px 16px",
-  borderBottom:"1px solid #e2e8f0",
-  color:"#c2410c",
-  fontWeight:700,
-  background:"#ffedd5"
-}}>
-{Number(row.mono).toFixed(6)}
-</td>
+          <td
+            style={{
+              textAlign: "right",
+              padding: "14px 16px",
+              borderBottom: "1px solid #e2e8f0",
+              color: "#d97706",
+              fontWeight: 600,
+            }}
+          >
+            {Number(row.f1).toFixed(6)}
+          </td>
 
-<td style={{
-  textAlign:"right",
-  padding:"14px 16px",
-  borderBottom:"1px solid #e2e8f0",
-  color:"#d97706",
-  fontWeight:600
-}}>
-{Number(row.f1).toFixed(6)}
-</td>
+          <td
+            style={{
+              textAlign: "right",
+              padding: "14px 16px",
+              borderBottom: "1px solid #e2e8f0",
+              color: "#ea580c",
+              fontWeight: 600,
+            }}
+          >
+            {Number(row.f2).toFixed(6)}
+          </td>
 
-<td style={{
-  textAlign:"right",
-  padding:"14px 16px",
-  borderBottom:"1px solid #e2e8f0",
-  color:"#ea580c",
-  fontWeight:600
-}}>
-{Number(row.f2).toFixed(6)}
-</td>
+          <td
+            style={{
+              textAlign: "right",
+              padding: "14px 16px",
+              borderBottom: "1px solid #e2e8f0",
+              color: "#ca8a04",
+              fontWeight: 600,
+            }}
+          >
+            {Number(row.f3).toFixed(6)}
+          </td>
+        </>
+      )}
 
-<td style={{
-  textAlign:"right",
-  padding:"14px 16px",
-  borderBottom:"1px solid #e2e8f0",
-  color:"#ca8a04",
-  fontWeight:600
-}}>
-{Number(row.f3).toFixed(6)}
-</td>
-</>
-)}
-
-{punPsvView==="psv" && (
-<td style={{
-  textAlign:"right",
-  padding:"14px 16px",
-  borderBottom:"1px solid #e2e8f0",
-  color:"#2563eb",
-  fontWeight:600
-}}>
-{Number(row.psv).toFixed(6)}
-</td>
-)}
-
-</tr>
-))}
+      {punPsvView === "psv" && (
+        <td
+          style={{
+            textAlign: "right",
+            padding: "14px 16px",
+            borderBottom: "1px solid #e2e8f0",
+            color: "#2563eb",
+            fontWeight: 600,
+          }}
+        >
+          {Number(row.psv).toFixed(6)}
+        </td>
+      )}
+    </tr>
+  ))}
 </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          renderAdminContent()
-        )}
-    </div>
-  );
+</table>
+</div>
+</div>
+) : (
+  renderAdminContent()
+)}
+</div>
+);
 }
