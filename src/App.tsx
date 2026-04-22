@@ -604,12 +604,43 @@ function field(label: string, value: string, setValue: (v: string) => void, type
 function selectField(label: string, value: string, setValue: (v: string) => void, options: string[]) {
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <div
+ style={{
+   fontSize:12,
+   fontWeight:700,
+   marginBottom:4,
+   color:
+     label === "Mese 1" || label === "Mese 2"
+       ? "#c96a00"
+       : "inherit"
+ }}
+>
+ {label}
+</div>
       <select
         style={{
           width: "100%",
           padding: 8,
-          border: "1px solid #cbd5e1",
+          border:
+            label === "Mese 1" || label === "Mese 2"
+              ? "2px solid #d97706"
+              : "1px solid #cbd5e1",
+        
+          background:
+            label === "Mese 1" || label === "Mese 2"
+              ? "#fff4e8"
+              : "white",
+        
+          color:
+            label === "Mese 1" || label === "Mese 2"
+              ? "#c96a00"
+              : "inherit",
+        
+          fontWeight:
+            label === "Mese 1" || label === "Mese 2"
+              ? 700
+              : 400,
+        
           borderRadius: 8,
           boxSizing: "border-box",
         }}
@@ -989,7 +1020,7 @@ function Energia({
     numeroPod: "1",
     tipo: "BTA2",
     offerta: energyOffers[0]?.nome || "",
-    mese1: "GENNAIO 2025",
+    mese1: "",
     mese2: "",
     meseRifTabella1: "GENNAIO",
     meseRifTabella2: "GENNAIO",
@@ -1020,6 +1051,59 @@ function Energia({
     acciseManualiValore: "",
     canoneRaiGiaPagato: "0",
   });
+  useEffect(() => {
+    const validMonthOptions = [...punPsvRows]
+      .filter((row) => {
+        if (
+          row.mese === "FISSO DOMESTICO" ||
+          row.mese === "FISSO BUSINESS"
+        ) {
+          return false;
+        }
+  
+        return (
+          Number(row.mono || 0) !== 0 ||
+          Number(row.f1 || 0) !== 0 ||
+          Number(row.f2 || 0) !== 0 ||
+          Number(row.f3 || 0) !== 0 ||
+          Number(row.psv || 0) !== 0
+        );
+      })
+      .sort((a, b) => {
+        const mesi = [
+          "GENNAIO",
+          "FEBBRAIO",
+          "MARZO",
+          "APRILE",
+          "MAGGIO",
+          "GIUGNO",
+          "LUGLIO",
+          "AGOSTO",
+          "SETTEMBRE",
+          "OTTOBRE",
+          "NOVEMBRE",
+          "DICEMBRE",
+        ];
+  
+        const score = (label: string) => {
+          const parts = String(label).trim().split(" ");
+          const mese = parts[0]?.toUpperCase() || "";
+          const anno = parseInt(parts[1] || "0", 10);
+          const meseIndex = mesi.indexOf(mese);
+          return anno * 100 + meseIndex;
+        };
+  
+        return score(b.mese) - score(a.mese);
+      });
+  
+    if (validMonthOptions.length > 0 && !s.mese1) {
+      setS((prev) => ({
+        ...prev,
+        mese1: validMonthOptions[0].mese,
+      }));
+    }
+  }, [punPsvRows, s.mese1]);
+  
   
   const mesiOrdinati = [...punPsvRows]
   .filter((m) => {
@@ -1396,161 +1480,141 @@ function Energia({
     `;
 
     const cleanName = sanitizeFileName(s.nome || "Cliente");
-    printHtmlDocument("Preventivo Energia", html, `${cleanName} - Energia`);
-  };
+printHtmlDocument("Preventivo Energia", html, `${cleanName} - Energia`);
+};
 
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
-        gap: 16,
-        alignItems: "start",
-      }}
-    >
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {sectionCard(
-          "dati",
-          "Energia",
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,minmax(0,1fr))",
-                gap: 12,
-              }}
-            >
-              {field("Nome", s.nome, (v) => set("nome", v))}
-              {field("POD", s.pod, (v) => set("pod", v))}
-              {field("IVA %", s.iva, (v) => set("iva", v), "number")}
-              {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
-              {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
-              {selectField("Tipo", s.tipo, (v) => set("tipo", v), energyTypes)}
-              {selectField("Offerta", s.offerta, (v) => set("offerta", v), energyOffers.map((x) => x.nome))}
-              {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
+return (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
+      gap: 16,
+      alignItems: "start",
+    }}
+  >
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {sectionCard(
+        "dati",
+        "Energia",
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,minmax(0,1fr))",
+              gap: 12,
+            }}
+          >
+            {field("Nome", s.nome, (v) => set("nome", v))}
+            {field("POD", s.pod, (v) => set("pod", v))}
+            {field("IVA %", s.iva, (v) => set("iva", v), "number")}
+            {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
+            {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
+            {selectField("Tipo", s.tipo, (v) => set("tipo", v), energyTypes)}
+            {selectField("Offerta", s.offerta, (v) => set("offerta", v), energyOffers.map((x) => x.nome))}
+            {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
+          </div>
+
+          {s.offerta === "DEDICATA" && (
+            <>
+              <div style={{ height: 12 }} />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
+                  gap: 12,
+                }}
+              >
+                {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                {field(
+                  "Maggiorazione Capacity Market",
+                  s.dedicataCapacityMarket,
+                  (v) => set("dedicataCapacityMarket", v),
+                  "number"
+                )}
+                {field("Quota Fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {sectionCard(
+        "mesi",
+        "Mesi e consumi",
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto auto",
+              alignItems: "stretch",
+              gap: 12,
+              marginBottom: 12,
+            }}
+          >
+            <div style={{ minWidth: 0 }} />
+
+            <div style={boxStyle}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{prezzoMedioEnergiaScheda}</div>
             </div>
 
-            {s.offerta === "DEDICATA" && (
-              <>
-                <div style={{ height: 12 }} />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
-                    gap: 12,
-                  }}
-                >
-                  {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
-                  {field(
-                    "Maggiorazione Capacity Market",
-                    s.dedicataCapacityMarket,
-                    (v) => set("dedicataCapacityMarket", v),
-                    "number"
-                  )}
-                  {field("Quota Fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {sectionCard(
-          "mesi",
-          "Mesi e consumi",
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto auto",
-                alignItems: "stretch",
-                gap: 12,
-                marginBottom: 12,
-              }}
-            >
-              <div style={{ minWidth: 0 }} />
-
-              <div style={boxStyle}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{prezzoMedioEnergiaScheda}</div>
-              </div>
-
-              <div style={boxStyle}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>
-                  {r.consumiTot > 0
-                    ? `${consumoAnnuoEnergia.toLocaleString("it-IT", {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 2,
-                      })} kWh`
-                    : "-"}
-                </div>
-              </div>
-
-              <div style={boxStyle}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>
-                  {r.consumiTot > 0
-                    ? `${r.consumiTot.toLocaleString("it-IT", {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 2,
-                      })} kWh`
-                    : "-"}
-                </div>
+            <div style={boxStyle}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                {r.consumiTot > 0
+                  ? `${consumoAnnuoEnergia.toLocaleString("it-IT", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })} kWh`
+                  : "-"}
               </div>
             </div>
 
+            <div style={boxStyle}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                {r.consumiTot > 0
+                  ? `${r.consumiTot.toLocaleString("it-IT", {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })} kWh`
+                  : "-"}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr",
+              gap: 12,
+            }}
+          >
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(6,minmax(0,1fr))",
-                gap: 12,
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                gap: 24,
+                alignItems: "start",
               }}
             >
-              {selectField("Mese 1", s.mese1, (v) => set("mese1", v),
-  mesiOrdinati
-    .filter((m) => {
-      if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
-      return (
-        n(m.mono) !== 0 ||
-        n(m.f1) !== 0 ||
-        n(m.f2) !== 0 ||
-        n(m.f3) !== 0
-      );
-    })
-    .map((m) => m.mese)
-)}
+              <div style={{ display: "grid", gap: 12 }}>
+                {selectField("Mese 1", s.mese1, (v) => set("mese1", v), [...mesiOrdinati.map((m) => m.mese)])}
 
-{field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
-{field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
-{field("F3 mese 1", s.f3Mese1, (v) => set("f3Mese1", v), "number")}
-{field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
+                {field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
+                {field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
+                {field("F3 mese 1", s.f3Mese1, (v) => set("f3Mese1", v), "number")}
+                {field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
+              </div>
 
-{selectField("Mese 2", s.mese2, (v) => set("mese2", v),
-  ["", ...mesiOrdinati
-    .filter((m) => {
-      if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
-      return (
-        n(m.mono) !== 0 ||
-        n(m.f1) !== 0 ||
-        n(m.f2) !== 0 ||
-        n(m.f3) !== 0
-      );
-    })
-    .map((m) => m.mese)
-  ]
-)}
+              <div style={{ display: "grid", gap: 12 }}>
+                {selectField("Mese 2", s.mese2, (v) => set("mese2", v), ["", ...mesiOrdinati.map((m) => m.mese)])}
 
-{field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
-{field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
-{field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
-{field("Mono mese 2", s.monoMese2, (v) => set("monoMese2", v), "number")}
-
-              {field(
-                "DISP+CP.Mrk",
-                s.dispacciamentoCapacityMarket,
-                (v) => set("dispacciamentoCapacityMarket", v),
-                "number"
-              )}
+                {field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
+                {field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
+                {field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
+                {field("Mono mese 2", s.monoMese2, (v) => set("monoMese2", v), "number")}
+              </div>
             </div>
 
             <div
@@ -1563,6 +1627,15 @@ function Energia({
                 flexDirection: isMobile ? "column" : "row",
               }}
             >
+              <div style={{ minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined }}>
+                {field(
+                  "DISP+CP.Mrk",
+                  s.dispacciamentoCapacityMarket,
+                  (v) => set("dispacciamentoCapacityMarket", v),
+                  "number"
+                )}
+              </div>
+
               <div style={{ minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined }}>
                 {readonlyField("DISP+CP.Mrk Base", numFormat(r.dispCpBase, 6))}
               </div>
@@ -1583,168 +1656,169 @@ function Energia({
                 Usa valore base
               </button>
             </div>
-          </>
-        )}
+          </div>
+        </>
+      )}
 
-        {sectionCard(
-          "rete",
-          "Rete, oneri, rettifiche",
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
-                gap: 12,
-              }}
-            >
-              {field("Quota consumi rete", s.quotaConsumiRete, (v) => set("quotaConsumiRete", v), "number")}
-              {field("Quota fissa rete", s.quotaFissaRete, (v) => set("quotaFissaRete", v), "number")}
-              {field("Quota potenza rete", s.quotaPotenzaRete, (v) => set("quotaPotenzaRete", v), "number")}
-            </div>
+      {sectionCard(
+        "rete",
+        "Rete, oneri, rettifiche",
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
+              gap: 12,
+            }}
+          >
+            {field("Quota consumi rete", s.quotaConsumiRete, (v) => set("quotaConsumiRete", v), "number")}
+            {field("Quota fissa rete", s.quotaFissaRete, (v) => set("quotaFissaRete", v), "number")}
+            {field("Quota potenza rete", s.quotaPotenzaRete, (v) => set("quotaPotenzaRete", v), "number")}
+          </div>
 
-            <div style={{ height: 12 }} />
+          <div style={{ height: 12 }} />
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))",
-                gap: 12,
-              }}
-            >
-              {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
-              {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
-            </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))",
+              gap: 12,
+            }}
+          >
+            {field("Reattiva immessa", s.reattivaImmessa, (v) => set("reattivaImmessa", v), "number")}
+            {field("Reattiva prelevata", s.reattivaPrelevata, (v) => set("reattivaPrelevata", v), "number")}
+          </div>
 
-            <div style={{ height: 12 }} />
+          <div style={{ height: 12 }} />
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(4,minmax(0,1fr))",
-                gap: 12,
-              }}
-            >
-              {toggleAmount(
-                "Confronto Fornitore Precedente",
-                s.confrontoFlag,
-                (v) => set("confrontoFlag", v),
-                s.confrontoValore,
-                (v) => set("confrontoValore", v)
-              )}
-              {toggleAmount(
-                "Ricalcoli/Sconti",
-                s.ricalcoloFlag,
-                (v) => set("ricalcoloFlag", v),
-                s.ricalcoloValore,
-                (v) => set("ricalcoloValore", v)
-              )}
-              {toggleAmount(
-                "Bonus sociale",
-                s.bonusFlag,
-                (v) => set("bonusFlag", v),
-                s.bonusValore,
-                (v) => set("bonusValore", v)
-              )}
-              {toggleAmount(
-                "Accise manuali",
-                s.acciseManualiFlag,
-                (v) => set("acciseManualiFlag", v),
-                s.acciseManualiValore,
-                (v) => set("acciseManualiValore", v)
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {sectionCard(
-          "anteprima",
-          "Anteprima Energia",
-          <>
-            {previewBox(
-              <>
-                {row("Spread usato", numFormat(r.spreadEff, 3))}
-                {row("Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
-                {row("Quota fissa usata", money(r.quotaFissaEff))}
-              </>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(4,minmax(0,1fr))",
+              gap: 12,
+            }}
+          >
+            {toggleAmount(
+              "Confronto Fornitore Precedente",
+              s.confrontoFlag,
+              (v) => set("confrontoFlag", v),
+              s.confrontoValore,
+              (v) => set("confrontoValore", v)
             )}
-
-            {previewBox(
-              <>
-                {row("Pun+Spread", money(r.H22_base))}
-                {row("Perdite di rete", money(r.perditeEnergia))}
-                {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
-                {row("Reattiva", money(r.H24))}
-              </>
+            {toggleAmount(
+              "Ricalcoli/Sconti",
+              s.ricalcoloFlag,
+              (v) => set("ricalcoloFlag", v),
+              s.ricalcoloValore,
+              (v) => set("ricalcoloValore", v)
             )}
-
-            {previewBox(
-              <>
-                {row("Vendita energia", money(r.H22), true, 16)}
-                {row("Quota consumi rete", money(r.H25))}
-                {row("Reattiva", money(r.H24))}
-                {row("Quota consumi totale", money(r.H22 + r.H25 + r.H24))}
-              </>,
-              "#fed7aa"
+            {toggleAmount(
+              "Bonus sociale",
+              s.bonusFlag,
+              (v) => set("bonusFlag", v),
+              s.bonusValore,
+              (v) => set("bonusValore", v)
             )}
-
-            {previewBox(
-              <>
-                {row("Quota fissa offerta/dedicata", money(r.H28))}
-                {row("Quota fissa rete", money(r.H29))}
-              </>
+            {toggleAmount(
+              "Accise manuali",
+              s.acciseManualiFlag,
+              (v) => set("acciseManualiFlag", v),
+              s.acciseManualiValore,
+              (v) => set("acciseManualiValore", v)
             )}
-
-            {previewBox(<>{row("Quota potenza rete", money(r.H30))}</>)}
-
-            {previewBox(
-              <>
-                {row("Accise", money(r.H35))}
-                {row("IVA", money(r.H36))}
-                {row("Totale Imposte", money(r.H37))}
-              </>
-            )}
-
-            {(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
-              previewBox(
-                <>
-                  {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
-                  {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
-                  {r.H40 !== 0 && row("Canone RAI", money(r.H40))}
-                </>
-              )}
-
-            {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
-
-            {isSi(s.confrontoFlag) &&
-              previewBox(
-                <>
-                  {row("Risparmio in fattura", money(r.risparmioFattura))}
-                  {row("Risparmio annuo", money(r.risparmioAnnuo))}
-                </>
-              )}
-
-            <button
-              onClick={printEnergyPdf}
-              style={{
-                marginTop: 14,
-                padding: "10px 14px",
-                borderRadius: 8,
-                background: "#0f172a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-                width: "100%",
-              }}
-            >
-              Crea PDF Energia
-            </button>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
-  );
+
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {sectionCard(
+        "anteprima",
+        "Anteprima Energia",
+        <>
+          {previewBox(
+            <>
+              {row("Spread usato", numFormat(r.spreadEff, 3))}
+              {row("Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
+              {row("Quota fissa usata", money(r.quotaFissaEff))}
+            </>
+          )}
+
+          {previewBox(
+            <>
+              {row("Pun+Spread", money(r.H22_base))}
+              {row("Perdite di rete", money(r.perditeEnergia))}
+              {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
+              {row("Reattiva", money(r.H24))}
+            </>
+          )}
+
+          {previewBox(
+            <>
+              {row("Vendita energia", money(r.H22), true, 16)}
+              {row("Quota consumi rete", money(r.H25))}
+              {row("Reattiva", money(r.H24))}
+              {row("Quota consumi totale", money(r.H22 + r.H25 + r.H24))}
+            </>,
+            "#fed7aa"
+          )}
+
+          {previewBox(
+            <>
+              {row("Quota fissa offerta/dedicata", money(r.H28))}
+              {row("Quota fissa rete", money(r.H29))}
+            </>
+          )}
+
+          {previewBox(<>{row("Quota potenza rete", money(r.H30))}</>)}
+
+          {previewBox(
+            <>
+              {row("Accise", money(r.H35))}
+              {row("IVA", money(r.H36))}
+              {row("Totale Imposte", money(r.H37))}
+            </>
+          )}
+
+          {(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
+            previewBox(
+              <>
+                {r.H39 !== 0 && row("Bonus sociale", `- ${money(r.H39)}`)}
+                {r.H38 !== 0 && row("Ricalcoli/Sconti", money(r.H38))}
+                {r.H40 !== 0 && row("Canone RAI", money(r.H40))}
+              </>
+            )}
+
+          {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
+
+          {isSi(s.confrontoFlag) &&
+            previewBox(
+              <>
+                {row("Risparmio in fattura", money(r.risparmioFattura))}
+                {row("Risparmio annuo", money(r.risparmioAnnuo))}
+              </>
+            )}
+
+          <button
+            onClick={printEnergyPdf}
+            style={{
+              marginTop: 14,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "#0f172a",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+              width: "100%",
+            }}
+          >
+            Crea PDF Energia
+          </button>
+        </>
+      )}
+    </div>
+  </div>
+);
 }
 
 function Gas({
@@ -1763,7 +1837,7 @@ function Gas({
     uso: "DOMESTICO",
     fatturazione: "MENSILE",
     offerta: gasOffers[0]?.nome || "",
-    periodo1: "GENNAIO 2025",
+    periodo1: "",
     periodo2: "",
     periodo3: "",
     periodo4: "",
@@ -1788,6 +1862,58 @@ function Gas({
     ricalcoloFlag: "NO",
     ricalcoloValore: "",
   });
+  useEffect(() => {
+    const validMonthOptions = [...punPsvRows]
+      .filter((row) => {
+        if (
+          row.mese === "FISSO DOMESTICO" ||
+          row.mese === "FISSO BUSINESS"
+        ) {
+          return false;
+        }
+  
+        return (
+          Number(row.mono || 0) !== 0 ||
+          Number(row.f1 || 0) !== 0 ||
+          Number(row.f2 || 0) !== 0 ||
+          Number(row.f3 || 0) !== 0 ||
+          Number(row.psv || 0) !== 0
+        );
+      })
+      .sort((a, b) => {
+        const mesi = [
+          "GENNAIO",
+          "FEBBRAIO",
+          "MARZO",
+          "APRILE",
+          "MAGGIO",
+          "GIUGNO",
+          "LUGLIO",
+          "AGOSTO",
+          "SETTEMBRE",
+          "OTTOBRE",
+          "NOVEMBRE",
+          "DICEMBRE",
+        ];
+  
+        const score = (label: string) => {
+          const parts = String(label).trim().split(" ");
+          const mese = parts[0]?.toUpperCase() || "";
+          const anno = parseInt(parts[1] || "0", 10);
+          const meseIndex = mesi.indexOf(mese);
+          return anno * 100 + meseIndex;
+        };
+  
+        return score(b.mese) - score(a.mese);
+      });
+  
+    if (validMonthOptions.length > 0 && !s.periodo1) {
+      setS((prev) => ({
+        ...prev,
+        periodo1: validMonthOptions[0].mese,
+      }));
+    }
+  }, [punPsvRows, s.periodo1]);
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [openSections, setOpenSections] = useState({
@@ -4189,6 +4315,36 @@ useState("");
   const tablePunPsvRows = [...visiblePunPsvRows].sort(
     (a, b) => getMonthYearSortValue(b.mese) - getMonthYearSortValue(a.mese)
   );
+  const validMonthOptions = [...punPsvRows]
+  .filter((row) => {
+    if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
+      return false;
+    }
+
+    return (
+      Number(row.mono || 0) !== 0 ||
+      Number(row.f1 || 0) !== 0 ||
+      Number(row.f2 || 0) !== 0 ||
+      Number(row.f3 || 0) !== 0 ||
+      Number(row.psv || 0) !== 0
+    );
+  })
+  .sort((a, b) => {
+    const mesi = [
+      "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
+      "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
+    ];
+
+    const score = (label: string) => {
+      const parts = String(label).trim().split(" ");
+      const mese = parts[0]?.toUpperCase() || "";
+      const anno = parseInt(parts[1] || "0", 10);
+      const meseIndex = mesi.indexOf(mese);
+      return anno * 100 + meseIndex;
+    };
+
+    return score(b.mese) - score(a.mese);
+  });
   const punValues = visiblePunPsvRows.map(r => Number(r.mono || 0));
 const psvValues = visiblePunPsvRows.map(r => r.psv);
 const punPolyline = getSvgPoints(punValues, 760, 220);
@@ -4284,6 +4440,11 @@ useEffect(() => {
     }
   }
 }, [tab, publicPunPsvOptions[0]?.mese]);
+
+
+useEffect(() => {
+}, [tab, validMonthOptions[0]?.mese]);
+
 
 useEffect(() => {
   const savedAdmin = localStorage.getItem("admin_session");
