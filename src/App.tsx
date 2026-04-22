@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import { supabase } from "./supabase";
+
 
 type MonthlyRow = {
   mese: string;
@@ -4494,6 +4496,55 @@ export default function App() {
     return localStorage.getItem("app_tab") || "energia";
   });
   
+  const punPsvRef = useRef<HTMLDivElement>(null);
+
+  const exportPunPsvPdf = async () => {
+    if (!punPsvRef.current) return;
+  
+    try {
+      const canvas = await html2canvas(punPsvRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scrollY: -window.scrollY,
+      });
+  
+      const imgData = canvas.toDataURL("image/png");
+  
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+  
+      const margin = 10;
+      const usableWidth = pageWidth - margin * 2;
+      const imgWidth = usableWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  
+      let y = margin;
+      let heightLeft = imgHeight;
+  
+      pdf.setFontSize(16);
+      pdf.text("Scheda PUN / PSV", margin, y);
+      y += 8;
+  
+      pdf.addImage(imgData, "PNG", margin, y, imgWidth, imgHeight);
+      heightLeft -= pageHeight - y - margin;
+  
+      while (heightLeft > 0) {
+        pdf.addPage();
+        const nextY = margin - (imgHeight - heightLeft);
+        pdf.addImage(imgData, "PNG", margin, nextY, imgWidth, imgHeight);
+        heightLeft -= pageHeight - margin * 2;
+      }
+  
+      pdf.save("Scheda-PUN-PSV.pdf");
+    } catch (error) {
+      console.error("Errore export PDF:", error);
+      alert("Errore durante l'esportazione PDF");
+    }
+  };
+  
+  
   const [selectedMonthPUN, setSelectedMonthPUN] = useState("");
   const [appliedMonthPUN, setAppliedMonthPUN] = useState("");
 
@@ -5177,17 +5228,17 @@ const renderAdminContent = () => {
         
             <div
   style={{
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-    marginBottom: 24,
-    maxWidth: 420,
+    display:"flex",
+    flexDirection:"column",
+    gap:8,
+    marginBottom:24,
+    maxWidth:420
   }}
 >
   <label
     style={{
-      fontWeight: 600,
-      color: "#0f172a",
+      fontWeight:600,
+      color:"#0f172a"
     }}
   >
     Mese selezionato
@@ -5195,26 +5246,23 @@ const renderAdminContent = () => {
 
   <div
     style={{
-      display: "flex",
-      gap: 12,
-      alignItems: "center",
-      flexWrap: "wrap",
+      display:"flex",
+      gap:12,
+      alignItems:"center",
+      flexWrap:"wrap"
     }}
   >
     <select
       value={selectedMonthPUN}
-      onChange={(e) => setSelectedMonthPUN(e.target.value)}
+      onChange={(e)=>setSelectedMonthPUN(e.target.value)}
       style={{
-        padding: "10px 12px",
-        borderRadius: 10,
-        border: "1px solid #cbd5e1",
-        background: "white",
-        color: "#0f172a",
-        fontSize: 16,
-        minWidth: 220,
+        padding:"12px 16px",
+        borderRadius:10,
+        border:"1px solid #cbd5e1",
+        minWidth:240
       }}
     >
-      {publicPunPsvOptions.map((row) => (
+      {punPsvRows.map((row)=>(
         <option key={row.mese} value={row.mese}>
           {row.mese}
         </option>
@@ -5223,19 +5271,36 @@ const renderAdminContent = () => {
 
     <button
       type="button"
-      onClick={() => setAppliedMonthPUN(selectedMonthPUN)}
+      onClick={()=>setAppliedMonthPUN(selectedMonthPUN)}
       style={{
-        background: "#0f172a",
-        color: "#fff",
-        border: "none",
-        borderRadius: 10,
-        padding: "10px 18px",
-        fontWeight: 700,
-        cursor: "pointer",
+        background:"#0f172a",
+        color:"#fff",
+        border:"none",
+        borderRadius:10,
+        padding:"10px 18px",
+        fontWeight:700,
+        cursor:"pointer"
       }}
     >
       VAI
     </button>
+
+    <button
+      type="button"
+      onClick={exportPunPsvPdf}
+      style={{
+        background:"#16a34a",
+        color:"#fff",
+        border:"none",
+        borderRadius:10,
+        padding:"10px 18px",
+        fontWeight:700,
+        cursor:"pointer"
+      }}
+    >
+      PDF
+    </button>
+
   </div>
 </div>
 
@@ -5287,13 +5352,16 @@ PSV
 </button>
 </div>
 
-            <div
-  style={{
-    display: "grid",
-    gridTemplateColumns: punPsvView === "both" ? "1fr 1fr" : "1fr",
-    gap: 20,
-    marginBottom: 24
-  }}
+<div
+ ref={punPsvRef}
+ style={{
+   display:"grid",
+   gridTemplateColumns: punPsvView==="both"
+      ? "1fr 1fr"
+      : "1fr",
+   gap:20,
+   marginBottom:24
+ }}
 >
 
 {/* PUN */}
@@ -5371,7 +5439,7 @@ PSV
           y={p.y - 12}
           textAnchor="middle"
           fontSize="11"
-          fill="#2563eb"
+          fill="#111111"
           fontWeight="700"
         >
           {punValues[i].toFixed(3)}
