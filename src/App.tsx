@@ -1194,16 +1194,7 @@ function Energia({
     [s, punPsvRows, energyOffers, dispCpRows]
   );
 
-  useEffect(() => {
-    if (tab === "punpsv" && publicPunPsvOptions.length > 0) {
-      const ultimo = publicPunPsvOptions[0].mese;
-      if (selectedMonthPUN !== ultimo) {
-        setSelectedMonthPUN(ultimo);
-      }
-    }
-  }, [tab, publicPunPsvOptions, selectedMonthPUN]);
-
-  useEffect(() => {
+    useEffect(() => {
     if (!s.dispacciamentoCapacityMarket || s.dispacciamentoCapacityMarket === "0") {
       setS((prev) => ({
         ...prev,
