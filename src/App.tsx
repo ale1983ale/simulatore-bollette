@@ -1627,34 +1627,85 @@ return (
                 flexDirection: isMobile ? "column" : "row",
               }}
             >
-              <div style={{ minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined }}>
-                {field(
-                  "DISP+CP.Mrk",
-                  s.dispacciamentoCapacityMarket,
-                  (v) => set("dispacciamentoCapacityMarket", v),
-                  "number"
-                )}
-              </div>
+              <div
+ style={{
+   background:"#fffbea",
+   border:"2px solid #e8d98a",
+   borderRadius:8,
+   padding:8
+ }}
+>
+{field(
+ "DISP + CP. Mrk",
+ s.dispacciamentoCapacityMarket,
+ (v)=>set("dispacciamentoCapacityMarket",v),
+ "number"
+)}
+</div>
 
               <div style={{ minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined }}>
-                {readonlyField("DISP+CP.Mrk Base", numFormat(r.dispCpBase, 6))}
-              </div>
+  <div
+    style={{
+      border:"1px solid #cbd5e1",
+      borderRadius:8,
+      padding:10,
+      background:"#ffffff"
+    }}
+  >
+    <div
+ style={{
+   fontSize:12,
+   fontWeight:700,
+   lineHeight:1.2,
+   marginBottom:8
+ }}
+>
+DISP + CP.Mrk<br />
+Base suggerito
+</div>
 
-              <button
-                type="button"
-                onClick={() => set("dispacciamentoCapacityMarket", String(r.dispCpBase))}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e1",
-                  background: "#ffffff",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  width: isMobile ? "100%" : "auto",
-                }}
-              >
-                Usa valore base
-              </button>
+    <div
+  style={{
+    display:"flex",
+    alignItems:"center",
+    justifyContent:"space-between",
+    gap:10
+  }}
+>
+  <div
+    style={{
+      fontSize:18,
+      fontWeight:700
+    }}
+  >
+    {numFormat(r.dispCpBase,6)}
+  </div>
+
+  <button
+ type="button"
+ onClick={() =>
+   set(
+     "dispacciamentoCapacityMarket",
+     String(r.dispCpBase)
+   )
+ }
+ style={{
+   padding:"6px 10px",
+   borderRadius:20,
+   border:"1px solid #d97706",
+   background:"#fff7ed",
+   color:"#c96a00",
+   fontWeight:700,
+   fontSize:12,
+   cursor:"pointer",
+   whiteSpace:"nowrap"
+ }}
+>
+↺ Applica
+</button>
+</div>
+  </div>
+</div>
             </div>
           </div>
         </>
