@@ -4502,47 +4502,126 @@ export default function App() {
     if (!punPsvRef.current) return;
   
     try {
-      const canvas = await html2canvas(punPsvRef.current, {
+      const root = punPsvRef.current;
+  
+      const grid = root.querySelector('div[style*="grid"]') as HTMLElement | null;
+      const tableWrap = root.querySelector('div[style*="overflow"]') as HTMLElement | null;
+  
+      if (!grid || !tableWrap) {
+        alert("Blocco PDF non trovato");
+        return;
+      }
+  
+      const cards = Array.from(grid.children) as HTMLElement[];
+      const punCard = cards[0] || null;
+      const psvCard = cards[1] || null;
+  
+      if (!punCard || !psvCard) {
+        alert("Grafici PUN/PSV non trovati");
+        return;
+      }
+  
+      const commonOptions = {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
         scrollY: -window.scrollY,
+      };
+  
+      const captureWideCard = async (
+        element: HTMLElement,
+        widthPx: number,
+        svgHeightPx: number
+      ) => {
+        const clone = element.cloneNode(true) as HTMLElement;
+        clone.style.position = "fixed";
+        clone.style.left = "-10000px";
+        clone.style.top = "0";
+        clone.style.width = `${widthPx}px`;
+        clone.style.maxWidth = `${widthPx}px`;
+        clone.style.display = "block";
+        clone.style.background = "#ffffff";
+        clone.style.boxSizing = "border-box";
+        clone.style.padding = "10px";
+        clone.style.margin = "0";
+      
+        const svg = clone.querySelector("svg") as SVGElement | null;
+if (svg) {
+  svg.setAttribute("viewBox", "0 0 760 220");
+  svg.setAttribute("preserveAspectRatio", "none");
+  (svg as unknown as HTMLElement).style.width = "100%";
+  (svg as unknown as HTMLElement).style.height = `${svgHeightPx}px`;
+  (svg as unknown as HTMLElement).style.display = "block";
+}
+      
+        document.body.appendChild(clone);
+        const canvas = await html2canvas(clone, commonOptions);
+        document.body.removeChild(clone);
+        return canvas;
+      };
+      const punCanvas = await captureWideCard(punCard, 1200, 320);
+const tableCanvas = await html2canvas(tableWrap, commonOptions);
+const psvCanvas = await captureWideCard(psvCard, 1200, 280);
+  
+      const punImg = punCanvas.toDataURL("image/png");
+      const tableImg = tableCanvas.toDataURL("image/png");
+      const psvImg = psvCanvas.toDataURL("image/png");
+  
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       });
   
-      const imgData = canvas.toDataURL("image/png");
-  
-      const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
   
-      const margin = 10;
+      const margin = 8;
       const usableWidth = pageWidth - margin * 2;
-      const imgWidth = usableWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
   
-      let y = margin;
-      let heightLeft = imgHeight;
-  
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(16);
-      pdf.text("Scheda PUN / PSV", margin, y);
-      y += 8;
+      pdf.text("REPORT PUN / PSV", pageWidth / 2, 12, { align: "center" });
+      pdf.setDrawColor(210);
+      pdf.line(margin, 17, pageWidth - margin, 17);
   
-      pdf.addImage(imgData, "PNG", margin, y, imgWidth, imgHeight);
-      heightLeft -= pageHeight - y - margin;
+      let y = 21;
   
-      while (heightLeft > 0) {
-        pdf.addPage();
-        const nextY = margin - (imgHeight - heightLeft);
-        pdf.addImage(imgData, "PNG", margin, nextY, imgWidth, imgHeight);
-        heightLeft -= pageHeight - margin * 2;
-      }
+      const drawBlock = (
+        imgData: string,
+        canvas: HTMLCanvasElement,
+        targetHeight: number
+      ) => {
+        const ratio = canvas.width / canvas.height;
+        let w = usableWidth;
+        let h = w / ratio;
   
-      pdf.save("Scheda-PUN-PSV.pdf");
+        if (h > targetHeight) {
+          h = targetHeight;
+          w = h * ratio;
+        }
+  
+        const x = (pageWidth - w) / 2;
+        pdf.addImage(imgData, "PNG", x, y, w, h);
+        y += h + 5;
+      };
+  
+      // PUN grande quasi tutta larghezza
+      drawBlock(punImg, punCanvas, 62);
+  
+      // tabella leggibile
+      drawBlock(tableImg, tableCanvas, 120);
+  
+      // PSV sotto
+      drawBlock(psvImg, psvCanvas, 58);
+  
+      pdf.save("Report-PUN-PSV-A4.pdf");
     } catch (error) {
-      console.error("Errore export PDF:", error);
-      alert("Errore durante l'esportazione PDF");
+      console.error(error);
+      alert("Errore esportazione PDF");
     }
   };
+  
   
   
   const [selectedMonthPUN, setSelectedMonthPUN] = useState("");
@@ -5227,569 +5306,569 @@ const renderAdminContent = () => {
             <h2 style={{ marginTop: 0, marginBottom: 20 }}>Andamento PUN / PSV</h2>
         
             <div
-  style={{
-    display:"flex",
-    flexDirection:"column",
-    gap:8,
-    marginBottom:24,
-    maxWidth:420
-  }}
->
-  <label
-    style={{
-      fontWeight:600,
-      color:"#0f172a"
-    }}
-  >
-    Mese selezionato
-  </label>
-
-  <div
-    style={{
-      display:"flex",
-      gap:12,
-      alignItems:"center",
-      flexWrap:"wrap"
-    }}
-  >
-    <select
-      value={selectedMonthPUN}
-      onChange={(e)=>setSelectedMonthPUN(e.target.value)}
-      style={{
-        padding:"12px 16px",
-        borderRadius:10,
-        border:"1px solid #cbd5e1",
-        minWidth:240
-      }}
-    >
-      {punPsvRows.map((row)=>(
-        <option key={row.mese} value={row.mese}>
-          {row.mese}
-        </option>
-      ))}
-    </select>
-
-    <button
-      type="button"
-      onClick={()=>setAppliedMonthPUN(selectedMonthPUN)}
-      style={{
-        background:"#0f172a",
-        color:"#fff",
-        border:"none",
-        borderRadius:10,
-        padding:"10px 18px",
-        fontWeight:700,
-        cursor:"pointer"
-      }}
-    >
-      VAI
-    </button>
-
-    <button
-      type="button"
-      onClick={exportPunPsvPdf}
-      style={{
-        background:"#16a34a",
-        color:"#fff",
-        border:"none",
-        borderRadius:10,
-        padding:"10px 18px",
-        fontWeight:700,
-        cursor:"pointer"
-      }}
-    >
-      PDF
-    </button>
-
-  </div>
-</div>
-
-            <div
- style={{
-   display:"flex",
-   gap:10,
-   flexWrap:"wrap",
-   marginBottom:20
- }}
->
-<button
-onClick={()=>setPunPsvView("both")}
-style={{
-padding:"10px 14px",
-borderRadius:10,
-background: punPsvView==="both" ? "#0f172a":"white",
-color: punPsvView==="both" ? "white":"#0f172a",
-fontWeight:700
-}}
->
-PUN-PSV
-</button>
-
-<button
-onClick={()=>setPunPsvView("pun")}
-style={{
-padding:"10px 14px",
-borderRadius:10,
-background: punPsvView==="pun" ? "#2563eb":"white",
-color: punPsvView==="pun" ? "white":"#0f172a",
-fontWeight:700
-}}
->
-PUN
-</button>
-
-<button
-onClick={()=>setPunPsvView("psv")}
-style={{
-padding:"10px 14px",
-borderRadius:10,
-background: punPsvView==="psv" ? "#16a34a":"white",
-color: punPsvView==="psv" ? "white":"#0f172a",
-fontWeight:700
-}}
->
-PSV
-</button>
-</div>
-
-<div
- ref={punPsvRef}
- style={{
-   display:"grid",
-   gridTemplateColumns: punPsvView==="both"
-      ? "1fr 1fr"
-      : "1fr",
-   gap:20,
-   marginBottom:24
- }}
->
-
-{/* PUN */}
-{(punPsvView === "both" || punPsvView === "pun") && (
-  <div
-    style={{
-      background: "#f8fafc",
-      border: "1px solid #e2e8f0",
-      borderRadius: 16,
-      padding: 20,
-    }}
-  >
-    <h3 style={{ marginTop: 0 }}>Andamento PUN</h3>
-
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        marginBottom: 12,
-        fontWeight: 700,
-      }}
-    >
-      <span>Ultimo:</span>
-      <span>{latestPun}</span>
-    </div>
-
-    <svg viewBox="0 0 760 220" style={{ width: "100%", height: 240 }}>
-      {[40, 80, 120, 160].map((y) => (
-        <line
-          key={y}
-          x1="0"
-          x2="760"
-          y1={y}
-          y2={y}
-          stroke="#dbe3ea"
-        />
-      ))}
-
-      <polyline
-        fill="none"
-        stroke="#f59e0b"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={punPolyline}
-      />
-
-      {punCoords.map((p, i) => (
-        <circle
-          key={i}
-          cx={p.x}
-          cy={p.y}
-          r="6"
-          fill="#f59e0b"
-        />
-      ))}
-
-      {punCoords.map((p, i) => (
-        <text
-          key={"m" + i}
-          x={p.x}
-          y="205"
-          textAnchor="middle"
-          fontSize="14"
-          fill="#64748b"
-        >
-          {["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"][i % 12]}
-        </text>
-      ))}
-
-      {punCoords.map((p, i) => (
-        <text
-          key={"v" + i}
-          x={p.x}
-          y={p.y - 12}
-          textAnchor="middle"
-          fontSize="11"
-          fill="#111111"
-          fontWeight="700"
-        >
-          {punValues[i].toFixed(3)}
-        </text>
-      ))}
-    </svg>
-  </div>
-)}
-
-{/* PSV */}
-{(punPsvView === "both" || punPsvView === "psv") && (
-  <div
-    style={{
-      background:"#f8fafc",
-      border:"1px solid #e2e8f0",
-      borderRadius:16,
-      padding:20
-    }}
-  >
-    <h3 style={{marginTop:0}}>Andamento PSV</h3>
-
-    <div style={{
-      display:"flex",
-      justifyContent:"space-between",
-      marginBottom:12,
-      fontWeight:700
-    }}>
-      <span>Ultimo:</span>
-      <span>{latestPsv}</span>
-    </div>
-
-    <svg viewBox="0 0 760 220" style={{width:"100%",height:240}}>
-      {[40,80,120,160].map(y=>(
-        <line
-          key={y}
-          x1="0"
-          x2="760"
-          y1={y}
-          y2={y}
-          stroke="#dbe3ea"
-        />
-      ))}
-
-      <polyline
-        fill="none"
-        stroke="#2563eb"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={psvPolyline}
-      />
-
-      {psvCoords.map((p,i)=>(
-        <circle
-          key={i}
-          cx={p.x}
-          cy={p.y}
-          r="6"
-          fill="#2563eb"
-        />
-      ))}
-
-      {psvCoords.map((p,i)=>(
-        <text
-          key={"psv"+i}
-          x={p.x}
-          y="205"
-          textAnchor="middle"
-          fontSize="14"
-          fill="#64748b"
-        >
-          {["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"][i % 12]}
-        </text>
-      ))}
-
-      {psvCoords.map((p,i)=>(
-        <text
-          key={"psv-v"+i}
-          x={p.x}
-          y={p.y-12}
-          textAnchor="middle"
-          fontSize="11"
-          fill="#2563eb"
-          fontWeight="700"
-        >
-          {psvValues[i].toFixed(3)}
-        </text>
-      ))}
-    </svg>
-  </div>
-)}
-
-</div>
-
-            <div style={{ overflowX: "auto" }}>
-              <table
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                marginBottom: 24,
+                maxWidth: 420,
+              }}
+            >
+              <label
                 style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  tableLayout: "fixed",
-                  background: "white",
+                  fontWeight: 600,
+                  color: "#0f172a",
                 }}
               >
-                <thead>
-                {punPsvView === "both" && (
-  <tr style={{ background: "#fff7ed" }}>
-    <th
-      style={{
-        textAlign: "left",
-        padding: "14px 16px",
-        width: "38%",
-      }}
-    >
-      Mese
-    </th>
-    <th
-      style={{
-        textAlign: "right",
-        padding: "14px 16px",
-        width: "20%",
-        color: "#f59e0b",
-      }}
-    >
-      PUN
-    </th>
-    <th
-      style={{
-        width: "18%",
-        padding: 0,
-      }}
-    >
-      <span style={{ visibility: "hidden" }}>spazio</span>
-    </th>
-    <th
-      style={{
-        textAlign: "right",
-        padding: "14px 16px",
-        width: "28%",
-        color: "#2563eb",
-      }}
-    >
-      PSV
-    </th>
-  </tr>
-)}
-
-  {punPsvView === "pun" && (
-    <tr style={{ background: "#f8fafc" }}>
-      <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
-      <th
-        style={{
-          textAlign: "right",
-          padding: "14px 16px",
-          background: "#ffedd5",
-          color: "#c2410c",
-          fontWeight: 800,
-        }}
-      >
-        Mono
-      </th>
-      <th
-        style={{
-          textAlign: "right",
-          padding: "14px 16px",
-          background: "#fff7ed",
-          color: "#d97706",
-          fontWeight: 700,
-        }}
-      >
-        F1
-      </th>
-      <th
-        style={{
-          textAlign: "right",
-          padding: "14px 16px",
-          background: "#fffbeb",
-          color: "#ea580c",
-          fontWeight: 700,
-        }}
-      >
-        F2
-      </th>
-      <th
-        style={{
-          textAlign: "right",
-          padding: "14px 16px",
-          background: "#fef9c3",
-          color: "#ca8a04",
-          fontWeight: 700,
-        }}
-      >
-        F3
-      </th>
-    </tr>
-  )}
-
-  {punPsvView === "psv" && (
-    <tr style={{ background: "#eff6ff" }}>
-      <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
-      <th style={{ textAlign: "right", padding: "14px 16px", color: "#2563eb" }}>
-        PSV
-      </th>
-    </tr>
-  )}
-</thead>
-
-<tbody>
-  {tablePunPsvRows.map((row, index) => (
-    <tr
-      key={row.mese}
-      style={{
-        background:
-          punPsvView === "pun"
-            ? index % 2 === 0
-              ? "#fffaf0"
-              : "#fff7ed"
-            : punPsvView === "psv"
-            ? index % 2 === 0
-              ? "#f8fbff"
-              : "#eff6ff"
-            : index % 2 === 0
-            ? "white"
-            : "#fcfdff",
-      }}
-    >
-      <td
-        style={{
-          padding: "14px 16px",
-          borderBottom: "1px solid #e2e8f0",
-        }}
-      >
-        {row.mese}
-      </td>
-
-      
-      {punPsvView === "both" && (
-  <>
-    <td
-      style={{
-        textAlign: "right",
-        padding: "14px 16px",
-        borderBottom: "1px solid #e2e8f0",
-        color: "#d97706",
-        fontWeight: 600,
-        width: "16%",
-      }}
-    >
-      {Number(row.mono).toFixed(6)}
-    </td>
-
-    <td
-      style={{
-        width: "18%",
-        padding: 0,
-        borderBottom: "1px solid #e2e8f0",
-      }}
-    >
-      <span style={{ visibility: "hidden" }}>spazio</span>
-    </td>
-
-    <td
-      style={{
-        textAlign: "right",
-        padding: "14px 16px",
-        borderBottom: "1px solid #e2e8f0",
-        color: "#2563eb",
-        fontWeight: 600,
-        width: "28%",
-      }}
-    >
-      {Number(row.psv).toFixed(6)}
-    </td>
-  </>
-)}
-
-      {punPsvView === "pun" && (
-        <>
-          <td
-            style={{
-              textAlign: "right",
-              padding: "14px 16px",
-              borderBottom: "1px solid #e2e8f0",
-              color: "#c2410c",
-              fontWeight: 700,
-              background: "#ffedd5",
-            }}
-          >
-            {Number(row.mono).toFixed(6)}
-          </td>
-
-          <td
-            style={{
-              textAlign: "right",
-              padding: "14px 16px",
-              borderBottom: "1px solid #e2e8f0",
-              color: "#d97706",
-              fontWeight: 600,
-            }}
-          >
-            {Number(row.f1).toFixed(6)}
-          </td>
-
-          <td
-            style={{
-              textAlign: "right",
-              padding: "14px 16px",
-              borderBottom: "1px solid #e2e8f0",
-              color: "#ea580c",
-              fontWeight: 600,
-            }}
-          >
-            {Number(row.f2).toFixed(6)}
-          </td>
-
-          <td
-            style={{
-              textAlign: "right",
-              padding: "14px 16px",
-              borderBottom: "1px solid #e2e8f0",
-              color: "#ca8a04",
-              fontWeight: 600,
-            }}
-          >
-            {Number(row.f3).toFixed(6)}
-          </td>
-        </>
-      )}
-
-      {punPsvView === "psv" && (
-        <td
-          style={{
-            textAlign: "right",
-            padding: "14px 16px",
-            borderBottom: "1px solid #e2e8f0",
-            color: "#2563eb",
-            fontWeight: 600,
-          }}
-        >
-          {Number(row.psv).toFixed(6)}
-        </td>
-      )}
-    </tr>
-  ))}
-</tbody>
-</table>
-</div>
-</div>
-) : (
-  renderAdminContent()
-)}
+                Mese selezionato
+              </label>
+        
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <select
+                  value={selectedMonthPUN}
+                  onChange={(e) => setSelectedMonthPUN(e.target.value)}
+                  style={{
+                    padding: "12px 16px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    minWidth: 240,
+                  }}
+                >
+                  {punPsvRows.map((row) => (
+                    <option key={row.mese} value={row.mese}>
+                      {row.mese}
+                    </option>
+                  ))}
+                </select>
+        
+                <button
+                  type="button"
+                  onClick={() => setAppliedMonthPUN(selectedMonthPUN)}
+                  style={{
+                    background: "#0f172a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "10px 18px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  VAI
+                </button>
+        
+                <button
+                  type="button"
+                  onClick={exportPunPsvPdf}
+                  style={{
+                    background: "#16a34a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "10px 18px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  PDF
+                </button>
+              </div>
+            </div>
+        
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                marginBottom: 20,
+              }}
+            >
+              <button
+                onClick={() => setPunPsvView("both")}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: punPsvView === "both" ? "#0f172a" : "white",
+                  color: punPsvView === "both" ? "white" : "#0f172a",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                PUN-PSV
+              </button>
+        
+              <button
+                onClick={() => setPunPsvView("pun")}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: punPsvView === "pun" ? "#2563eb" : "white",
+                  color: punPsvView === "pun" ? "white" : "#0f172a",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                PUN
+              </button>
+        
+              <button
+                onClick={() => setPunPsvView("psv")}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: punPsvView === "psv" ? "#16a34a" : "white",
+                  color: punPsvView === "psv" ? "white" : "#0f172a",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                PSV
+              </button>
+            </div>
+        
+            <div ref={punPsvRef}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: punPsvView === "both" ? "1fr 1fr" : "1fr",
+                  gap: 20,
+                  marginBottom: 24,
+                }}
+              >
+                {(punPsvView === "both" || punPsvView === "pun") && (
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 16,
+                      padding: 20,
+                    }}
+                  >
+                    <h3 style={{ marginTop: 0 }}>Andamento PUN</h3>
+        
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span>Ultimo:</span>
+                      <span>{latestPun}</span>
+                    </div>
+        
+                    <svg viewBox="0 0 760 220" style={{ width: "100%", height: 240 }}>
+                      {[40, 80, 120, 160].map((y) => (
+                        <line
+                          key={y}
+                          x1="0"
+                          x2="760"
+                          y1={y}
+                          y2={y}
+                          stroke="#dbe3ea"
+                        />
+                      ))}
+        
+                      <polyline
+                        fill="none"
+                        stroke="#f59e0b"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={punPolyline}
+                      />
+        
+                      {punCoords.map((p, i) => (
+                        <circle key={i} cx={p.x} cy={p.y} r="6" fill="#f59e0b" />
+                      ))}
+        
+                      {punCoords.map((p, i) => (
+                        <text
+                          key={"m" + i}
+                          x={p.x}
+                          y="205"
+                          textAnchor="middle"
+                          fontSize="14"
+                          fill="#64748b"
+                        >
+                          {
+                            ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"][
+                              i % 12
+                            ]
+                          }
+                        </text>
+                      ))}
+        
+                      {punCoords.map((p, i) => (
+                        <text
+                          key={"v" + i}
+                          x={p.x}
+                          y={p.y - 12}
+                          textAnchor="middle"
+                          fontSize="11"
+                          fill="#111111"
+                          fontWeight="700"
+                        >
+                          {punValues[i].toFixed(3)}
+                        </text>
+                      ))}
+                    </svg>
+                  </div>
+                )}
+        
+                {(punPsvView === "both" || punPsvView === "psv") && (
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 16,
+                      padding: 20,
+                    }}
+                  >
+                    <h3 style={{ marginTop: 0 }}>Andamento PSV</h3>
+        
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span>Ultimo:</span>
+                      <span>{latestPsv}</span>
+                    </div>
+        
+                    <svg viewBox="0 0 760 220" style={{ width: "100%", height: 240 }}>
+                      {[40, 80, 120, 160].map((y) => (
+                        <line
+                          key={y}
+                          x1="0"
+                          x2="760"
+                          y1={y}
+                          y2={y}
+                          stroke="#dbe3ea"
+                        />
+                      ))}
+        
+                      <polyline
+                        fill="none"
+                        stroke="#2563eb"
+                        strokeWidth="5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={psvPolyline}
+                      />
+        
+                      {psvCoords.map((p, i) => (
+                        <circle key={i} cx={p.x} cy={p.y} r="6" fill="#2563eb" />
+                      ))}
+        
+                      {psvCoords.map((p, i) => (
+                        <text
+                          key={"psv" + i}
+                          x={p.x}
+                          y="205"
+                          textAnchor="middle"
+                          fontSize="14"
+                          fill="#64748b"
+                        >
+                          {
+                            ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"][
+                              i % 12
+                            ]
+                          }
+                        </text>
+                      ))}
+        
+                      {psvCoords.map((p, i) => (
+                        <text
+                          key={"psv-v" + i}
+                          x={p.x}
+                          y={p.y - 12}
+                          textAnchor="middle"
+                          fontSize="11"
+                          fill="#111111"
+                          fontWeight="700"
+                        >
+                          {psvValues[i].toFixed(3)}
+                        </text>
+                      ))}
+                    </svg>
+                  </div>
+                )}
+              </div>
+        
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    tableLayout: "fixed",
+                    background: "white",
+                  }}
+                >
+                  <thead>
+                    {punPsvView === "both" && (
+                      <tr style={{ background: "#fff7ed" }}>
+                        <th
+                          style={{
+                            textAlign: "left",
+                            padding: "14px 16px",
+                            width: "38%",
+                          }}
+                        >
+                          Mese
+                        </th>
+                        <th
+                          style={{
+                            textAlign: "right",
+                            padding: "14px 16px",
+                            width: "20%",
+                            color: "#f59e0b",
+                          }}
+                        >
+                          PUN
+                        </th>
+                        <th
+                          style={{
+                            width: "18%",
+                            padding: 0,
+                          }}
+                        >
+                          <span style={{ visibility: "hidden" }}>spazio</span>
+                        </th>
+                        <th
+                          style={{
+                            textAlign: "right",
+                            padding: "14px 16px",
+                            width: "28%",
+                            color: "#2563eb",
+                          }}
+                        >
+                          PSV
+                        </th>
+                      </tr>
+                    )}
+        
+                    {punPsvView === "pun" && (
+                      <tr style={{ background: "#f8fafc" }}>
+                        <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
+                        <th
+                          style={{
+                            textAlign: "right",
+                            padding: "14px 16px",
+                            background: "#ffedd5",
+                            color: "#c2410c",
+                            fontWeight: 800,
+                          }}
+                        >
+                          Mono
+                        </th>
+                        <th
+                          style={{
+                            textAlign: "right",
+                            padding: "14px 16px",
+                            background: "#fff7ed",
+                            color: "#d97706",
+                            fontWeight: 700,
+                          }}
+                        >
+                          F1
+                        </th>
+                        <th
+                          style={{
+                            textAlign: "right",
+                            padding: "14px 16px",
+                            background: "#fffbeb",
+                            color: "#ea580c",
+                            fontWeight: 700,
+                          }}
+                        >
+                          F2
+                        </th>
+                        <th
+                          style={{
+                            textAlign: "right",
+                            padding: "14px 16px",
+                            background: "#fef9c3",
+                            color: "#ca8a04",
+                            fontWeight: 700,
+                          }}
+                        >
+                          F3
+                        </th>
+                      </tr>
+                    )}
+        
+                    {punPsvView === "psv" && (
+                      <tr style={{ background: "#eff6ff" }}>
+                        <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
+                        <th
+                          style={{
+                            textAlign: "right",
+                            padding: "14px 16px",
+                            color: "#2563eb",
+                          }}
+                        >
+                          PSV
+                        </th>
+                      </tr>
+                    )}
+                  </thead>
+        
+                  <tbody>
+                  {tablePunPsvRows.slice(0,12).map((row,index)=>(
+                      <tr
+                        key={row.mese}
+                        style={{
+                          background:
+                            punPsvView === "pun"
+                              ? index % 2 === 0
+                                ? "#fffaf0"
+                                : "#fff7ed"
+                              : punPsvView === "psv"
+                              ? index % 2 === 0
+                                ? "#f8fbff"
+                                : "#eff6ff"
+                              : index % 2 === 0
+                              ? "white"
+                              : "#fcfdff",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "14px 16px",
+                            borderBottom: "1px solid #e2e8f0",
+                          }}
+                        >
+                          {row.mese}
+                        </td>
+        
+                        {punPsvView === "both" && (
+                          <>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "14px 16px",
+                                borderBottom: "1px solid #e2e8f0",
+                                color: "#d97706",
+                                fontWeight: 600,
+                                width: "16%",
+                              }}
+                            >
+                              {Number(row.mono).toFixed(6)}
+                            </td>
+        
+                            <td
+                              style={{
+                                width: "18%",
+                                padding: 0,
+                                borderBottom: "1px solid #e2e8f0",
+                              }}
+                            >
+                              <span style={{ visibility: "hidden" }}>spazio</span>
+                            </td>
+        
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "14px 16px",
+                                borderBottom: "1px solid #e2e8f0",
+                                color: "#2563eb",
+                                fontWeight: 600,
+                                width: "28%",
+                              }}
+                            >
+                              {Number(row.psv).toFixed(6)}
+                            </td>
+                          </>
+                        )}
+        
+                        {punPsvView === "pun" && (
+                          <>
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "14px 16px",
+                                borderBottom: "1px solid #e2e8f0",
+                                color: "#c2410c",
+                                fontWeight: 700,
+                                background: "#ffedd5",
+                              }}
+                            >
+                              {Number(row.mono).toFixed(6)}
+                            </td>
+        
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "14px 16px",
+                                borderBottom: "1px solid #e2e8f0",
+                                color: "#d97706",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {Number(row.f1).toFixed(6)}
+                            </td>
+        
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "14px 16px",
+                                borderBottom: "1px solid #e2e8f0",
+                                color: "#ea580c",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {Number(row.f2).toFixed(6)}
+                            </td>
+        
+                            <td
+                              style={{
+                                textAlign: "right",
+                                padding: "14px 16px",
+                                borderBottom: "1px solid #e2e8f0",
+                                color: "#ca8a04",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {Number(row.f3).toFixed(6)}
+                            </td>
+                          </>
+                        )}
+        
+                        {punPsvView === "psv" && (
+                          <td
+                            style={{
+                              textAlign: "right",
+                              padding: "14px 16px",
+                              borderBottom: "1px solid #e2e8f0",
+                              color: "#2563eb",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {Number(row.psv).toFixed(6)}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          renderAdminContent()
+        )}
 </div>
 );
 }
