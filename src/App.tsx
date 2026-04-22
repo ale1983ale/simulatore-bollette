@@ -4174,7 +4174,8 @@ export default function App() {
     return localStorage.getItem("app_tab") || "energia";
   });
   
-  const [selectedMonthPUN, setSelectedMonthPUN] = useState("GENNAIO 2025");
+  const [selectedMonthPUN, setSelectedMonthPUN] =
+useState("");
   const [punPsvView, setPunPsvView] = useState<"both" | "pun" | "psv">("both");
   
   function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
