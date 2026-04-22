@@ -2448,6 +2448,8 @@ function Gas({
       borderRadius: 10,
       padding: 12,
       background: "#ffffff",
+      background: "#eef6ff",   // azzurro chiaro
+border: "1px solid #bfd8f6",
       display: "grid",
       gap: 12,
     }}
@@ -2462,6 +2464,8 @@ function Gas({
       borderRadius: 10,
       padding: 12,
       background: "#ffffff",
+      background: "#eef6ff",   // azzurro chiaro
+border: "1px solid #bfd8f6",
       display: "grid",
       gap: 12,
     }}
@@ -2476,6 +2480,8 @@ function Gas({
       borderRadius: 10,
       padding: 12,
       background: "#ffffff",
+      background: "#eef6ff",   // azzurro chiaro
+border: "1px solid #bfd8f6",
       display: "grid",
       gap: 12,
     }}
@@ -2490,6 +2496,8 @@ function Gas({
       borderRadius: 10,
       padding: 12,
       background: "#ffffff",
+      background: "#eef6ff",   // azzurro chiaro
+border: "1px solid #bfd8f6",
       display: "grid",
       gap: 12,
     }}
