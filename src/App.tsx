@@ -149,8 +149,21 @@ const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
   })),
 ];
 
+function normalizeMonthLabel(value: string) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " ");
+}
+
+
 function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
-  const index = rows.findIndex((r) => r.mese === selectedMonth);
+  const normalizedSelected = normalizeMonthLabel(selectedMonth);
+
+  const index = rows.findIndex(
+    (r) => normalizeMonthLabel(r.mese) === normalizedSelected
+  );
+
   if (index === -1) return [];
 
   return rows.slice(Math.max(0, index - 11), index + 1);
@@ -1180,6 +1193,15 @@ function Energia({
     () => calcEnergia(s, punPsvRows, energyOffers, dispCpRows),
     [s, punPsvRows, energyOffers, dispCpRows]
   );
+
+  useEffect(() => {
+    if (tab === "punpsv" && publicPunPsvOptions.length > 0) {
+      const ultimo = publicPunPsvOptions[0].mese;
+      if (selectedMonthPUN !== ultimo) {
+        setSelectedMonthPUN(ultimo);
+      }
+    }
+  }, [tab, publicPunPsvOptions, selectedMonthPUN]);
 
   useEffect(() => {
     if (!s.dispacciamentoCapacityMarket || s.dispacciamentoCapacityMarket === "0") {
@@ -4461,18 +4483,42 @@ export default function App() {
     return localStorage.getItem("app_tab") || "energia";
   });
   
-  const [selectedMonthPUN, setSelectedMonthPUN] =
-useState("");
+  const [selectedMonthPUN, setSelectedMonthPUN] = useState("");
+  const [appliedMonthPUN, setAppliedMonthPUN] = useState("");
+
+  
   const [punPsvView, setPunPsvView] = useState<"both" | "pun" | "psv">("both");
   
-  function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
-    const index = rows.findIndex(r => r.mese === selectedMonth);
-    if (index === -1) return [];
-  
-    return rows.slice(Math.max(0, index - 11), index + 1);
+  function normalizeMonthLabel(value: string) {
+    return String(value || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, " ");
   }
   
-  const visiblePunPsvRows = getLast12PunPsvRows(punPsvRows, selectedMonthPUN);
+  function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
+    const normalizedSelected = normalizeMonthLabel(selectedMonth);
+  
+    const index = rows.findIndex(
+      (r) => normalizeMonthLabel(r.mese) === normalizedSelected
+    );
+  
+    if (index === -1) return [];
+  
+    return rows.slice(
+      Math.max(0, index - 11),
+      index + 1
+    );
+  }
+  
+  const visiblePunPsvRows =
+  getLast12PunPsvRows(
+    punPsvRows,
+    appliedMonthPUN || selectedMonthPUN
+  );
+  console.log("selectedMonthPUN:", selectedMonthPUN);
+console.log("punPsvRows:", punPsvRows);
+console.log("visiblePunPsvRows:", visiblePunPsvRows);
   const tablePunPsvRows = [...visiblePunPsvRows].sort(
     (a, b) => getMonthYearSortValue(b.mese) - getMonthYearSortValue(a.mese)
   );
@@ -4555,6 +4601,7 @@ const latestPsv =
   .filter((row) => {
     if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
       return false;
+      
     }
 
     return (
@@ -4581,6 +4628,8 @@ const latestPsv =
       "DICEMBRE",
     ];
 
+
+    
     const score = (label: string) => {
       const parts = String(label).trim().split(" ");
       const mese = parts[0]?.toUpperCase() || "";
@@ -4592,16 +4641,13 @@ const latestPsv =
     return score(b.mese) - score(a.mese);
   });
 
-useEffect(() => {
-  if (tab === "punpsv" && publicPunPsvOptions.length > 0) {
-    const ultimo = publicPunPsvOptions[0].mese;
-
-    if (selectedMonthPUN !== ultimo) {
-      setSelectedMonthPUN(ultimo);
+  useEffect(() => {
+    if (!appliedMonthPUN && publicPunPsvOptions.length > 0) {
+      const defaultMonth = publicPunPsvOptions[0].mese;
+      setSelectedMonthPUN(defaultMonth);
+      setAppliedMonthPUN(defaultMonth);
     }
-  }
-}, [tab, publicPunPsvOptions[0]?.mese]);
-
+  }, [appliedMonthPUN, publicPunPsvOptions]);
 
 useEffect(() => {
 }, [tab, validMonthOptions[0]?.mese]);
@@ -5119,37 +5165,68 @@ const renderAdminContent = () => {
             <h2 style={{ marginTop: 0, marginBottom: 20 }}>Andamento PUN / PSV</h2>
         
             <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                marginBottom: 24,
-                maxWidth: 280,
-              }}
-            >
-              <label style={{ fontWeight: 600, color: "#0f172a" }}>
-                Mese selezionato
-              </label>
-        
-              <select
-                value={selectedMonthPUN}
-                onChange={(e) => setSelectedMonthPUN(e.target.value)}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid #cbd5e1",
-                  background: "white",
-                  color: "#0f172a",
-                  fontSize: 16,
-                }}
-              >
-                {publicPunPsvOptions.map((row) => (
-  <option key={row.mese} value={row.mese}>
-    {row.mese}
-  </option>
-))}
-              </select>
-            </div>
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    marginBottom: 24,
+    maxWidth: 420,
+  }}
+>
+  <label
+    style={{
+      fontWeight: 600,
+      color: "#0f172a",
+    }}
+  >
+    Mese selezionato
+  </label>
+
+  <div
+    style={{
+      display: "flex",
+      gap: 12,
+      alignItems: "center",
+      flexWrap: "wrap",
+    }}
+  >
+    <select
+      value={selectedMonthPUN}
+      onChange={(e) => setSelectedMonthPUN(e.target.value)}
+      style={{
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid #cbd5e1",
+        background: "white",
+        color: "#0f172a",
+        fontSize: 16,
+        minWidth: 220,
+      }}
+    >
+      {publicPunPsvOptions.map((row) => (
+        <option key={row.mese} value={row.mese}>
+          {row.mese}
+        </option>
+      ))}
+    </select>
+
+    <button
+      type="button"
+      onClick={() => setAppliedMonthPUN(selectedMonthPUN)}
+      style={{
+        background: "#0f172a",
+        color: "#fff",
+        border: "none",
+        borderRadius: 10,
+        padding: "10px 18px",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      VAI
+    </button>
+  </div>
+</div>
 
             <div
  style={{
