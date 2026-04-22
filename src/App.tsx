@@ -176,14 +176,24 @@ function getSvgPoints(values: number[], width: number, height: number) {
   const min = Math.min(...values);
   const range = max - min || 1;
 
-  const paddingX = 28;
-  const usableWidth = width - paddingX * 2;
+  const paddingLeft = 28;
+  const paddingRight = 28;
+  const paddingTop = 30;
+  const paddingBottom = 46;
+
+  const usableWidth = width - paddingLeft - paddingRight;
+  const usableHeight = height - paddingTop - paddingBottom;
 
   return values
     .map((v, i) => {
       const x =
-        paddingX + (i / Math.max(values.length - 1, 1)) * usableWidth;
-      const y = height - ((v - min) / range) * height;
+        paddingLeft +
+        (i / Math.max(values.length - 1, 1)) * usableWidth;
+
+      const y =
+        paddingTop +
+        (1 - (v - min) / range) * usableHeight;
+
       return `${x},${y}`;
     })
     .join(" ");
@@ -195,13 +205,23 @@ function getChartCoords(values: number[], width: number, height: number) {
   const min = Math.min(...values);
   const range = max - min || 1;
 
-  const paddingX = 28; // margine laterale per non tagliare i mesi
-  const usableWidth = width - paddingX * 2;
+  const paddingLeft = 28;
+  const paddingRight = 28;
+  const paddingTop = 30;
+  const paddingBottom = 46;
+
+  const usableWidth = width - paddingLeft - paddingRight;
+  const usableHeight = height - paddingTop - paddingBottom;
 
   return values.map((v, i) => {
     const x =
-      paddingX + (i / Math.max(values.length - 1, 1)) * usableWidth;
-    const y = height - ((v - min) / range) * height;
+      paddingLeft +
+      (i / Math.max(values.length - 1, 1)) * usableWidth;
+
+    const y =
+      paddingTop +
+      (1 - (v - min) / range) * usableHeight;
+
     return { x, y, value: v };
   });
 }
