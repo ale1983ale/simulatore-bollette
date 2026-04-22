@@ -601,80 +601,45 @@ function field(label: string, value: string, setValue: (v: string) => void, type
   );
 }
 
-function selectField(label: string, value: string, setValue: (v: string) => void, options: string[]) {
+function selectField(
+  label: string,
+  value: string,
+  setValue: (v: string) => void,
+  options: string[]
+) {
   return (
     <div>
       <div
- style={{
-   fontSize:12,
-   fontWeight:700,
-   marginBottom:4,
-   color:
-     label === "Mese 1" || label === "Mese 2"
-       ? "#c96a00"
-       : "inherit"
- }}
->
- {label}
-</div>
+        style={{
+          fontSize:12,
+          fontWeight:700,
+          marginBottom:4,
+          color:"inherit"
+        }}
+      >
+        {label}
+      </div>
+
       <select
         style={{
-          width: "100%",
-          padding: 8,
-          border:
-            label === "Mese 1" || label === "Mese 2"
-              ? "2px solid #d97706"
-              : "1px solid #cbd5e1",
-        
-          background:
-            label === "Mese 1" || label === "Mese 2"
-              ? "#fff4e8"
-              : "white",
-        
-          color:
-            label === "Mese 1" || label === "Mese 2"
-              ? "#c96a00"
-              : "inherit",
-        
-          fontWeight:
-            label === "Mese 1" || label === "Mese 2"
-              ? 700
-              : 400,
-        
-          borderRadius: 8,
-          boxSizing: "border-box",
+          width:"100%",
+          padding:8,
+          border:"1px solid #cbd5e1",
+          background:"white",
+          color:"inherit",
+          fontWeight:400,
+          borderRadius:8,
+          boxSizing:"border-box",
         }}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e)=>setValue(e.target.value)}
       >
-        {options.map((o) => (
+        {options.map((o)=>(
           <option key={o} value={o}>
             {o || "-"}
           </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-function readonlyField(label: string, value: string) {
-  return (
-    <div>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{label}</div>
-      <input
-        style={{
-          width: "100%",
-          padding: 8,
-          border: "1px solid #cbd5e1",
-          borderRadius: 8,
-          boxSizing: "border-box",
-          background: "#f8fafc",
-          color: "#0f172a",
-        }}
-        type="text"
-        value={value}
-        readOnly
-      />
     </div>
   );
 }
@@ -1298,6 +1263,7 @@ function Energia({
     const altrePartiteTot = [r.H38, -r.H39, r.H40].reduce((a, b) => a + b, 0);
 
     const acciseIvaRows = [
+      ,
       r.H35 !== 0 ? `<tr><td>Accise</td><td style="text-align:right">${money(r.H35)}</td></tr>` : "",
       r.H36 !== 0 ? `<tr><td>IVA</td><td style="text-align:right">${money(r.H36)}</td></tr>` : "",
     ]
@@ -1441,6 +1407,35 @@ function Energia({
         ${
           acciseIvaTot !== 0
             ? `
+            <div class="box box-energy">
+  <div class="section-title">
+    <span>TOTALE IMPONIBILE</span>
+    <span>${money(
+      r.H22 +
+      r.H25 +
+      r.H24 +
+      r.H28 +
+      r.H29 +
+      r.H30
+    )}</span>
+  </div>
+  <div class="bar" style="background:${orange}"></div>
+  <table>
+    <tbody>
+      <tr class="strong-row">
+        <td>Totale imponibile</td>
+        <td style="text-align:right">${money(
+          r.H22 +
+          r.H25 +
+          r.H24 +
+          r.H28 +
+          r.H29 +
+          r.H30
+        )}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
         <div class="box box-energy">
           <div class="section-title">
             <span>ACCISE E IVA</span>
@@ -1821,15 +1816,34 @@ Base suggerito
             </>
           )}
 
-          {previewBox(<>{row("Quota potenza rete", money(r.H30))}</>)}
+{previewBox(<>{row("Quota potenza rete", money(r.H30))}</>)}
 
-          {previewBox(
-            <>
-              {row("Accise", money(r.H35))}
-              {row("IVA", money(r.H36))}
-              {row("Totale Imposte", money(r.H37))}
-            </>
-          )}
+{previewBox(
+  <>
+    {row(
+      "TOTALE IMPONIBILE",
+      money(
+        r.H22 +
+        r.H25 +
+        r.H24 +
+        r.H28 +
+        r.H29 +
+        r.H30
+      ),
+      true,
+      16
+    )}
+  </>,
+  "#ffedd5"
+)}
+
+{previewBox(
+  <>
+    {row("Accise", money(r.H35))}
+    {row("IVA", money(r.H36))}
+    {row("Totale Imposte", money(r.H37))}
+  </>
+)}
 
           {(r.H39 !== 0 || r.H38 !== 0 || r.H40 !== 0) &&
             previewBox(
@@ -2246,6 +2260,13 @@ function Gas({
         </div>`
             : ""
         }
+        <div class="box box-gas">
+  <div class="section-title">
+    <span>TOTALE IMPONIBILE</span>
+    <span>${money(r.H24 + r.H29)}</span>
+  </div>
+  <div class="bar" style="background:${blue}"></div>
+</div>
 
         ${
           acciseIvaTot !== 0
@@ -2323,7 +2344,7 @@ function Gas({
               {field("Valore accisa", s.accisaValore, (v) => set("accisaValore", v), "number")}
               {field("Adeguamento parametro", s.adeguamentoParametro, (v) => set("adeguamentoParametro", v), "number")}
             </div>
-
+  
             {s.offerta === "DEDICATA" && (
               <>
                 <div style={{ height: 12 }} />
@@ -2342,7 +2363,7 @@ function Gas({
             )}
           </>
         )}
-
+  
         {sectionCard(
           "mesi",
           "Mesi e consumi",
@@ -2357,12 +2378,12 @@ function Gas({
               }}
             >
               <div style={{ minWidth: 0 }} />
-
+  
               <div style={boxStyle}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{prezzoMedioGasScheda}</div>
               </div>
-
+  
               <div style={boxStyle}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo annuo</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>
@@ -2374,7 +2395,7 @@ function Gas({
                     : "-"}
                 </div>
               </div>
-
+  
               <div style={boxStyle}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Consumo totale fattura</div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>
@@ -2387,26 +2408,81 @@ function Gas({
                 </div>
               </div>
             </div>
-
+  
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,minmax(0,1fr))",
+                gridTemplateColumns: "1fr",
                 gap: 12,
               }}
             >
-              {selectField("Mese 1", s.periodo1, (v) => set("periodo1", v), gasMonthOptions)}
-              {selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasMonthOptions])}
-              {selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasMonthOptions])}
-              {selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasMonthOptions])}
-              {field("Consumo 1", s.consumo1, (v) => set("consumo1", v), "number")}
-              {field("Consumo 2", s.consumo2, (v) => set("consumo2", v), "number")}
-              {field("Consumo 3", s.consumo3, (v) => set("consumo3", v), "number")}
-              {field("Consumo 4", s.consumo4, (v) => set("consumo4", v), "number")}
+              <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+    gap: 16,
+  }}
+>
+  <div
+    style={{
+      border: "1px solid #cbd5e1",
+      borderRadius: 10,
+      padding: 12,
+      background: "#ffffff",
+      display: "grid",
+      gap: 12,
+    }}
+  >
+    {selectField("Mese 1", s.periodo1, (v) => set("periodo1", v), ["", ...gasMonthOptions])}
+    {field("Consumo 1", s.consumo1, (v) => set("consumo1", v), "number")}
+  </div>
+
+  <div
+    style={{
+      border: "1px solid #cbd5e1",
+      borderRadius: 10,
+      padding: 12,
+      background: "#ffffff",
+      display: "grid",
+      gap: 12,
+    }}
+  >
+    {selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasMonthOptions])}
+    {field("Consumo 2", s.consumo2, (v) => set("consumo2", v), "number")}
+  </div>
+
+  <div
+    style={{
+      border: "1px solid #cbd5e1",
+      borderRadius: 10,
+      padding: 12,
+      background: "#ffffff",
+      display: "grid",
+      gap: 12,
+    }}
+  >
+    {selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasMonthOptions])}
+    {field("Consumo 3", s.consumo3, (v) => set("consumo3", v), "number")}
+  </div>
+
+  <div
+    style={{
+      border: "1px solid #cbd5e1",
+      borderRadius: 10,
+      padding: 12,
+      background: "#ffffff",
+      display: "grid",
+      gap: 12,
+    }}
+  >
+    {selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasMonthOptions])}
+    {field("Consumo 4", s.consumo4, (v) => set("consumo4", v), "number")}
+  </div>
+</div>
             </div>
           </>
         )}
-
+  
         {sectionCard(
           "rete",
           "Rete e corrispettivi",
@@ -2421,9 +2497,9 @@ function Gas({
               {field("Quota consumi rete", s.quotaVariabileAggiuntiva, (v) => set("quotaVariabileAggiuntiva", v), "number")}
               {field("Quota fissa rete", s.quotaFissaAggiuntiva, (v) => set("quotaFissaAggiuntiva", v), "number")}
             </div>
-
+  
             <div style={{ height: 12 }} />
-
+  
             <div
               style={{
                 display: "grid",
@@ -2463,7 +2539,7 @@ function Gas({
           </>
         )}
       </div>
-
+  
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {sectionCard(
           "anteprima",
@@ -2476,14 +2552,14 @@ function Gas({
                 {row("Quota fissa usata", money(r.quotaFissaEff))}
               </>
             )}
-
+  
             {previewBox(
               <>
                 {row("PSV+Spread", money(r.X55))}
                 {row("Quota variabile offerta", money(r.X56))}
               </>
             )}
-
+  
             {previewBox(
               <>
                 {row("Vendita materia + Adeguamento Parametro", money(r.H22), true, 16)}
@@ -2492,7 +2568,7 @@ function Gas({
               </>,
               "#bfdbfe"
             )}
-
+  
             {previewBox(
               <>
                 {row("Quota fissa vendita", money(r.H27))}
@@ -2500,7 +2576,14 @@ function Gas({
                 {row("Quota fissa totale", money(r.H29))}
               </>
             )}
-
+  
+            {previewBox(
+              <>
+                {row("TOTALE IMPONIBILE", money(r.H24 + r.H29), true, 16)}
+              </>,
+              "#dbeafe"
+            )}
+  
             {previewBox(
               <>
                 {row("Accise", money(r.H32))}
@@ -2508,7 +2591,7 @@ function Gas({
                 {row("Totale Imposte", money(r.H34))}
               </>
             )}
-
+  
             {(r.H35 !== 0 || r.H36 !== 0) &&
               previewBox(
                 <>
@@ -2516,9 +2599,9 @@ function Gas({
                   {r.H36 !== 0 && row("Bonus sociale", `- ${money(r.H36)}`)}
                 </>
               )}
-
+  
             {previewBox(<>{row("Totale preventivo", money(r.H37), true, 16)}</>, "#93c5fd")}
-
+  
             {isSi(s.confrontoFlag) &&
               previewBox(
                 <>
@@ -2526,7 +2609,7 @@ function Gas({
                   {row("Risparmio annuo", money(r.risparmioAnnuo))}
                 </>
               )}
-
+  
             <button
               onClick={printGasPdf}
               style={{
