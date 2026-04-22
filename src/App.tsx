@@ -150,7 +150,7 @@ const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
 ];
 
 function getLast12PunPsvRows(rows: any[], selectedMonth: string) {
-  const index = rows.findIndex(r => r.mese === selectedMonth);
+  const index = rows.findIndex((r) => r.mese === selectedMonth);
   if (index === -1) return [];
 
   return rows.slice(Math.max(0, index - 11), index + 1);
@@ -4176,6 +4176,9 @@ export default function App() {
   }
   
   const visiblePunPsvRows = getLast12PunPsvRows(punPsvRows, selectedMonthPUN);
+  const tablePunPsvRows = [...visiblePunPsvRows].sort(
+    (a, b) => getMonthYearSortValue(b.mese) - getMonthYearSortValue(a.mese)
+  );
   const punValues = visiblePunPsvRows.map(r => Number(r.mono || 0));
 const psvValues = visiblePunPsvRows.map(r => r.psv);
 const punPolyline = getSvgPoints(punValues, 760, 220);
@@ -4984,7 +4987,7 @@ fill="#16a34a"
                 </thead>
 
                 <tbody>
-                  {visiblePunPsvRows.map((row, index) => (
+                {tablePunPsvRows.map((row, index) => (
                     <tr
                       key={row.mese}
                       style={{
