@@ -4167,6 +4167,29 @@ export default function App() {
 const psvValues = visiblePunPsvRows.map(r => r.psv);
 const punPolyline = getSvgPoints(punValues, 760, 220);
 const psvPolyline = getSvgPoints(psvValues, 760, 220);
+const publicPunPsvOptions = [...punPsvRows]
+  .filter((row) => {
+    if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
+      return false;
+          }
+          return (
+            Number(row.mono || 0) !== 0 ||
+            Number(row.f1 || 0) !== 0 ||
+            Number(row.f2 || 0) !== 0 ||
+            Number(row.f3 || 0) !== 0 ||
+            Number(row.psv || 0) !== 0
+          );
+  })
+  .sort((a, b) => getMonthYearSortValue(b.mese) - getMonthYearSortValue(a.mese));
+
+  useEffect(() => {
+    if (
+      publicPunPsvOptions.length > 0 &&
+      !publicPunPsvOptions.some((row) => row.mese === selectedMonthPUN)
+    ) {
+      setSelectedMonthPUN(publicPunPsvOptions[0].mese);
+    }
+  }, [publicPunPsvOptions, selectedMonthPUN]);
 
   useEffect(() => {
     const savedAdmin = localStorage.getItem("admin_session");
@@ -4702,11 +4725,11 @@ const renderAdminContent = () => {
                   fontSize: 16,
                 }}
               >
-                {punPsvRows.map((row) => (
-                  <option key={row.mese} value={row.mese}>
-                    {row.mese}
-                  </option>
-                ))}
+                {publicPunPsvOptions.map((row) => (
+  <option key={row.mese} value={row.mese}>
+    {row.mese}
+  </option>
+))}
               </select>
             </div>
         
