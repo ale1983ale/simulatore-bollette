@@ -3424,10 +3424,13 @@ function AgentsAdmin({
 function LoginView({
   setSession,
   setAdminProfile,
+  setAgentSession,
 }: {
   setSession: React.Dispatch<React.SetStateAction<any>>;
   setAdminProfile: React.Dispatch<React.SetStateAction<AdminProfile | null>>;
+  setAgentSession: React.Dispatch<React.SetStateAction<any>>;
 }) {
+  const [mode, setMode] = useState<"agent" | "admin">("agent");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3447,23 +3450,44 @@ function LoginView({
         return;
       }
 
-      const { data, error } = await supabase
-  .from("admin_users")
-  .select("id, nome, username, password, role")
-  .ilike("username", user)
-  .eq("password", pass)
-  .maybeSingle();
+      if (mode === "admin") {
+        const { data, error } = await supabase
+          .from("admin_users")
+          .select("id, nome, username, password, role")
+          .ilike("username", user)
+          .eq("password", pass)
+          .maybeSingle();
 
-if (error || !data) {
-  setErrorMsg("Credenziali non valide");
-  setLoading(false);
-  return;
-}
+        if (error || !data) {
+          setErrorMsg("Credenziali admin non valide");
+          setLoading(false);
+          return;
+        }
 
-            localStorage.setItem("admin_session", JSON.stringify(data));
+        localStorage.setItem("admin_session", JSON.stringify(data));
+        setSession(data);
+        setAdminProfile(data);
+        setAgentSession(null);
+      } else {
+        const { data, error } = await supabase
+          .from("agents")
+          .select("*")
+          .ilike("username", user)
+          .eq("password", pass)
+          .maybeSingle();
 
-      setSession(data);
-      setAdminProfile(data);
+        if (error || !data) {
+          setErrorMsg("Credenziali agente non valide");
+          setLoading(false);
+          return;
+        }
+
+        localStorage.setItem("agent_session", JSON.stringify(data));
+        setAgentSession(data);
+        setSession(null);
+        setAdminProfile(null);
+        localStorage.setItem("agent_session", JSON.stringify(data));
+      }
     } catch (err) {
       setErrorMsg("Errore durante il login");
     }
@@ -3493,7 +3517,51 @@ if (error || !data) {
           gap: 14,
         }}
       >
-        <h2 style={{ margin: 0 }}>Accesso Admin</h2>
+        <h2 style={{ margin: 0 }}>
+          {mode === "admin" ? "Accesso Admin" : "Accesso Agente"}
+        </h2>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("agent");
+              setErrorMsg("");
+            }}
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: mode === "agent" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+              background: mode === "agent" ? "#0f172a" : "white",
+              color: mode === "agent" ? "white" : "#0f172a",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Agente
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode("admin");
+              setErrorMsg("");
+            }}
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: mode === "admin" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+              background: mode === "admin" ? "#0f172a" : "white",
+              color: mode === "admin" ? "white" : "#0f172a",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Admin
+          </button>
+        </div>
 
         <input
           placeholder="Username"
@@ -3545,17 +3613,13 @@ if (error || !data) {
   );
 }
 
-function ReportAgent() {
-  const [agentSession, setAgentSession] = useState<any>(null);
-  const [agentUsername, setAgentUsername] = useState("");
-  const [agentPassword, setAgentPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
+function ReportAgent({ agentSession }: { agentSession: any }) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState<any[]>([]);
   const [form, setForm] = useState<any>({
     report_date: "",
-    agent_id: 0,
+    agent_id: agentSession?.id || 0,
     contracts_energia: "",
     consumi_energia: "",
     contracts_gas: "",
@@ -3565,73 +3629,43 @@ function ReportAgent() {
 
   const loadReportsByAgent = async (agentId: number) => {
     setLoading(true);
-  
+
     const { data, error } = await supabase
       .from("reports")
       .select("*")
       .eq("agent_id", agentId)
       .order("report_date", { ascending: false });
-  
+
     if (error) {
       console.error("LOAD REPORTS BY AGENT ERROR:", error);
       setReports([]);
     } else {
       setReports(data || []);
     }
-  
+
     setLoading(false);
   };
-  
-  const loginAgent = async () => {
-    const username = agentUsername.trim().toLowerCase();
-    const password = agentPassword.trim().toLowerCase();
 
-    if (!username || !password) {
-      setLoginError("Inserisci username e password");
-      return;
+  useEffect(() => {
+    if (agentSession?.id) {
+      setForm((prev: any) => ({ ...prev, agent_id: agentSession.id }));
+      loadReportsByAgent(agentSession.id);
     }
-
-    const { data, error } = await supabase
-      .from("agents")
-      .select("*")
-      .eq("username", username)
-      .eq("password", password)
-      .maybeSingle();
-
-    if (error || !data) {
-      setLoginError("Credenziali non valide");
-      return;
-    }
-
-    if (data.username === "admin") {
-      setLoginError("Usa Report Admin per questo accesso");
-      return;
-    }
-
-    console.log("LOGIN AGENTE DATA:", data);
-    setAgentSession({
-      ...data,
-      owner_admin_id: data.owner_admin_id,
-    });
-    setLoginError("");
-    setForm((prev: any) => ({ ...prev, agent_id: data.id || 0 }));
-    await loadReportsByAgent(data.id || 0);
-    
-  };
+  }, [agentSession]);
 
   const saveReport = async () => {
     if (!agentSession) {
       alert("Non autenticato");
       return;
     }
-  
+
     if (!form.report_date) {
       alert("Seleziona la data report");
       return;
     }
-  
+
     setSaving(true);
-  
+
     const payload = {
       report_date: form.report_date,
       agent_id: agentSession.id,
@@ -3643,40 +3677,38 @@ function ReportAgent() {
       notes: form.notes || "",
     };
 
-    console.log("REPORT PAYLOAD:", payload);
-  
     const { error } = await supabase
       .from("reports")
       .upsert(payload, { onConflict: "agent_id,report_date" });
-  
+
     setSaving(false);
-  
+
     if (error) {
       alert("Errore salvataggio report: " + error.message);
       return;
     }
-  
+
     alert("Report salvato");
     await loadReportsByAgent(agentSession.id || 0);
   };
-  
+
   const deleteReport = async (reportId: number) => {
     if (!agentSession) return;
-  
+
     const ok = window.confirm("Vuoi davvero cancellare questo report?");
     if (!ok) return;
-  
+
     const { error } = await supabase
       .from("reports")
       .delete()
       .eq("id", reportId)
       .eq("agent_id", agentSession.id);
-  
+
     if (error) {
       alert("Errore cancellazione report: " + error.message);
       return;
     }
-  
+
     alert("Report cancellato");
     await loadReportsByAgent(agentSession.id || 0);
   };
@@ -3693,63 +3725,154 @@ function ReportAgent() {
       >
         <h2 style={{ marginTop: 0 }}>Report</h2>
 
-        {!agentSession ? (
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-                gap: 12,
-                maxWidth: 500,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Username
-                </div>
-                <input
-                  value={agentUsername}
-                  onChange={(e) => setAgentUsername(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <strong>Agente:</strong> {agentSession?.nome} {agentSession?.cognome}
+          </div>
 
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Password
-                </div>
-                <input
-                  type="password"
-                  value={agentPassword}
-                  onChange={(e) => setAgentPassword(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3,minmax(0,1fr))",
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Data report
               </div>
+              <input
+                type="date"
+                value={form.report_date}
+                onChange={(e) =>
+                  setForm((prev: any) => ({ ...prev, report_date: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
             </div>
 
-            <div style={{ height: 12 }} />
-
-            {loginError && (
-              <div style={{ color: "#dc2626", marginBottom: 12 }}>
-                {loginError}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Contratti energia
               </div>
-            )}
+              <input
+                type="number"
+                value={form.contracts_energia}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    contracts_energia: e.target.value,
+                  }))
+                }
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
 
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Consumi energia
+              </div>
+              <input
+                type="number"
+                value={form.consumi_energia}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    consumi_energia: e.target.value,
+                  }))
+                }
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Contratti gas
+              </div>
+              <input
+                type="number"
+                value={form.contracts_gas}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    contracts_gas: e.target.value,
+                  }))
+                }
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Consumi gas
+              </div>
+              <input
+                type="number"
+                value={form.consumi_gas}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    consumi_gas: e.target.value,
+                  }))
+                }
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Note
+              </div>
+              <input
+                type="text"
+                value={form.notes}
+                onChange={(e) =>
+                  setForm((prev: any) => ({ ...prev, notes: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
             <button
-              type="button"
-              onClick={loginAgent}
+              onClick={saveReport}
               style={{
                 padding: "10px 14px",
                 borderRadius: 8,
@@ -3759,279 +3882,85 @@ function ReportAgent() {
                 cursor: "pointer",
               }}
             >
-              Entra
+              {saving ? "Salvataggio..." : "Salva report"}
             </button>
-          </>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>I miei report</h2>
+
+        {loading ? (
+          <div>Caricamento...</div>
+        ) : reports.length === 0 ? (
+          <div>Nessun report</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <strong>Agente:</strong> {agentSession.nome} {agentSession.cognome}
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3,minmax(0,1fr))",
-                gap: 12,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Data report
-                </div>
-                <input
-                  type="date"
-                  value={form.report_date}
-                  onChange={(e) =>
-                    setForm((prev: any) => ({ ...prev, report_date: e.target.value }))
-                  }
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Contratti energia
-                </div>
-                <input
-                  type="number"
-                  value={form.contracts_energia}
-                  onChange={(e) =>
-                    setForm((prev: any) => ({
-                      ...prev,
-                      contracts_energia: e.target.value,
-                    }))
-                  }
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Consumi energia
-                </div>
-                <input
-                  type="number"
-                  value={form.consumi_energia}
-                  onChange={(e) =>
-                    setForm((prev: any) => ({
-                      ...prev,
-                      consumi_energia: e.target.value,
-                    }))
-                  }
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Contratti gas
-                </div>
-                <input
-                  type="number"
-                  value={form.contracts_gas}
-                  onChange={(e) =>
-                    setForm((prev: any) => ({
-                      ...prev,
-                      contracts_gas: e.target.value,
-                    }))
-                  }
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Consumi gas
-                </div>
-                <input
-                  type="number"
-                  value={form.consumi_gas}
-                  onChange={(e) =>
-                    setForm((prev: any) => ({
-                      ...prev,
-                      consumi_gas: e.target.value,
-                    }))
-                  }
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                  Note
-                </div>
-                <input
-                  type="text"
-                  value={form.notes}
-                  onChange={(e) =>
-                    setForm((prev: any) => ({ ...prev, notes: e.target.value }))
-                  }
-                  style={{
-                    width: "100%",
-                    padding: 8,
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 8,
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={saveReport}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#0f172a",
-                  color: "white",
-                  cursor: "pointer",
-                }}
-              >
-                {saving ? "Salvataggio..." : "Salva report"}
-              </button>
-
-              <button
-                onClick={() => {
-                  setAgentSession(null);
-                  setAgentUsername("");
-                  setAgentPassword("");
-                  setLoginError("");
-                  setReports([]);
-                  setForm({
-                    report_date: "",
-                    agent_id: 0,
-                    contracts_energia: "",
-                    consumi_energia: "",
-                    contracts_gas: "",
-                    consumi_gas: "",
-                    notes: "",
-                  });
-                }}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e1",
-                  background: "white",
-                  cursor: "pointer",
-                }}
-              >
-                Esci
-              </button>
-            </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {[
+                    "Data",
+                    "Contratti energia",
+                    "Consumi energia",
+                    "Contratti gas",
+                    "Consumi gas",
+                    "Note",
+                    "Azioni",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: "left",
+                        padding: 8,
+                        borderBottom: "1px solid #e2e8f0",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((r, i) => (
+                  <tr key={r.id || i}>
+                    <td style={{ padding: 8 }}>{r.report_date}</td>
+                    <td style={{ padding: 8 }}>{r.contracts_energia}</td>
+                    <td style={{ padding: 8 }}>{r.consumi_energia}</td>
+                    <td style={{ padding: 8 }}>{r.contracts_gas}</td>
+                    <td style={{ padding: 8 }}>{r.consumi_gas}</td>
+                    <td style={{ padding: 8 }}>{r.notes}</td>
+                    <td style={{ padding: 8 }}>
+                      <button
+                        onClick={() => deleteReport(r.id)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid #dc2626",
+                          background: "white",
+                          color: "#dc2626",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        🗑
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
-
-      {agentSession && (
-        <div
-          style={{
-            background: "white",
-            border: "1px solid #e2e8f0",
-            borderRadius: 12,
-            padding: 16,
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>I miei report</h2>
-
-          {loading ? (
-  <div>Caricamento...</div>
-) : reports.length === 0 ? (
-  <div>Nessun report</div>
-) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                  {[
-  "Data",
-  "Contratti energia",
-  "Consumi energia",
-  "Contratti gas",
-  "Consumi gas",
-  "Note",
-  "Azioni",
-].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          textAlign: "left",
-                          padding: 8,
-                          borderBottom: "1px solid #e2e8f0",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-  {reports.map((r, i) => (
-    <tr key={r.id || i}>
-      <td style={{ padding: 8 }}>{r.report_date}</td>
-      <td style={{ padding: 8 }}>{r.contracts_energia}</td>
-      <td style={{ padding: 8 }}>{r.consumi_energia}</td>
-      <td style={{ padding: 8 }}>{r.contracts_gas}</td>
-      <td style={{ padding: 8 }}>{r.consumi_gas}</td>
-      <td style={{ padding: 8 }}>{r.notes}</td>
-
-{/* 👇 QUESTO È IL CESTINO */}
-<td style={{ padding: 8 }}>
-  <button
-    onClick={() => deleteReport(r.id)}
-    style={{
-      padding: "6px 10px",
-      borderRadius: 8,
-      border: "1px solid #dc2626",
-      background: "white",
-      color: "#dc2626",
-      cursor: "pointer",
-      fontWeight: 700,
-    }}
-  >
-    🗑
-  </button>
-</td>
-    </tr>
-  ))}
-</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -4670,6 +4599,7 @@ export default function App() {
   };
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
+  const [agentSession, setAgentSession] = useState<any>(null);
 
   const [punPsvRows, setPunPsvRows] = useState<PunPsvRow[]>(INITIAL_PUN_PSV_ROWS);
   const [selectedPunPsvMonth, setSelectedPunPsvMonth] = useState<string>("DICEMBRE 2026");
@@ -4696,6 +4626,21 @@ export default function App() {
   const [tab, setTab] = useState(() => {
     return localStorage.getItem("app_tab") || "energia";
   });
+  useEffect(() => {
+    const adminSaved = localStorage.getItem("admin_session");
+    const agentSaved = localStorage.getItem("agent_session");
+  
+    if (adminSaved) {
+      const admin = JSON.parse(adminSaved);
+      setAdminSession(admin);
+      setAdminProfile(admin);
+    }
+  
+    if (agentSaved) {
+      const agent = JSON.parse(agentSaved);
+      setAgentSession(agent);
+    }
+  }, []);
   
   const punPsvRef = useRef<HTMLDivElement>(null);
   const punChartRef = useRef<HTMLDivElement>(null);
@@ -5257,37 +5202,29 @@ const renderAdminContent = () => {
             </button>
           )}
 
-          {adminProfile?.role === "super_admin" && (
-            <button
-              onClick={() => setTab("punpsvAdmin")}
-              style={{
-                ...baseBtn,
-                ...(tab === "punpsvAdmin" ? activeBtn : {}),
-              }}
-            >
-              PUN / PSV Admin
-            </button>
-          )}
+{(agentSession || adminSession) && (
+  <button
+    onClick={() => {
+      localStorage.removeItem("admin_session");
+      localStorage.removeItem("agent_session");
 
-          <button
-            onClick={() => {
-              localStorage.removeItem("admin_session");
-              setAdminSession(null);
-              setAdminProfile(null);
-              setSession(null);
-              setTab("energia");
-              localStorage.removeItem("app_tab");
-            }}
-            style={{
-              ...baseBtn,
-              background: "#ef4444",
-              color: "white",
-              border: "1px solid #ef4444",
-            }}
-          >
-            Esci
-          </button>
-        </div>
+      setAdminSession(null);
+      setAdminProfile(null);
+      setAgentSession(null);
+
+      setTab("energia");
+      localStorage.removeItem("app_tab");
+    }}
+    style={{
+      ...baseBtn,
+      background: "#ef4444",
+      color: "white",
+      border: "1px solid #ef4444",
+    }}
+  >
+    Esci
+  </button>
+)}
       </div>
 
       {tab === "reportAdmin" && <ReportAdmin adminProfile={adminProfile} />}
@@ -5437,14 +5374,30 @@ const renderAdminContent = () => {
         </div>
       )}
     </div>
+  </div>
   );
 };
-  
+if (!agentSession && !adminSession) {
+  return (
+    <LoginView
+      setSession={setAdminSession}
+      setAdminProfile={setAdminProfile}
+      setAgentSession={setAgentSession}
+    />
+  );
+}
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20 }}>
       <h1>Simulatore Bollette</h1>
   
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div
+  style={{
+    display: "flex",
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  }}
+>
   <button
     onClick={() => setTab("energia")}
     style={{
@@ -5485,15 +5438,39 @@ const renderAdminContent = () => {
     PUN / PSV
   </button>
 
-  <button
-    onClick={() => setTab("reportAdmin")}
-    style={{
-      ...baseBtn,
-      ...(tab === "reportAdmin" ? activeBtn : {}),
-    }}
-  >
-    Area Admin
-  </button>
+  {adminProfile?.role === "super_admin" && (
+    <button
+      onClick={() => setTab("reportAdmin")}
+      style={{
+        ...baseBtn,
+        ...(tab === "reportAdmin" ? activeBtn : {}),
+      }}
+    >
+      Area Admin
+    </button>
+  )}
+
+  {(agentSession || adminSession) && (
+    <button
+      onClick={() => {
+        localStorage.removeItem("admin_session");
+        localStorage.removeItem("agent_session");
+        setAdminSession(null);
+        setAdminProfile(null);
+        setAgentSession(null);
+        setTab("energia");
+        localStorage.removeItem("app_tab");
+      }}
+      style={{
+        ...baseBtn,
+        background: "#ef4444",
+        color: "white",
+        border: "1px solid #ef4444",
+      }}
+    >
+      Esci
+    </button>
+  )}
 </div>
   
 {tab === "energia" ? (
@@ -5509,7 +5486,7 @@ const renderAdminContent = () => {
   gasAcciseSettings={gasAcciseSettings}
 />
 ) : tab === "report" ? (
-        <ReportAgent />
+  <ReportAgent agentSession={agentSession} />
         ) : tab === "punpsvPublic" ? (
           <div
             style={{
