@@ -50,11 +50,14 @@ type Agent = {
 
 type AdminProfile = {
   id?: number;
+  auth_id: string;
   nome?: string;
+  cognome?: string;
+  email?: string;
   username: string;
-  password: string;
-  role: "super_admin" | "admin";
-};
+  password?: string;
+  role?: string;
+ };
 type PunPsvRow = {
   mese: string;
   mono: number;
@@ -4571,21 +4574,36 @@ function AdminUsersManager({
 }) {
   const [admins, setAdmins] = useState<any[]>([]);
   const [newNome, setNewNome] = useState("");
+  const [newCognome, setNewCognome] = useState("");
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [editingAdmin, setEditingAdmin] = useState<any>(null);
+  const [editAdminNome, setEditAdminNome] = useState("");
+  const [editAdminCognome, setEditAdminCognome] = useState("");
+  const [editAdminUsername, setEditAdminUsername] = useState("");
+  const [editAdminPassword, setEditAdminPassword] = useState("");
+
   const loadAdmins = async () => {
     if (adminProfile?.role !== "super_admin") return;
 
+    setLoading(true);
+
     const { data, error } = await supabase
       .from("admin_users")
-      .select("id, nome, username, password, role")
-      .order("username", { ascending: true });
+      .select("id, nome, cognome, username, password, role")
+      .order("nome", { ascending: true });
 
-    if (!error && data) {
-      setAdmins(data);
+    if (error) {
+      console.error("LOAD ADMINS ERROR:", error);
+      setAdmins([]);
+      setLoading(false);
+      return;
     }
+
+    setAdmins(data || []);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -4593,59 +4611,108 @@ function AdminUsersManager({
   }, []);
 
   const createAdmin = async () => {
-    const nome = newNome.trim();
-    const username = newUsername.trim().toLowerCase();
-    const password = newPassword.trim();
-
-    if (!nome || !username || !password) {
-      alert("Compila tutti i campi");
+    if (
+      !newNome.trim() ||
+      !newCognome.trim() ||
+      !newUsername.trim() ||
+      !newPassword.trim()
+    ) {
+      alert("Inserisci nome, cognome, username e password");
       return;
     }
 
-    setLoading(true);
-
     const { error } = await supabase.from("admin_users").insert([
       {
-        nome,
-        username,
-        password,
-        auth_id: crypto.randomUUID(),
+        nome: newNome.trim().toUpperCase(),
+        cognome: newCognome.trim().toUpperCase(),
+        username: newUsername.trim(),
+        password: newPassword.trim(),
         role: "admin",
       },
     ]);
-
-    setLoading(false);
 
     if (error) {
       alert("Errore creazione admin: " + error.message);
       return;
     }
 
+    alert("Admin creato");
+
     setNewNome("");
+    setNewCognome("");
     setNewUsername("");
     setNewPassword("");
 
-    loadAdmins();
+    await loadAdmins();
   };
 
-  const deleteAdmin = async (id: number) => {
-    if (!confirm("Eliminare admin?")) return;
+  const updateAdmin = async () => {
+    if (!editingAdmin?.id) return;
 
-    await supabase.from("admin_users").delete().eq("id", id);
-    loadAdmins();
+    if (
+      !editAdminNome.trim() ||
+      !editAdminCognome.trim() ||
+      !editAdminUsername.trim() ||
+      !editAdminPassword.trim()
+    ) {
+      alert("Inserisci nome, cognome, username e password");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("admin_users")
+      .update({
+        nome: editAdminNome.trim().toUpperCase(),
+        cognome: editAdminCognome.trim().toUpperCase(),
+        username: editAdminUsername.trim(),
+        password: editAdminPassword.trim(),
+      })
+      .eq("id", editingAdmin.id);
+
+    if (error) {
+      alert("Errore modifica admin: " + error.message);
+      return;
+    }
+
+    alert("Admin aggiornato");
+
+    setEditingAdmin(null);
+    setEditAdminNome("");
+    setEditAdminCognome("");
+    setEditAdminUsername("");
+    setEditAdminPassword("");
+
+    await loadAdmins();
   };
 
-  if (adminProfile?.role !== "super_admin") return null;
+  const deleteAdmin = async (adminId?: number) => {
+    if (!adminId) return;
+
+    const ok = window.confirm("Vuoi eliminare questo admin?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("admin_users")
+      .delete()
+      .eq("id", adminId);
+
+    if (error) {
+      alert("Errore eliminazione admin: " + error.message);
+      return;
+    }
+
+    alert("Admin eliminato");
+    await loadAdmins();
+  };
 
   return (
-    <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 18 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div
         style={{
           background: "white",
           border: "1px solid #e2e8f0",
-          borderRadius: 16,
-          padding: 20,
-          boxShadow: "0 6px 18px rgba(0,0,0,0.05)",
+          borderRadius: 12,
+          padding: 16,
         }}
       >
         <div
@@ -4653,17 +4720,18 @@ function AdminUsersManager({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 16,
+            gap: 12,
             flexWrap: "wrap",
-            gap: 10,
           }}
         >
           <h2 style={{ margin: 0 }}>Admin web app</h2>
-          <div style={{ fontSize: 13, color: "#64748b" }}>
-            Crea nuovi admin con accesso diretto via username e password
+          <div style={{ color: "#64748b", fontSize: 14 }}>
+            Gestione amministratori della web app
           </div>
         </div>
-  
+
+        <div style={{ height: 16 }} />
+
         <div
           style={{
             display: "grid",
@@ -4672,159 +4740,364 @@ function AdminUsersManager({
           }}
         >
           <input
-            placeholder="Nome"
             value={newNome}
             onChange={(e) => setNewNome(e.target.value)}
+            placeholder="Nome"
             style={{
               width: "100%",
-              padding: "12px 14px",
-              border: "1px solid #cbd5e1",
+              padding: 12,
               borderRadius: 10,
+              border: "1px solid #cbd5e1",
               boxSizing: "border-box",
-              fontSize: 14,
             }}
           />
+
           <input
-            placeholder="Username"
+            value={newCognome}
+            onChange={(e) => setNewCognome(e.target.value)}
+            placeholder="Cognome"
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid #cbd5e1",
+              boxSizing: "border-box",
+            }}
+          />
+
+          <input
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
+            placeholder="Username"
             style={{
               width: "100%",
-              padding: "12px 14px",
-              border: "1px solid #cbd5e1",
+              padding: 12,
               borderRadius: 10,
+              border: "1px solid #cbd5e1",
               boxSizing: "border-box",
-              fontSize: 14,
             }}
           />
+
           <input
-            placeholder="Password"
-            type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Password"
             style={{
               width: "100%",
-              padding: "12px 14px",
-              border: "1px solid #cbd5e1",
+              padding: 12,
               borderRadius: 10,
+              border: "1px solid #cbd5e1",
               boxSizing: "border-box",
-              fontSize: 14,
             }}
           />
-          <button
-            onClick={createAdmin}
-            disabled={loading}
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: 10,
-              border: "none",
-              background: "#0f172a",
-              color: "white",
-              cursor: "pointer",
-              fontWeight: 700,
-              fontSize: 14,
-            }}
-          >
-            {loading ? "Creazione..." : "Crea admin"}
-          </button>
         </div>
+
+        <div style={{ height: 12 }} />
+
+        <button
+          type="button"
+          onClick={createAdmin}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "none",
+            background: "#0f172a",
+            color: "white",
+            cursor: "pointer",
+            fontWeight: 700,
+          }}
+        >
+          Crea admin
+        </button>
       </div>
-  
+
       <div
         style={{
           background: "white",
           border: "1px solid #e2e8f0",
-          borderRadius: 16,
-          padding: 20,
-          boxShadow: "0 6px 18px rgba(0,0,0,0.05)",
+          borderRadius: 12,
+          padding: 16,
         }}
       >
+        <h2 style={{ marginTop: 0 }}>Elenco admin</h2>
+
+        {loading ? (
+          <div>Caricamento...</div>
+        ) : admins.length === 0 ? (
+          <div>Nessun admin trovato</div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["Nome", "Cognome", "Username", "Password", "Ruolo", "Azioni"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: "left",
+                          padding: "10px 8px",
+                          borderBottom: "1px solid #e2e8f0",
+                          fontSize: 13,
+                          color: "#475569",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
+                </tr>
+              </thead>
+
+              <tbody>
+                {admins.map((a) => (
+                  <tr key={a.id}>
+                    <td
+                      style={{
+                        padding: "12px 8px",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      {a.nome?.toUpperCase() || "-"}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: "12px 8px",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      {a.cognome?.toUpperCase() || "-"}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: "12px 8px",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      {a.username}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: "12px 8px",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      {a.password}
+                    </td>
+
+                    <td
+                      style={{
+                        padding: "12px 8px",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          background:
+                            a.role === "super_admin" ? "#dbeafe" : "#f1f5f9",
+                          color:
+                            a.role === "super_admin" ? "#1d4ed8" : "#334155",
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {a.role}
+                      </span>
+                    </td>
+
+                    <td
+                      style={{
+                        padding: "12px 8px",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={() => {
+                            setEditingAdmin(a);
+                            setEditAdminNome(a.nome || "");
+                            setEditAdminCognome(a.cognome || "");
+                            setEditAdminUsername(a.username || "");
+                            setEditAdminPassword(a.password || "");
+                          }}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #2563eb",
+                            background: "white",
+                            color: "#2563eb",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Modifica
+                        </button>
+
+                        <button
+                          onClick={() => deleteAdmin(a.id)}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #dc2626",
+                            background: "white",
+                            color: "#dc2626",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Elimina
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {editingAdmin && (
         <div
           style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.35)",
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent: "center",
             alignItems: "center",
-            marginBottom: 16,
-            flexWrap: "wrap",
-            gap: 10,
+            zIndex: 9999,
           }}
         >
-          <h2 style={{ margin: 0 }}>Elenco admin</h2>
-          <div style={{ fontSize: 13, color: "#64748b" }}>
-            Gestione amministratori della web app
+          <div
+            style={{
+              background: "white",
+              padding: 24,
+              borderRadius: 14,
+              width: 440,
+              maxWidth: "calc(100vw - 32px)",
+              boxSizing: "border-box",
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Modifica Admin</h3>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Nome
+              </div>
+              <input
+                value={editAdminNome}
+                onChange={(e) => setEditAdminNome(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Cognome
+              </div>
+              <input
+                value={editAdminCognome}
+                onChange={(e) => setEditAdminCognome(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Username
+              </div>
+              <input
+                value={editAdminUsername}
+                onChange={(e) => setEditAdminUsername(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Password
+              </div>
+              <input
+                value={editAdminPassword}
+                onChange={(e) => setEditAdminPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+              }}
+            >
+              <button
+                onClick={() => {
+                  setEditingAdmin(null);
+                  setEditAdminNome("");
+                  setEditAdminCognome("");
+                  setEditAdminUsername("");
+                  setEditAdminPassword("");
+                }}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #94a3b8",
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+
+              <button
+                onClick={updateAdmin}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#0f172a",
+                  color: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Salva
+              </button>
+            </div>
           </div>
         </div>
-  
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Nome", "Username", "Password", "Ruolo", "Azioni"].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: "left",
-                      padding: "10px 8px",
-                      borderBottom: "1px solid #e2e8f0",
-                      fontSize: 13,
-                      color: "#475569",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {admins.map((a) => (
-                <tr key={a.id}>
-                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
-                    {a.nome || "-"}
-                  </td>
-                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
-                    {a.username}
-                  </td>
-                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
-                    {a.password}
-                  </td>
-                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        background: a.role === "super_admin" ? "#dbeafe" : "#f1f5f9",
-                        color: a.role === "super_admin" ? "#1d4ed8" : "#334155",
-                        fontSize: 12,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {a.role}
-                    </span>
-                  </td>
-                  <td style={{ padding: "12px 8px", borderBottom: "1px solid #f1f5f9" }}>
-                    <button
-                      onClick={() => deleteAdmin(a.id)}
-                      style={{
-                        padding: "8px 12px",
-                        borderRadius: 8,
-                        border: "1px solid #dc2626",
-                        background: "white",
-                        color: "#dc2626",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Elimina
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
