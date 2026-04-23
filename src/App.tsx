@@ -4626,6 +4626,7 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
   
   const [selectedMonthPUN, setSelectedMonthPUN] = useState("");
   const [appliedMonthPUN, setAppliedMonthPUN] = useState("");
+  const activePunPsvMonth = appliedMonthPUN || selectedMonthPUN;
 
   
   const [punPsvView, setPunPsvView] = useState<"both" | "pun" | "psv">("both");
@@ -4660,9 +4661,10 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
   console.log("selectedMonthPUN:", selectedMonthPUN);
 console.log("punPsvRows:", punPsvRows);
 console.log("visiblePunPsvRows:", visiblePunPsvRows);
-  const tablePunPsvRows = [...visiblePunPsvRows].sort(
-    (a, b) => getMonthYearSortValue(b.mese) - getMonthYearSortValue(a.mese)
-  );
+const tablePunPsvRows = getLast12PunPsvRows(
+  punPsvRows,
+  activePunPsvMonth
+).reverse();
   const validMonthOptions = [...punPsvRows]
   .filter((row) => {
     if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
@@ -4693,26 +4695,43 @@ console.log("visiblePunPsvRows:", visiblePunPsvRows);
 
     return score(b.mese) - score(a.mese);
   });
-  const punValues = visiblePunPsvRows.map(r => Number(r.mono || 0));
-const psvValues = visiblePunPsvRows.map(r => r.psv);
+  const chartPunPsvRows = [...tablePunPsvRows];
+
+const punValues = chartPunPsvRows.map(r => Number(r.mono || 0));
+const psvValues = chartPunPsvRows.map(r => Number(r.psv || 0));
 const punPolyline = getSvgPoints(punValues, 760, 220);
 const psvPolyline = getSvgPoints(psvValues, 760, 220);
 const punCoords = getChartCoords(punValues, 760, 220);
 const psvCoords = getChartCoords(psvValues, 760, 220);
+const monthLabels = chartPunPsvRows.map((row) => {
+  const mese = String(row.mese || "").split(" ")[0]?.toUpperCase() || "";
 
+  const shortMap: Record<string, string> = {
+    GENNAIO: "Gen",
+    FEBBRAIO: "Feb",
+    MARZO: "Mar",
+    APRILE: "Apr",
+    MAGGIO: "Mag",
+    GIUGNO: "Giu",
+    LUGLIO: "Lug",
+    AGOSTO: "Ago",
+    SETTEMBRE: "Set",
+    OTTOBRE: "Ott",
+    NOVEMBRE: "Nov",
+    DICEMBRE: "Dic",
+  };
+
+  return shortMap[mese] || mese;
+});
 const latestPun =
-  visiblePunPsvRows.length > 0
-    ? Number(
-        visiblePunPsvRows[visiblePunPsvRows.length - 1].mono || 0
-      ).toFixed(6)
-    : "-";
+tablePunPsvRows.length > 0
+ ? Number(tablePunPsvRows[0].mono || 0).toFixed(6)
+ : "-";
 
 const latestPsv =
-  visiblePunPsvRows.length > 0
-    ? Number(
-        visiblePunPsvRows[visiblePunPsvRows.length - 1].psv || 0
-      ).toFixed(6)
-    : "-";
+tablePunPsvRows.length > 0
+ ? Number(tablePunPsvRows[0].psv || 0).toFixed(6)
+ : "-";
        
     function getRowMonthScore(row: any) {
       const mesi = [
@@ -5488,11 +5507,7 @@ const renderAdminContent = () => {
                           fontSize="14"
                           fill="#64748b"
                         >
-                          {
-                            ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"][
-                              i % 12
-                            ]
-                          }
+                          {monthLabels[i] || ""}
                         </text>
                       ))}
         
@@ -5570,11 +5585,7 @@ const renderAdminContent = () => {
                           fontSize="14"
                           fill="#64748b"
                         >
-                          {
-                            ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"][
-                              i % 12
-                            ]
-                          }
+                          {monthLabels[i] || ""}
                         </text>
                       ))}
         
