@@ -4740,10 +4740,10 @@ const latestPsv =
     
     const publicPunPsvOptions = [...punPsvRows]
   .filter((row) => {
-    if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
-      return false;
-      
-    }
+    const mese = String(row.mese || "").trim().toUpperCase();
+
+    if (!mese) return false;
+    if (mese === "FISSO DOMESTICO" || mese === "FISSO BUSINESS") return false;
 
     return (
       Number(row.mono || 0) !== 0 ||
@@ -4769,17 +4769,18 @@ const latestPsv =
       "DICEMBRE",
     ];
 
-
-    
     const score = (label: string) => {
       const parts = String(label).trim().split(" ");
       const mese = parts[0]?.toUpperCase() || "";
       const anno = parseInt(parts[1] || "0", 10);
       const meseIndex = mesi.indexOf(mese);
+
+      if (!anno || meseIndex === -1) return -1;
+
       return anno * 100 + meseIndex;
     };
 
-    return score(b.mese) - score(a.mese);
+    return score(String(b.mese)) - score(String(a.mese));
   });
 
   useEffect(() => {
@@ -5344,7 +5345,7 @@ const renderAdminContent = () => {
                     minWidth: 240,
                   }}
                 >
-                  {punPsvRows.map((row) => (
+                  {publicPunPsvOptions.map((row) => (
                     <option key={row.mese} value={row.mese}>
                       {row.mese}
                     </option>
