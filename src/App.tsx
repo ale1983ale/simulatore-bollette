@@ -1686,8 +1686,8 @@ return (
 >
 {field(
  "DISP + CP. Mrk da Calcolare",
- s.dispacciamentoCapacityMarket,
- (v)=>set("dispacciamentoCapacityMarket",v),
+ Number(s.dispacciamentoCapacityMarket).toFixed(4),
+ (v)=>set("dispacciamentoCapacityMarket", Number(v)),
  "number"
 )}
 </div>
