@@ -581,13 +581,18 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       const html2canvas = html2canvasModule.default;
 
       const canvas = await html2canvas(page, {
-        scale: 2,
+        scale: 1,
         useCORS: true,
         backgroundColor: "#ffffff",
       });
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
+      const imgData = canvas.toDataURL("image/jpeg", 0.55);
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: "a4",
+        compress: true
+      });
 
       const pdfWidth = 210;
       const pdfHeight = 297;
@@ -601,14 +606,12 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       let heightLeft = imgHeight;
       let position = margin;
 
-      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-      heightLeft -= usableHeight;
+      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
 
       while (heightLeft > 0) {
         pdf.addPage();
         position = margin - (imgHeight - heightLeft);
-        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-        heightLeft -= usableHeight;
+        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
       }
 
       pdf.save(`${finalFileName}.pdf`);
