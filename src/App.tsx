@@ -5332,8 +5332,11 @@ const renderAdminContent = () => {
                 }}
               >
                 <select
-                  value={selectedMonthPUN}
-                  onChange={(e) => setSelectedMonthPUN(e.target.value)}
+  value={selectedMonthPUN}
+  onChange={(e)=>{
+    setSelectedMonthPUN(e.target.value);
+    setAppliedMonthPUN(e.target.value);
+  }}
                   style={{
                     padding: "12px 16px",
                     borderRadius: 10,
@@ -5348,22 +5351,7 @@ const renderAdminContent = () => {
                   ))}
                 </select>
         
-                <button
-                  type="button"
-                  onClick={() => setAppliedMonthPUN(selectedMonthPUN)}
-                  style={{
-                    background: "#0f172a",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 10,
-                    padding: "10px 18px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  VAI
-                </button>
-        
+                       
                 <button
                   type="button"
                   onClick={exportPunPsvPdf}
