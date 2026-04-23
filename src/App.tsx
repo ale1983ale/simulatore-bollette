@@ -4497,29 +4497,25 @@ export default function App() {
   });
   
   const punPsvRef = useRef<HTMLDivElement>(null);
-
+  const punChartRef = useRef<HTMLDivElement>(null);
+  const psvChartRef = useRef<HTMLDivElement>(null);
+  const punPsvTableRef = useRef<HTMLDivElement>(null);
   const exportPunPsvPdf = async () => {
     if (!punPsvRef.current) return;
   
     try {
       const root = punPsvRef.current;
+
+const punCard = punChartRef.current;
+const psvCard = psvChartRef.current;
+const tableWrap = punPsvTableRef.current;
+
+if (!punCard || !psvCard || !tableWrap) {
+  alert("Blocco PDF non trovato");
+  return;
+}
   
-      const grid = root.querySelector('div[style*="grid"]') as HTMLElement | null;
-      const tableWrap = root.querySelector('div[style*="overflow"]') as HTMLElement | null;
-  
-      if (!grid || !tableWrap) {
-        alert("Blocco PDF non trovato");
-        return;
-      }
-  
-      const cards = Array.from(grid.children) as HTMLElement[];
-      const punCard = cards[0] || null;
-      const psvCard = cards[1] || null;
-  
-      if (!punCard || !psvCard) {
-        alert("Grafici PUN/PSV non trovati");
-        return;
-      }
+      
   
       const commonOptions = {
         scale: 2,
@@ -5452,13 +5448,14 @@ const renderAdminContent = () => {
               >
                 {(punPsvView === "both" || punPsvView === "pun") && (
                   <div
-                    style={{
-                      background: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 16,
-                      padding: 20,
-                    }}
-                  >
+                  ref={punChartRef}
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 16,
+                    padding: 20,
+                  }}
+                >
                     <h3 style={{ marginTop: 0 }}>Andamento PUN</h3>
         
                     <div
@@ -5530,13 +5527,14 @@ const renderAdminContent = () => {
         
                 {(punPsvView === "both" || punPsvView === "psv") && (
                   <div
-                    style={{
-                      background: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 16,
-                      padding: 20,
-                    }}
-                  >
+                  ref={psvChartRef}
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 16,
+                    padding: 20,
+                  }}
+                >
                     <h3 style={{ marginTop: 0 }}>Andamento PSV</h3>
         
                     <div
@@ -5606,8 +5604,69 @@ const renderAdminContent = () => {
                   </div>
                 )}
               </div>
-        
-              <div style={{ overflowX: "auto" }}>
+</div>
+
+
+{/* RIQUADRO ULTIMO MESE + TABELLA */}
+<div
+ ref={punPsvTableRef}
+ style={{
+   background:"#f8fafc",
+   border:"2px solid #dbeafe",
+   borderRadius:18,
+   padding:"18px 22px",
+   marginBottom:18,
+   boxShadow:"0 4px 12px rgba(0,0,0,.05)"
+ }}
+>
+ <div
+   style={{
+      display:"grid",
+      gridTemplateColumns:"1.5fr 1fr 1fr",
+      gap:18,
+      alignItems:"center"
+   }}
+ >
+   <div>
+      <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>
+        ULTIMO MESE
+      </div>
+      <div style={{fontSize:24,fontWeight:800}}>
+        {tablePunPsvRows[0]?.mese}
+      </div>
+   </div>
+
+   <div>
+      <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>
+        PUN
+      </div>
+      <div style={{
+        fontSize:24,
+        fontWeight:800,
+        color:"#d97706"
+      }}>
+       {Number(tablePunPsvRows[0]?.mono||0).toFixed(6)}
+      </div>
+   </div>
+
+   <div>
+      <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>
+        PSV
+      </div>
+      <div style={{
+         fontSize:24,
+         fontWeight:800,
+         color:"#2563eb"
+      }}>
+       {Number(tablePunPsvRows[0]?.psv||0).toFixed(6)}
+      </div>
+   </div>
+
+ </div>
+
+
+
+<div style={{ overflowX:"auto" }}>
                 <table
                   style={{
                     width: "100%",
