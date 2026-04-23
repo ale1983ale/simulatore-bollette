@@ -2979,8 +2979,15 @@ function AgentsAdmin({
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [nome, setNome] = useState("");
   const [cognome, setCognome] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
 
   const loadAgents = async () => {
     setLoading(true);
@@ -3011,8 +3018,8 @@ function AgentsAdmin({
   }, []);
 
   const saveAgent = async () => {
-    if (!nome || !cognome) {
-      alert("Inserisci nome e cognome");
+    if (!nome.trim() || !cognome.trim() || !username.trim() || !password.trim()) {
+      alert("Inserisci nome, cognome, username e password");
       return;
     }
 
@@ -3021,17 +3028,14 @@ function AgentsAdmin({
       return;
     }
 
-    const username = nome.toLowerCase().trim();
-    const password = cognome.toLowerCase().trim();
-
     setSaving(true);
 
     const { error } = await supabase.from("agents").insert([
       {
-        nome,
-        cognome,
-        username,
-        password,
+        nome: nome.trim(),
+        cognome: cognome.trim(),
+        username: username.trim(),
+        password: password.trim(),
         owner_admin_id: adminProfile.id,
       },
     ]);
@@ -3047,6 +3051,8 @@ function AgentsAdmin({
     alert("Agente salvato");
     setNome("");
     setCognome("");
+    setUsername("");
+    setPassword("");
     await loadAgents();
   };
 
@@ -3069,6 +3075,40 @@ function AgentsAdmin({
       return;
     }
 
+    await loadAgents();
+  };
+
+  const updateAgent = async () => {
+    if (!editingAgent?.id) return;
+
+    if (!editUsername.trim() || !editPassword.trim()) {
+      alert("Inserisci username e password");
+      return;
+    }
+
+    let query = supabase
+      .from("agents")
+      .update({
+        username: editUsername.trim(),
+        password: editPassword.trim(),
+      })
+      .eq("id", editingAgent.id);
+
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_admin_id", adminProfile?.id);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+      alert("Errore modifica: " + error.message);
+      return;
+    }
+
+    alert("Agente aggiornato");
+    setEditingAgent(null);
+    setEditUsername("");
+    setEditPassword("");
     await loadAgents();
   };
 
@@ -3115,6 +3155,40 @@ function AgentsAdmin({
             <input
               value={cognome}
               onChange={(e) => setCognome(e.target.value)}
+              style={{
+                width: "100%",
+                padding: 8,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              Username
+            </div>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{
+                width: "100%",
+                padding: 8,
+                border: "1px solid #cbd5e1",
+                borderRadius: 8,
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              Password
+            </div>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: "100%",
                 padding: 8,
@@ -3192,22 +3266,45 @@ function AgentsAdmin({
                       {a.password}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                      <button
-                        type="button"
-                        onClick={() => deleteAgent(a.id)}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 8,
-                          border: "1px solid #dc2626",
-                          background: "white",
-                          color: "#dc2626",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                        }}
-                        title="Elimina agente"
-                      >
-                        🗑
-                      </button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAgent(a);
+                            setEditUsername(a.username || "");
+                            setEditPassword(a.password || "");
+                          }}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #2563eb",
+                            background: "white",
+                            color: "#2563eb",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                          }}
+                          title="Modifica agente"
+                        >
+                          Modifica
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteAgent(a.id)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #dc2626",
+                            background: "white",
+                            color: "#dc2626",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                          }}
+                          title="Elimina agente"
+                        >
+                          🗑
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -3216,6 +3313,110 @@ function AgentsAdmin({
           </div>
         )}
       </div>
+
+      {editingAgent && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.35)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: 24,
+              borderRadius: 14,
+              width: 420,
+              maxWidth: "calc(100vw - 32px)",
+              boxSizing: "border-box",
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+              Modifica credenziali agente
+            </h3>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Username
+              </div>
+              <input
+                value={editUsername}
+                onChange={(e) => setEditUsername(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Password
+              </div>
+              <input
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingAgent(null);
+                  setEditUsername("");
+                  setEditPassword("");
+                }}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #94a3b8",
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+
+              <button
+                type="button"
+                onClick={updateAgent}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#0f172a",
+                  color: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Salva
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
