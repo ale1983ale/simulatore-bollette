@@ -2977,6 +2977,7 @@ function AgentsAdmin({
   adminProfile: AdminProfile | null;
 }) {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [admins, setAdmins] = useState<AdminProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -2984,10 +2985,30 @@ function AgentsAdmin({
   const [cognome, setCognome] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedOwnerAdminId, setSelectedOwnerAdminId] = useState<number | "">("");
 
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [editUsername, setEditUsername] = useState("");
   const [editPassword, setEditPassword] = useState("");
+  const [editOwnerAdminId, setEditOwnerAdminId] = useState<number | "">("");
+  const [ownerFilter,setOwnerFilter] = useState("ALL");
+
+  const loadAdmins = async () => {
+    if (adminProfile?.role !== "super_admin") return;
+
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("id, nome, username, role")
+      .order("nome", { ascending: true });
+
+    if (error) {
+      console.error("LOAD ADMINS ERROR:", error);
+      setAdmins([]);
+      return;
+    }
+
+    setAdmins((data as AdminProfile[]) || []);
+  };
 
   const loadAgents = async () => {
     setLoading(true);
@@ -3015,7 +3036,29 @@ function AgentsAdmin({
 
   useEffect(() => {
     loadAgents();
-  }, []);
+    loadAdmins();
+
+    if (adminProfile?.role === "super_admin") {
+      setSelectedOwnerAdminId(adminProfile?.id || "");
+    } else {
+      setSelectedOwnerAdminId("");
+    }
+  }, [adminProfile?.id, adminProfile?.role]);
+
+  const getOwnerAdminLabel = (ownerAdminId?: number) => {
+    if (!ownerAdminId) return "-";
+    const found = admins.find((a) => a.id === ownerAdminId);
+    if (!found) return `ID ${ownerAdminId}`;
+    return `${found.nome || found.username} (${found.username})`;
+  };
+  const filteredAgents =
+  ownerFilter === "ALL"
+    ? agents
+    : ownerFilter === "MINE"
+    ? agents.filter(a => a.owner_admin_id === adminProfile?.id)
+    : agents.filter(
+        a => String(a.owner_admin_id) === ownerFilter
+      );
 
   const saveAgent = async () => {
     if (!nome.trim() || !cognome.trim() || !username.trim() || !password.trim()) {
@@ -3028,6 +3071,18 @@ function AgentsAdmin({
       return;
     }
 
+    let ownerAdminIdToSave: number | undefined;
+
+    if (adminProfile.role === "super_admin") {
+      if (!selectedOwnerAdminId) {
+        alert("Seleziona l'admin proprietario dell'agente");
+        return;
+      }
+      ownerAdminIdToSave = Number(selectedOwnerAdminId);
+    } else {
+      ownerAdminIdToSave = adminProfile.id;
+    }
+
     setSaving(true);
 
     const { error } = await supabase.from("agents").insert([
@@ -3036,7 +3091,7 @@ function AgentsAdmin({
         cognome: cognome.trim(),
         username: username.trim(),
         password: password.trim(),
-        owner_admin_id: adminProfile.id,
+        owner_admin_id: ownerAdminIdToSave,
       },
     ]);
 
@@ -3053,6 +3108,11 @@ function AgentsAdmin({
     setCognome("");
     setUsername("");
     setPassword("");
+
+    if (adminProfile.role === "super_admin") {
+      setSelectedOwnerAdminId(adminProfile?.id || "");
+    }
+
     await loadAgents();
   };
 
@@ -3080,38 +3140,52 @@ function AgentsAdmin({
 
   const updateAgent = async () => {
     if (!editingAgent?.id) return;
-
+  
     if (!editUsername.trim() || !editPassword.trim()) {
       alert("Inserisci username e password");
       return;
     }
-
+  
+    const updatePayload: any = {
+      username: editUsername.trim(),
+      password: editPassword.trim(),
+    };
+  
+    if (adminProfile?.role === "super_admin") {
+      if (!editOwnerAdminId) {
+        alert("Seleziona l'admin proprietario");
+        return;
+      }
+  
+      updatePayload.owner_admin_id = Number(editOwnerAdminId);
+    }
+  
     let query = supabase
       .from("agents")
-      .update({
-        username: editUsername.trim(),
-        password: editPassword.trim(),
-      })
+      .update(updatePayload)
       .eq("id", editingAgent.id);
-
+  
     if (adminProfile?.role !== "super_admin") {
       query = query.eq("owner_admin_id", adminProfile?.id);
     }
-
+  
     const { error } = await query;
-
+  
     if (error) {
       alert("Errore modifica: " + error.message);
       return;
     }
-
+  
     alert("Agente aggiornato");
+  
     setEditingAgent(null);
     setEditUsername("");
     setEditPassword("");
+    setEditOwnerAdminId("");
+  
     await loadAgents();
   };
-
+  
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div
@@ -3123,7 +3197,7 @@ function AgentsAdmin({
         }}
       >
         <h2 style={{ marginTop: 0 }}>Agent Admin</h2>
-
+  
         <div
           style={{
             display: "grid",
@@ -3147,7 +3221,7 @@ function AgentsAdmin({
               }}
             />
           </div>
-
+  
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
               Cognome
@@ -3164,7 +3238,7 @@ function AgentsAdmin({
               }}
             />
           </div>
-
+  
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
               Username
@@ -3181,7 +3255,7 @@ function AgentsAdmin({
               }}
             />
           </div>
-
+  
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
               Password
@@ -3198,10 +3272,41 @@ function AgentsAdmin({
               }}
             />
           </div>
+  
+          {adminProfile?.role === "super_admin" && (
+            <div style={{ gridColumn: "1 / span 2" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Admin proprietario
+              </div>
+              <select
+                value={selectedOwnerAdminId}
+                onChange={(e) =>
+                  setSelectedOwnerAdminId(
+                    e.target.value ? Number(e.target.value) : ""
+                  )
+                }
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  background: "white",
+                  boxSizing: "border-box",
+                }}
+              >
+                <option value="">Seleziona admin</option>
+                {admins.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {(a.nome || a.username) + " (" + a.username + ")"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
-
+  
         <div style={{ height: 12 }} />
-
+  
         <button
           type="button"
           onClick={saveAgent}
@@ -3218,7 +3323,7 @@ function AgentsAdmin({
           {saving ? "Salvataggio..." : "Salva agente"}
         </button>
       </div>
-
+  
       <div
         style={{
           background: "white",
@@ -3228,7 +3333,32 @@ function AgentsAdmin({
         }}
       >
         <h2 style={{ marginTop: 0 }}>Elenco agenti</h2>
+        <div style={{ marginBottom:16 }}>
+  <div style={{ fontSize:12, fontWeight:700, marginBottom:4 }}>
+    Filtro agenti
+  </div>
 
+  <select
+    value={ownerFilter}
+    onChange={(e)=>setOwnerFilter(e.target.value)}
+    style={{
+      padding:8,
+      borderRadius:8,
+      border:"1px solid #cbd5e1",
+      background:"white"
+    }}
+  >
+    <option value="ALL">Tutti gli agenti</option>
+    <option value="MINE">Solo miei agenti</option>
+
+    {admins.map((a)=>(
+      <option key={a.id} value={String(a.id)}>
+        {a.nome || a.username}
+      </option>
+    ))}
+  </select>
+</div>
+  
         {loading ? (
           <div>Caricamento...</div>
         ) : (
@@ -3236,7 +3366,14 @@ function AgentsAdmin({
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Nome", "Cognome", "Username", "Password", "Azioni"].map((h) => (
+                  {[
+                    "Nome",
+                    "Cognome",
+                    "Username",
+                    "Password",
+                    ...(adminProfile?.role === "super_admin" ? ["Admin"] : []),
+                    "Azioni",
+                  ].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -3251,7 +3388,7 @@ function AgentsAdmin({
                 </tr>
               </thead>
               <tbody>
-                {agents.map((a, i) => (
+              {filteredAgents.map((a, i) => (
                   <tr key={a.id || i}>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       {a.nome?.toUpperCase()}
@@ -3265,6 +3402,24 @@ function AgentsAdmin({
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       {a.password}
                     </td>
+  
+                    {adminProfile?.role === "super_admin" && (
+  <td
+    style={{
+      padding: 8,
+      borderBottom: "1px solid #f1f5f9",
+      fontWeight: 700,
+background:
+  a.owner_admin_id === adminProfile?.id
+    ? "#f0fdf4"
+    : "#eff6ff",
+borderRadius:8,
+    }}
+  >
+    {getOwnerAdminLabel(a.owner_admin_id as number)}
+  </td>
+)}
+  
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
@@ -3273,6 +3428,7 @@ function AgentsAdmin({
                             setEditingAgent(a);
                             setEditUsername(a.username || "");
                             setEditPassword(a.password || "");
+                            setEditOwnerAdminId(a.owner_admin_id || "");
                           }}
                           style={{
                             padding: "6px 10px",
@@ -3287,7 +3443,7 @@ function AgentsAdmin({
                         >
                           Modifica
                         </button>
-
+  
                         <button
                           type="button"
                           onClick={() => deleteAgent(a.id)}
@@ -3313,7 +3469,7 @@ function AgentsAdmin({
           </div>
         )}
       </div>
-
+  
       {editingAgent && (
         <div
           style={{
@@ -3339,7 +3495,7 @@ function AgentsAdmin({
             <h3 style={{ marginTop: 0, marginBottom: 16 }}>
               Modifica credenziali agente
             </h3>
-
+  
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Username
@@ -3356,7 +3512,7 @@ function AgentsAdmin({
                 }}
               />
             </div>
-
+  
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Password
@@ -3373,7 +3529,36 @@ function AgentsAdmin({
                 }}
               />
             </div>
-
+  
+            {adminProfile?.role === "super_admin" && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Admin proprietario
+                </div>
+                <select
+                  value={editOwnerAdminId}
+                  onChange={(e) =>
+                    setEditOwnerAdminId(e.target.value ? Number(e.target.value) : "")
+                  }
+                  style={{
+                    width: "100%",
+                    padding: 10,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    background: "white",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <option value="">Seleziona admin</option>
+                  {admins.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {(a.nome || a.username) + " (" + a.username + ")"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+  
             <div
               style={{
                 display: "flex",
@@ -3387,6 +3572,7 @@ function AgentsAdmin({
                   setEditingAgent(null);
                   setEditUsername("");
                   setEditPassword("");
+                  setEditOwnerAdminId("");
                 }}
                 style={{
                   padding: "10px 14px",
@@ -3398,7 +3584,7 @@ function AgentsAdmin({
               >
                 Annulla
               </button>
-
+  
               <button
                 type="button"
                 onClick={updateAgent}
@@ -3420,7 +3606,6 @@ function AgentsAdmin({
     </div>
   );
 }
-
 function LoginView({
   setSession,
   setAdminProfile,
@@ -3977,89 +4162,117 @@ function ReportAdmin({
   const [mode, setMode] = useState<"ALL" | "PERIODO">("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState<"ALL" | "MINE" | "OTHERS">("ALL");
+
   const loadAgents = async () => {
     let query = supabase
-  .from("agents")
-  .select("*")
-  .neq("username", "admin")
-  .order("nome", { ascending: true });
+      .from("agents")
+      .select("*")
+      .order("nome", { ascending: true });
 
-  if (adminProfile?.role !== "super_admin") {
-    query = query.eq("owner_admin_id", adminProfile?.id);
-  }
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_admin_id", adminProfile?.id);
+    } else {
+      if (ownerFilter === "MINE") {
+        query = query.eq("owner_admin_id", adminProfile?.id);
+      } else if (ownerFilter === "OTHERS") {
+        query = query.neq("owner_admin_id", adminProfile?.id);
+      }
+    }
 
-const { data } = await query;
-setAgents(data || []);
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("LOAD AGENTS ERROR:", error);
+      setAgents([]);
+      return;
+    }
+
+    setAgents(data || []);
   };
 
   const loadReports = async (agentId?: number | null) => {
     setLoading(true);
-  
+
     let query = supabase
       .from("reports")
       .select("*")
       .order("report_date", { ascending: false });
-  
-      if (adminProfile?.role !== "super_admin") {
+
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_admin_id", adminProfile?.id);
+    } else {
+      if (ownerFilter === "MINE") {
         query = query.eq("owner_admin_id", adminProfile?.id);
+      } else if (ownerFilter === "OTHERS") {
+        query = query.neq("owner_admin_id", adminProfile?.id);
       }
-  
+    }
+
     if (agentId) {
       query = query.eq("agent_id", agentId);
     }
-  
+
     const { data, error } = await query;
 
-if (error) {
-  console.error("LOAD REPORTS ERROR:", error);
-  setReports([]);
-} else {
-  setReports(data || []);
-}
+    if (error) {
+      console.error("LOAD REPORTS ERROR:", error);
+      setReports([]);
+    } else {
+      setReports(data || []);
+    }
 
-setLoading(false);
+    setLoading(false);
   };
-  
-    
 
   useEffect(() => {
+    setSelectedAgentId(null);
     loadAgents();
     loadReports(null);
-  }, []);
+  }, [ownerFilter, adminProfile?.id, adminProfile?.role]);
+
   const deleteReportAdmin = async (reportId: number) => {
     const ok = window.confirm("Vuoi davvero cancellare questo report?");
     if (!ok) return;
-  
+
     let query = supabase.from("reports").delete().eq("id", reportId);
 
-if (adminProfile?.role !== "super_admin") {
-  query = query.eq("owner_admin_id", adminProfile?.id);
-}
-  
+    if (adminProfile?.role !== "super_admin") {
+      query = query.eq("owner_admin_id", adminProfile?.id);
+    } else {
+      if (ownerFilter === "MINE") {
+        query = query.eq("owner_admin_id", adminProfile?.id);
+      } else if (ownerFilter === "OTHERS") {
+        query = query.neq("owner_admin_id", adminProfile?.id);
+      }
+    }
+
     const { error } = await query;
-  
+
     if (error) {
       alert("Errore cancellazione report: " + error.message);
       return;
     }
-  
+
     alert("Report cancellato");
     await loadReports(selectedAgentId);
   };
+
   const filteredReports =
-  mode === "ALL"
-    ? reports
-    : reports.filter((r) => {
-        if (!r.report_date) return false;
+    mode === "ALL"
+      ? reports
+      : reports.filter((r) => {
+          if (!r.report_date) return false;
 
-        const d = r.report_date;
+          const d = r.report_date;
 
-        if (dateFrom && d < dateFrom) return false;
-        if (dateTo && d > dateTo) return false;
+          if (dateFrom && d < dateFrom) return false;
+          if (dateTo && d > dateTo) return false;
 
-        return true;
-      });
-      const totals = filteredReports.reduce(
+          return true;
+        });
+
+  const totals = filteredReports.reduce(
     (acc, r) => {
       acc.contracts_energia += Number(r.contracts_energia || 0);
       acc.consumi_energia += Number(r.consumi_energia || 0);
@@ -4093,6 +4306,30 @@ if (adminProfile?.role !== "super_admin") {
         }}
       >
         <h2 style={{ marginTop: 0 }}>Report Admin</h2>
+
+        {adminProfile?.role === "super_admin" && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              Filtro agenti
+            </div>
+            <select
+              value={ownerFilter}
+              onChange={(e) =>
+                setOwnerFilter(e.target.value as "ALL" | "MINE" | "OTHERS")
+              }
+              style={{
+                padding: 8,
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: "white",
+              }}
+            >
+              <option value="ALL">Tutti gli agenti</option>
+              <option value="MINE">I miei agenti</option>
+              <option value="OTHERS">Agenti degli altri admin</option>
+            </select>
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
@@ -4145,77 +4382,90 @@ if (adminProfile?.role !== "super_admin") {
         }}
       >
         <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-    flexWrap: "wrap",
-    gap: 12,
-  }}
->
-  {/* SINISTRA */}
-  <div>
-    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-      Modalità
-    </div>
-    <select
-      value={mode}
-      onChange={(e) => setMode(e.target.value as any)}
-      style={{
-        padding: 8,
-        borderRadius: 8,
-        border: "1px solid #cbd5e1",
-      }}
-    >
-      <option value="ALL">TOTALE</option>
-      <option value="PERIODO">PERIODO SCELTO</option>
-    </select>
-  </div>
-
-  {/* DESTRA */}
-  {mode === "PERIODO" && (
-    <div style={{ display: "flex", gap: 8 }}>
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-          Da
-        </div>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
           style={{
-            padding: 8,
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 12,
+            flexWrap: "wrap",
+            gap: 12,
           }}
-        />
-      </div>
+        >
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+              Modalità
+            </div>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as any)}
+              style={{
+                padding: 8,
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+              }}
+            >
+              <option value="ALL">TOTALE</option>
+              <option value="PERIODO">PERIODO SCELTO</option>
+            </select>
+          </div>
 
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-          A
+          {mode === "PERIODO" && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  Da
+                </div>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  A
+                </div>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          style={{
-            padding: 8,
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
-          }}
-        />
-      </div>
-    </div>
-  )}
-</div>
+
         <h3 style={{ marginTop: 0 }}>Riepilogo totali</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
-          {previewBox(<>{row("Contratti energia", String(totals.contracts_energia), true)}</>)}
-          {previewBox(<>{row("Consumi energia", numFormat(totals.consumi_energia, 2), true)}</>)}
-          {previewBox(<>{row("Contratti gas", String(totals.contracts_gas), true)}</>)}
-          {previewBox(<>{row("Consumi gas", numFormat(totals.consumi_gas, 2), true)}</>)}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4,minmax(0,1fr))",
+            gap: 12,
+          }}
+        >
+          {previewBox(
+            <>{row("Contratti energia", String(totals.contracts_energia), true)}</>
+          )}
+          {previewBox(
+            <>{row("Consumi energia", numFormat(totals.consumi_energia, 2), true)}</>
+          )}
+          {previewBox(
+            <>{row("Contratti gas", String(totals.contracts_gas), true)}</>
+          )}
+          {previewBox(
+            <>{row("Consumi gas", numFormat(totals.consumi_gas, 2), true)}</>
+          )}
         </div>
       </div>
 
@@ -4262,10 +4512,10 @@ if (adminProfile?.role !== "super_admin") {
                 </tr>
               </thead>
               <tbody>
-              {filteredReports.map((r, i) => (
+                {filteredReports.map((r, i) => (
                   <tr key={r.id || i}>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                    {getAgentName(r.agent_id)?.toUpperCase()}
+                      {getAgentName(r.agent_id)?.toUpperCase()}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       {r.report_date}
@@ -4286,23 +4536,23 @@ if (adminProfile?.role !== "super_admin") {
                       {r.notes}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-  <button
-    type="button"
-    onClick={() => deleteReportAdmin(r.id)}
-    style={{
-      padding: "6px 10px",
-      borderRadius: 8,
-      border: "1px solid #dc2626",
-      background: "white",
-      color: "#dc2626",
-      cursor: "pointer",
-      fontWeight: 700,
-    }}
-    title="Cancella report"
-  >
-    🗑
-  </button>
-</td>
+                      <button
+                        type="button"
+                        onClick={() => deleteReportAdmin(r.id)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 8,
+                          border: "1px solid #dc2626",
+                          background: "white",
+                          color: "#dc2626",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                        title="Cancella report"
+                      >
+                        🗑
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -5190,17 +5440,7 @@ const renderAdminContent = () => {
             Agent Admin
           </button>
 
-          {adminProfile?.role === "super_admin" && (
-            <button
-              onClick={() => setTab("listini")}
-              style={{
-                ...baseBtn,
-                ...(tab === "listini" ? activeBtn : {}),
-              }}
-            >
-              Listini
-            </button>
-          )}
+          
 
 {(agentSession || adminSession) && (
   <button
