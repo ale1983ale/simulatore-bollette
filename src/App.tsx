@@ -1736,7 +1736,7 @@ Base suggerito
       fontWeight:700
     }}
   >
-    {numFormat(r.dispCpBase,6)}
+    {numFormat(r.dispCpBase,4 )}
   </div>
 
   <button
@@ -5718,6 +5718,18 @@ const renderAdminContent = () => {
           >
             Agent Admin
           </button>
+
+          {adminProfile?.role === "super_admin" && (
+  <button
+    onClick={() => setTab("listini")}
+    style={{
+      ...baseBtn,
+      ...(tab === "listini" ? activeBtn : {}),
+    }}
+  >
+    Listini
+  </button>
+)}
 
           
 
