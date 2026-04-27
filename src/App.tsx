@@ -581,18 +581,13 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       const html2canvas = html2canvasModule.default;
 
       const canvas = await html2canvas(page, {
-        scale: 1,
+        scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
       });
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.55);
-      const pdf = new jsPDF({
-        orientation: "p",
-        unit: "mm",
-        format: "a4",
-        compress: true
-      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
 
       const pdfWidth = 210;
       const pdfHeight = 297;
@@ -606,12 +601,14 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       let heightLeft = imgHeight;
       let position = margin;
 
-      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= usableHeight;
 
       while (heightLeft > 0) {
         pdf.addPage();
         position = margin - (imgHeight - heightLeft);
-        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        heightLeft -= usableHeight;
       }
 
       pdf.save(`${finalFileName}.pdf`);
@@ -623,6 +620,8 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
 }
 
 function field(label: string, value: string, setValue: (v: string) => void, type = "text") {
+  const inputType = type === "number" ? "text" : type;
+
   return (
     <div>
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{label}</div>
@@ -634,7 +633,8 @@ function field(label: string, value: string, setValue: (v: string) => void, type
           borderRadius: 8,
           boxSizing: "border-box",
         }}
-        type={type}
+        type={inputType}
+        inputMode={type === "number" ? "decimal" : undefined}
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />
@@ -1691,10 +1691,13 @@ return (
  }}
 >
 {field(
- "DISP + CP. Mrk da Calcolare",
- Number(s.dispacciamentoCapacityMarket).toFixed(4),
- (v)=>set("dispacciamentoCapacityMarket", Number(v)),
- "number"
+  "DISP + CP. Mrk da Calcolare",
+  String(s.dispacciamentoCapacityMarket ?? "").replace(".", ","),
+  (v) => {
+    const pulito = v.replace(",", ".");
+    set("dispacciamentoCapacityMarket", pulito);
+  },
+  "text"
 )}
 </div>
 
