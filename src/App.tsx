@@ -5295,10 +5295,10 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
       };
   
       // PUN grande quasi tutta larghezza
-      drawBlock(punImg, punCanvas, 62);
+      drawBlock(punImg, punCanvas, 52);
   
       // tabella leggibile
-      drawBlock(tableImg, tableCanvas, 150);
+      drawBlock(tableImg, tableCanvas, 175);
   
       // PSV sotto
       drawBlock(psvImg, psvCanvas, 58);
