@@ -5253,9 +5253,6 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
       const tableImg = tableCanvas.toDataURL("image/jpeg",1);
       const psvImg = psvCanvas.toDataURL("image/jpeg",1);
 
-      drawBlock(punImg, punCanvas, 62);
-drawBlock(tableImg, tableCanvas, 120);
-drawBlock(psvImg, psvCanvas, 58);
   
       const pdf = new jsPDF({
         orientation: "portrait",
