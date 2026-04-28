@@ -5302,7 +5302,9 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
       // PSV sotto
       drawBlock(psvImg, psvCanvas, 53);
   
-      pdf.save("Report-PUN-PSV-A4.pdf");
+      const meseNome = activePunPsvMonth.replace(/\s+/g,"-").toUpperCase();
+
+      pdf.save(`Report-PUN-PSV-${meseNome}.pdf`);
     } catch (error) {
       console.error(error);
       alert("Errore esportazione PDF");
