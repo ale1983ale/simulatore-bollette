@@ -5269,7 +5269,7 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
   
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(16);
-      pdf.text("REPORT PUN / PSV", pageWidth / 2, 12, { align: "center" });
+      pdf.text("REPORT PUN / PSV TEST", pageWidth / 2, 12, { align: "center" });
       pdf.setDrawColor(210);
       pdf.line(margin, 17, pageWidth - margin, 17);
   
@@ -5298,7 +5298,7 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
       drawBlock(punImg, punCanvas, 62);
   
       // tabella leggibile
-      drawBlock(tableImg, tableCanvas, 120);
+      drawBlock(tableImg, tableCanvas, 150);
   
       // PSV sotto
       drawBlock(psvImg, psvCanvas, 58);
