@@ -6340,12 +6340,12 @@ if (!agentSession && !adminSession) {
 <div
  ref={punPsvTableRef}
  style={{
-   background:"#f8fafc",
-   border:"2px solid #dbeafe",
-   borderRadius:18,
-   padding:"18px 22px",
-   marginBottom:18,
-   boxShadow:"0 4px 12px rgba(0,0,0,.05)"
+   background:"#fff",
+   borderRadius:16,
+   padding:20,
+   width:"100%",
+   maxWidth:"100%",
+   margin:"0 auto"
  }}
 >
  <div
