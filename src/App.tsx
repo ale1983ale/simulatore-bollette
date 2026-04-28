@@ -6307,7 +6307,7 @@ if (!agentSession && !adminSession) {
                         <text
                           key={"psv" + i}
                           x={p.x}
-                          y="220"
+                          y="190"
                           textAnchor="middle"
                           fontSize="15"
                           fill="#64748b"
