@@ -5244,7 +5244,7 @@ if (svg) {
         document.body.removeChild(clone);
         return canvas;
       };
-      const punCanvas = await captureWideCard(punCard, 1200, 320);
+      const punCanvas = await captureWideCard(punCard, 1200, 280);
       const tableCanvas = await captureWideCard(tableWrap, 1200, 0);
 const psvCanvas = await captureWideCard(psvCard, 1200, 280);
 
