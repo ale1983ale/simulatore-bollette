@@ -581,36 +581,42 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       const html2canvas = html2canvasModule.default;
 
       const canvas = await html2canvas(page, {
-        scale: 2,
+        scale: 1.2,
         useCORS: true,
         backgroundColor: "#ffffff",
       });
-
-      const imgData = canvas.toDataURL("image/jpeg", 1);
-      const pdf = new jsPDF("p", "mm", "a4");
-
+      
+      const imgData = canvas.toDataURL("image/jpeg", 0.75);
+      
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+      
       const pdfWidth = 210;
       const pdfHeight = 297;
       const margin = 8;
       const usableWidth = pdfWidth - margin * 2;
       const usableHeight = pdfHeight - margin * 2;
-
+      
       const imgWidth = usableWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
+      
       let heightLeft = imgHeight;
       let position = margin;
-
-      canvas.toDataURL("image/jpeg", 1);
+      
+      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
       heightLeft -= usableHeight;
-
+      
       while (heightLeft > 0) {
         pdf.addPage();
         position = margin - (imgHeight - heightLeft);
-        canvas.toDataURL("image/jpeg", 1);
+        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
         heightLeft -= usableHeight;
       }
-
+      
       pdf.save(`${finalFileName}.pdf`);
       win.close();
     } catch {
@@ -5273,7 +5279,7 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
         }
   
         const x = (pageWidth - w) / 2;
-        pdf.addImage(imgData, "PNG", x, y, w, h);
+        pdf.addImage(imgData, "JPEG", x, y, w, h);
         y += h + 5;
       };
   
