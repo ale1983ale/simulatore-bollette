@@ -5245,7 +5245,10 @@ if (svg) {
         return canvas;
       };
       const punCanvas = await captureWideCard(punCard, 1200, 320);
-const tableCanvas = await html2canvas(tableWrap, commonOptions);
+      const tableCanvas = await html2canvas(tableWrap, {
+        ...commonOptions,
+        scale: 2.2
+      });
 const psvCanvas = await captureWideCard(psvCard, 1200, 280);
   
       const punImg = punCanvas.toDataURL("image/jpeg",1);
