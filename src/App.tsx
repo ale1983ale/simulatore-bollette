@@ -597,25 +597,33 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       
       const pdfWidth = 210;
       const pdfHeight = 297;
-      const margin = 8;
+      const marginTop = 8;
+const marginBottom = 22;
+const margin = 8;
       const usableWidth = pdfWidth - margin * 2;
-      const usableHeight = pdfHeight - margin * 2;
+      const usableHeight = pdfHeight - marginTop - marginBottom;
       
-      const imgWidth = usableWidth;
+      const imgWidth = usableWidth * 0.90;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      let heightLeft = imgHeight;
-      let position = margin;
-      
-      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
-      heightLeft -= usableHeight;
-      
-      while (heightLeft > 0) {
-        pdf.addPage();
-        position = margin - (imgHeight - heightLeft);
-        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
-        heightLeft -= usableHeight;
-      }
+      let renderedHeight = 0;
+
+while (renderedHeight < imgHeight) {
+  if (renderedHeight > 0) {
+    pdf.addPage();
+  }
+
+  pdf.addImage(
+    imgData,
+    "JPEG",
+    margin,
+    margin - renderedHeight,
+    imgWidth,
+    imgHeight
+  );
+
+  renderedHeight += usableHeight - 10;
+}
       
       pdf.save(`${finalFileName}.pdf`);
       win.close();
@@ -5555,9 +5563,10 @@ useEffect(() => {
   const isSuperAdmin = true;
 
   const thStyle = {
-    padding: "10px",
-    borderBottom: "1px solid #ddd",
-    textAlign: "left" as const,
+    padding: "12px",
+    fontSize: "17px",
+    fontWeight: 800,
+    textAlign: "center"
   };
   
   const tdStyle = {
@@ -6152,7 +6161,12 @@ if (!agentSession && !adminSession) {
               </button>
             </div>
         
-            <div ref={punPsvRef}>
+            <div
+  ref={punPsvRef}
+  style={{
+    paddingBottom: "200px"
+  }}
+>
               <div
                 style={{
                   display: "grid",
@@ -6185,7 +6199,7 @@ if (!agentSession && !adminSession) {
                       <span>{latestPun}</span>
                     </div>
         
-                    <svg viewBox="0 0 760 260" style={{ width:"100%", height:300 }}>
+                    <svg viewBox="0 0 760 300" style={{ width:"100%", height:340 }}>
                       {[40, 80, 120, 160].map((y) => (
                         <line
                           key={y}
@@ -6212,15 +6226,15 @@ if (!agentSession && !adminSession) {
         
                       {punCoords.map((p, i) => (
                         <text
-                          key={"m" + i}
-                          x={p.x}
-                          y="205"
-                          textAnchor="middle"
-                          fontSize="15"
-                          fill="#64748b"
-                        >
-                          {monthLabels[i] || ""}
-                        </text>
+                        key={"m" + i}
+                        x={p.x}
+                        y="195"
+                        textAnchor="middle"
+                        fontSize="15"
+                        fill="#64748b"
+                      >
+                        {monthLabels[i] || ""}
+                      </text>
                       ))}
         
                       {punCoords.map((p, i) => (
