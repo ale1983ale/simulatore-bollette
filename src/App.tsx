@@ -5294,13 +5294,13 @@ const psvCanvas = await captureWideCard(psvCard, 1200, 280);
       };
   
       // PUN grande quasi tutta larghezza
-      drawBlock(punImg, punCanvas, 52);
+      drawBlock(punImg, punCanvas, 53);
   
       // tabella leggibile
       drawBlock(tableImg, tableCanvas, 175);
   
       // PSV sotto
-      drawBlock(psvImg, psvCanvas, 58);
+      drawBlock(psvImg, psvCanvas, 53);
   
       pdf.save("Report-PUN-PSV-A4.pdf");
     } catch (error) {
