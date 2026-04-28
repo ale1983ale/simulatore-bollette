@@ -5247,7 +5247,7 @@ if (svg) {
       const punCanvas = await captureWideCard(punCard, 1200, 320);
       const tableCanvas = await html2canvas(tableWrap, {
         ...commonOptions,
-        scale: 2.2
+        scale: 2.7
       });
 const psvCanvas = await captureWideCard(psvCard, 1200, 280);
   
