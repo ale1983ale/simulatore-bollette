@@ -586,7 +586,7 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
         backgroundColor: "#ffffff",
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 1);
       const pdf = new jsPDF("p", "mm", "a4");
 
       const pdfWidth = 210;
@@ -601,13 +601,13 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       let heightLeft = imgHeight;
       let position = margin;
 
-      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      canvas.toDataURL("image/jpeg", 1);
       heightLeft -= usableHeight;
 
       while (heightLeft > 0) {
         pdf.addPage();
         position = margin - (imgHeight - heightLeft);
-        pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+        canvas.toDataURL("image/jpeg", 1);
         heightLeft -= usableHeight;
       }
 
@@ -5193,7 +5193,7 @@ if (!punCard || !psvCard || !tableWrap) {
       
   
       const commonOptions = {
-        scale: 2,
+        scale: 1.2,
         useCORS: true,
         backgroundColor: "#ffffff",
         scrollY: -window.scrollY,
@@ -5234,9 +5234,9 @@ if (svg) {
 const tableCanvas = await html2canvas(tableWrap, commonOptions);
 const psvCanvas = await captureWideCard(psvCard, 1200, 280);
   
-      const punImg = punCanvas.toDataURL("image/png");
-      const tableImg = tableCanvas.toDataURL("image/png");
-      const psvImg = psvCanvas.toDataURL("image/png");
+      const punImg = punCanvas.toDataURL("image/jpeg",1);
+      const tableImg = tableCanvas.toDataURL("image/jpeg",1);
+      const psvImg = psvCanvas.toDataURL("image/jpeg",1);
   
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -6179,7 +6179,7 @@ if (!agentSession && !adminSession) {
                       <span>{latestPun}</span>
                     </div>
         
-                    <svg viewBox="0 0 760 220" style={{ width: "100%", height: 240 }}>
+                    <svg viewBox="0 0 760 260" style={{ width:"100%", height:300 }}>
                       {[40, 80, 120, 160].map((y) => (
                         <line
                           key={y}
@@ -6194,14 +6194,14 @@ if (!agentSession && !adminSession) {
                       <polyline
                         fill="none"
                         stroke="#f59e0b"
-                        strokeWidth="5"
+                        strokeWidth="6"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         points={punPolyline}
                       />
         
                       {punCoords.map((p, i) => (
-                        <circle key={i} cx={p.x} cy={p.y} r="6" fill="#f59e0b" />
+                        <circle key={i} cx={p.x} cy={p.y} r="8" fill="#f59e0b" />
                       ))}
         
                       {punCoords.map((p, i) => (
@@ -6210,7 +6210,7 @@ if (!agentSession && !adminSession) {
                           x={p.x}
                           y="205"
                           textAnchor="middle"
-                          fontSize="14"
+                          fontSize="15"
                           fill="#64748b"
                         >
                           {monthLabels[i] || ""}
@@ -6223,7 +6223,7 @@ if (!agentSession && !adminSession) {
                           x={p.x}
                           y={p.y - 12}
                           textAnchor="middle"
-                          fontSize="11"
+                          fontSize="13"
                           fill="#111111"
                           fontWeight="700"
                         >
@@ -6287,9 +6287,9 @@ if (!agentSession && !adminSession) {
                         <text
                           key={"psv" + i}
                           x={p.x}
-                          y="205"
+                          y="220"
                           textAnchor="middle"
-                          fontSize="14"
+                          fontSize="15"
                           fill="#64748b"
                         >
                           {monthLabels[i] || ""}
@@ -6302,7 +6302,7 @@ if (!agentSession && !adminSession) {
                           x={p.x}
                           y={p.y - 12}
                           textAnchor="middle"
-                          fontSize="11"
+                          fontSize="13"
                           fill="#111111"
                           fontWeight="700"
                         >
