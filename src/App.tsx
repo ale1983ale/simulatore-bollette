@@ -1576,9 +1576,9 @@ return (
                   gap: 12,
                 }}
               >
-                {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                {field("Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                 {field(
-                  "Maggiorazione Capacity Market",
+                  "Maggiorazione Capacity Market (senza perdite)",
                   s.dedicataCapacityMarket,
                   (v) => set("dedicataCapacityMarket", v),
                   "number"
