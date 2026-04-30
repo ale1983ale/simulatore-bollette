@@ -5750,7 +5750,17 @@ const renderAdminContent = () => {
   </button>
 )}
 
-          
+{adminProfile?.role === "super_admin" && (
+  <button
+    onClick={() => setTab("punpsvAdmin")}
+    style={{
+      ...baseBtn,
+      ...(tab === "punpsvAdmin" ? activeBtn : {}),
+    }}
+  >
+    PUN / PSV Admin
+  </button>
+)}  
 
 {(agentSession || adminSession) && (
   <button
