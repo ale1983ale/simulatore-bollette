@@ -6246,8 +6246,16 @@ if (!agentSession && !adminSession) {
                         textAnchor="middle"
                         fontSize="15"
                         fill="#64748b"
-                      >
-                        {monthLabels[i] || ""}
+                        >
+                        <>
+                          <tspan x={p.x} dy="0">
+                            {(monthLabels[i] || "").toUpperCase()}
+                          </tspan>
+                      
+                          <tspan x={p.x} dy="16">
+                          {selectedPunPsvMonth.split(" ")[1]}
+                          </tspan>
+                        </>
                       </text>
                       ))}
         
@@ -6319,15 +6327,23 @@ if (!agentSession && !adminSession) {
         
                       {psvCoords.map((p, i) => (
                         <text
-                          key={"psv" + i}
-                          x={p.x}
-                          y="190"
-                          textAnchor="middle"
-                          fontSize="15"
-                          fill="#64748b"
-                        >
-                          {monthLabels[i] || ""}
-                        </text>
+                        key={"psv" + i}
+                        x={p.x}
+                        y="190"
+                        textAnchor="middle"
+                        fontSize="15"
+                        fill="#64748b"
+                      >
+                        <>
+                          <tspan x={p.x} dy="0">
+                            {(monthLabels[i] || "").toUpperCase()}
+                          </tspan>
+                      
+                          <tspan x={p.x} dy="16">
+                          {selectedPunPsvMonth.split(" ")[1]}
+                          </tspan>
+                        </>
+                      </text>
                       ))}
         
                       {psvCoords.map((p, i) => (
