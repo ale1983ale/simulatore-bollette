@@ -2195,10 +2195,10 @@ function Gas({
       ? 4
       : 3);
 
-  const prezzoMedioGasScheda =
-    r.consumoTotale > 0
-      ? `${(r.H24 / r.consumoTotale).toFixed(6).replace(".", ",")} €/Smc`
-      : "-";
+      const prezzoMedioGasScheda =
+      r.consumoTotale > 0
+        ? `${(r.H22 / r.consumoTotale).toFixed(6).replace(".", ",")} €/Smc`
+        : "-";
 
   const boxStyle: React.CSSProperties = {
     border: "1px solid #cbd5e1",
