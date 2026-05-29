@@ -4612,7 +4612,7 @@ function AdminUsersManager({
 
     const { data, error } = await supabase
       .from("admin_users")
-      .select("id, nome, cognome, username, password, role")
+      .select("id, auth_id, nome, cognome, username, password, role")
       .order("nome", { ascending: true });
 
     if (error) {
@@ -4643,6 +4643,7 @@ function AdminUsersManager({
 
     const { error } = await supabase.from("admin_users").insert([
       {
+        auth_id: crypto.randomUUID(),
         nome: newNome.trim().toUpperCase(),
         cognome: newCognome.trim().toUpperCase(),
         username: newUsername.trim(),
