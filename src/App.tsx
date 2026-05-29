@@ -1451,7 +1451,7 @@ function Energia({
             <span>ALTRE PARTITE</span>
             <span>${money(altrePartiteTot)}</span>
           </div>
-          <div class="bar" style="background:${green}"></div>
+          <div class="bar" style="background:${orange}"></div>
           <table>
             <tbody>
               ${altrePartiteRows}
@@ -2328,7 +2328,7 @@ function Gas({
             <span>ALTRE PARTITE</span>
             <span>${money(altrePartiteTot)}</span>
           </div>
-          <div class="bar" style="background:${green}"></div>
+          <div class="bar" style="background:${orange}"></div>
           <table>
             <tbody>
               ${altrePartiteRows}
