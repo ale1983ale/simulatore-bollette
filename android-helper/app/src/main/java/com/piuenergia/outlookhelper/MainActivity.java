@@ -2,10 +2,13 @@ package com.piuenergia.outlookhelper;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Html;
 import android.util.Base64;
 import android.widget.Button;
@@ -45,13 +48,38 @@ public class MainActivity extends Activity {
     private TextView status;
     private Button openButton;
     private Button previousButton;
+    private Button sequenceButton;
+    private Button signatureToggleButton;
     private String cachedLogoBase64;
     private ImageView logoPreview;
+    private boolean signatureEnabled = true;
+    private boolean sequenceActive = false;
+    private boolean waitingForOutlookReturn = false;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+        signatureEnabled = prefs.getBoolean("signatureEnabled", true);
         buildUi();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (sequenceActive && waitingForOutlookReturn) {
+            waitingForOutlookReturn = false;
+            if (recipients == null || index >= recipients.length()) {
+                stopSequence(true);
+                return;
+            }
+            handler.postDelayed(() -> {
+                if (sequenceActive && recipients != null && index < recipients.length()) {
+                    openCurrent();
+                }
+            }, 1200);
+        }
     }
 
     private void buildUi() {
@@ -78,10 +106,22 @@ public class MainActivity extends Activity {
         status.setPadding(0, p, 0, p);
         root.addView(status);
 
+        signatureToggleButton = new Button(this);
+        updateSignatureToggleText();
+        signatureToggleButton.setOnClickListener(v -> {
+            signatureEnabled = !signatureEnabled;
+            getSharedPreferences("settings", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("signatureEnabled", signatureEnabled)
+                    .apply();
+            updateSignatureToggleText();
+        });
+        root.addView(signatureToggleButton);
+
         TextView sigTitle = new TextView(this);
         sigTitle.setText("Firma aziendale preimpostata");
         sigTitle.setTextSize(18);
-        sigTitle.setPadding(0, 0, 0, p / 2);
+        sigTitle.setPadding(0, p, 0, p / 2);
         root.addView(sigTitle);
 
         TextView sigPreview = new TextView(this);
@@ -106,7 +146,7 @@ public class MainActivity extends Activity {
         root.addView(logoButton);
 
         TextView sigNote = new TextView(this);
-        sigNote.setText("Il testo della firma è già impostato. Seleziona il banner/logo una sola volta: resterà salvato nell'app per le email successive.");
+        sigNote.setText("Usa FIRMA: SÌ/NO per decidere se aggiungerla alle email. Il logo scelto resta salvato nell'app.");
         sigNote.setPadding(0, p / 2, 0, p);
         root.addView(sigNote);
 
@@ -116,24 +156,65 @@ public class MainActivity extends Activity {
         openButton.setOnClickListener(v -> openCurrent());
         root.addView(openButton);
 
+        sequenceButton = new Button(this);
+        sequenceButton.setText("▶ Avvia sequenza automatica");
+        sequenceButton.setEnabled(false);
+        sequenceButton.setOnClickListener(v -> toggleSequence());
+        root.addView(sequenceButton);
+
         previousButton = new Button(this);
         previousButton.setText("Torna all'email precedente");
         previousButton.setEnabled(false);
         previousButton.setOnClickListener(v -> {
+            stopSequence(false);
             if (index > 0) index--;
             updateStatus();
         });
         root.addView(previousButton);
 
         TextView note = new TextView(this);
-        note.setText("Flusso Android: apri la mail già compilata, controlla firma e allegato, premi Invia in Outlook, torna qui e apri la successiva.");
+        note.setText("Sequenza automatica: premi Avvia una sola volta. Si apre la prima email in Outlook; dopo aver premuto Invia e essere tornato qui, l'app apre automaticamente la successiva. Puoi fermare la sequenza in qualsiasi momento.");
         note.setPadding(0, p, 0, 0);
         root.addView(note);
 
         setContentView(scroll);
     }
 
+    private void updateSignatureToggleText() {
+        if (signatureToggleButton == null) return;
+        signatureToggleButton.setText(signatureEnabled ? "FIRMA: SÌ" : "FIRMA: NO");
+    }
+
+    private void toggleSequence() {
+        if (sequenceActive) {
+            stopSequence(false);
+            return;
+        }
+        if (recipients == null || recipients.length() == 0 || index >= recipients.length()) {
+            Toast.makeText(this, "Nessuna email da aprire", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        sequenceActive = true;
+        sequenceButton.setText("■ Ferma sequenza");
+        openButton.setEnabled(false);
+        openCurrent();
+    }
+
+    private void stopSequence(boolean completed) {
+        sequenceActive = false;
+        waitingForOutlookReturn = false;
+        handler.removeCallbacksAndMessages(null);
+        if (sequenceButton != null) {
+            sequenceButton.setText("▶ Avvia sequenza automatica");
+        }
+        updateStatus();
+        if (completed) {
+            Toast.makeText(this, "Sequenza completata", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void pickZip() {
+        stopSequence(false);
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/zip");
@@ -195,7 +276,8 @@ public class MainActivity extends Activity {
         manifest = new JSONObject(json);
         recipients = manifest.getJSONArray("recipients");
         index = 0;
-        openButton.setEnabled(recipients.length() > 0);
+        sequenceActive = false;
+        waitingForOutlookReturn = false;
         updateStatus();
     }
 
@@ -204,21 +286,24 @@ public class MainActivity extends Activity {
             status.setText("Nessuna email nel pacchetto.");
             openButton.setEnabled(false);
             previousButton.setEnabled(false);
+            if (sequenceButton != null) sequenceButton.setEnabled(false);
             return;
         }
         if (index >= recipients.length()) {
             status.setText("Completato: hai aperto tutte le " + recipients.length() + " email. Se ne hai saltata una, usa il tasto precedente.");
             openButton.setText("Tutte le email aperte");
             openButton.setEnabled(false);
+            if (sequenceButton != null) sequenceButton.setEnabled(false);
         } else {
             JSONObject r = recipients.optJSONObject(index);
             String email = r != null ? r.optString("email", "") : "";
             String agency = r != null ? r.optString("agency", "") : "";
             status.setText("Email " + (index + 1) + " di " + recipients.length() + "\n" + agency + "\n" + email);
             openButton.setText("Apri email " + (index + 1) + "/" + recipients.length() + " in Outlook");
-            openButton.setEnabled(true);
+            openButton.setEnabled(!sequenceActive);
+            if (sequenceButton != null) sequenceButton.setEnabled(true);
         }
-        previousButton.setEnabled(index > 0);
+        previousButton.setEnabled(index > 0 && !sequenceActive);
     }
 
     private void openCurrent() {
@@ -229,9 +314,13 @@ public class MainActivity extends Activity {
             String subject = manifest.optString("subject", "");
             String body = manifest.optString("body", "");
 
-            String plain = body + "\n\n" + SIGNATURE_PLAIN;
+            String plain = body;
             String html = "<div style='font-family:Arial,sans-serif;font-size:11pt;'>" +
-                    nl2br(Html.escapeHtml(body)) + "</div><br>" + buildSignatureHtml();
+                    nl2br(Html.escapeHtml(body)) + "</div>";
+            if (signatureEnabled) {
+                plain += "\n\n" + SIGNATURE_PLAIN;
+                html += "<br>" + buildSignatureHtml();
+            }
 
             JSONArray att = r.optJSONArray("attachments");
             ArrayList<Uri> uris = new ArrayList<>();
@@ -253,6 +342,8 @@ public class MainActivity extends Activity {
             if (uris.size() > 1) intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
+            if (sequenceActive) waitingForOutlookReturn = true;
+
             try {
                 getPackageManager().getPackageInfo("com.microsoft.office.outlook", 0);
                 intent.setPackage("com.microsoft.office.outlook");
@@ -264,6 +355,8 @@ public class MainActivity extends Activity {
             index++;
             updateStatus();
         } catch (Exception e) {
+            waitingForOutlookReturn = false;
+            if (sequenceActive) stopSequence(false);
             Toast.makeText(this, "Errore: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
