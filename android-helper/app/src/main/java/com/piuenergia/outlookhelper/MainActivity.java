@@ -31,6 +31,7 @@ import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
     private static final int PICK_ZIP = 1001;
+    private static final int PICK_LOGO = 1002;
     private static final String SIGNATURE_PLAIN =
             "Alessio Cedroni\n" +
             "Responsabile Commerciale\n" +
@@ -45,6 +46,7 @@ public class MainActivity extends Activity {
     private Button openButton;
     private Button previousButton;
     private String cachedLogoBase64;
+    private ImageView logoPreview;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,19 +94,19 @@ public class MainActivity extends Activity {
         sigPreview.setPadding(0, 0, 0, p / 2);
         root.addView(sigPreview);
 
-        ImageView logoPreview = new ImageView(this);
+        logoPreview = new ImageView(this);
         logoPreview.setAdjustViewBounds(true);
         logoPreview.setMaxHeight((int) (180 * getResources().getDisplayMetrics().density));
-        try {
-            byte[] logoBytes = Base64.decode(getLogoBase64(), Base64.DEFAULT);
-            Bitmap bitmap = BitmapFactory.decodeByteArray(logoBytes, 0, logoBytes.length);
-            logoPreview.setImageBitmap(bitmap);
-        } catch (Exception ignored) {
-        }
+        refreshLogoPreview();
         root.addView(logoPreview);
 
+        Button logoButton = new Button(this);
+        logoButton.setText("Scegli / modifica logo firma");
+        logoButton.setOnClickListener(v -> pickLogo());
+        root.addView(logoButton);
+
         TextView sigNote = new TextView(this);
-        sigNote.setText("La firma e il banner +Energia sono già inclusi nell'app: non devi configurare nulla.");
+        sigNote.setText("Il testo della firma è già impostato. Seleziona il banner/logo una sola volta: resterà salvato nell'app per le email successive.");
         sigNote.setPadding(0, p / 2, 0, p);
         root.addView(sigNote);
 
@@ -138,12 +140,23 @@ public class MainActivity extends Activity {
         startActivityForResult(intent, PICK_ZIP);
     }
 
+    private void pickLogo() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        startActivityForResult(intent, PICK_LOGO);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == PICK_ZIP && resultCode == RESULT_OK && data != null && data.getData() != null) {
+        if (resultCode == RESULT_OK && data != null && data.getData() != null) {
             try {
-                loadPackage(data.getData());
+                if (requestCode == PICK_ZIP) {
+                    loadPackage(data.getData());
+                } else if (requestCode == PICK_LOGO) {
+                    saveLogo(data.getData());
+                }
             } catch (Exception e) {
                 Toast.makeText(this, "Errore: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
@@ -272,14 +285,45 @@ public class MainActivity extends Activity {
         return html.toString();
     }
 
+    private File getLogoFile() {
+        return new File(getFilesDir(), "signature_logo");
+    }
+
+    private void saveLogo(Uri uri) throws Exception {
+        File outFile = getLogoFile();
+        try (InputStream in = getContentResolver().openInputStream(uri);
+             FileOutputStream out = new FileOutputStream(outFile)) {
+            if (in == null) throw new Exception("Impossibile leggere il logo");
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+        }
+        cachedLogoBase64 = null;
+        refreshLogoPreview();
+        Toast.makeText(this, "Logo firma salvato", Toast.LENGTH_SHORT).show();
+    }
+
+    private void refreshLogoPreview() {
+        if (logoPreview == null) return;
+        File file = getLogoFile();
+        if (!file.exists()) {
+            logoPreview.setImageDrawable(null);
+            return;
+        }
+        Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+        logoPreview.setImageBitmap(bitmap);
+    }
+
     private String getLogoBase64() {
         if (cachedLogoBase64 != null) return cachedLogoBase64;
-        try (InputStream in = getResources().openRawResource(R.raw.signature_logo_b64);
+        File file = getLogoFile();
+        if (!file.exists()) return cachedLogoBase64 = "";
+        try (InputStream in = new java.io.FileInputStream(file);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096];
             int n;
             while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
-            cachedLogoBase64 = out.toString(StandardCharsets.UTF_8.name()).replaceAll("\\s+", "");
+            cachedLogoBase64 = Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
         } catch (Exception e) {
             cachedLogoBase64 = "";
         }
