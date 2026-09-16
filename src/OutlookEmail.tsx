@@ -20,11 +20,23 @@ type AdminSession = {
   password?: string;
 };
 
+type SourceAgency = {
+  key: string;
+  label: string;
+  fileName: string;
+};
+
+type FileMode = "single" | "separate";
+
 const normalize = (value: string) =>
   String(value || "")
     .trim()
     .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^A-Z0-9]/g, "");
+
+const stripExtension = (value: string) => String(value || "").replace(/\.[^.]+$/, "");
 
 const sanitizeFileName = (value: string) =>
   String(value || "email")
@@ -132,11 +144,58 @@ function syncHeaders(ownerKey: string, includeJson = false) {
   };
 }
 
+function findManualFile(agent: AgentRow, files: File[]) {
+  const expected = normalize(agent.allegato);
+  if (expected) {
+    const exact = files.find((file) => normalize(file.name) === expected);
+    if (exact) return exact;
+  }
+
+  const agencyKey = normalize(agent.agenzia);
+  if (!agencyKey) return null;
+  return files.find((file) => normalize(stripExtension(file.name)) === agencyKey) || null;
+}
+
+function detectAgencyColumn(matrix: unknown[][], preferredHeader: string) {
+  const candidates = new Set(
+    [
+      preferredHeader,
+      "AGENZIA",
+      "AGENZIA AGENTE",
+      "NOME AGENZIA",
+      "NOME AGENZIA/AGENTE",
+      "AGENTE",
+      "NOME AGENTE",
+      "CONSULENTE",
+    ]
+      .map(normalize)
+      .filter(Boolean)
+  );
+
+  const maxRows = Math.min(matrix.length, 20);
+  for (let rowIndex = 0; rowIndex < maxRows; rowIndex += 1) {
+    const row = matrix[rowIndex] || [];
+    for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+      if (candidates.has(normalize(String(row[colIndex] ?? "")))) {
+        return { rowIndex, colIndex, label: String(row[colIndex] ?? "") };
+      }
+    }
+  }
+  return null;
+}
+
 export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [fileMode, setFileMode] = useState<FileMode>("single");
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [sourceAgencies, setSourceAgencies] = useState<SourceAgency[]>([]);
+  const [generatedByAgency, setGeneratedByAgency] = useState<Map<string, File>>(new Map());
+  const [splitWarnings, setSplitWarnings] = useState<string[]>([]);
+  const [preferredAgencyHeader, setPreferredAgencyHeader] = useState("AGENZIA");
+  const [splitBusy, setSplitBusy] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState(
     "Buongiorno,\n\nin allegato trasmetto il file di competenza.\n\nCordiali saluti"
@@ -172,10 +231,7 @@ export default function OutlookEmail() {
         host.style.display = "contents";
       }
 
-      if (
-        host.parentElement !== reportAdminButton.parentElement ||
-        host.nextSibling !== reportAdminButton
-      ) {
+      if (host.parentElement !== reportAdminButton.parentElement || host.nextSibling !== reportAdminButton) {
         reportAdminButton.parentElement.insertBefore(host, reportAdminButton);
       }
 
@@ -250,17 +306,14 @@ export default function OutlookEmail() {
       }));
       const now = new Date().toISOString();
 
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/email_recipient_lists?on_conflict=owner_key`,
-        {
-          method: "POST",
-          headers: {
-            ...syncHeaders(ownerKey, true),
-            Prefer: "resolution=merge-duplicates,return=minimal",
-          },
-          body: JSON.stringify({ owner_key: ownerKey, recipients, updated_at: now }),
-        }
-      );
+      const response = await fetch(`${supabaseUrl}/rest/v1/email_recipient_lists?on_conflict=owner_key`, {
+        method: "POST",
+        headers: {
+          ...syncHeaders(ownerKey, true),
+          Prefer: "resolution=merge-duplicates,return=minimal",
+        },
+        body: JSON.stringify({ owner_key: ownerKey, recipients, updated_at: now }),
+      });
 
       if (!response.ok) {
         const details = await response.text();
@@ -284,29 +337,51 @@ export default function OutlookEmail() {
     if (open) void loadSavedRecipients(false);
   }, [open]);
 
-  const fileMap = useMemo(() => {
-    const map = new Map<string, File>();
-    files.forEach((file) => map.set(normalize(file.name), file));
-    return map;
-  }, [files]);
+  const matched = useMemo<PreparedRow[]>(() => {
+    return agents.map((agent) => {
+      const file =
+        fileMode === "single"
+          ? generatedByAgency.get(normalize(agent.agenzia)) || null
+          : findManualFile(agent, files);
+      return { ...agent, file };
+    });
+  }, [agents, files, fileMode, generatedByAgency]);
 
-  const matched = useMemo<PreparedRow[]>(
-    () =>
-      agents.map((agent) => {
-        const exact = fileMap.get(normalize(agent.allegato));
-        if (exact) return { ...agent, file: exact };
+  const readyRows = useMemo(() => matched.filter((row) => row.file && row.email.trim()), [matched]);
+  const filesWithMissingEmail = useMemo(() => matched.filter((row) => row.file && !row.email.trim()), [matched]);
 
-        const agencyKey = normalize(agent.agenzia);
-        const byAgency = agencyKey
-          ? files.find((file) => normalize(file.name).includes(agencyKey))
-          : undefined;
+  const unassociatedSourceAgencies = useMemo(() => {
+    if (fileMode !== "single") return [];
+    const recipientKeys = new Set(agents.map((agent) => normalize(agent.agenzia)).filter(Boolean));
+    return sourceAgencies.filter((agency) => !recipientKeys.has(agency.key));
+  }, [agents, fileMode, sourceAgencies]);
 
-        return { ...agent, file: byAgency || null };
-      }),
-    [agents, files, fileMap]
-  );
+  const recipientsWithoutSourceData = useMemo(() => {
+    if (fileMode !== "single" || !sourceAgencies.length) return [];
+    const sourceKeys = new Set(sourceAgencies.map((agency) => agency.key));
+    return agents.filter((agent) => normalize(agent.agenzia) && !sourceKeys.has(normalize(agent.agenzia)));
+  }, [agents, fileMode, sourceAgencies]);
 
-  const importExcel = async (file?: File) => {
+  const probableSourceMatches = useMemo(() => {
+    return unassociatedSourceAgencies
+      .map((source) => {
+        const candidate = agents.find((agent) => {
+          const agentKey = normalize(agent.agenzia);
+          if (!agentKey || agentKey.length < 4 || source.key.length < 4) return false;
+          return agentKey.includes(source.key) || source.key.includes(agentKey);
+        });
+        return candidate ? `${source.label} ↔ ${candidate.agenzia}` : "";
+      })
+      .filter(Boolean);
+  }, [agents, unassociatedSourceAgencies]);
+
+  const unmatchedManualFiles = useMemo(() => {
+    if (fileMode !== "separate") return [];
+    const used = new Set(matched.flatMap((row) => (row.file ? [row.file] : [])));
+    return files.filter((file) => !used.has(file));
+  }, [fileMode, files, matched]);
+
+  const importRecipientsExcel = async (file?: File) => {
     if (!file) return;
     setNotice("");
     try {
@@ -333,7 +408,167 @@ export default function OutlookEmail() {
       setEditingRecipients(false);
       setNotice(`Importati ${parsed.length} destinatari. Premi “Salva elenco online” per ritrovarli anche sul cellulare.`);
     } catch (error: any) {
-      setNotice(`Errore nella lettura dell'Excel: ${error?.message || error}`);
+      setNotice(`Errore nella lettura dell'Excel destinatari: ${error?.message || error}`);
+    }
+  };
+
+  const splitSourceWorkbook = async (file: File) => {
+    setSplitBusy(true);
+    setNotice("");
+    setSourceFile(file);
+    setFiles([]);
+    setGeneratedByAgency(new Map());
+    setSourceAgencies([]);
+    setSplitWarnings([]);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array", cellDates: true });
+      const groups = new Map<string, { label: string; sheets: Map<string, unknown[][]> }>();
+      const warnings: string[] = [];
+
+      for (const sheetName of workbook.SheetNames) {
+        const sourceSheet = workbook.Sheets[sheetName];
+        const matrix = XLSX.utils.sheet_to_json<unknown[]>(sourceSheet, {
+          header: 1,
+          defval: "",
+          raw: false,
+        }) as unknown[][];
+
+        if (!matrix.length) continue;
+        const detected = detectAgencyColumn(matrix, preferredAgencyHeader);
+        if (!detected) {
+          warnings.push(`Foglio “${sheetName}” ignorato: non trovo la colonna agenzia.`);
+          continue;
+        }
+
+        const prefix = matrix.slice(0, detected.rowIndex + 1).map((row) => [...row]);
+        for (let rowIndex = detected.rowIndex + 1; rowIndex < matrix.length; rowIndex += 1) {
+          const row = matrix[rowIndex] || [];
+          const agencyLabel = String(row[detected.colIndex] ?? "").trim();
+          const agencyKey = normalize(agencyLabel);
+          if (!agencyKey) continue;
+
+          if (!groups.has(agencyKey)) {
+            groups.set(agencyKey, { label: agencyLabel, sheets: new Map() });
+          }
+          const group = groups.get(agencyKey)!;
+          if (!group.sheets.has(sheetName)) {
+            group.sheets.set(sheetName, prefix.map((prefixRow) => [...prefixRow]));
+          }
+          group.sheets.get(sheetName)!.push([...row]);
+        }
+      }
+
+      if (!groups.size) {
+        throw new Error(
+          `Non ho trovato righe da dividere. Verifica che esista una colonna “${preferredAgencyHeader || "AGENZIA"}” (oppure AGENTE/NOME AGENZIA).`
+        );
+      }
+
+      const generatedMap = new Map<string, File>();
+      const generatedFiles: File[] = [];
+      const sourceList: SourceAgency[] = [];
+
+      for (const [agencyKey, group] of groups) {
+        const outWorkbook = XLSX.utils.book_new();
+        for (const [sheetName, rows] of group.sheets) {
+          const outSheet = XLSX.utils.aoa_to_sheet(rows as any[][]);
+          const originalSheet = workbook.Sheets[sheetName] as any;
+          if (originalSheet?.["!cols"]) (outSheet as any)["!cols"] = originalSheet["!cols"];
+          XLSX.utils.book_append_sheet(outWorkbook, outSheet, sheetName);
+        }
+
+        const rawName = sanitizeFileName(group.label || agencyKey).replace(/\.xlsx$/i, "");
+        const fileName = `${rawName}.xlsx`;
+        const outData = XLSX.write(outWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+        const generatedFile = new File([outData], fileName, {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        generatedMap.set(agencyKey, generatedFile);
+        generatedFiles.push(generatedFile);
+        sourceList.push({ key: agencyKey, label: group.label, fileName });
+      }
+
+      sourceList.sort((a, b) => a.label.localeCompare(b.label, "it"));
+      generatedFiles.sort((a, b) => a.name.localeCompare(b.name, "it"));
+      setGeneratedByAgency(generatedMap);
+      setFiles(generatedFiles);
+      setSourceAgencies(sourceList);
+      setSplitWarnings(warnings);
+
+      const recipientKeys = new Set(agents.map((agent) => normalize(agent.agenzia)).filter(Boolean));
+      const unmatched = sourceList.filter((agency) => !recipientKeys.has(agency.key));
+      const sourceKeys = new Set(sourceList.map((agency) => agency.key));
+      const withoutData = agents.filter(
+        (agent) => normalize(agent.agenzia) && !sourceKeys.has(normalize(agent.agenzia))
+      );
+
+      const summary = `File unico diviso in ${generatedFiles.length} file, uno per agenzia.`;
+      setNotice(
+        unmatched.length
+          ? `${summary} ATTENZIONE: ${unmatched.length} agenzie del file non sono associate a un nominativo.`
+          : `${summary} Tutte le agenzie trovate sono associate.`
+      );
+
+      if (unmatched.length || warnings.length) {
+        const alertLines = ["CONTROLLO ABBINAMENTI", ""];
+        if (unmatched.length) {
+          alertLines.push(
+            `${unmatched.length} agenzie presenti nel file unico NON associate:`,
+            ...unmatched.slice(0, 15).map((item) => `• ${item.label}`)
+          );
+          if (unmatched.length > 15) alertLines.push(`• ...e altre ${unmatched.length - 15}`);
+        }
+        if (warnings.length) {
+          alertLines.push("", "Fogli ignorati:", ...warnings.map((item) => `• ${item}`));
+        }
+        if (withoutData.length) {
+          alertLines.push(
+            "",
+            `${withoutData.length} nominativi salvati non hanno righe in questo file e non riceveranno email.`
+          );
+        }
+        window.alert(alertLines.join("\n"));
+      }
+    } catch (error: any) {
+      setFiles([]);
+      setGeneratedByAgency(new Map());
+      setSourceAgencies([]);
+      setSplitWarnings([]);
+      setNotice(`Errore nella divisione del file unico: ${error?.message || error}`);
+    } finally {
+      setSplitBusy(false);
+    }
+  };
+
+  const handleSeparateFiles = (selected: File[]) => {
+    setSourceFile(null);
+    setSourceAgencies([]);
+    setGeneratedByAgency(new Map());
+    setSplitWarnings([]);
+    setFiles(selected);
+
+    const used = new Set<File>();
+    agents.forEach((agent) => {
+      const matchedFile = findManualFile(agent, selected);
+      if (matchedFile) used.add(matchedFile);
+    });
+    const extras = selected.filter((file) => !used.has(file));
+    if (extras.length) {
+      window.alert(
+        [
+          "ATTENZIONE",
+          "",
+          `${extras.length} file non risultano associati a nessun nominativo:`,
+          ...extras.slice(0, 15).map((file) => `• ${file.name}`),
+          extras.length > 15 ? `• ...e altri ${extras.length - 15}` : "",
+          "",
+          "Controlla il nome Agenzia / Allegato previsto prima di creare le bozze.",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
     }
   };
 
@@ -357,21 +592,45 @@ export default function OutlookEmail() {
     setDirty(true);
   };
 
+  const switchFileMode = (mode: FileMode) => {
+    setFileMode(mode);
+    setFiles([]);
+    setSourceFile(null);
+    setSourceAgencies([]);
+    setGeneratedByAgency(new Map());
+    setSplitWarnings([]);
+    setNotice("");
+  };
+
   const createLocalDrafts = async () => {
     setNotice("");
 
-    if (!agents.length) {
-      setNotice("Carica o aggiungi prima almeno un destinatario.");
-      return;
-    }
     if (!subject.trim()) {
       setNotice("Inserisci l'oggetto della mail.");
       return;
     }
-
-    const invalid = matched.filter((row) => !row.email || !row.file);
-    if (invalid.length) {
-      setNotice(`Mancano email o allegati per ${invalid.length} righe. Correggile prima di creare le bozze.`);
+    if (!files.length) {
+      setNotice(fileMode === "single" ? "Carica prima il file unico da dividere." : "Carica prima i file degli agenti.");
+      return;
+    }
+    if (fileMode === "single" && unassociatedSourceAgencies.length) {
+      setNotice(
+        `Ci sono ${unassociatedSourceAgencies.length} agenzie del file unico senza nominativo associato. Correggi prima gli abbinamenti.`
+      );
+      return;
+    }
+    if (fileMode === "separate" && unmatchedManualFiles.length) {
+      setNotice(
+        `Ci sono ${unmatchedManualFiles.length} file non associati a nessun nominativo. Correggi prima gli abbinamenti.`
+      );
+      return;
+    }
+    if (filesWithMissingEmail.length) {
+      setNotice(`Manca l'email per ${filesWithMissingEmail.length} nominativi che hanno un file associato.`);
+      return;
+    }
+    if (!readyRows.length) {
+      setNotice("Non ci sono email pronte: nessun file risulta associato a un nominativo con indirizzo email.");
       return;
     }
 
@@ -380,8 +639,8 @@ export default function OutlookEmail() {
       const zip = new JSZip();
       const usedNames = new Set<string>();
 
-      for (let index = 0; index < matched.length; index += 1) {
-        const row = matched[index];
+      for (let index = 0; index < readyRows.length; index += 1) {
+        const row = readyRows[index];
         const eml = await buildEml(row, subject.trim(), body);
         const baseName = sanitizeFileName(row.agenzia || `email-${index + 1}`);
         let fileName = `${baseName}.eml`;
@@ -401,16 +660,17 @@ export default function OutlookEmail() {
           "",
           "1. Estrai questo file ZIP in una cartella del PC.",
           "2. Fai doppio clic su ciascun file .eml.",
-          "3. Outlook dovrebbe aprirlo come messaggio non inviato, gia compilato con destinatario, oggetto, testo e allegato.",
+          "3. Outlook dovrebbe aprirlo come messaggio non inviato, già compilato con destinatario, oggetto, testo e allegato.",
           "4. Controlla il contenuto e premi Invia manualmente.",
           "",
-          "Nessuna password Outlook e nessuna autorizzazione Microsoft sono state usate per generare questi file.",
+          `Email create: ${readyRows.length}`,
+          "Nessuna password Outlook e nessuna autorizzazione Microsoft sono state usate.",
         ].join("\r\n")
       );
 
       const blob = await zip.generateAsync({ type: "blob" });
       downloadBlob(blob, `BOZZE_EMAIL_${new Date().toISOString().slice(0, 10)}.zip`);
-      setNotice(`Create ${matched.length} email .eml. Nessuna mail è stata inviata.`);
+      setNotice(`Create ${readyRows.length} email .eml. Nessuna mail è stata inviata.`);
     } catch (error: any) {
       setNotice(`Errore nella creazione delle email: ${error?.message || error}`);
     } finally {
@@ -450,6 +710,9 @@ export default function OutlookEmail() {
     cursor: "pointer",
   };
 
+  const hasAssociationAlerts =
+    unassociatedSourceAgencies.length > 0 || unmatchedManualFiles.length > 0 || splitWarnings.length > 0;
+
   return (
     <>
       {portalHost &&
@@ -487,7 +750,7 @@ export default function OutlookEmail() {
               <div>
                 <h1 style={{ margin: 0, fontSize: 26 }}>Invio Email Outlook</h1>
                 <div style={{ color: "#64748b", marginTop: 4 }}>
-                  I nominativi possono essere salvati online e sincronizzati tra PC e cellulare.
+                  Puoi caricare un file unico: la webapp lo divide automaticamente per agenzia e controlla gli abbinamenti.
                 </div>
               </div>
               <button onClick={() => setOpen(false)} style={{ ...button, background: "#e2e8f0" }}>
@@ -498,13 +761,13 @@ export default function OutlookEmail() {
             <div style={{ ...card, marginBottom: 16, background: "#ecfdf5", borderColor: "#a7f3d0" }}>
               <strong>✓ Nessun collegamento Outlook richiesto</strong>
               <div style={{ marginTop: 6, color: "#475569" }}>
-                I nominativi vengono salvati su Supabase quando premi “Salva elenco online”. Gli allegati restano invece solo sul dispositivo da cui li selezioni.
+                I nominativi possono essere salvati su Supabase. I file Excel e gli allegati restano solo sul dispositivo da cui li selezioni.
               </div>
               <div style={{ marginTop: 8, fontSize: 13, color: dirty ? "#b45309" : "#64748b", fontWeight: dirty ? 700 : 400 }}>
                 {dirty
-                  ? "Hai modifiche non ancora salvate online."
+                  ? "Hai modifiche ai nominativi non ancora salvate online."
                   : savedAt
-                    ? `Ultimo salvataggio: ${new Date(savedAt).toLocaleString("it-IT")}`
+                    ? `Ultimo salvataggio nominativi: ${new Date(savedAt).toLocaleString("it-IT")}`
                     : "Nessun salvataggio online rilevato."}
               </div>
             </div>
@@ -512,7 +775,7 @@ export default function OutlookEmail() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+                gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))",
                 gap: 16,
                 marginBottom: 16,
               }}
@@ -520,10 +783,10 @@ export default function OutlookEmail() {
               <div style={card}>
                 <strong>1. Elenco destinatari</strong>
                 <p style={{ color: "#64748b", fontSize: 14 }}>
-                  Puoi importare un Excel oppure usare l'elenco già salvato online.
+                  Importa l'Excel AGENZIA / EMAIL / ALLEGATO oppure usa l'elenco salvato online.
                 </p>
-                <input type="file" accept=".xlsx,.xls" onChange={(e) => importExcel(e.target.files?.[0])} />
-                <div style={{ marginTop: 10, fontWeight: 700 }}>{agents.length} destinatari presenti</div>
+                <input type="file" accept=".xlsx,.xls" onChange={(e) => importRecipientsExcel(e.target.files?.[0])} />
+                <div style={{ marginTop: 10, fontWeight: 700 }}>{agents.length} nominativi presenti</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
                   <button
                     onClick={() => void saveRecipients()}
@@ -543,14 +806,130 @@ export default function OutlookEmail() {
               </div>
 
               <div style={card}>
-                <strong>2. Allegati</strong>
-                <p style={{ color: "#64748b", fontSize: 14 }}>
-                  Seleziona contemporaneamente tutti i file destinati agli agenti. Gli allegati non vengono salvati online.
-                </p>
-                <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-                <div style={{ marginTop: 10, fontWeight: 700 }}>{files.length} file caricati su questo dispositivo</div>
+                <strong>2. File da allegare</strong>
+                <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => switchFileMode("single")}
+                    style={{
+                      ...button,
+                      background: fileMode === "single" ? "#2563eb" : "#e2e8f0",
+                      color: fileMode === "single" ? "white" : "#0f172a",
+                    }}
+                  >
+                    File unico (consigliato)
+                  </button>
+                  <button
+                    onClick={() => switchFileMode("separate")}
+                    style={{
+                      ...button,
+                      background: fileMode === "separate" ? "#2563eb" : "#e2e8f0",
+                      color: fileMode === "separate" ? "white" : "#0f172a",
+                    }}
+                  >
+                    File già separati
+                  </button>
+                </div>
+
+                {fileMode === "single" ? (
+                  <>
+                    <p style={{ color: "#64748b", fontSize: 14 }}>
+                      Carica il file completo. Verranno mantenuti tutti i fogli che contengono la colonna agenzia e creato un Excel per ogni agenzia.
+                    </p>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <label style={{ fontSize: 13, color: "#475569" }}>
+                        Nome colonna agenzia (ricerca automatica anche di AGENTE / NOME AGENZIA)
+                      </label>
+                      <input
+                        style={field}
+                        value={preferredAgencyHeader}
+                        onChange={(e) => setPreferredAgencyHeader(e.target.value)}
+                        placeholder="AGENZIA"
+                      />
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.xlsm"
+                        onChange={(e) => {
+                          const selected = e.target.files?.[0];
+                          if (selected) void splitSourceWorkbook(selected);
+                        }}
+                      />
+                      {sourceFile && (
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                          <span style={{ fontSize: 13, color: "#475569" }}>{sourceFile.name}</span>
+                          <button
+                            onClick={() => void splitSourceWorkbook(sourceFile)}
+                            disabled={splitBusy}
+                            style={{ ...button, background: "#e2e8f0", padding: "7px 10px" }}
+                          >
+                            Rigenera divisione
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ marginTop: 10, fontWeight: 700 }}>
+                      {splitBusy ? "Sto dividendo il file..." : `${files.length} file generati automaticamente`}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ color: "#64748b", fontSize: 14 }}>
+                      Seleziona tutti i file già separati. Il nome deve coincidere con Agenzia o con Allegato previsto.
+                    </p>
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => handleSeparateFiles(Array.from(e.target.files || []))}
+                    />
+                    <div style={{ marginTop: 10, fontWeight: 700 }}>{files.length} file caricati</div>
+                  </>
+                )}
               </div>
             </div>
+
+            {(hasAssociationAlerts || (fileMode === "single" && sourceAgencies.length > 0)) && (
+              <div
+                style={{
+                  ...card,
+                  marginBottom: 16,
+                  background: hasAssociationAlerts ? "#fff7ed" : "#ecfdf5",
+                  borderColor: hasAssociationAlerts ? "#fdba74" : "#a7f3d0",
+                }}
+              >
+                <strong>{hasAssociationAlerts ? "⚠️ Controllo associazioni" : "✓ Associazioni file corrette"}</strong>
+                {fileMode === "single" && sourceAgencies.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    Trovate <strong>{sourceAgencies.length}</strong> agenzie nel file unico; <strong>{readyRows.length}</strong> email sono pronte.
+                  </div>
+                )}
+                {!!unassociatedSourceAgencies.length && (
+                  <div style={{ marginTop: 8, color: "#9a3412" }}>
+                    <strong>Agenzie del file senza nominativo associato ({unassociatedSourceAgencies.length}):</strong>{" "}
+                    {unassociatedSourceAgencies.map((item) => item.label).join(", ")}
+                  </div>
+                )}
+                {!!probableSourceMatches.length && (
+                  <div style={{ marginTop: 8, color: "#92400e" }}>
+                    Possibili incongruenze di nome: {probableSourceMatches.join("; ")}. Non vengono associate automaticamente per evitare invii errati.
+                  </div>
+                )}
+                {!!unmatchedManualFiles.length && (
+                  <div style={{ marginTop: 8, color: "#9a3412" }}>
+                    <strong>File non associati ({unmatchedManualFiles.length}):</strong>{" "}
+                    {unmatchedManualFiles.map((file) => file.name).join(", ")}
+                  </div>
+                )}
+                {!!splitWarnings.length && (
+                  <div style={{ marginTop: 8, color: "#92400e" }}>
+                    {splitWarnings.join(" ")}
+                  </div>
+                )}
+                {fileMode === "single" && !!recipientsWithoutSourceData.length && (
+                  <div style={{ marginTop: 8, color: "#64748b" }}>
+                    {recipientsWithoutSourceData.length} nominativi salvati non hanno dati in questo file: per loro non verrà creata alcuna email.
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ ...card, marginBottom: 16 }}>
               <strong>3. Messaggio</strong>
@@ -579,7 +958,12 @@ export default function OutlookEmail() {
                   flexWrap: "wrap",
                 }}
               >
-                <strong>4. Controllo abbinamenti</strong>
+                <div>
+                  <strong>4. Controllo abbinamenti</strong>
+                  <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>
+                    {readyRows.length} email pronte. I nominativi senza file associato vengono semplicemente esclusi dall'invio.
+                  </div>
+                </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {editingRecipients && (
                     <button
@@ -615,7 +999,7 @@ export default function OutlookEmail() {
                     <th style={{ padding: 8 }}>Agenzia</th>
                     <th style={{ padding: 8 }}>Email</th>
                     <th style={{ padding: 8 }}>Allegato previsto</th>
-                    <th style={{ padding: 8 }}>Stato</th>
+                    <th style={{ padding: 8 }}>File associato / Stato</th>
                     {editingRecipients && <th style={{ padding: 8 }}>Azioni</th>}
                   </tr>
                 </thead>
@@ -664,17 +1048,19 @@ export default function OutlookEmail() {
                         style={{
                           padding: 8,
                           fontWeight: 700,
-                          color: row.email && row.file ? "#15803d" : "#b91c1c",
+                          color: row.file && row.email ? "#15803d" : row.file && !row.email ? "#b91c1c" : "#64748b",
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {row.email && row.file
+                        {row.file && row.email
                           ? `✓ ${row.file.name}`
-                          : !row.email
-                            ? "Email mancante"
-                            : files.length
-                              ? "Allegato non trovato"
-                              : "Allegati non caricati"}
+                          : row.file && !row.email
+                            ? `Email mancante — ${row.file.name}`
+                            : fileMode === "single" && sourceAgencies.length
+                              ? "Nessun dato nel file — non inviata"
+                              : files.length
+                                ? "Nessun file associato — non inviata"
+                                : "File non caricati"}
                       </td>
                       {editingRecipients && (
                         <td style={{ padding: 8 }}>
@@ -720,16 +1106,16 @@ export default function OutlookEmail() {
                 Pulisci messaggio
               </button>
               <button
-                disabled={busy || !agents.length}
+                disabled={busy || splitBusy || !readyRows.length}
                 onClick={createLocalDrafts}
                 style={{
                   ...button,
                   background: "#16a34a",
                   color: "white",
-                  opacity: busy || !agents.length ? 0.55 : 1,
+                  opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1,
                 }}
               >
-                {busy ? "Creo il pacchetto..." : "Scarica bozze Outlook (.zip)"}
+                {busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.zip)`}
               </button>
             </div>
           </div>
