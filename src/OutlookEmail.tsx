@@ -185,6 +185,15 @@ function matchScore(agent: AgentRow, sourceLabel: string) {
   if (sourceWords.length >= 2 && subset(sourceWords, agencyWords)) return 116;
   if (sourceWords.length >= 2 && subset(sourceWords, expectedWords)) return 114;
 
+  // Un file può chiamarsi semplicemente con una sola parola significativa
+  // (es. BALDUINI.xlsx) mentre l'anagrafica contiene "Alessandro Balduini".
+  // In questo caso la parola del file viene cercata sia in Agenzia sia nelle
+  // Parole chiave agente. La risoluzione finale resta comunque univoca grazie
+  // a buildAssignments, quindi i casi ambigui non vengono associati.
+  const sourceSingle = sourceWords.length === 1 ? sourceWords[0] : "";
+  if (sourceSingle.length >= 4 && agencyWords.includes(sourceSingle)) return 108;
+  if (sourceSingle.length >= 4 && expectedWords.includes(sourceSingle)) return 106;
+
   const singleAgency = agencyWords.length === 1 ? agencyWords[0] : "";
   const singleExpected = expectedWords.length === 1 ? expectedWords[0] : "";
   if (singleAgency.length >= 5 && sourceWords.includes(singleAgency)) return 90;
@@ -233,26 +242,6 @@ function buildAssignments(agents: AgentRow[], sources: SourceAgency[]): Assignme
   });
 
   return { byAgent, usedSources, suggestions };
-}
-
-function findManualFile(agent: AgentRow, files: File[]) {
-  const expected = normalize(agent.allegato);
-  if (expected) {
-    const exact = files.find((file) => normalize(file.name) === expected);
-    if (exact) return exact;
-  }
-
-  const agencyNorm = normalize(agent.agenzia);
-  const exactAgency = files.find((file) => normalize(stripExtension(file.name)) === agencyNorm);
-  if (exactAgency) return exactAgency;
-
-  const ranked = files
-    .map((file) => ({ file, score: matchScore(agent, stripExtension(file.name)) }))
-    .filter((item) => item.score >= 88)
-    .sort((a, b) => b.score - a.score);
-  if (!ranked.length) return null;
-  if (ranked.length > 1 && ranked[0].score === ranked[1].score) return null;
-  return ranked[0].file;
 }
 
 function detectAgencyColumn(matrix: unknown[][], preferredHeader: string) {
@@ -390,9 +379,35 @@ export default function OutlookEmail() {
 
   const assignment = useMemo(() => buildAssignments(agents, sourceAgencies), [agents, sourceAgencies]);
 
+  const manualSources = useMemo<SourceAgency[]>(
+    () =>
+      fileMode === "separate"
+        ? files.map((file, index) => ({
+            key: `manual-${index}`,
+            label: stripExtension(file.name),
+            fileName: file.name,
+          }))
+        : [],
+    [fileMode, files]
+  );
+
+  const manualAssignment = useMemo(
+    () => buildAssignments(agents, manualSources),
+    [agents, manualSources]
+  );
+
   const matched = useMemo<PreparedRow[]>(() => {
     return agents.map((agent, agentIndex) => {
-      if (fileMode === "separate") return { ...agent, file: findManualFile(agent, files) };
+      if (fileMode === "separate") {
+        const sourceIndex = manualAssignment.byAgent.get(agentIndex);
+        if (sourceIndex === undefined) return { ...agent, file: null };
+        const source = manualSources[sourceIndex];
+        return {
+          ...agent,
+          file: files[sourceIndex] || null,
+          sourceLabel: source?.label,
+        };
+      }
       const sourceIndex = assignment.byAgent.get(agentIndex);
       if (sourceIndex === undefined) return { ...agent, file: null };
       const source = sourceAgencies[sourceIndex];
@@ -402,7 +417,7 @@ export default function OutlookEmail() {
         sourceLabel: source.label,
       };
     });
-  }, [agents, files, fileMode, sourceAgencies, generatedByAgency, assignment]);
+  }, [agents, files, fileMode, sourceAgencies, generatedByAgency, assignment, manualAssignment, manualSources]);
 
   const readyRows = useMemo(() => matched.filter((row) => row.file && row.email.trim()), [matched]);
   const filesWithMissingEmail = useMemo(() => matched.filter((row) => row.file && !row.email.trim()), [matched]);
@@ -430,9 +445,8 @@ export default function OutlookEmail() {
 
   const unmatchedManualFiles = useMemo(() => {
     if (fileMode !== "separate") return [];
-    const used = new Set(matched.flatMap((row) => (row.file ? [row.file] : [])));
-    return files.filter((file) => !used.has(file));
-  }, [fileMode, files, matched]);
+    return files.filter((_, sourceIndex) => !manualAssignment.usedSources.has(sourceIndex));
+  }, [fileMode, files, manualAssignment]);
 
   const importRecipientsExcel = async (file?: File) => {
     if (!file) return;
@@ -560,12 +574,14 @@ export default function OutlookEmail() {
     setGeneratedByAgency(new Map());
     setSplitWarnings([]);
     setFiles(selected);
-    const used = new Set<File>();
-    agents.forEach((agent) => {
-      const found = findManualFile(agent, selected);
-      if (found) used.add(found);
-    });
-    const extras = selected.filter((file) => !used.has(file));
+
+    const sources = selected.map((file, index) => ({
+      key: `manual-${index}`,
+      label: stripExtension(file.name),
+      fileName: file.name,
+    }));
+    const nowAssignment = buildAssignments(agents, sources);
+    const extras = selected.filter((_, sourceIndex) => !nowAssignment.usedSources.has(sourceIndex));
     if (extras.length) {
       window.alert(`ATTENZIONE\n\n${extras.length} file non risultano associati a nessun nominativo:\n${extras.slice(0, 15).map((file) => `• ${file.name}`).join("\n")}`);
     }
