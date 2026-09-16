@@ -2736,28 +2736,79 @@ function Listini({
   gasAcciseSettings: GasAcciseSettings;
   setGasAcciseSettings: React.Dispatch<React.SetStateAction<GasAcciseSettings>>;
 }) {
+  const cloneDispCpRows = (rows: DispCpRow[]) => rows.map((row) => ({ ...row }));
+  const cloneEnergyOffers = (rows: EnergyOffer[]) => rows.map((row) => ({ ...row }));
+  const cloneGasOffers = (rows: GasOffer[]) => rows.map((row) => ({ ...row }));
+
+  const [draftDispCpRows, setDraftDispCpRows] = useState<DispCpRow[]>(() => cloneDispCpRows(dispCpRows));
+  const [draftEnergyOffers, setDraftEnergyOffers] = useState<EnergyOffer[]>(() => cloneEnergyOffers(energyOffers));
+  const [draftGasOffers, setDraftGasOffers] = useState<GasOffer[]>(() => cloneGasOffers(gasOffers));
+  const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (dirty) return;
+    setDraftDispCpRows(cloneDispCpRows(dispCpRows));
+    setDraftEnergyOffers(cloneEnergyOffers(energyOffers));
+    setDraftGasOffers(cloneGasOffers(gasOffers));
+    setDraftGasAcciseSettings({ ...gasAcciseSettings });
+  }, [dispCpRows, energyOffers, gasOffers, gasAcciseSettings, dirty]);
+
+  const markDirty = () => setDirty(true);
+
   const updateDispCp = (index: number, key: keyof DispCpRow, value: string) => {
-    setDispCpRows((prev) =>
+    setDraftDispCpRows((prev) =>
       prev.map((row, i) =>
         i === index ? { ...row, [key]: key === "mese" ? value : n(value) } : row
       )
     );
+    markDirty();
   };
 
   const updateEnergyOffer = (index: number, key: keyof EnergyOffer, value: string) => {
-    setEnergyOffers((prev) =>
+    setDraftEnergyOffers((prev) =>
       prev.map((row, i) =>
         i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
       )
     );
+    markDirty();
   };
 
   const updateGasOffer = (index: number, key: keyof GasOffer, value: string) => {
-    setGasOffers((prev) =>
+    setDraftGasOffers((prev) =>
       prev.map((row, i) =>
         i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
       )
     );
+    markDirty();
+  };
+
+  const saveListini = async () => {
+    setSaving(true);
+
+    const payload = [
+      { key: "dispCpRows", value_json: draftDispCpRows },
+      { key: "energyOffers", value_json: draftEnergyOffers },
+      { key: "gasOffers", value_json: draftGasOffers },
+      { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
+    ];
+
+    const { error } = await supabase.from("app_settings").upsert(payload);
+    setSaving(false);
+
+    if (error) {
+      console.error("SAVE LISTINI ERROR:", error);
+      alert("Errore nel salvataggio dei listini");
+      return;
+    }
+
+    setDispCpRows(cloneDispCpRows(draftDispCpRows));
+    setEnergyOffers(cloneEnergyOffers(draftEnergyOffers));
+    setGasOffers(cloneGasOffers(draftGasOffers));
+    setGasAcciseSettings({ ...draftGasAcciseSettings });
+    setDirty(false);
+    alert("Listini salvati online");
   };
 
   const thStyle: React.CSSProperties = {
@@ -2781,6 +2832,38 @@ function Listini({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        {dirty && (
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#b45309" }}>
+            Modifiche non salvate
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={saveListini}
+          disabled={saving || !dirty}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 8,
+            border: "none",
+            background: saving || !dirty ? "#cbd5e1" : "#2563eb",
+            color: "white",
+            fontWeight: 800,
+            cursor: saving || !dirty ? "not-allowed" : "pointer",
+          }}
+        >
+          {saving ? "Salvataggio..." : "Salva listini"}
+        </button>
+      </div>
+
       <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
         <h2 style={{ marginTop: 0 }}>Dispacciamento + CP Market Energia</h2>
         <div style={{ overflowX: "auto" }}>
@@ -2788,14 +2871,12 @@ function Listini({
             <thead>
               <tr>
                 {["Mese", "Dispacciam", "CP Market", "Tot"].map((h) => (
-                  <th key={h} style={thStyle}>
-                    {h}
-                  </th>
+                  <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {dispCpRows.map((row, i) => {
+              {draftDispCpRows.map((row, i) => {
                 const tot = n(row.dispacciamento) + n(row.cpMarket);
                 return (
                   <tr key={row.mese}>
@@ -2855,10 +2936,11 @@ function Listini({
                 type="number"
                 step="0.000001"
                 style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 8 }}
-                value={gasAcciseSettings.agevolata}
-                onChange={(e) =>
-                  setGasAcciseSettings((prev) => ({ ...prev, agevolata: n(e.target.value) }))
-                }
+                value={draftGasAcciseSettings.agevolata}
+                onChange={(e) => {
+                  setDraftGasAcciseSettings((prev) => ({ ...prev, agevolata: n(e.target.value) }));
+                  markDirty();
+                }}
               />
             </div>
             <div>
@@ -2867,10 +2949,11 @@ function Listini({
                 type="number"
                 step="0.000001"
                 style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 8 }}
-                value={gasAcciseSettings.nonAgevolata}
-                onChange={(e) =>
-                  setGasAcciseSettings((prev) => ({ ...prev, nonAgevolata: n(e.target.value) }))
-                }
+                value={draftGasAcciseSettings.nonAgevolata}
+                onChange={(e) => {
+                  setDraftGasAcciseSettings((prev) => ({ ...prev, nonAgevolata: n(e.target.value) }));
+                  markDirty();
+                }}
               />
             </div>
           </div>
@@ -2884,14 +2967,12 @@ function Listini({
             <thead>
               <tr>
                 {["Nome offerta", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
-                  <th key={h} style={thStyle}>
-                    {h}
-                  </th>
+                  <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {energyOffers.map((row, i) => (
+              {draftEnergyOffers.map((row, i) => (
                 <tr key={row.nome + i}>
                   <td style={tdStyle}>
                     <input
@@ -2941,14 +3022,12 @@ function Listini({
             <thead>
               <tr>
                 {["Nome offerta", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
-                  <th key={h} style={thStyle}>
-                    {h}
-                  </th>
+                  <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {gasOffers.map((row, i) => (
+              {draftGasOffers.map((row, i) => (
                 <tr key={row.nome + i}>
                   <td style={tdStyle}>
                     <input
@@ -5553,7 +5632,13 @@ const [loadingSettings, setLoadingSettings] = useState(true);
 const [savingSettings, setSavingSettings] = useState(false);
 
 // ✅ STEP 3 QUI
-const [selectedYear, setSelectedYear] = useState(2025);
+const [selectedYear, setSelectedYear] = useState(() => {
+  const currentYear = new Date().getFullYear();
+  const availableYears = ANNI.filter((anno) => anno <= currentYear);
+  return availableYears.length
+    ? Math.max(...availableYears)
+    : Math.max(...ANNI);
+});
 
 // STEP 4
 const fixedRows = monthlyRows.filter(r => r.anno === 0);
