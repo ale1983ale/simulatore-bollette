@@ -105,6 +105,7 @@ export default function OutlookEmail() {
   );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [editingRecipients, setEditingRecipients] = useState(false);
 
   useEffect(() => {
     let host: HTMLElement | null = null;
@@ -203,10 +204,31 @@ export default function OutlookEmail() {
       }
 
       setAgents(parsed);
+      setEditingRecipients(false);
       setNotice(`Importati ${parsed.length} destinatari.`);
     } catch (error: any) {
       setNotice(`Errore nella lettura dell'Excel: ${error?.message || error}`);
     }
+  };
+
+  const updateAgent = (index: number, fieldName: keyof AgentRow, value: string) => {
+    setAgents((current) =>
+      current.map((agent, agentIndex) =>
+        agentIndex === index ? { ...agent, [fieldName]: value } : agent
+      )
+    );
+  };
+
+  const deleteAgent = (index: number) => {
+    setAgents((current) => current.filter((_, agentIndex) => agentIndex !== index));
+  };
+
+  const addAgent = () => {
+    setAgents((current) => [
+      ...current,
+      { agenzia: "", email: "", allegato: "" },
+    ]);
+    setEditingRecipients(true);
   };
 
   const createLocalDrafts = async () => {
@@ -288,6 +310,12 @@ export default function OutlookEmail() {
     padding: "10px 12px",
     fontSize: 14,
     background: "white",
+  };
+
+  const smallField: React.CSSProperties = {
+    ...field,
+    minWidth: 170,
+    padding: "7px 9px",
   };
 
   const button: React.CSSProperties = {
@@ -399,43 +427,141 @@ export default function OutlookEmail() {
               </div>
             </div>
 
-            {!!agents.length && (
-              <div style={{ ...card, marginBottom: 16, overflowX: "auto" }}>
+            <div style={{ ...card, marginBottom: 16, overflowX: "auto" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
                 <strong>4. Controllo abbinamenti</strong>
-                <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: 14 }}>
-                  <thead>
-                    <tr style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0" }}>
-                      <th style={{ padding: 8 }}>Agenzia</th>
-                      <th style={{ padding: 8 }}>Email</th>
-                      <th style={{ padding: 8 }}>Allegato previsto</th>
-                      <th style={{ padding: 8 }}>Stato</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matched.map((row, index) => (
-                      <tr key={`${row.agenzia}-${index}`} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                        <td style={{ padding: 8 }}>{row.agenzia || "—"}</td>
-                        <td style={{ padding: 8 }}>{row.email || "—"}</td>
-                        <td style={{ padding: 8 }}>{row.allegato || "—"}</td>
-                        <td
-                          style={{
-                            padding: 8,
-                            fontWeight: 700,
-                            color: row.email && row.file ? "#15803d" : "#b91c1c",
-                          }}
-                        >
-                          {row.email && row.file
-                            ? `✓ ${row.file.name}`
-                            : !row.email
-                              ? "Email mancante"
-                              : "Allegato non trovato"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {editingRecipients && (
+                    <button
+                      onClick={addAgent}
+                      style={{ ...button, background: "#dcfce7", color: "#166534", padding: "7px 11px" }}
+                    >
+                      + Aggiungi nominativo
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setEditingRecipients((value) => !value)}
+                    style={{
+                      ...button,
+                      background: editingRecipients ? "#16a34a" : "#e2e8f0",
+                      color: editingRecipients ? "white" : "#0f172a",
+                      padding: "7px 11px",
+                    }}
+                  >
+                    {editingRecipients ? "✓ Fine modifica" : "✏️ Modifica"}
+                  </button>
+                </div>
               </div>
-            )}
+
+              <datalist id="email-attachment-files">
+                {files.map((file) => (
+                  <option key={file.name} value={file.name} />
+                ))}
+              </datalist>
+
+              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: 14 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0" }}>
+                    <th style={{ padding: 8 }}>Agenzia</th>
+                    <th style={{ padding: 8 }}>Email</th>
+                    <th style={{ padding: 8 }}>Allegato previsto</th>
+                    <th style={{ padding: 8 }}>Stato</th>
+                    {editingRecipients && <th style={{ padding: 8 }}>Azioni</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {matched.map((row, index) => (
+                    <tr key={index} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td style={{ padding: 8 }}>
+                        {editingRecipients ? (
+                          <input
+                            style={smallField}
+                            value={agents[index]?.agenzia ?? ""}
+                            onChange={(e) => updateAgent(index, "agenzia", e.target.value)}
+                            placeholder="Agenzia"
+                          />
+                        ) : (
+                          row.agenzia || "—"
+                        )}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {editingRecipients ? (
+                          <input
+                            style={{ ...smallField, minWidth: 220 }}
+                            value={agents[index]?.email ?? ""}
+                            onChange={(e) => updateAgent(index, "email", e.target.value)}
+                            placeholder="email@esempio.it"
+                            type="email"
+                          />
+                        ) : (
+                          row.email || "—"
+                        )}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {editingRecipients ? (
+                          <input
+                            style={{ ...smallField, minWidth: 210 }}
+                            value={agents[index]?.allegato ?? ""}
+                            onChange={(e) => updateAgent(index, "allegato", e.target.value)}
+                            placeholder="NOMEFILE.xlsx"
+                            list="email-attachment-files"
+                          />
+                        ) : (
+                          row.allegato || "—"
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          fontWeight: 700,
+                          color: row.email && row.file ? "#15803d" : "#b91c1c",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {row.email && row.file
+                          ? `✓ ${row.file.name}`
+                          : !row.email
+                            ? "Email mancante"
+                            : "Allegato non trovato"}
+                      </td>
+                      {editingRecipients && (
+                        <td style={{ padding: 8 }}>
+                          <button
+                            onClick={() => deleteAgent(index)}
+                            style={{
+                              ...button,
+                              background: "#fee2e2",
+                              color: "#991b1b",
+                              padding: "7px 10px",
+                            }}
+                          >
+                            Elimina
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {!matched.length && (
+                    <tr>
+                      <td
+                        colSpan={editingRecipients ? 5 : 4}
+                        style={{ padding: 16, textAlign: "center", color: "#64748b" }}
+                      >
+                        Nessun nominativo presente. Premi Modifica e poi Aggiungi nominativo, oppure carica l'Excel.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
             {notice && (
               <div style={{ ...card, marginBottom: 16, background: "#eff6ff", borderColor: "#bfdbfe" }}>
