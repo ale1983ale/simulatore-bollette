@@ -2,14 +2,14 @@ package com.piuenergia.outlookhelper;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.text.Html;
-import android.view.View;
+import android.util.Base64;
 import android.widget.Button;
-import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -20,24 +20,31 @@ import androidx.core.content.FileProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
     private static final int PICK_ZIP = 1001;
+    private static final String SIGNATURE_PLAIN =
+            "Alessio Cedroni\n" +
+            "Responsabile Commerciale\n" +
+            "Mobile +39 347 040 2901\n" +
+            "alessio.cedroni@piuenergia.it";
+
     private JSONObject manifest;
     private JSONArray recipients;
     private File packageDir;
     private int index = 0;
     private TextView status;
-    private EditText signature;
-    private EditText logoUrl;
     private Button openButton;
     private Button previousButton;
+    private String cachedLogoBase64;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,36 +76,37 @@ public class MainActivity extends Activity {
         status.setPadding(0, p, 0, p);
         root.addView(status);
 
-        TextView sigLabel = new TextView(this);
-        sigLabel.setText("Firma automatica (testo)");
-        root.addView(sigLabel);
+        TextView sigTitle = new TextView(this);
+        sigTitle.setText("Firma aziendale preimpostata");
+        sigTitle.setTextSize(18);
+        sigTitle.setPadding(0, 0, 0, p / 2);
+        root.addView(sigTitle);
 
-        signature = new EditText(this);
-        signature.setMinLines(3);
-        signature.setHint("Es. Alessio Cedroni\nResponsabile Commerciale\n+Energia S.p.A.");
-        root.addView(signature);
+        TextView sigPreview = new TextView(this);
+        sigPreview.setText(Html.fromHtml(
+                "<b><font color='#1f4e79'>Alessio Cedroni</font></b><br>" +
+                "Responsabile Commerciale<br>" +
+                "Mobile +39 347 040 2901<br>" +
+                "<font color='#1f4e79'>alessio.cedroni@piuenergia.it</font>",
+                Html.FROM_HTML_MODE_LEGACY));
+        sigPreview.setPadding(0, 0, 0, p / 2);
+        root.addView(sigPreview);
 
-        TextView logoLabel = new TextView(this);
-        logoLabel.setText("URL logo aziendale (facoltativo)");
-        logoLabel.setPadding(0, p / 2, 0, 0);
-        root.addView(logoLabel);
+        ImageView logoPreview = new ImageView(this);
+        logoPreview.setAdjustViewBounds(true);
+        logoPreview.setMaxHeight((int) (180 * getResources().getDisplayMetrics().density));
+        try {
+            byte[] logoBytes = Base64.decode(getLogoBase64(), Base64.DEFAULT);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(logoBytes, 0, logoBytes.length);
+            logoPreview.setImageBitmap(bitmap);
+        } catch (Exception ignored) {
+        }
+        root.addView(logoPreview);
 
-        logoUrl = new EditText(this);
-        logoUrl.setHint("https://.../logo.png");
-        root.addView(logoUrl);
-
-        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
-        signature.setText(prefs.getString("signature", ""));
-        logoUrl.setText(prefs.getString("logoUrl", ""));
-
-        Button save = new Button(this);
-        save.setText("Salva firma");
-        save.setOnClickListener(v -> {
-            prefs.edit().putString("signature", signature.getText().toString())
-                    .putString("logoUrl", logoUrl.getText().toString().trim()).apply();
-            Toast.makeText(this, "Firma salvata", Toast.LENGTH_SHORT).show();
-        });
-        root.addView(save);
+        TextView sigNote = new TextView(this);
+        sigNote.setText("La firma e il banner +Energia sono già inclusi nell'app: non devi configurare nulla.");
+        sigNote.setPadding(0, p / 2, 0, p);
+        root.addView(sigNote);
 
         openButton = new Button(this);
         openButton.setText("2. Apri email corrente in Outlook");
@@ -116,7 +124,7 @@ public class MainActivity extends Activity {
         root.addView(previousButton);
 
         TextView note = new TextView(this);
-        note.setText("Flusso Android: apri la mail già compilata, premi Invia in Outlook, torna qui e apri la successiva. Il logo viene tentato come immagine HTML remota: Outlook mobile può eventualmente rimuoverlo.");
+        note.setText("Flusso Android: apri la mail già compilata, controlla firma e allegato, premi Invia in Outlook, torna qui e apri la successiva.");
         note.setPadding(0, p, 0, 0);
         root.addView(note);
 
@@ -170,7 +178,7 @@ public class MainActivity extends Activity {
 
         File manifestFile = new File(packageDir, "manifest.json");
         if (!manifestFile.exists()) throw new Exception("manifest.json non trovato nel pacchetto");
-        String json = new String(java.nio.file.Files.readAllBytes(manifestFile.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+        String json = new String(java.nio.file.Files.readAllBytes(manifestFile.toPath()), StandardCharsets.UTF_8);
         manifest = new JSONObject(json);
         recipients = manifest.getJSONArray("recipients");
         index = 0;
@@ -207,13 +215,10 @@ public class MainActivity extends Activity {
             String email = r.optString("email", "");
             String subject = manifest.optString("subject", "");
             String body = manifest.optString("body", "");
-            String sig = signature.getText().toString().trim();
-            String logo = logoUrl.getText().toString().trim();
 
-            String plain = body + (sig.isEmpty() ? "" : "\n\n" + sig);
-            String html = "<div style='font-family:Arial,sans-serif;font-size:11pt;'>" + nl2br(Html.escapeHtml(body)) + "</div>";
-            if (!sig.isEmpty()) html += "<br><div style='font-family:Arial,sans-serif;font-size:10.5pt;'>" + nl2br(Html.escapeHtml(sig)) + "</div>";
-            if (!logo.isEmpty()) html += "<br><img src='" + Html.escapeHtml(logo) + "' style='max-width:220px;height:auto;'>";
+            String plain = body + "\n\n" + SIGNATURE_PLAIN;
+            String html = "<div style='font-family:Arial,sans-serif;font-size:11pt;'>" +
+                    nl2br(Html.escapeHtml(body)) + "</div><br>" + buildSignatureHtml();
 
             JSONArray att = r.optJSONArray("attachments");
             ArrayList<Uri> uris = new ArrayList<>();
@@ -248,6 +253,37 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "Errore: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    private String buildSignatureHtml() {
+        StringBuilder html = new StringBuilder();
+        html.append("<div style='font-family:Arial,sans-serif;font-size:10.5pt;line-height:1.35;color:#333333;'>")
+                .append("<b style='color:#1f4e79;'>Alessio Cedroni</b><br>")
+                .append("Responsabile Commerciale<br>")
+                .append("Mobile <a href='tel:+393470402901' style='color:#1f4e79;text-decoration:none;'>+39 347 040 2901</a><br>")
+                .append("<a href='mailto:alessio.cedroni@piuenergia.it' style='color:#1f4e79;text-decoration:none;'>alessio.cedroni@piuenergia.it</a>")
+                .append("</div>");
+        String logo = getLogoBase64();
+        if (!logo.isEmpty()) {
+            html.append("<br><img alt='+Energia' src='data:image/png;base64,")
+                    .append(logo)
+                    .append("' width='400' style='display:block;max-width:100%;height:auto;border:0;'>");
+        }
+        return html.toString();
+    }
+
+    private String getLogoBase64() {
+        if (cachedLogoBase64 != null) return cachedLogoBase64;
+        try (InputStream in = getResources().openRawResource(R.raw.signature_logo_b64);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int n;
+            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+            cachedLogoBase64 = out.toString(StandardCharsets.UTF_8.name()).replaceAll("\\s+", "");
+        } catch (Exception e) {
+            cachedLogoBase64 = "";
+        }
+        return cachedLogoBase64;
     }
 
     private String nl2br(String value) {
