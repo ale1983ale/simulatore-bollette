@@ -8,6 +8,7 @@ import OutlookEmailPreviewRefresh from "./OutlookEmailPreviewRefresh";
 import OutlookEmailCommonFiles from "./OutlookEmailCommonFiles";
 import OutlookEmailModeStyleFix from "./OutlookEmailModeStyleFix";
 import OutlookEmailSingleDraftFix from "./OutlookEmailSingleDraftFix";
+import OutlookEmailAutoSendPackageSafe from "./OutlookEmailAutoSendPackageSafe";
 
 const hasAdminSession = Boolean(localStorage.getItem("admin_session"));
 
@@ -21,5 +22,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     {hasAdminSession && <OutlookEmailCommonFiles />}
     {hasAdminSession && <OutlookEmailModeStyleFix />}
     {hasAdminSession && <OutlookEmailSingleDraftFix />}
+    {hasAdminSession && <OutlookEmailAutoSendPackageSafe />}
   </React.StrictMode>
 );
