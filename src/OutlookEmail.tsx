@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
+import { supabaseAnonKey, supabaseUrl } from "./supabase";
 
 type AgentRow = {
   agenzia: string;
@@ -11,6 +12,12 @@ type AgentRow = {
 
 type PreparedRow = AgentRow & {
   file: File | null;
+};
+
+type AdminSession = {
+  id?: number | string;
+  username?: string;
+  password?: string;
 };
 
 const normalize = (value: string) =>
@@ -45,7 +52,7 @@ const encodeHeader = (value: string) => `=?UTF-8?B?${utf8ToBase64(value)}?=`;
 
 const encodeRfc5987 = (value: string) =>
   encodeURIComponent(value)
-    .replace(/['()]/g, escape)
+    .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
     .replace(/\*/g, "%2A");
 
 async function buildEml(row: PreparedRow, subject: string, body: string) {
@@ -94,6 +101,37 @@ function downloadBlob(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+function readAdminSession(): AdminSession | null {
+  try {
+    const raw = localStorage.getItem("admin_session");
+    return raw ? (JSON.parse(raw) as AdminSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getOwnerKey() {
+  const admin = readAdminSession();
+  if (!admin?.id || !admin?.username) {
+    throw new Error("Sessione amministratore non trovata. Esci e accedi di nuovo all'area Admin.");
+  }
+
+  const seed = `${admin.id}|${admin.username}|${admin.password || ""}|email-recipient-sync-v1`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function syncHeaders(ownerKey: string, includeJson = false) {
+  return {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${supabaseAnonKey}`,
+    "x-client-info": `email-recipient-sync-${ownerKey}`,
+    ...(includeJson ? { "Content-Type": "application/json" } : {}),
+  };
+}
+
 export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
@@ -106,6 +144,9 @@ export default function OutlookEmail() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [editingRecipients, setEditingRecipients] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     let host: HTMLElement | null = null;
@@ -142,14 +183,8 @@ export default function OutlookEmail() {
     };
 
     placeInAdminToolbar();
-
     const observer = new MutationObserver(placeInAdminToolbar);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     const timer = window.setInterval(placeInAdminToolbar, 750);
 
     return () => {
@@ -158,6 +193,96 @@ export default function OutlookEmail() {
       if (host?.isConnected) host.remove();
     };
   }, []);
+
+  const loadSavedRecipients = async (showMessage = true) => {
+    setSyncBusy(true);
+    try {
+      const ownerKey = await getOwnerKey();
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/email_recipient_lists?owner_key=eq.${ownerKey}&select=recipients,updated_at&limit=1`,
+        { headers: syncHeaders(ownerKey) }
+      );
+
+      if (!response.ok) {
+        const details = await response.text();
+        if (response.status === 404 || details.includes("email_recipient_lists")) {
+          throw new Error("Archivio destinatari non ancora configurato in Supabase.");
+        }
+        throw new Error(details || `Errore ${response.status}`);
+      }
+
+      const rows = (await response.json()) as Array<{ recipients?: unknown; updated_at?: string }>;
+      const row = rows[0];
+      const saved = Array.isArray(row?.recipients) ? row.recipients : [];
+      const cleaned = saved
+        .map((item: any) => ({
+          agenzia: String(item?.agenzia || ""),
+          email: String(item?.email || ""),
+          allegato: String(item?.allegato || ""),
+        }))
+        .filter((item) => item.agenzia || item.email || item.allegato);
+
+      setAgents(cleaned);
+      setDirty(false);
+      setSavedAt(row?.updated_at || null);
+      if (showMessage) {
+        setNotice(
+          cleaned.length
+            ? `Caricati ${cleaned.length} nominativi salvati online.`
+            : "Non ci sono ancora nominativi salvati online."
+        );
+      }
+    } catch (error: any) {
+      setNotice(`Salvataggio online: ${error?.message || error}`);
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  const saveRecipients = async () => {
+    setSyncBusy(true);
+    try {
+      const ownerKey = await getOwnerKey();
+      const recipients = agents.map((agent) => ({
+        agenzia: agent.agenzia.trim(),
+        email: agent.email.trim(),
+        allegato: agent.allegato.trim(),
+      }));
+      const now = new Date().toISOString();
+
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/email_recipient_lists?on_conflict=owner_key`,
+        {
+          method: "POST",
+          headers: {
+            ...syncHeaders(ownerKey, true),
+            Prefer: "resolution=merge-duplicates,return=minimal",
+          },
+          body: JSON.stringify({ owner_key: ownerKey, recipients, updated_at: now }),
+        }
+      );
+
+      if (!response.ok) {
+        const details = await response.text();
+        if (response.status === 404 || details.includes("email_recipient_lists")) {
+          throw new Error("Archivio destinatari non ancora configurato in Supabase.");
+        }
+        throw new Error(details || `Errore ${response.status}`);
+      }
+
+      setDirty(false);
+      setSavedAt(now);
+      setNotice(`Elenco salvato online: ${recipients.length} nominativi. Ora lo ritrovi anche dagli altri dispositivi.`);
+    } catch (error: any) {
+      setNotice(`Impossibile salvare l'elenco: ${error?.message || error}`);
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) void loadSavedRecipients(false);
+  }, [open]);
 
   const fileMap = useMemo(() => {
     const map = new Map<string, File>();
@@ -204,8 +329,9 @@ export default function OutlookEmail() {
       }
 
       setAgents(parsed);
+      setDirty(true);
       setEditingRecipients(false);
-      setNotice(`Importati ${parsed.length} destinatari.`);
+      setNotice(`Importati ${parsed.length} destinatari. Premi “Salva elenco online” per ritrovarli anche sul cellulare.`);
     } catch (error: any) {
       setNotice(`Errore nella lettura dell'Excel: ${error?.message || error}`);
     }
@@ -217,25 +343,25 @@ export default function OutlookEmail() {
         agentIndex === index ? { ...agent, [fieldName]: value } : agent
       )
     );
+    setDirty(true);
   };
 
   const deleteAgent = (index: number) => {
     setAgents((current) => current.filter((_, agentIndex) => agentIndex !== index));
+    setDirty(true);
   };
 
   const addAgent = () => {
-    setAgents((current) => [
-      ...current,
-      { agenzia: "", email: "", allegato: "" },
-    ]);
+    setAgents((current) => [...current, { agenzia: "", email: "", allegato: "" }]);
     setEditingRecipients(true);
+    setDirty(true);
   };
 
   const createLocalDrafts = async () => {
     setNotice("");
 
     if (!agents.length) {
-      setNotice("Carica prima l'Excel con AGENZIA, EMAIL e ALLEGATO.");
+      setNotice("Carica o aggiungi prima almeno un destinatario.");
       return;
     }
     if (!subject.trim()) {
@@ -284,9 +410,7 @@ export default function OutlookEmail() {
 
       const blob = await zip.generateAsync({ type: "blob" });
       downloadBlob(blob, `BOZZE_EMAIL_${new Date().toISOString().slice(0, 10)}.zip`);
-      setNotice(
-        `Create ${matched.length} email .eml. Ho scaricato un unico ZIP: estrailo e apri i file con Outlook. Nessuna mail e stata inviata.`
-      );
+      setNotice(`Create ${matched.length} email .eml. Nessuna mail è stata inviata.`);
     } catch (error: any) {
       setNotice(`Errore nella creazione delle email: ${error?.message || error}`);
     } finally {
@@ -332,12 +456,7 @@ export default function OutlookEmail() {
         createPortal(
           <button
             onClick={() => setOpen(true)}
-            style={{
-              ...button,
-              background: "#2563eb",
-              color: "white",
-              marginRight: 8,
-            }}
+            style={{ ...button, background: "#2563eb", color: "white", marginRight: 8 }}
           >
             ✉️ Invio Email
           </button>,
@@ -368,7 +487,7 @@ export default function OutlookEmail() {
               <div>
                 <h1 style={{ margin: 0, fontSize: 26 }}>Invio Email Outlook</h1>
                 <div style={{ color: "#64748b", marginTop: 4 }}>
-                  Prepara le email sul PC senza collegare Outlook e senza autorizzazioni aziendali.
+                  I nominativi possono essere salvati online e sincronizzati tra PC e cellulare.
                 </div>
               </div>
               <button onClick={() => setOpen(false)} style={{ ...button, background: "#e2e8f0" }}>
@@ -377,9 +496,16 @@ export default function OutlookEmail() {
             </div>
 
             <div style={{ ...card, marginBottom: 16, background: "#ecfdf5", borderColor: "#a7f3d0" }}>
-              <strong>✓ Nessun collegamento Microsoft richiesto</strong>
+              <strong>✓ Nessun collegamento Outlook richiesto</strong>
               <div style={{ marginTop: 6, color: "#475569" }}>
-                La webapp lavora solo sui file che selezioni nel browser e genera un pacchetto ZIP di email .eml. Non accede alla tua casella Outlook e non invia nulla.
+                I nominativi vengono salvati su Supabase quando premi “Salva elenco online”. Gli allegati restano invece solo sul dispositivo da cui li selezioni.
+              </div>
+              <div style={{ marginTop: 8, fontSize: 13, color: dirty ? "#b45309" : "#64748b", fontWeight: dirty ? 700 : 400 }}>
+                {dirty
+                  ? "Hai modifiche non ancora salvate online."
+                  : savedAt
+                    ? `Ultimo salvataggio: ${new Date(savedAt).toLocaleString("it-IT")}`
+                    : "Nessun salvataggio online rilevato."}
               </div>
             </div>
 
@@ -394,19 +520,35 @@ export default function OutlookEmail() {
               <div style={card}>
                 <strong>1. Elenco destinatari</strong>
                 <p style={{ color: "#64748b", fontSize: 14 }}>
-                  Carica il modello Excel con le colonne AGENZIA, EMAIL e ALLEGATO.
+                  Puoi importare un Excel oppure usare l'elenco già salvato online.
                 </p>
                 <input type="file" accept=".xlsx,.xls" onChange={(e) => importExcel(e.target.files?.[0])} />
-                <div style={{ marginTop: 10, fontWeight: 700 }}>{agents.length} destinatari caricati</div>
+                <div style={{ marginTop: 10, fontWeight: 700 }}>{agents.length} destinatari presenti</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                  <button
+                    onClick={() => void saveRecipients()}
+                    disabled={syncBusy}
+                    style={{ ...button, background: "#16a34a", color: "white", opacity: syncBusy ? 0.6 : 1 }}
+                  >
+                    {syncBusy ? "Sincronizzo..." : "Salva elenco online"}
+                  </button>
+                  <button
+                    onClick={() => void loadSavedRecipients(true)}
+                    disabled={syncBusy}
+                    style={{ ...button, background: "#e2e8f0", opacity: syncBusy ? 0.6 : 1 }}
+                  >
+                    Ricarica elenco
+                  </button>
+                </div>
               </div>
 
               <div style={card}>
                 <strong>2. Allegati</strong>
                 <p style={{ color: "#64748b", fontSize: 14 }}>
-                  Seleziona contemporaneamente tutti i file destinati agli agenti.
+                  Seleziona contemporaneamente tutti i file destinati agli agenti. Gli allegati non vengono salvati online.
                 </p>
                 <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-                <div style={{ marginTop: 10, fontWeight: 700 }}>{files.length} file caricati</div>
+                <div style={{ marginTop: 10, fontWeight: 700 }}>{files.length} file caricati su questo dispositivo</div>
               </div>
             </div>
 
@@ -530,18 +672,15 @@ export default function OutlookEmail() {
                           ? `✓ ${row.file.name}`
                           : !row.email
                             ? "Email mancante"
-                            : "Allegato non trovato"}
+                            : files.length
+                              ? "Allegato non trovato"
+                              : "Allegati non caricati"}
                       </td>
                       {editingRecipients && (
                         <td style={{ padding: 8 }}>
                           <button
                             onClick={() => deleteAgent(index)}
-                            style={{
-                              ...button,
-                              background: "#fee2e2",
-                              color: "#991b1b",
-                              padding: "7px 10px",
-                            }}
+                            style={{ ...button, background: "#fee2e2", color: "#991b1b", padding: "7px 10px" }}
                           >
                             Elimina
                           </button>
@@ -555,7 +694,7 @@ export default function OutlookEmail() {
                         colSpan={editingRecipients ? 5 : 4}
                         style={{ padding: 16, textAlign: "center", color: "#64748b" }}
                       >
-                        Nessun nominativo presente. Premi Modifica e poi Aggiungi nominativo, oppure carica l'Excel.
+                        Nessun nominativo presente. Importa l'Excel oppure premi Modifica e aggiungi un nominativo.
                       </td>
                     </tr>
                   )}
@@ -569,7 +708,7 @@ export default function OutlookEmail() {
               </div>
             )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30, flexWrap: "wrap" }}>
               <button
                 onClick={() => {
                   setSubject("");
