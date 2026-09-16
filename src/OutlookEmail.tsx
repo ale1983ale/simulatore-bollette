@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
 
@@ -95,6 +96,7 @@ function downloadBlob(blob: Blob, fileName: string) {
 
 export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [subject, setSubject] = useState("");
@@ -104,9 +106,57 @@ export default function OutlookEmail() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
-  const canUseModule = Boolean(
-    localStorage.getItem("admin_session") || localStorage.getItem("admin_profile")
-  );
+  useEffect(() => {
+    let host: HTMLElement | null = null;
+
+    const placeInAdminToolbar = () => {
+      const reportAdminButton = Array.from(document.querySelectorAll("button")).find(
+        (node) =>
+          node.textContent?.trim() === "Report Admin" &&
+          (node as HTMLElement).offsetParent !== null
+      ) as HTMLElement | undefined;
+
+      if (!reportAdminButton?.parentElement) {
+        if (host?.isConnected) host.remove();
+        host = null;
+        setPortalHost(null);
+        setOpen(false);
+        return;
+      }
+
+      if (!host || !host.isConnected) {
+        host = document.createElement("span");
+        host.setAttribute("data-outlook-email-admin-slot", "true");
+        host.style.display = "contents";
+      }
+
+      if (
+        host.parentElement !== reportAdminButton.parentElement ||
+        host.nextSibling !== reportAdminButton
+      ) {
+        reportAdminButton.parentElement.insertBefore(host, reportAdminButton);
+      }
+
+      setPortalHost(host);
+    };
+
+    placeInAdminToolbar();
+
+    const observer = new MutationObserver(placeInAdminToolbar);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    const timer = window.setInterval(placeInAdminToolbar, 750);
+
+    return () => {
+      observer.disconnect();
+      window.clearInterval(timer);
+      if (host?.isConnected) host.remove();
+    };
+  }, []);
 
   const fileMap = useMemo(() => {
     const map = new Map<string, File>();
@@ -248,25 +298,23 @@ export default function OutlookEmail() {
     cursor: "pointer",
   };
 
-  if (!canUseModule) return null;
-
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          position: "fixed",
-          right: 18,
-          bottom: 18,
-          zIndex: 9998,
-          ...button,
-          background: "#2563eb",
-          color: "white",
-          boxShadow: "0 8px 25px rgba(37,99,235,.35)",
-        }}
-      >
-        ✉️ Invio Email
-      </button>
+      {portalHost &&
+        createPortal(
+          <button
+            onClick={() => setOpen(true)}
+            style={{
+              ...button,
+              background: "#2563eb",
+              color: "white",
+              marginRight: 8,
+            }}
+          >
+            ✉️ Invio Email
+          </button>,
+          portalHost
+        )}
 
       {open && (
         <div
