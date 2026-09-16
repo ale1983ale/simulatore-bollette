@@ -1,10 +1,7 @@
 import { useEffect, useRef } from "react";
 import JSZip from "jszip";
 
-type Recipient = {
-  agency: string;
-  email: string;
-};
+type Recipient = { agency: string; email: string };
 
 const bytesToBase64 = (bytes: Uint8Array) => {
   let binary = "";
@@ -44,7 +41,6 @@ function downloadBlob(blob: Blob, fileName: string) {
 
 async function buildEml(recipient: Recipient, subject: string, body: string, files: File[]) {
   const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const bodyBase64 = wrapBase64(utf8ToBase64(body));
   const parts: string[] = [
     "X-Unsent: 1",
     `To: ${recipient.email}`,
@@ -57,13 +53,12 @@ async function buildEml(recipient: Recipient, subject: string, body: string, fil
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
-    bodyBase64,
+    wrapBase64(utf8ToBase64(body)),
     "",
   ];
 
   for (const file of files) {
-    const attachmentBytes = new Uint8Array(await file.arrayBuffer());
-    const attachmentBase64 = wrapBase64(bytesToBase64(attachmentBytes));
+    const bytes = new Uint8Array(await file.arrayBuffer());
     const encodedName = encodeRfc5987(file.name);
     parts.push(
       `--${boundary}`,
@@ -71,7 +66,7 @@ async function buildEml(recipient: Recipient, subject: string, body: string, fil
       "Content-Transfer-Encoding: base64",
       `Content-Disposition: attachment; filename*=UTF-8''${encodedName}`,
       "",
-      attachmentBase64,
+      wrapBase64(bytesToBase64(bytes)),
       ""
     );
   }
@@ -80,10 +75,24 @@ async function buildEml(recipient: Recipient, subject: string, body: string, fil
   return parts.join("\r\n");
 }
 
+function findFileArea() {
+  const separateButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
+    (button) => button.textContent?.trim() === "File già separati" && button.offsetParent !== null
+  );
+  if (!separateButton?.parentElement?.parentElement) return null;
+  const row = separateButton.parentElement;
+  const card = row.parentElement;
+  const singleButton = Array.from(row.querySelectorAll<HTMLButtonElement>("button")).find(
+    (button) => button.textContent?.trim() === "File unico (consigliato)"
+  );
+  if (!singleButton) return null;
+  return { row, card, singleButton, separateButton };
+}
+
 function findEmailTable() {
   return Array.from(document.querySelectorAll<HTMLTableElement>("table")).find((table) =>
-    Array.from(table.querySelectorAll("thead th")).some((cell) =>
-      (cell.textContent || "").includes("File associato / Stato")
+    Array.from(table.querySelectorAll("thead th")).some((th) =>
+      (th.textContent || "").includes("File associato / Stato")
     )
   );
 }
@@ -92,8 +101,8 @@ function readRecipients(): Recipient[] {
   const table = findEmailTable();
   if (!table) return [];
   const headers = Array.from(table.querySelectorAll<HTMLTableCellElement>("thead th"));
-  const agencyIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Agenzia");
-  const emailIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Email");
+  const agencyIndex = headers.findIndex((th) => (th.textContent || "").trim() === "Agenzia");
+  const emailIndex = headers.findIndex((th) => (th.textContent || "").trim() === "Email");
   if (agencyIndex < 0 || emailIndex < 0) return [];
 
   return Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr"))
@@ -114,325 +123,231 @@ function readMessage() {
     (node) => (node.textContent || "").trim() === "3. Messaggio"
   );
   const card = title?.parentElement;
-  if (!card) return { subject: "", body: "" };
-  const subject = card.querySelector<HTMLInputElement>('input:not([type="file"])')?.value || "";
-  const body = card.querySelector<HTMLTextAreaElement>("textarea")?.value || "";
-  return { subject: subject.trim(), body };
-}
-
-function findFileCardAndButtons() {
-  const separateButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
-    (button) => button.textContent?.trim() === "File già separati" && button.offsetParent !== null
-  );
-  if (!separateButton?.parentElement?.parentElement) return null;
-  const row = separateButton.parentElement;
-  const card = row.parentElement;
-  const singleButton = Array.from(row.querySelectorAll<HTMLButtonElement>("button")).find(
-    (button) => button.textContent?.trim() === "File unico (consigliato)"
-  );
-  if (!singleButton) return null;
-  return { card, row, singleButton, separateButton };
+  return {
+    subject: card?.querySelector<HTMLInputElement>('input:not([type="file"])')?.value.trim() || "",
+    body: card?.querySelector<HTMLTextAreaElement>("textarea")?.value || "",
+  };
 }
 
 export default function OutlookEmailCommonFiles() {
   const activeRef = useRef(false);
-  const commonFilesRef = useRef<File[]>([]);
-  const buildingRef = useRef(false);
+  const filesRef = useRef<File[]>([]);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     let timer = 0;
-    let observer: MutationObserver | null = null;
 
-    const restoreOriginalControls = () => {
-      const found = findFileCardAndButtons();
+    const restoreOriginal = () => {
+      const found = findFileArea();
       if (!found) return;
       Array.from(found.card.children).forEach((child) => {
-        const element = child as HTMLElement;
-        if (element.dataset.commonOriginalDisplay !== undefined) {
-          element.style.display = element.dataset.commonOriginalDisplay;
-          delete element.dataset.commonOriginalDisplay;
+        const el = child as HTMLElement;
+        if (el.dataset.commonHidden === "true") {
+          el.style.display = el.dataset.commonDisplay || "";
+          delete el.dataset.commonHidden;
+          delete el.dataset.commonDisplay;
         }
       });
     };
 
-    const setOriginalControlsHidden = (hidden: boolean) => {
-      const found = findFileCardAndButtons();
+    const hideOriginal = () => {
+      const found = findFileArea();
       if (!found) return;
-      let afterModeRow = false;
+      let afterButtons = false;
       Array.from(found.card.children).forEach((child) => {
         if (child === found.row) {
-          afterModeRow = true;
+          afterButtons = true;
           return;
         }
-        if (!afterModeRow) return;
-        const element = child as HTMLElement;
-        if (element.dataset.commonFilesPanel === "true") return;
-        if (hidden) {
-          if (element.dataset.commonOriginalDisplay === undefined) {
-            element.dataset.commonOriginalDisplay = element.style.display || "";
-          }
-          element.style.display = "none";
-        } else if (element.dataset.commonOriginalDisplay !== undefined) {
-          element.style.display = element.dataset.commonOriginalDisplay;
-          delete element.dataset.commonOriginalDisplay;
+        if (!afterButtons) return;
+        const el = child as HTMLElement;
+        if (el.dataset.commonPanel === "true") return;
+        if (el.dataset.commonHidden !== "true") {
+          el.dataset.commonHidden = "true";
+          el.dataset.commonDisplay = el.style.display || "";
+          el.style.display = "none";
         }
       });
     };
 
-    const updatePanel = () => {
-      const panel = document.querySelector<HTMLElement>('[data-common-files-panel="true"]');
+    const refreshPanel = () => {
+      if (!activeRef.current) return;
+      const panel = document.querySelector<HTMLElement>('[data-common-panel="true"]');
       if (!panel) return;
-      const details = panel.querySelector<HTMLElement>('[data-common-files-details="true"]');
-      if (!details) return;
-      const files = commonFilesRef.current;
-      details.textContent = files.length
-        ? `${files.length} file caricati: ${files.map((file) => file.name).join(", ")}`
-        : "Nessun file caricato";
-    };
-
-    const ensurePanel = () => {
-      const found = findFileCardAndButtons();
-      if (!found) return null;
-      let panel = found.card.querySelector<HTMLElement>('[data-common-files-panel="true"]');
-      if (panel) return panel;
-
-      panel = document.createElement("div");
-      panel.dataset.commonFilesPanel = "true";
-      panel.style.marginTop = "4px";
-      panel.style.padding = "12px";
-      panel.style.border = "1px solid #bfdbfe";
-      panel.style.borderRadius = "10px";
-      panel.style.background = "#eff6ff";
-
-      const text = document.createElement("p");
-      text.style.margin = "0 0 10px";
-      text.style.color = "#475569";
-      text.style.fontSize = "14px";
-      text.textContent = "Carica uno o più file: gli stessi allegati verranno inseriti nella mail di tutti i nominativi con un indirizzo email.";
-
-      const input = document.createElement("input");
-      input.type = "file";
-      input.multiple = true;
-      input.dataset.commonFilesInput = "true";
-      input.addEventListener("change", () => {
-        commonFilesRef.current = Array.from(input.files || []);
-        updatePanel();
-        ensureUi();
-      });
-
-      const details = document.createElement("div");
-      details.dataset.commonFilesDetails = "true";
-      details.style.marginTop = "9px";
-      details.style.fontWeight = "700";
-      details.style.fontSize = "13px";
-
-      panel.append(text, input, details);
-      found.row.insertAdjacentElement("afterend", panel);
-      updatePanel();
-      return panel;
-    };
-
-    const updateCommonTable = () => {
-      if (!activeRef.current) return;
-      const table = findEmailTable();
-      if (!table) return;
-      const headers = Array.from(table.querySelectorAll<HTMLTableCellElement>("thead th"));
-      const statusIndex = headers.findIndex((cell) =>
-        (cell.textContent || "").includes("File associato / Stato")
-      );
-      const emailIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Email");
-      if (statusIndex < 0 || emailIndex < 0) return;
-
-      const attachmentCount = commonFilesRef.current.length;
-      Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr")).forEach((row) => {
-        const cells = Array.from(row.querySelectorAll<HTMLTableCellElement>("td"));
-        if (cells.length <= Math.max(statusIndex, emailIndex)) return;
-        const emailInput = cells[emailIndex]?.querySelector<HTMLInputElement>("input");
-        const email = (emailInput?.value || cells[emailIndex]?.textContent || "").trim();
-        const statusCell = cells[statusIndex];
-        statusCell.style.fontWeight = "700";
-        statusCell.style.whiteSpace = "nowrap";
-        if (!email) {
-          statusCell.textContent = "Email mancante — non inviata";
-          statusCell.style.color = "#b91c1c";
-        } else if (attachmentCount) {
-          statusCell.textContent = `✓ ${attachmentCount} ${attachmentCount === 1 ? "file comune" : "file comuni"}`;
-          statusCell.style.color = "#15803d";
-        } else {
-          statusCell.textContent = "Carica almeno un file comune";
-          statusCell.style.color = "#64748b";
-        }
-      });
-
-      const controlTitle = Array.from(document.querySelectorAll("strong")).find(
-        (node) => (node.textContent || "").trim() === "4. Controllo abbinamenti"
-      );
-      const info = Array.from(controlTitle?.parentElement?.children || []).find(
-        (node) => node.tagName === "DIV"
-      ) as HTMLElement | undefined;
-      if (info) {
-        const recipients = readRecipients().length;
-        info.textContent = attachmentCount
-          ? `${recipients} email pronte. Gli stessi ${attachmentCount} ${attachmentCount === 1 ? "file verranno allegati" : "file verranno allegati"} a tutti.`
-          : `${recipients} destinatari disponibili. Carica almeno un file da inviare a tutti.`;
-      }
-    };
-
-    const updateDownloadButton = () => {
-      if (!activeRef.current) return;
-      const button = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
-        (node) => (node.textContent || "").includes("bozze Outlook")
-      );
-      if (!button) return;
-      const recipients = readRecipients().length;
-      const ready = commonFilesRef.current.length > 0 && recipients > 0 && !buildingRef.current;
-      button.disabled = !ready;
-      button.style.opacity = ready ? "1" : "0.55";
-      button.textContent = buildingRef.current
-        ? "Creo il pacchetto..."
-        : `Scarica ${recipients || ""} bozze Outlook (.zip)`;
-    };
-
-    const deactivateCommonMode = () => {
-      if (!activeRef.current) return;
-      activeRef.current = false;
-      commonFilesRef.current = [];
-      restoreOriginalControls();
-      const panel = document.querySelector<HTMLElement>('[data-common-files-panel="true"]');
-      if (panel) panel.style.display = "none";
-    };
-
-    const ensureModeButtons = () => {
-      const found = findFileCardAndButtons();
-      if (!found) return;
-
-      if (!found.singleButton.dataset.commonExitBound) {
-        found.singleButton.dataset.commonExitBound = "true";
-        found.singleButton.addEventListener("click", deactivateCommonMode);
-      }
-      if (!found.separateButton.dataset.commonExitBound) {
-        found.separateButton.dataset.commonExitBound = "true";
-        found.separateButton.addEventListener("click", deactivateCommonMode);
-      }
-
-      let commonButton = found.row.querySelector<HTMLButtonElement>('[data-common-files-mode="true"]');
-      if (!commonButton) {
-        commonButton = document.createElement("button");
-        commonButton.type = "button";
-        commonButton.dataset.commonFilesMode = "true";
-        commonButton.textContent = "Stesso file per tutti";
-        commonButton.style.border = "0";
-        commonButton.style.borderRadius = "10px";
-        commonButton.style.padding = "10px 14px";
-        commonButton.style.fontWeight = "700";
-        commonButton.style.cursor = "pointer";
-        commonButton.addEventListener("click", () => {
-          activeRef.current = true;
-          const panel = ensurePanel();
-          if (panel) panel.style.display = "block";
-          setOriginalControlsHidden(true);
-          ensureUi();
-        });
-        found.row.appendChild(commonButton);
-      }
-
-      if (activeRef.current) {
-        found.singleButton.style.background = "#e2e8f0";
-        found.singleButton.style.color = "#0f172a";
-        found.separateButton.style.background = "#e2e8f0";
-        found.separateButton.style.color = "#0f172a";
-        commonButton.style.background = "#2563eb";
-        commonButton.style.color = "white";
-        const panel = ensurePanel();
-        if (panel) panel.style.display = "block";
-        setOriginalControlsHidden(true);
-      } else {
-        commonButton.style.background = "#e2e8f0";
-        commonButton.style.color = "#0f172a";
-      }
-    };
-
-    const ensureUi = () => {
-      ensureModeButtons();
-      if (!activeRef.current) return;
-      updatePanel();
-      updateCommonTable();
-      updateDownloadButton();
-    };
-
-    const createCommonDrafts = async () => {
-      if (buildingRef.current) return;
-      const files = commonFilesRef.current;
+      const details = panel.querySelector<HTMLElement>('[data-common-details="true"]');
+      const download = panel.querySelector<HTMLButtonElement>('[data-common-download="true"]');
       const recipients = readRecipients();
-      const { subject, body } = readMessage();
+      const fileCount = filesRef.current.length;
+      const detailsText = fileCount
+        ? `${fileCount} ${fileCount === 1 ? "file caricato" : "file caricati"}: ${filesRef.current.map((file) => file.name).join(", ")}. Destinatari: ${recipients.length}.`
+        : `Nessun file caricato. Destinatari disponibili: ${recipients.length}.`;
+      if (details && details.textContent !== detailsText) details.textContent = detailsText;
+      if (download) {
+        const enabled = fileCount > 0 && recipients.length > 0 && !busyRef.current;
+        download.disabled = !enabled;
+        download.style.opacity = enabled ? "1" : "0.55";
+        const label = busyRef.current ? "Creo il pacchetto..." : `Scarica ${recipients.length || ""} bozze Outlook (.zip)`;
+        if (download.textContent !== label) download.textContent = label;
+      }
+    };
 
+    const createDrafts = async () => {
+      if (busyRef.current) return;
+      const recipients = readRecipients();
+      const files = filesRef.current;
+      const { subject, body } = readMessage();
       if (!files.length) return window.alert("Carica almeno un file da inviare a tutti.");
-      if (!recipients.length) return window.alert("Non trovo destinatari con un indirizzo email.");
+      if (!recipients.length) return window.alert("Non trovo destinatari con email.");
       if (!subject) return window.alert("Inserisci l'oggetto della mail.");
 
-      buildingRef.current = true;
-      ensureUi();
+      busyRef.current = true;
+      refreshPanel();
       try {
         const zip = new JSZip();
-        const usedNames = new Set<string>();
-        for (let index = 0; index < recipients.length; index += 1) {
-          const recipient = recipients[index];
+        const used = new Set<string>();
+        for (let i = 0; i < recipients.length; i += 1) {
+          const recipient = recipients[i];
           const eml = await buildEml(recipient, subject, body, files);
-          const baseName = sanitizeFileName(recipient.agency || `email-${index + 1}`);
-          let fileName = `${baseName}.eml`;
-          let suffix = 2;
-          while (usedNames.has(fileName.toLowerCase())) fileName = `${baseName}-${suffix++}.eml`;
-          usedNames.add(fileName.toLowerCase());
-          zip.file(fileName, eml);
+          const base = sanitizeFileName(recipient.agency || `email-${i + 1}`);
+          let name = `${base}.eml`;
+          let n = 2;
+          while (used.has(name.toLowerCase())) name = `${base}-${n++}.eml`;
+          used.add(name.toLowerCase());
+          zip.file(name, eml);
         }
-        zip.file(
-          "LEGGIMI.txt",
-          [
-            "BOZZE EMAIL PER OUTLOOK - STESSI FILE PER TUTTI",
-            "",
-            `Destinatari: ${recipients.length}`,
-            `Allegati per ogni destinatario: ${files.length}`,
-            ...files.map((file) => `- ${file.name}`),
-            "",
-            "Apri ciascun .eml, controlla il contenuto e premi Invia manualmente.",
-            "Nessuna mail è stata inviata automaticamente.",
-          ].join("\r\n")
-        );
+        zip.file("LEGGIMI.txt", `Bozze create: ${recipients.length}\r\nAllegati uguali per tutti: ${files.length}\r\nNessuna mail è stata inviata automaticamente.`);
         const blob = await zip.generateAsync({ type: "blob" });
         downloadBlob(blob, `BOZZE_EMAIL_STESSI_FILE_${new Date().toISOString().slice(0, 10)}.zip`);
       } catch (error: any) {
         window.alert(`Errore nella creazione delle bozze: ${error?.message || error}`);
       } finally {
-        buildingRef.current = false;
-        ensureUi();
+        busyRef.current = false;
+        refreshPanel();
       }
     };
 
-    const onClickCapture = (event: MouseEvent) => {
-      if (!activeRef.current) return;
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const button = target.closest("button");
-      if (!button || !(button.textContent || "").includes("bozze Outlook")) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      void createCommonDrafts();
+    const ensurePanel = () => {
+      const found = findFileArea();
+      if (!found) return null;
+      let panel = found.card.querySelector<HTMLElement>('[data-common-panel="true"]');
+      if (!panel) {
+        panel = document.createElement("div");
+        panel.dataset.commonPanel = "true";
+        panel.style.marginTop = "8px";
+        panel.style.padding = "14px";
+        panel.style.border = "1px solid #bfdbfe";
+        panel.style.borderRadius = "10px";
+        panel.style.background = "#eff6ff";
+
+        const text = document.createElement("div");
+        text.textContent = "Carica uno o più file: gli stessi allegati saranno inseriti nella mail di tutti i nominativi con email.";
+        text.style.color = "#475569";
+        text.style.fontSize = "14px";
+        text.style.marginBottom = "10px";
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true;
+        input.addEventListener("change", () => {
+          filesRef.current = Array.from(input.files || []);
+          refreshPanel();
+        });
+
+        const details = document.createElement("div");
+        details.dataset.commonDetails = "true";
+        details.style.marginTop = "10px";
+        details.style.fontWeight = "700";
+        details.style.fontSize = "13px";
+
+        const download = document.createElement("button");
+        download.type = "button";
+        download.dataset.commonDownload = "true";
+        download.style.marginTop = "12px";
+        download.style.border = "0";
+        download.style.borderRadius = "10px";
+        download.style.padding = "10px 14px";
+        download.style.fontWeight = "700";
+        download.style.cursor = "pointer";
+        download.style.background = "#16a34a";
+        download.style.color = "white";
+        download.addEventListener("click", () => void createDrafts());
+
+        const note = document.createElement("div");
+        note.textContent = "In questa modalità la colonna di abbinamento individuale viene ignorata: gli stessi file vanno a tutti.";
+        note.style.marginTop = "8px";
+        note.style.fontSize = "12px";
+        note.style.color = "#64748b";
+
+        panel.append(text, input, details, download, note);
+        found.row.insertAdjacentElement("afterend", panel);
+      }
+      return panel;
     };
 
-    document.addEventListener("click", onClickCapture, true);
-    observer = new MutationObserver(() => ensureUi());
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    timer = window.setInterval(ensureUi, 500);
+    const deactivate = () => {
+      if (!activeRef.current) return;
+      activeRef.current = false;
+      filesRef.current = [];
+      restoreOriginal();
+      const panel = document.querySelector<HTMLElement>('[data-common-panel="true"]');
+      if (panel) panel.style.display = "none";
+    };
+
+    const ensureUi = () => {
+      const found = findFileArea();
+      if (!found) return;
+
+      if (!found.singleButton.dataset.commonSafeExit) {
+        found.singleButton.dataset.commonSafeExit = "true";
+        found.singleButton.addEventListener("click", deactivate);
+      }
+      if (!found.separateButton.dataset.commonSafeExit) {
+        found.separateButton.dataset.commonSafeExit = "true";
+        found.separateButton.addEventListener("click", deactivate);
+      }
+
+      let common = found.row.querySelector<HTMLButtonElement>('[data-common-safe-mode="true"]');
+      if (!common) {
+        common = document.createElement("button");
+        common.type = "button";
+        common.dataset.commonSafeMode = "true";
+        common.textContent = "Stesso file per tutti";
+        common.style.border = "0";
+        common.style.borderRadius = "10px";
+        common.style.padding = "10px 14px";
+        common.style.fontWeight = "700";
+        common.style.cursor = "pointer";
+        common.addEventListener("click", () => {
+          activeRef.current = true;
+          hideOriginal();
+          const panel = ensurePanel();
+          if (panel) panel.style.display = "block";
+          refreshPanel();
+        });
+        found.row.appendChild(common);
+      }
+
+      if (activeRef.current) {
+        common.style.background = "#2563eb";
+        common.style.color = "white";
+        hideOriginal();
+        const panel = ensurePanel();
+        if (panel && panel.style.display !== "block") panel.style.display = "block";
+        refreshPanel();
+      } else {
+        common.style.background = "#e2e8f0";
+        common.style.color = "#0f172a";
+      }
+    };
+
     ensureUi();
+    timer = window.setInterval(ensureUi, 700);
 
     return () => {
-      document.removeEventListener("click", onClickCapture, true);
-      observer?.disconnect();
       window.clearInterval(timer);
-      restoreOriginalControls();
-      document.querySelector('[data-common-files-mode="true"]')?.remove();
-      document.querySelector('[data-common-files-panel="true"]')?.remove();
+      restoreOriginal();
+      document.querySelector('[data-common-safe-mode="true"]')?.remove();
+      document.querySelector('[data-common-panel="true"]')?.remove();
     };
   }, []);
 
