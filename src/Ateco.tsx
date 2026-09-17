@@ -167,7 +167,7 @@ function StatusBox({ label, card, color }: { label: string; card: TaxCard; color
         : "#eff6ff";
   const border = !active ? "#cbd5e1" : color === "orange" ? "#fb923c" : "#60a5fa";
   const accent = !active ? "#64748b" : color === "orange" ? "#c2410c" : "#1d4ed8";
-  const answer = card.status === "yes" ? "SI" : card.status === "no" ? "NO" : "DA VERIFICARE";
+  const answer = card.status === "no" ? "NO" : "SI";
 
   return (
     <div
@@ -195,7 +195,7 @@ function StatusBox({ label, card, color }: { label: string; card: TaxCard; color
         <div style={{ fontWeight: 900, color: "#0f172a" }}>ESITO</div>
         <div
           style={{
-            minWidth: card.status === "conditional" ? 124 : 54,
+            minWidth: 54,
             textAlign: "center",
             padding: "6px 12px",
             borderRadius: 999,

@@ -1,0 +1,48 @@
+name: Patch ATECO conditional as SI
+
+on:
+  push:
+    branches: [feature/ateco-si-no]
+    paths:
+      - '.github/workflows/patch-ateco-conditional-si.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/ateco-si-no
+      - name: Patch ATECO result badge
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/Ateco.tsx')
+          text = p.read_text()
+          old = '  const answer = card.status === "yes" ? "SI" : card.status === "no" ? "NO" : "DA VERIFICARE";'
+          new = '  const answer = card.status === "no" ? "NO" : "SI";'
+          if old not in text:
+              raise SystemExit('answer line not found')
+          text = text.replace(old, new, 1)
+          old2 = '            minWidth: card.status === "conditional" ? 124 : 54,'
+          new2 = '            minWidth: 54,'
+          if old2 in text:
+              text = text.replace(old2, new2, 1)
+          p.write_text(text)
+          PY
+      - name: Build
+        run: |
+          npm install
+          npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Ateco.tsx
+          git commit -m "Show SI for eligible conditional ATECO tax cases"
+          git push origin feature/ateco-si-no
