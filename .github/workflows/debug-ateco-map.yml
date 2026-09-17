@@ -1,0 +1,35 @@
+name: Debug ATECO mapping workbook
+
+on:
+  push:
+    branches: [feature/ateco-lookup-v2]
+    paths:
+      - '.github/workflows/debug-ateco-map.yml'
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ateco-lookup-v2
+      - run: pip install openpyxl requests
+      - name: Inspect official ISTAT operational table
+        run: |
+          python - <<'PY'
+          import requests
+          from pathlib import Path
+          from openpyxl import load_workbook
+
+          url='https://www.istat.it/wp-content/uploads/2026/07/Aggiornamento-2026-Tabella-operativa-riclassificazione-ATECO-2022-ATECO-2025.xlsx'
+          p=Path('/tmp/op.xlsx')
+          r=requests.get(url,timeout=90); r.raise_for_status(); p.write_bytes(r.content)
+          wb=load_workbook(p,read_only=True,data_only=True)
+          print('SHEETS',wb.sheetnames)
+          for ws in wb.worksheets:
+            print('\nSHEET',ws.title,'rows',ws.max_row,'cols',ws.max_column)
+            for idx,row in enumerate(ws.iter_rows(values_only=True)):
+              if idx>=15: break
+              print(idx+1,row)
+          PY
