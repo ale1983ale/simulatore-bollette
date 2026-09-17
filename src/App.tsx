@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { supabase } from "./supabase";
+import Ateco from "./Ateco";
 
 
 type MonthlyRow = {
@@ -6144,20 +6145,7 @@ if (!agentSession && !adminSession) {
 ) : tab === "report" ? (
   <ReportAgent agentSession={agentSession} />
         ) : tab === "ateco" ? (
-          <div
-            style={{
-              background: "white",
-              padding: 24,
-              borderRadius: 16,
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-            }}
-          >
-            <h2 style={{ marginTop: 0, marginBottom: 12 }}>ATECO</h2>
-            <div style={{ color: "#64748b" }}>
-              Sezione ATECO pronta per le prossime funzioni.
-            </div>
-          </div>
+          <Ateco />
         ) : tab === "punpsvPublic" ? (
           <div
             style={{
