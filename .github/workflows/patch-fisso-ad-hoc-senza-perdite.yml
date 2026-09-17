@@ -1,0 +1,49 @@
+name: Patch fixed price label
+
+on:
+  push:
+    branches:
+      - fix/fisso-ad-hoc-senza-perdite
+    paths:
+      - "scripts/patch-fisso-ad-hoc-senza-perdite.mjs"
+      - ".github/workflows/patch-fisso-ad-hoc-senza-perdite.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: fix/fisso-ad-hoc-senza-perdite
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Apply patch
+        run: node scripts/patch-fisso-ad-hoc-senza-perdite.mjs
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit patched App.tsx
+        shell: bash
+        run: |
+          if git diff --quiet -- src/App.tsx; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git commit -m "Rename fixed price field label"
+          git push
