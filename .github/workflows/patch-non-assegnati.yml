@@ -26,7 +26,7 @@ jobs:
 
       - name: Validate build
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Commit patched files and remove one-time patch
