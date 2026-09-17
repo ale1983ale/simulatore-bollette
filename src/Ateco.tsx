@@ -150,7 +150,7 @@ function gasExciseEligibility(code: string): TaxCard {
     status: "conditional",
     title: "POSSIBILE USO NON DOMESTICO",
     detail:
-      "Dal 2026 l'accisa gas dipende dall'uso e dai locali. Le attività produttive possono applicare l'aliquota per usi non domestici. Per utilizzatori industriali oltre 1.200.000 mc/anno può inoltre operare la riduzione del 40%, se ricorrono i requisiti.",
+      "Dal 2026 l'accisa gas dipende dall'uso e dai locali. Le attività produttive possono rientrare negli usi non domestici, ma la qualificazione dipende dall'uso effettivo e dai locali serviti, non dal solo codice ATECO.",
   };
 }
 
