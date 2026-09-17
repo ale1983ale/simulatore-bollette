@@ -39,7 +39,7 @@ jobs:
 
       - name: Build
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Commit change
