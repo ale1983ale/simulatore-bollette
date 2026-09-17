@@ -1,0 +1,108 @@
+name: Fix ATECO operational mapping
+
+on:
+  push:
+    branches: [feature/ateco-lookup-v2]
+    paths:
+      - '.github/workflows/fix-ateco-operational-map.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/ateco-lookup-v2
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: pip install openpyxl requests
+
+      - name: Generate official operational ATECO mapping
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import requests
+          from openpyxl import load_workbook
+
+          url = 'https://www.istat.it/wp-content/uploads/2026/07/Aggiornamento-2026-Tabella-operativa-riclassificazione-ATECO-2022-ATECO-2025.xlsx'
+          p = Path('/tmp/ateco-operational.xlsx')
+          r = requests.get(url, timeout=90)
+          r.raise_for_status()
+          p.write_bytes(r.content)
+
+          wb = load_workbook(p, read_only=True, data_only=True)
+          ws = wb['Tabella operativa']
+          rows = ws.iter_rows(values_only=True)
+          header = next(rows)
+          idx = {str(v).strip(): i for i, v in enumerate(header) if v is not None}
+
+          required = [
+              'CODICE_ATECO_2022',
+              'TITOLO_ATECO_2022',
+              'CODICE_ATECO_2025_RAPPRESENTATIVO',
+              'TITOLO_ATECO_2025_RAPPRESENTATIVO',
+          ]
+          missing = [x for x in required if x not in idx]
+          if missing:
+              raise SystemExit(f'Missing columns: {missing}')
+
+          out = []
+          seen = set()
+          for row in rows:
+              old = str(row[idx['CODICE_ATECO_2022']] or '').strip()
+              old_title = str(row[idx['TITOLO_ATECO_2022']] or '').strip()
+              new = str(row[idx['CODICE_ATECO_2025_RAPPRESENTATIVO']] or '').strip()
+              new_title = str(row[idx['TITOLO_ATECO_2025_RAPPRESENTATIVO']] or '').strip()
+              if not old or not new or new.lower() == 'n.d.':
+                  continue
+              if old in seen:
+                  continue
+              seen.add(old)
+              out.append({
+                  'oldCode': old,
+                  'oldTitle': old_title,
+                  'newCodes': [new],
+                  'newTitle': new_title,
+              })
+
+          if len(out) < 3000:
+              raise SystemExit(f'Operational mapping unexpectedly short: {len(out)}')
+
+          dest = Path('public/data/ateco-map-2022-2025.json')
+          dest.parent.mkdir(parents=True, exist_ok=True)
+          dest.write_text(json.dumps(out, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+          print('Operational mapping rows:', len(out))
+          PY
+
+      - name: Remove outdated gas excise sentence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/Ateco.tsx')
+          text = p.read_text()
+          old = ' Le attività produttive possono applicare l\'aliquota per usi non domestici. Per utilizzatori industriali oltre 1.200.000 mc/anno può inoltre operare la riduzione del 40%, se ricorrono i requisiti.'
+          new = ' Le attività produttive possono rientrare negli usi non domestici, ma la qualificazione dipende dall\'uso effettivo e dai locali serviti, non dal solo codice ATECO.'
+          if old in text:
+              text = text.replace(old, new, 1)
+          p.write_text(text)
+          PY
+
+      - name: Build
+        run: |
+          npm install
+          npm run build
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/ateco-map-2022-2025.json src/Ateco.tsx
+          git commit -m "Use official 2026 ATECO operational recodification table"
+          git push origin feature/ateco-lookup-v2

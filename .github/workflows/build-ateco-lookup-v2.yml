@@ -1,0 +1,165 @@
+name: Build ATECO lookup v2
+
+on:
+  push:
+    branches: [feature/ateco-lookup-v2]
+    paths:
+      - '.github/workflows/build-ateco-lookup-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-feature:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/ateco-lookup-v2
+          fetch-depth: 0
+
+      - name: Fetch source helper branch
+        run: git fetch origin feature/ateco-tab:refs/remotes/origin/feature/ateco-tab
+
+      - name: Copy ATECO component
+        run: git show origin/feature/ateco-tab:src/Ateco.tsx > src/Ateco.tsx
+
+      - name: Install Python dependencies
+        run: pip install openpyxl requests
+
+      - name: Generate official ATECO data
+        run: |
+          python - <<'PY'
+          import csv, io, json, re
+          from pathlib import Path
+          import requests
+          from openpyxl import load_workbook
+
+          out_dir = Path('public/data')
+          out_dir.mkdir(parents=True, exist_ok=True)
+
+          csv_url = 'https://raw.githubusercontent.com/istat/ndc-ontologie-vocabolari-controllati/main/assets/controlled-vocabularies/economy/ateco-2025/ateco-2025.csv'
+          r = requests.get(csv_url, timeout=60)
+          r.raise_for_status()
+          reader = csv.DictReader(io.StringIO(r.content.decode('utf-8-sig')), delimiter=';')
+          ateco = []
+          for row in reader:
+            code = (row.get('CODICE ATECO 2025') or '').strip()
+            title = (row.get('PREFLABEL_IT') or '').strip()
+            if code and title:
+              ateco.append({'code': code, 'title': title})
+          (out_dir / 'ateco2025.json').write_text(json.dumps(ateco, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+
+          xlsx_url = 'https://www.istat.it/wp-content/uploads/2026/07/Aggiornamento-2026-Tavola-raccordo-bidirezionale-ATECO-2025-ATECO-2022-italiano.xlsx'
+          xlsx_path = Path('/tmp/ateco-map.xlsx')
+          r = requests.get(xlsx_url, timeout=90)
+          r.raise_for_status()
+          xlsx_path.write_bytes(r.content)
+          wb = load_workbook(xlsx_path, read_only=True, data_only=True)
+
+          def h(v):
+            return re.sub(r'[^A-Z0-9]+', ' ', str(v or '').upper()).strip()
+
+          def code(v):
+            return str(v or '').strip().replace(',', '.')
+
+          mapping = {}
+          found_sheet = False
+          for ws in wb.worksheets:
+            all_rows = list(ws.iter_rows(values_only=True))
+            header_idx = None
+            old_idx = new_idx = old_title_idx = None
+            for ri, row in enumerate(all_rows[:40]):
+              hs = [h(v) for v in row]
+              oi = ni = oti = None
+              for i, name in enumerate(hs):
+                if 'ATECO' in name and ('2022' in name or '2007' in name):
+                  if any(x in name for x in ['COD', 'CODICE']) or name.endswith('2022'):
+                    oi = i
+                  if any(x in name for x in ['TIT', 'DESCR']):
+                    oti = i
+                if 'ATECO' in name and '2025' in name and (any(x in name for x in ['COD', 'CODICE']) or name.endswith('2025')):
+                  ni = i
+              if oi is not None and ni is not None:
+                header_idx, old_idx, new_idx, old_title_idx = ri, oi, ni, oti
+                break
+
+            if header_idx is None:
+              # fallback: locate columns by looking for ATECO-like code pairs
+              for ri, row in enumerate(all_rows[:50]):
+                vals = [code(v) for v in row]
+                candidates = [i for i, v in enumerate(vals) if re.fullmatch(r'\d{2}(?:\.\d{1,2}){0,2}', v)]
+                if len(candidates) >= 2:
+                  header_idx = max(0, ri - 1)
+                  old_idx, new_idx = candidates[0], candidates[1]
+                  break
+
+            if header_idx is None or old_idx is None or new_idx is None:
+              continue
+
+            found_sheet = True
+            for row in all_rows[header_idx + 1:]:
+              if old_idx >= len(row) or new_idx >= len(row):
+                continue
+              old = code(row[old_idx])
+              new = code(row[new_idx])
+              if not old or not new or not re.search(r'\d', old) or not re.search(r'\d', new):
+                continue
+              item = mapping.setdefault(old, {'oldCode': old, 'oldTitle': '', 'newCodes': []})
+              if old_title_idx is not None and old_title_idx < len(row) and row[old_title_idx] and not item['oldTitle']:
+                item['oldTitle'] = str(row[old_title_idx]).strip()
+              if new not in item['newCodes']:
+                item['newCodes'].append(new)
+
+          if not found_sheet or not mapping:
+            print('Workbook sheets:', wb.sheetnames)
+            for ws in wb.worksheets:
+              print('Sheet', ws.title)
+              for row in list(ws.iter_rows(values_only=True))[:12]:
+                print(row)
+            raise SystemExit('Unable to parse ISTAT correspondence workbook')
+
+          rows_out = sorted(mapping.values(), key=lambda x: x['oldCode'])
+          (out_dir / 'ateco-map-2022-2025.json').write_text(json.dumps(rows_out, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+          print('ATECO rows', len(ateco), 'mapping rows', len(rows_out))
+          PY
+
+      - name: Patch App.tsx
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/App.tsx')
+          text = p.read_text()
+
+          import_line = 'import Ateco from "./Ateco";\n'
+          if import_line not in text:
+            anchor = 'import { supabase } from "./supabase";\n'
+            if anchor not in text:
+              raise SystemExit('Supabase import anchor not found')
+            text = text.replace(anchor, anchor + import_line, 1)
+
+          old = '''        ) : tab === "ateco" ? (\n          <div\n            style={{\n              background: "white",\n              padding: 24,\n              borderRadius: 16,\n              border: "1px solid #e2e8f0",\n              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",\n            }}\n          >\n            <h2 style={{ marginTop: 0, marginBottom: 12 }}>ATECO</h2>\n            <div style={{ color: "#64748b" }}>\n              Sezione ATECO pronta per le prossime funzioni.\n            </div>\n          </div>\n        ) : tab === "punpsvPublic" ? (\n'''
+          new = '''        ) : tab === "ateco" ? (\n          <Ateco />\n        ) : tab === "punpsvPublic" ? (\n'''
+          if old not in text:
+            if '<Ateco />' not in text:
+              raise SystemExit('ATECO placeholder not found')
+          else:
+            text = text.replace(old, new, 1)
+
+          p.write_text(text)
+          PY
+
+      - name: Build app
+        run: |
+          npm install
+          npm run build
+
+      - name: Commit feature
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/Ateco.tsx public/data/ateco2025.json public/data/ateco-map-2022-2025.json
+          git commit -m "Add ATECO code lookup, 2026 mapping and tax indicators"
+          git push origin feature/ateco-lookup-v2
