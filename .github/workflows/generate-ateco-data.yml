@@ -1,0 +1,119 @@
+name: Generate ATECO data
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/ateco-tab]
+    paths:
+      - '.github/workflows/generate-ateco-data.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/ateco-tab
+          fetch-depth: 0
+
+      - name: Install Python dependencies
+        run: pip install openpyxl requests
+
+      - name: Download and convert official ISTAT data
+        run: |
+          python - <<'PY'
+          import csv, io, json, re
+          from pathlib import Path
+          import requests
+          from openpyxl import load_workbook
+
+          out_dir = Path('public/data')
+          out_dir.mkdir(parents=True, exist_ok=True)
+
+          # Official ISTAT controlled vocabulary (CSV)
+          csv_url = 'https://raw.githubusercontent.com/istat/ndc-ontologie-vocabolari-controllati/main/assets/controlled-vocabularies/economy/ateco-2025/ateco-2025.csv'
+          csv_resp = requests.get(csv_url, timeout=60)
+          csv_resp.raise_for_status()
+          text = csv_resp.content.decode('utf-8-sig')
+          reader = csv.DictReader(io.StringIO(text), delimiter=';')
+          ateco = []
+          for row in reader:
+            code = (row.get('CODICE ATECO 2025') or '').strip()
+            title = (row.get('PREFLABEL_IT') or '').strip()
+            if code and title:
+              ateco.append({'code': code, 'title': title})
+          (out_dir / 'ateco2025.json').write_text(json.dumps(ateco, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+
+          # Official ISTAT 2026 bidirectional correspondence table ATECO 2025 / ATECO 2022
+          xlsx_url = 'https://www.istat.it/wp-content/uploads/2026/07/Aggiornamento-2026-Tavola-raccordo-bidirezionale-ATECO-2025-ATECO-2022-italiano.xlsx'
+          xlsx_path = Path('/tmp/ateco-map.xlsx')
+          xlsx_resp = requests.get(xlsx_url, timeout=90)
+          xlsx_resp.raise_for_status()
+          xlsx_path.write_bytes(xlsx_resp.content)
+          wb = load_workbook(xlsx_path, read_only=True, data_only=True)
+
+          def norm_header(v):
+            return re.sub(r'[^A-Z0-9]+', ' ', str(v or '').upper()).strip()
+
+          def norm_code(v):
+            if v is None: return ''
+            s = str(v).strip().replace(',', '.')
+            if s.endswith('.0') and s.replace('.', '', 1).isdigit() and '.' not in str(v):
+              s = s[:-2]
+            return s
+
+          mapping = {}
+          for ws in wb.worksheets:
+            rows = ws.iter_rows(values_only=True)
+            header = None
+            old_idx = new_idx = old_title_idx = None
+            for _ in range(30):
+              try:
+                row = next(rows)
+              except StopIteration:
+                break
+              headers = [norm_header(v) for v in row]
+              for i, h in enumerate(headers):
+                if 'ATECO' in h and ('2022' in h or '2007' in h) and ('COD' in h or h.endswith('2022') or h.endswith('2007')):
+                  old_idx = i
+                if 'ATECO' in h and '2025' in h and ('COD' in h or h.endswith('2025')):
+                  new_idx = i
+                if 'ATECO' in h and ('2022' in h or '2007' in h) and ('TIT' in h or 'DESCR' in h):
+                  old_title_idx = i
+              if old_idx is not None and new_idx is not None:
+                header = row
+                break
+            if header is None:
+              continue
+            for row in rows:
+              if old_idx >= len(row) or new_idx >= len(row):
+                continue
+              old = norm_code(row[old_idx])
+              new = norm_code(row[new_idx])
+              if not old or not new:
+                continue
+              item = mapping.setdefault(old, {'oldCode': old, 'oldTitle': '', 'newCodes': []})
+              if old_title_idx is not None and old_title_idx < len(row) and row[old_title_idx] and not item['oldTitle']:
+                item['oldTitle'] = str(row[old_title_idx]).strip()
+              if new not in item['newCodes']:
+                item['newCodes'].append(new)
+
+          rows_out = sorted(mapping.values(), key=lambda x: x['oldCode'])
+          (out_dir / 'ateco-map-2022-2025.json').write_text(json.dumps(rows_out, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+          print(f'ATECO rows: {len(ateco)}')
+          print(f'Mapping rows: {len(rows_out)}')
+          if not ateco or not rows_out:
+            raise SystemExit('Generated ATECO data is empty')
+          PY
+
+      - name: Commit generated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/ateco2025.json public/data/ateco-map-2022-2025.json
+          git commit -m "Add official ATECO 2025 data and 2026 mapping" || exit 0
+          git push origin feature/ateco-tab
