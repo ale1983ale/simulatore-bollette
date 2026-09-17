@@ -167,6 +167,7 @@ function StatusBox({ label, card, color }: { label: string; card: TaxCard; color
         : "#eff6ff";
   const border = !active ? "#cbd5e1" : color === "orange" ? "#fb923c" : "#60a5fa";
   const accent = !active ? "#64748b" : color === "orange" ? "#c2410c" : "#1d4ed8";
+  const answer = card.status === "yes" ? "SI" : card.status === "no" ? "NO" : "DA VERIFICARE";
 
   return (
     <div
@@ -180,6 +181,33 @@ function StatusBox({ label, card, color }: { label: string; card: TaxCard; color
     >
       <div style={{ fontSize: 12, fontWeight: 800, color: accent, letterSpacing: 0.4, marginBottom: 8 }}>
         {label}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          flexWrap: "wrap",
+          marginBottom: 10,
+        }}
+      >
+        <div style={{ fontWeight: 900, color: "#0f172a" }}>ESITO</div>
+        <div
+          style={{
+            minWidth: card.status === "conditional" ? 124 : 54,
+            textAlign: "center",
+            padding: "6px 12px",
+            borderRadius: 999,
+            fontWeight: 900,
+            fontSize: 14,
+            border: `2px solid ${border}`,
+            color: accent,
+            background: "#ffffff",
+          }}
+        >
+          {answer}
+        </div>
       </div>
       <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{card.title}</div>
       <div style={{ fontSize: 13, lineHeight: 1.45, color: "#475569" }}>{card.detail}</div>
@@ -393,10 +421,10 @@ export default function Ateco() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-            {luceAccise && <StatusBox label="LUCE · ACCISE" card={luceAccise} color="orange" />}
-            {luceIva && <StatusBox label="LUCE · IVA" card={luceIva} color="blue" />}
-            {gasAccise && <StatusBox label="GAS · ACCISE" card={gasAccise} color="orange" />}
-            {gasIva && <StatusBox label="GAS · IVA" card={gasIva} color="blue" />}
+            {luceAccise && <StatusBox label="LUCE - ACCISE AGEVOLATE" card={luceAccise} color="orange" />}
+            {luceIva && <StatusBox label="LUCE - IVA AGEVOLATA" card={luceIva} color="blue" />}
+            {gasAccise && <StatusBox label="GAS - ACCISE AGEVOLATE" card={gasAccise} color="orange" />}
+            {gasIva && <StatusBox label="GAS - IVA AGEVOLATA" card={gasIva} color="blue" />}
           </div>
 
           <div
