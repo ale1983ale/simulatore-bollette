@@ -1,0 +1,67 @@
+name: Patch ATECO SI NO
+
+on:
+  push:
+    branches: [feature/ateco-si-no]
+    paths:
+      - '.github/workflows/patch-ateco-si-no.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/ateco-si-no
+          fetch-depth: 0
+
+      - name: Patch ATECO result cards
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/Ateco.tsx')
+          text = p.read_text()
+
+          old = '''  const border = !active ? "#cbd5e1" : color === "orange" ? "#fb923c" : "#60a5fa";\n  const accent = !active ? "#64748b" : color === "orange" ? "#c2410c" : "#1d4ed8";\n\n  return ('''
+          new = '''  const border = !active ? "#cbd5e1" : color === "orange" ? "#fb923c" : "#60a5fa";\n  const accent = !active ? "#64748b" : color === "orange" ? "#c2410c" : "#1d4ed8";\n  const answer = card.status === "yes" ? "SI" : card.status === "no" ? "NO" : "DA VERIFICARE";\n\n  return ('''
+          if old not in text:
+            raise SystemExit('StatusBox anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''      <div style={{ fontSize: 12, fontWeight: 800, color: accent, letterSpacing: 0.4, marginBottom: 8 }}>\n        {label}\n      </div>\n      <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{card.title}</div>'''
+          new = '''      <div style={{ fontSize: 12, fontWeight: 800, color: accent, letterSpacing: 0.4, marginBottom: 8 }}>\n        {label}\n      </div>\n      <div\n        style={{\n          display: "flex",\n          alignItems: "center",\n          justifyContent: "space-between",\n          gap: 10,\n          flexWrap: "wrap",\n          marginBottom: 10,\n        }}\n      >\n        <div style={{ fontWeight: 900, color: "#0f172a" }}>ESITO</div>\n        <div\n          style={{\n            minWidth: card.status === "conditional" ? 124 : 54,\n            textAlign: "center",\n            padding: "6px 12px",\n            borderRadius: 999,\n            fontWeight: 900,\n            fontSize: 14,\n            border: `2px solid ${border}`,\n            color: accent,\n            background: "#ffffff",\n          }}\n        >\n          {answer}\n        </div>\n      </div>\n      <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{card.title}</div>'''
+          if old not in text:
+            raise SystemExit('StatusBox content anchor not found')
+          text = text.replace(old, new, 1)
+
+          replacements = {
+            'label="LUCE · ACCISE"': 'label="LUCE - ACCISE AGEVOLATE"',
+            'label="LUCE · IVA"': 'label="LUCE - IVA AGEVOLATA"',
+            'label="GAS · ACCISE"': 'label="GAS - ACCISE AGEVOLATE"',
+            'label="GAS · IVA"': 'label="GAS - IVA AGEVOLATA"',
+          }
+          for a, b in replacements.items():
+            if a not in text:
+              raise SystemExit(f'Label anchor not found: {a}')
+            text = text.replace(a, b, 1)
+
+          p.write_text(text)
+          PY
+
+      - name: Build
+        run: |
+          npm install
+          npm run build
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Ateco.tsx
+          git commit -m "Add explicit SI NO indicators to ATECO tax cards"
+          git push origin feature/ateco-si-no
