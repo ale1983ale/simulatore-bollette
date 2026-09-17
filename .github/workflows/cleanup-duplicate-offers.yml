@@ -1,0 +1,43 @@
+name: Cleanup duplicate offers
+
+on:
+  push:
+    branches:
+      - feature/cleanup-duplicate-offers
+    paths:
+      - "scripts/cleanup_duplicate_offers.py"
+      - ".github/workflows/cleanup-duplicate-offers.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply cleanup
+        run: python scripts/cleanup_duplicate_offers.py
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit patched App.tsx
+        shell: bash
+        run: |
+          if git diff --quiet -- src/App.tsx; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git commit -m "Remove duplicate legacy offers and keep +SICURADEDICATA"
+          git push
