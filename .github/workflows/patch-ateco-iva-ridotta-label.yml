@@ -1,0 +1,41 @@
+name: Patch ATECO IVA ridotta label
+
+on:
+  push:
+    branches:
+      - feature/ateco-iva-ridotta-label
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Simplify IVA display
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/Ateco.tsx')
+          s = p.read_text()
+          s = s.replace('  vatRate?: "10%" | "22%" | "ESENTE" | "DA VERIFICARE";\n', '')
+          s = s.replace('      title: "IVA RIDOTTA 10%",\n      vatRate: "10%",', '      title: "IVA RIDOTTA",')
+          s = s.replace('      vatRate: "DA VERIFICARE",\n', '')
+          s = s.replace('      title: "POSSIBILE IVA 10%",', '      title: "POSSIBILE IVA RIDOTTA",')
+          s = s.replace('    vatRate: "22%",\n', '')
+          block = '''      {card.vatRate && (\n        <div\n          style={{\n            marginBottom: 10,\n            padding: "9px 12px",\n            borderRadius: 10,\n            background: "#ffffff",\n            border: `1px solid ${border}`,\n            fontWeight: 900,\n            color: accent,\n            fontSize: 14,\n          }}\n        >\n          ALIQUOTA IVA: <span style={{ fontSize: 18 }}>{card.vatRate}</span>\n        </div>\n      )}\n'''
+          s = s.replace(block, '')
+          p.write_text(s)
+          PY
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Ateco.tsx
+          git diff --cached --quiet || git commit -m "Show only IVA ridotta without rate details"
+          git push
