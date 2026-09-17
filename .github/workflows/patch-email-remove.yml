@@ -1,0 +1,45 @@
+name: Patch email remove button
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/patch-email-remove.cjs'
+      - '.github/workflows/patch-email-remove.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Apply patch
+        run: node .github/scripts/patch-email-remove.cjs
+
+      - name: Remove one-time patch files
+        run: |
+          rm -f .github/scripts/patch-email-remove.cjs
+          rm -f .github/workflows/patch-email-remove.yml
+
+      - name: Commit patched files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/OutlookEmail.tsx src/OutlookEmailPreview.tsx src/OutlookEmailAutoSendPackageSafe.tsx src/OutlookEmailCommonFiles.tsx .github/scripts/patch-email-remove.cjs .github/workflows/patch-email-remove.yml
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Add remove recipient control to email workflow"
+          git push origin main
