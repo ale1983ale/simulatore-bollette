@@ -29,7 +29,7 @@ jobs:
           p.write_text(s)
           PY
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Build
         run: npm run build
       - name: Commit
