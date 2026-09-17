@@ -6084,6 +6084,16 @@ if (!agentSession && !adminSession) {
     PUN / PSV
   </button>
 
+  <button
+    onClick={() => setTab("ateco")}
+    style={{
+      ...baseBtn,
+      ...(tab === "ateco" ? activeBtn : {}),
+    }}
+  >
+    ATECO
+  </button>
+
   {adminProfile?.role === "super_admin" && (
     <button
       onClick={() => setTab("reportAdmin")}
@@ -6133,6 +6143,21 @@ if (!agentSession && !adminSession) {
 />
 ) : tab === "report" ? (
   <ReportAgent agentSession={agentSession} />
+        ) : tab === "ateco" ? (
+          <div
+            style={{
+              background: "white",
+              padding: 24,
+              borderRadius: 16,
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: 12 }}>ATECO</h2>
+            <div style={{ color: "#64748b" }}>
+              Sezione ATECO pronta per le prossime funzioni.
+            </div>
+          </div>
         ) : tab === "punpsvPublic" ? (
           <div
             style={{
