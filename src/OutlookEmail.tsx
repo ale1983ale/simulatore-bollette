@@ -269,7 +269,8 @@ const isNonAssignedAgent = (agent: AgentRow) => normalize(agent.agenzia) === nor
 async function buildNonAssignedWorkbook(
   sources: SourceAgency[],
   generatedByAgency: Map<string, File>,
-  preferredHeader: string
+  preferredHeader: string,
+  originalFileName: string
 ): Promise<File | null> {
   if (!sources.length) return null;
 
@@ -315,7 +316,11 @@ async function buildNonAssignedWorkbook(
   }
 
   const outData = XLSX.write(outWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-  return new File([outData], NON_ASSIGNED_LABEL + ".xlsx", {
+  const originalStem = sanitizeFileName(stripExtension(originalFileName || "")).trim();
+  const nonAssignedName = originalStem
+    ? `${NON_ASSIGNED_LABEL} ${originalStem}.xlsx`
+    : `${NON_ASSIGNED_LABEL}.xlsx`;
+  return new File([outData], nonAssignedName, {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 }
@@ -506,7 +511,8 @@ export default function OutlookEmail() {
     void buildNonAssignedWorkbook(
       unassociatedSourceAgencies,
       generatedByAgency,
-      preferredAgencyHeader
+      preferredAgencyHeader,
+      sourceFile?.name || ""
     )
       .then((file) => {
         if (!cancelled) setNonAssignedFile(file);
@@ -514,14 +520,14 @@ export default function OutlookEmail() {
       .catch((error) => {
         if (!cancelled) {
           setNonAssignedFile(null);
-          setNotice(`Errore nella creazione di NON ASSEGNATI.xlsx: ${error?.message || error}`);
+          setNotice(`Errore nella creazione del file NON ASSEGNATI: ${error?.message || error}`);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [fileMode, unassociatedSourceAgencies, generatedByAgency, preferredAgencyHeader]);
+  }, [fileMode, unassociatedSourceAgencies, generatedByAgency, preferredAgencyHeader, sourceFile]);
 
   const recipientsWithoutSourceData = useMemo(
     () => agents.filter((agent, agentIndex) => !isNonAssignedAgent(agent) && !assignment.byAgent.has(agentIndex)),
@@ -719,7 +725,7 @@ export default function OutlookEmail() {
     if (!subject.trim()) return setNotice("Inserisci l'oggetto della mail.");
     if (!files.length) return setNotice(fileMode === "single" ? "Carica prima il file unico." : "Carica prima i file degli agenti.");
     if (fileMode === "single" && unassociatedSourceAgencies.length && !nonAssignedConfigured) return setNotice(`Ci sono ${unassociatedSourceAgencies.length} agenzie del file senza nominativo associato. Aggiungi il nominativo “NON ASSEGNATI” con l’email a cui inviarle.`);
-    if (fileMode === "single" && unassociatedSourceAgencies.length && nonAssignedConfigured && !nonAssignedFile) return setNotice("Sto preparando NON ASSEGNATI.xlsx. Attendi un istante e riprova.");
+    if (fileMode === "single" && unassociatedSourceAgencies.length && nonAssignedConfigured && !nonAssignedFile) return setNotice("Sto preparando il file NON ASSEGNATI con il nome del file originale. Attendi un istante e riprova.");
     if (fileMode === "separate" && unmatchedManualFiles.length) return setNotice(`Ci sono ${unmatchedManualFiles.length} file non associati. Correggi prima gli abbinamenti.`);
     if (filesWithMissingEmail.length) return setNotice(`Manca l'email per ${filesWithMissingEmail.length} nominativi con file associato.`);
     if (!readyRows.length) return setNotice("Non ci sono email pronte.");
