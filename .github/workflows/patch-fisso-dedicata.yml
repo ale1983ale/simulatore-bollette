@@ -1,0 +1,172 @@
+name: Patch +FISSO DEDICATA
+
+on:
+  push:
+    branches:
+      - feature/fisso-dedicata
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch App
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/App.tsx')
+          s = p.read_text()
+
+          def rep(old, new, count=None):
+              global s
+              found = s.count(old)
+              if found == 0:
+                  raise SystemExit(f'Pattern not found: {old[:120]}')
+              if count is not None and found != count:
+                  raise SystemExit(f'Expected {count} occurrences, found {found}: {old[:120]}')
+              s = s.replace(old, new)
+
+          # New special fixed-price month, zero by default.
+          rep(
+              '  { mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },\n  ...PUN_PSV_MONTHS.map((mese) => ({',
+              '  { mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },\n  { mese: "FISSO AD HOC", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },\n  ...PUN_PSV_MONTHS.map((mese) => ({',
+              1,
+          )
+          rep(
+              '  if (label === "FISSO BUSINESS") return Number.MAX_SAFE_INTEGER - 1;\n',
+              '  if (label === "FISSO BUSINESS") return Number.MAX_SAFE_INTEGER - 1;\n  if (label === "FISSO AD HOC") return Number.MAX_SAFE_INTEGER - 2;\n',
+              1,
+          )
+          rep(
+              '  { mese: "FISSO BUSINESS", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },\n\n  ...ANNI.flatMap((anno) =>',
+              '  { mese: "FISSO BUSINESS", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },\n  { mese: "FISSO AD HOC", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },\n\n  ...ANNI.flatMap((anno) =>',
+              1,
+          )
+
+          # New offer in both admin lists.
+          rep(
+              '  { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },\n',
+              '  { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },\n  { nome: "+FISSO DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },\n',
+              1,
+          )
+          rep(
+              '  { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },\n',
+              '  { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },\n  { nome: "+FISSO DEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },\n',
+              1,
+          )
+
+          # Reuse all custom DEDICATA fields/calculation logic for +FISSO DEDICATA.
+          anchor = 'const isSi = (v: string) => String(v).trim().toUpperCase() === "SI";\n'
+          rep(anchor, anchor + '\nconst isDedicatedOffer = (offer: string) =>\n  offer === "DEDICATA" || offer === "+FISSO DEDICATA";\n', 1)
+          s = s.replace('d.offerta === "DEDICATA"', 'isDedicatedOffer(d.offerta)')
+          s = s.replace('s.offerta === "DEDICATA"', 'isDedicatedOffer(s.offerta)')
+
+          # In the forms, rename Spread only for +FISSO DEDICATA.
+          rep(
+              '{field("Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}',
+              '{field(s.offerta === "+FISSO DEDICATA" ? "PREZZO FISSO AD HOC" : "Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}',
+              1,
+          )
+          rep(
+              '{field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}',
+              '{field(s.offerta === "+FISSO DEDICATA" ? "PREZZO FISSO AD HOC" : "Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}',
+              1,
+          )
+
+          # Preview labels also follow the selected offer.
+          rep(
+              '{row("Spread usato", numFormat(r.spreadEff, 3))}',
+              '{row(s.offerta === "+FISSO DEDICATA" ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}',
+              1,
+          )
+          rep(
+              '{row("Pun+Spread", money(r.H22_base))}',
+              '{row(s.offerta === "+FISSO DEDICATA" ? "Prezzo energia fisso" : "Pun+Spread", money(r.H22_base))}',
+              1,
+          )
+          rep(
+              '{row("Spread usato", numFormat(r.spreadEff, 2))}',
+              '{row(s.offerta === "+FISSO DEDICATA" ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 2))}',
+              1,
+          )
+          rep(
+              '{row("PSV+Spread", money(r.X55))}',
+              '{row(s.offerta === "+FISSO DEDICATA" ? "Prezzo gas fisso" : "PSV+Spread", money(r.X55))}',
+              1,
+          )
+
+          # FISSO AD HOC must remain selectable even with all zero values.
+          s = s.replace(
+              'if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;',
+              'if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS" || m.mese === "FISSO AD HOC") return true;'
+          )
+          s = s.replace(
+              'if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {',
+              'if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") {'
+          )
+          s = s.replace(
+              'if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") return true;',
+              'if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") return true;'
+          )
+          s = s.replace(
+              'if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;\n    return m.psv && m.psv !== 0;',
+              'if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS" || m.mese === "FISSO AD HOC") return true;\n    return m.psv && m.psv !== 0;'
+          )
+          s = s.replace(
+              'if (mese === "FISSO DOMESTICO" || mese === "FISSO BUSINESS") return false;',
+              'if (mese === "FISSO DOMESTICO" || mese === "FISSO BUSINESS" || mese === "FISSO AD HOC") return false;'
+          )
+
+          # Keep fixed/special rows at the top of both energy and gas selectors.
+          s = s.replace(
+              '    if (a.mese === "FISSO BUSINESS") return -1;\n    if (b.mese === "FISSO BUSINESS") return 1;\n',
+              '    if (a.mese === "FISSO BUSINESS") return -1;\n    if (b.mese === "FISSO BUSINESS") return 1;\n    if (a.mese === "FISSO AD HOC") return -1;\n    if (b.mese === "FISSO AD HOC") return 1;\n'
+          )
+
+          # Existing saved settings must receive the new offers automatically.
+          rep(
+              '      if (Array.isArray(map.energyOffers)) {\n        setEnergyOffers(map.energyOffers);\n      }\n\n      if (Array.isArray(map.gasOffers)) {\n        setGasOffers(map.gasOffers);\n      }',
+              '''      if (Array.isArray(map.energyOffers)) {\n        const savedEnergyOffers = map.energyOffers as EnergyOffer[];\n        const mergedEnergyOffers = [...savedEnergyOffers];\n        INITIAL_ENERGY_OFFERS.forEach((baseOffer) => {\n          if (!mergedEnergyOffers.some((x) => x.nome === baseOffer.nome)) {\n            mergedEnergyOffers.push(baseOffer);\n          }\n        });\n        setEnergyOffers(mergedEnergyOffers);\n      }\n\n      if (Array.isArray(map.gasOffers)) {\n        const savedGasOffers = map.gasOffers as GasOffer[];\n        const mergedGasOffers = [...savedGasOffers];\n        INITIAL_GAS_OFFERS.forEach((baseOffer) => {\n          if (!mergedGasOffers.some((x) => x.nome === baseOffer.nome)) {\n            mergedGasOffers.push(baseOffer);\n          }\n        });\n        setGasOffers(mergedGasOffers);\n      }''',
+              1,
+          )
+
+          # Existing saved PUN/PSV settings must receive FISSO AD HOC at zero.
+          rep(
+              '      if (Array.isArray(map.punPsvRows)) {\n        setPunPsvRows(map.punPsvRows);\n      }',
+              '''      if (Array.isArray(map.punPsvRows)) {\n        const savedPunPsvRows = map.punPsvRows as PunPsvRow[];\n        const mergedPunPsvRows = INITIAL_PUN_PSV_ROWS.map((baseRow) =>\n          savedPunPsvRows.find((row) => row.mese === baseRow.mese) || baseRow\n        );\n        const extraSavedRows = savedPunPsvRows.filter(\n          (row) => !mergedPunPsvRows.some((merged) => merged.mese === row.mese)\n        );\n        setPunPsvRows([...mergedPunPsvRows, ...extraSavedRows]);\n      }''',
+              1,
+          )
+
+          # PUN/PSV yearly table: show the special row regardless of selected year.
+          s = s.replace(
+              'if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") return true;',
+              'if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") return true;'
+          )
+
+          # Safety checks.
+          required = [
+              '+FISSO DEDICATA',
+              'FISSO AD HOC',
+              'PREZZO FISSO AD HOC',
+              'const isDedicatedOffer',
+          ]
+          for token in required:
+              if token not in s:
+                  raise SystemExit(f'Missing expected token after patch: {token}')
+
+          p.write_text(s)
+          PY
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git diff --cached --quiet || git commit -m "Add +FISSO DEDICATA offer and FISSO AD HOC month"
+          git push

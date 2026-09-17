@@ -145,6 +145,7 @@ const PUN_PSV_MONTHS = [
 const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
   { mese: "FISSO DOMESTICO", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "FISSO AD HOC", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   ...PUN_PSV_MONTHS.map((mese) => ({
     mese,
     mono: 0,
@@ -241,6 +242,7 @@ const ANNI = [2024,2025, 2026, 2027, 2028, 2029];
 function getMonthYearSortValue(label: string) {
   if (label === "FISSO DOMESTICO") return Number.MAX_SAFE_INTEGER;
   if (label === "FISSO BUSINESS") return Number.MAX_SAFE_INTEGER - 1;
+  if (label === "FISSO AD HOC") return Number.MAX_SAFE_INTEGER - 2;
 
   const parts = String(label).trim().split(" ");
   if (parts.length < 2) return -1;
@@ -257,6 +259,7 @@ function getMonthYearSortValue(label: string) {
 const INITIAL_MONTHLY: MonthlyRow[] = [
   { mese: "FISSO DOMESTICO", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "FISSO BUSINESS", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "FISSO AD HOC", anno: 0, mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
 
   ...ANNI.flatMap((anno) =>
     MESI.map((mese) => ({
@@ -300,6 +303,7 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
   { nome: "CASAUNICA", canone: 12, spread: 0.03, maggiorazioneCapacityMarket: 0 },
   { nome: "CASASPECIAL", canone: 10, spread: 0.025, maggiorazioneCapacityMarket: 0 },
   { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },
+  { nome: "+FISSO DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },
   { nome: "SICURADOMESTICO", canone: 12, spread: 0, maggiorazioneCapacityMarket: 0.011 },
   { nome: "SICURABUSINESS", canone: 15, spread: 0, maggiorazioneCapacityMarket: 0.011 },
   { nome: "CONDOMINI 5", canone: 20, spread: 0.022, maggiorazioneCapacityMarket: 0.022 },
@@ -316,6 +320,7 @@ const INITIAL_GAS_OFFERS: GasOffer[] = [
   { nome: "VALORE", canone: 15, spread: 0.15, quotaVariabile: 0.1 },
   { nome: "VALOREUNICA", canone: 13, spread: 0.1, quotaVariabile: 0.09 },
   { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },
+  { nome: "+FISSO DEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },
   { nome: "CASA", canone: 12, spread: 0.15, quotaVariabile: 0.1 },
   { nome: "CASAUNICA", canone: 10, spread: 0.1, quotaVariabile: 0.09 },
   { nome: "SICURADOMESTICO", canone: 12, spread: 0, quotaVariabile: 0.1 },
@@ -372,6 +377,9 @@ const numFormat = (v: number, decimals: number) =>
   });
 
 const isSi = (v: string) => String(v).trim().toUpperCase() === "SI";
+
+const isDedicatedOffer = (offer: string) =>
+  offer === "DEDICATA" || offer === "+FISSO DEDICATA";
 
 const energyMonths = (f: string) =>
   f === "BIMESTRALE" || f === "MULTI POD BIMESTRALE" ? 2 : 1;
@@ -820,13 +828,13 @@ function calcEnergia(
 
   const mesi = energyMonths(d.fatturazione);
 
-  const spreadEff = d.offerta === "DEDICATA" ? n(d.dedicataSpread) : n(off.spread);
+  const spreadEff = isDedicatedOffer(d.offerta) ? n(d.dedicataSpread) : n(off.spread);
   const cmEff =
-    d.offerta === "DEDICATA"
+    isDedicatedOffer(d.offerta)
       ? n(d.dedicataCapacityMarket)
       : n(off.maggiorazioneCapacityMarket);
   const quotaFissaEff =
-    d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
+    isDedicatedOffer(d.offerta) ? n(d.dedicataQuotaFissa) : n(off.canone);
 
   const prezzoMono1 = mese1IsFisso ? n(fissoRow.mono) : n(row1.mono);
   const prezzoMono2 = mese2IsFisso ? n(fissoRow.mono) : n(row2.mono);
@@ -946,15 +954,15 @@ function calcGas(d: any, punPsvRows: PunPsvRow[], gasOffers: GasOffer[]) {
   const mesi = gasMonths(d.fatturazione);
 
   const spreadEff =
-    d.offerta === "DEDICATA" ? n(d.dedicataSpread) : n(off.spread);
+    isDedicatedOffer(d.offerta) ? n(d.dedicataSpread) : n(off.spread);
 
   const quotaVarEff =
-    d.offerta === "DEDICATA"
+    isDedicatedOffer(d.offerta)
       ? n(d.dedicataQuotaVariabile)
       : n(off.quotaVariabile);
 
   const quotaFissaEff =
-    d.offerta === "DEDICATA" ? n(d.dedicataQuotaFissa) : n(off.canone);
+    isDedicatedOffer(d.offerta) ? n(d.dedicataQuotaFissa) : n(off.canone);
 
   const p1 = n((punPsvRows.find((x) => x.mese === d.periodo1) || { psv: 0 }).psv);
   const p2 = n((punPsvRows.find((x) => x.mese === d.periodo2) || { psv: 0 }).psv);
@@ -1128,7 +1136,7 @@ function Energia({
   
   const mesiOrdinati = [...punPsvRows]
   .filter((m) => {
-    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS" || m.mese === "FISSO AD HOC") return true;
     return (
       n(m.mono) !== 0 ||
       n(m.f1) !== 0 ||
@@ -1141,6 +1149,8 @@ function Energia({
     if (b.mese === "FISSO DOMESTICO") return 1;
     if (a.mese === "FISSO BUSINESS") return -1;
     if (b.mese === "FISSO BUSINESS") return 1;
+    if (a.mese === "FISSO AD HOC") return -1;
+    if (b.mese === "FISSO AD HOC") return 1;
 
     const getAnno = (m: string) => Number(m.split(" ")[1] || 0);
 
@@ -1567,7 +1577,7 @@ return (
             {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
           </div>
 
-          {s.offerta === "DEDICATA" && (
+          {isDedicatedOffer(s.offerta) && (
             <>
               <div style={{ height: 12 }} />
               <div
@@ -1577,7 +1587,7 @@ return (
                   gap: 12,
                 }}
               >
-                {field("Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                {field(s.offerta === "+FISSO DEDICATA" ? "PREZZO FISSO AD HOC" : "Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                 {field(
                   "Maggiorazione Capacity Market (senza perdite)",
                   s.dedicataCapacityMarket,
@@ -1862,7 +1872,7 @@ Base suggerito
         <>
           {previewBox(
             <>
-              {row("Spread usato", numFormat(r.spreadEff, 3))}
+              {row(s.offerta === "+FISSO DEDICATA" ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}
               {row("Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
               {row("Quota fissa usata", money(r.quotaFissaEff))}
             </>
@@ -1870,7 +1880,7 @@ Base suggerito
 
           {previewBox(
             <>
-              {row("Pun+Spread", money(r.H22_base))}
+              {row(s.offerta === "+FISSO DEDICATA" ? "Prezzo energia fisso" : "Pun+Spread", money(r.H22_base))}
               {row("Perdite di rete", money(r.perditeEnergia))}
               {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
               {row("Reattiva", money(r.H24))}
@@ -2092,7 +2102,7 @@ function Gas({
 
   const mesiOrdinati = [...punPsvRows]
   .filter((m) => {
-    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS" || m.mese === "FISSO AD HOC") return true;
     return n(m.psv) !== 0;
   })
   .sort((a, b) => {
@@ -2100,6 +2110,8 @@ function Gas({
     if (b.mese === "FISSO DOMESTICO") return 1;
     if (a.mese === "FISSO BUSINESS") return -1;
     if (b.mese === "FISSO BUSINESS") return 1;
+    if (a.mese === "FISSO AD HOC") return -1;
+    if (b.mese === "FISSO AD HOC") return 1;
 
     const getAnno = (m: string) => Number(m.split(" ")[1] || 0);
 
@@ -2163,7 +2175,7 @@ function Gas({
 
   const gasMonthOptions = mesiOrdinati
   .filter((m) => {
-    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS") return true;
+    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS" || m.mese === "FISSO AD HOC") return true;
     return m.psv && m.psv !== 0;
   })
   .map((m) => m.mese);
@@ -2423,7 +2435,7 @@ function Gas({
               {field("Adeguamento parametro", s.adeguamentoParametro, (v) => set("adeguamentoParametro", v), "number")}
             </div>
   
-            {s.offerta === "DEDICATA" && (
+            {isDedicatedOffer(s.offerta) && (
               <>
                 <div style={{ height: 12 }} />
                 <div
@@ -2433,7 +2445,7 @@ function Gas({
                     gap: 12,
                   }}
                 >
-                  {field("Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                  {field(s.offerta === "+FISSO DEDICATA" ? "PREZZO FISSO AD HOC" : "Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                   {field("Quota variabile", s.dedicataQuotaVariabile, (v) => set("dedicataQuotaVariabile", v), "number")}
                   {field("Quota fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
                 </div>
@@ -2633,7 +2645,7 @@ border: "1px solid #bfd8f6",
           <>
             {previewBox(
               <>
-                {row("Spread usato", numFormat(r.spreadEff, 2))}
+                {row(s.offerta === "+FISSO DEDICATA" ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 2))}
                 {row("Quota variabile usata", numFormat(r.quotaVarEff, 2))}
                 {row("Quota fissa usata", money(r.quotaFissaEff))}
               </>
@@ -2641,7 +2653,7 @@ border: "1px solid #bfd8f6",
   
             {previewBox(
               <>
-                {row("PSV+Spread", money(r.X55))}
+                {row(s.offerta === "+FISSO DEDICATA" ? "Prezzo gas fisso" : "PSV+Spread", money(r.X55))}
                 {row("Quota variabile offerta", money(r.X56))}
               </>
             )}
@@ -5437,7 +5449,7 @@ const tablePunPsvRows = getLast12PunPsvRows(
 ).reverse();
   const validMonthOptions = [...punPsvRows]
   .filter((row) => {
-    if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
+    if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") {
       return false;
     }
 
@@ -5532,7 +5544,7 @@ tablePunPsvRows.length > 0
     const mese = String(row.mese || "").trim().toUpperCase();
 
     if (!mese) return false;
-    if (mese === "FISSO DOMESTICO" || mese === "FISSO BUSINESS") return false;
+    if (mese === "FISSO DOMESTICO" || mese === "FISSO BUSINESS" || mese === "FISSO AD HOC") return false;
 
     return (
       Number(row.mono || 0) !== 0 ||
@@ -5691,7 +5703,7 @@ useEffect(() => {
 
       if (Array.isArray(map.monthlyRows)) {
         const normalizedSavedRows: MonthlyRow[] = map.monthlyRows.map((row: any) => {
-          if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") {
+          if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") {
             return {
               mese: row.mese,
               anno: 0,
@@ -5730,11 +5742,25 @@ useEffect(() => {
       }
 
       if (Array.isArray(map.energyOffers)) {
-        setEnergyOffers(map.energyOffers);
+        const savedEnergyOffers = map.energyOffers as EnergyOffer[];
+        const mergedEnergyOffers = [...savedEnergyOffers];
+        INITIAL_ENERGY_OFFERS.forEach((baseOffer) => {
+          if (!mergedEnergyOffers.some((x) => x.nome === baseOffer.nome)) {
+            mergedEnergyOffers.push(baseOffer);
+          }
+        });
+        setEnergyOffers(mergedEnergyOffers);
       }
 
       if (Array.isArray(map.gasOffers)) {
-        setGasOffers(map.gasOffers);
+        const savedGasOffers = map.gasOffers as GasOffer[];
+        const mergedGasOffers = [...savedGasOffers];
+        INITIAL_GAS_OFFERS.forEach((baseOffer) => {
+          if (!mergedGasOffers.some((x) => x.nome === baseOffer.nome)) {
+            mergedGasOffers.push(baseOffer);
+          }
+        });
+        setGasOffers(mergedGasOffers);
       }
 
       if (map.gasAcciseSettings) {
@@ -5742,7 +5768,14 @@ useEffect(() => {
       }
 
       if (Array.isArray(map.punPsvRows)) {
-        setPunPsvRows(map.punPsvRows);
+        const savedPunPsvRows = map.punPsvRows as PunPsvRow[];
+        const mergedPunPsvRows = INITIAL_PUN_PSV_ROWS.map((baseRow) =>
+          savedPunPsvRows.find((row) => row.mese === baseRow.mese) || baseRow
+        );
+        const extraSavedRows = savedPunPsvRows.filter(
+          (row) => !mergedPunPsvRows.some((merged) => merged.mese === row.mese)
+        );
+        setPunPsvRows([...mergedPunPsvRows, ...extraSavedRows]);
       }
     }
 
@@ -5962,7 +5995,7 @@ const renderAdminContent = () => {
     <tbody>
       {punPsvRows
         .filter((row) => {
-          if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS") return true;
+          if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") return true;
           return row.mese.endsWith(String(selectedYear));
         })
         .map((row) => (
