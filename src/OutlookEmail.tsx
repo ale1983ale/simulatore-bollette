@@ -164,6 +164,7 @@ function syncHeaders(ownerKey: string, includeJson = false) {
 }
 
 function matchScore(agent: AgentRow, sourceLabel: string) {
+  if (normalize(agent.agenzia) === normalize(NON_ASSIGNED_LABEL)) return 0;
   const sourceNorm = normalize(sourceLabel);
   const agencyNorm = normalize(agent.agenzia);
   const expectedStem = stripExtension(agent.allegato);
@@ -262,6 +263,63 @@ function detectAgencyColumn(matrix: unknown[][], preferredHeader: string) {
   return null;
 }
 
+const NON_ASSIGNED_LABEL = "NON ASSEGNATI";
+const isNonAssignedAgent = (agent: AgentRow) => normalize(agent.agenzia) === normalize(NON_ASSIGNED_LABEL);
+
+async function buildNonAssignedWorkbook(
+  sources: SourceAgency[],
+  generatedByAgency: Map<string, File>,
+  preferredHeader: string
+): Promise<File | null> {
+  if (!sources.length) return null;
+
+  const mergedSheets = new Map<string, { rows: unknown[][]; cols?: any }>();
+
+  for (const source of sources) {
+    const file = generatedByAgency.get(source.key);
+    if (!file) continue;
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data, { type: "array", cellDates: true });
+
+    for (const sheetName of workbook.SheetNames) {
+      const sheet = workbook.Sheets[sheetName] as any;
+      const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+        header: 1,
+        defval: "",
+        raw: false,
+      }) as unknown[][];
+      if (!matrix.length) continue;
+
+      const current = mergedSheets.get(sheetName);
+      if (!current) {
+        mergedSheets.set(sheetName, {
+          rows: matrix.map((row) => [...row]),
+          cols: sheet?.["!cols"],
+        });
+        continue;
+      }
+
+      const detected = detectAgencyColumn(matrix, preferredHeader);
+      const dataStart = detected ? detected.rowIndex + 1 : 1;
+      current.rows.push(...matrix.slice(dataStart).map((row) => [...row]));
+    }
+  }
+
+  if (!mergedSheets.size) return null;
+
+  const outWorkbook = XLSX.utils.book_new();
+  for (const [sheetName, value] of mergedSheets) {
+    const outSheet = XLSX.utils.aoa_to_sheet(value.rows as any[][]);
+    if (value.cols) (outSheet as any)["!cols"] = value.cols;
+    XLSX.utils.book_append_sheet(outWorkbook, outSheet, sheetName);
+  }
+
+  const outData = XLSX.write(outWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  return new File([outData], NON_ASSIGNED_LABEL + ".xlsx", {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
 export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
@@ -272,6 +330,7 @@ export default function OutlookEmail() {
   const [sourceAgencies, setSourceAgencies] = useState<SourceAgency[]>([]);
   const [generatedByAgency, setGeneratedByAgency] = useState<Map<string, File>>(new Map());
   const [splitWarnings, setSplitWarnings] = useState<string[]>([]);
+  const [nonAssignedFile, setNonAssignedFile] = useState<File | null>(null);
   const [preferredAgencyHeader, setPreferredAgencyHeader] = useState("AGENZIA");
   const [splitBusy, setSplitBusy] = useState(false);
   const [subject, setSubject] = useState("");
@@ -378,6 +437,9 @@ export default function OutlookEmail() {
   }, [open]);
 
   const assignment = useMemo(() => buildAssignments(agents, sourceAgencies), [agents, sourceAgencies]);
+  const nonAssignedAgentIndex = useMemo(() => agents.findIndex(isNonAssignedAgent), [agents]);
+  const nonAssignedAgent = nonAssignedAgentIndex >= 0 ? agents[nonAssignedAgentIndex] : null;
+  const nonAssignedConfigured = Boolean(nonAssignedAgent?.email.trim());
 
   const manualSources = useMemo<SourceAgency[]>(
     () =>
@@ -398,6 +460,13 @@ export default function OutlookEmail() {
 
   const matched = useMemo<PreparedRow[]>(() => {
     return agents.map((agent, agentIndex) => {
+      if (fileMode === "single" && isNonAssignedAgent(agent)) {
+        return {
+          ...agent,
+          file: nonAssignedFile,
+          sourceLabel: nonAssignedFile ? NON_ASSIGNED_LABEL : undefined,
+        };
+      }
       if (fileMode === "separate") {
         const sourceIndex = manualAssignment.byAgent.get(agentIndex);
         if (sourceIndex === undefined) return { ...agent, file: null };
@@ -417,7 +486,7 @@ export default function OutlookEmail() {
         sourceLabel: source.label,
       };
     });
-  }, [agents, files, fileMode, sourceAgencies, generatedByAgency, assignment, manualAssignment, manualSources]);
+  }, [agents, files, fileMode, sourceAgencies, generatedByAgency, assignment, manualAssignment, manualSources, nonAssignedFile]);
 
   const readyRows = useMemo(() => matched.filter((row) => row.file && row.email.trim()), [matched]);
   const filesWithMissingEmail = useMemo(() => matched.filter((row) => row.file && !row.email.trim()), [matched]);
@@ -427,8 +496,35 @@ export default function OutlookEmail() {
     [sourceAgencies, assignment]
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    if (fileMode !== "single" || !unassociatedSourceAgencies.length) {
+      setNonAssignedFile(null);
+      return;
+    }
+
+    void buildNonAssignedWorkbook(
+      unassociatedSourceAgencies,
+      generatedByAgency,
+      preferredAgencyHeader
+    )
+      .then((file) => {
+        if (!cancelled) setNonAssignedFile(file);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setNonAssignedFile(null);
+          setNotice(`Errore nella creazione di NON ASSEGNATI.xlsx: ${error?.message || error}`);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fileMode, unassociatedSourceAgencies, generatedByAgency, preferredAgencyHeader]);
+
   const recipientsWithoutSourceData = useMemo(
-    () => agents.filter((_, agentIndex) => !assignment.byAgent.has(agentIndex)),
+    () => agents.filter((agent, agentIndex) => !isNonAssignedAgent(agent) && !assignment.byAgent.has(agentIndex)),
     [agents, assignment]
   );
 
@@ -480,6 +576,7 @@ export default function OutlookEmail() {
     setGeneratedByAgency(new Map());
     setSourceAgencies([]);
     setSplitWarnings([]);
+    setNonAssignedFile(null);
 
     try {
       const data = await file.arrayBuffer();
@@ -545,6 +642,7 @@ export default function OutlookEmail() {
       setGeneratedByAgency(new Map());
       setSourceAgencies([]);
       setSplitWarnings([]);
+    setNonAssignedFile(null);
       setNotice(`Errore nella divisione del file unico: ${error?.message || error}`);
     } finally {
       setSplitBusy(false);
@@ -556,23 +654,25 @@ export default function OutlookEmail() {
     const timer = window.setTimeout(() => {
       const nowAssignment = buildAssignments(agents, sourceAgencies);
       const unmatched = sourceAgencies.filter((_, index) => !nowAssignment.usedSources.has(index));
-      if (!unmatched.length && !splitWarnings.length) return;
+      const unmatchedNeedsAttention = unmatched.length > 0 && !nonAssignedConfigured;
+      if (!unmatchedNeedsAttention && !splitWarnings.length) return;
       const lines = ["CONTROLLO ABBINAMENTI", ""];
-      if (unmatched.length) {
-        lines.push(`${unmatched.length} agenzie del file non sono associate a un nominativo:`, ...unmatched.slice(0, 15).map((item) => `• ${item.label}`));
+      if (unmatchedNeedsAttention) {
+        lines.push(`${unmatched.length} agenzie del file non sono associate a un nominativo. Aggiungi il nominativo “NON ASSEGNATI” con la tua email per riceverle in un unico file:`, ...unmatched.slice(0, 15).map((item) => `• ${item.label}`));
         if (unmatched.length > 15) lines.push(`• ...e altre ${unmatched.length - 15}`);
       }
       if (splitWarnings.length) lines.push("", ...splitWarnings.map((item) => `• ${item}`));
       window.alert(lines.join("\n"));
     }, 50);
     return () => window.clearTimeout(timer);
-  }, [sourceAgencies, agents, fileMode, splitWarnings]);
+  }, [sourceAgencies, agents, fileMode, splitWarnings, nonAssignedConfigured]);
 
   const handleSeparateFiles = (selected: File[]) => {
     setSourceFile(null);
     setSourceAgencies([]);
     setGeneratedByAgency(new Map());
     setSplitWarnings([]);
+    setNonAssignedFile(null);
     setFiles(selected);
 
     const sources = selected.map((file, index) => ({
@@ -610,6 +710,7 @@ export default function OutlookEmail() {
     setSourceAgencies([]);
     setGeneratedByAgency(new Map());
     setSplitWarnings([]);
+    setNonAssignedFile(null);
     setNotice("");
   };
 
@@ -617,7 +718,8 @@ export default function OutlookEmail() {
     setNotice("");
     if (!subject.trim()) return setNotice("Inserisci l'oggetto della mail.");
     if (!files.length) return setNotice(fileMode === "single" ? "Carica prima il file unico." : "Carica prima i file degli agenti.");
-    if (fileMode === "single" && unassociatedSourceAgencies.length) return setNotice(`Ci sono ${unassociatedSourceAgencies.length} agenzie del file senza nominativo associato. Correggi prima gli abbinamenti.`);
+    if (fileMode === "single" && unassociatedSourceAgencies.length && !nonAssignedConfigured) return setNotice(`Ci sono ${unassociatedSourceAgencies.length} agenzie del file senza nominativo associato. Aggiungi il nominativo “NON ASSEGNATI” con l’email a cui inviarle.`);
+    if (fileMode === "single" && unassociatedSourceAgencies.length && nonAssignedConfigured && !nonAssignedFile) return setNotice("Sto preparando NON ASSEGNATI.xlsx. Attendi un istante e riprova.");
     if (fileMode === "separate" && unmatchedManualFiles.length) return setNotice(`Ci sono ${unmatchedManualFiles.length} file non associati. Correggi prima gli abbinamenti.`);
     if (filesWithMissingEmail.length) return setNotice(`Manca l'email per ${filesWithMissingEmail.length} nominativi con file associato.`);
     if (!readyRows.length) return setNotice("Non ci sono email pronte.");
@@ -661,7 +763,7 @@ export default function OutlookEmail() {
   const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, background: "white" };
   const smallField: React.CSSProperties = { ...field, minWidth: 170, padding: "7px 9px" };
   const button: React.CSSProperties = { border: 0, borderRadius: 10, padding: "10px 14px", fontWeight: 700, cursor: "pointer" };
-  const hasAssociationAlerts = unassociatedSourceAgencies.length > 0 || unmatchedManualFiles.length > 0 || splitWarnings.length > 0;
+  const hasAssociationAlerts = (unassociatedSourceAgencies.length > 0 && !nonAssignedConfigured) || unmatchedManualFiles.length > 0 || splitWarnings.length > 0;
 
   return (
     <>
@@ -731,7 +833,8 @@ export default function OutlookEmail() {
               <div style={{ ...card, marginBottom: 16, background: hasAssociationAlerts ? "#fff7ed" : "#ecfdf5", borderColor: hasAssociationAlerts ? "#fdba74" : "#a7f3d0" }}>
                 <strong>{hasAssociationAlerts ? "⚠️ Controllo associazioni" : "✓ Associazioni file corrette"}</strong>
                 {fileMode === "single" && sourceAgencies.length > 0 && <div style={{ marginTop: 8 }}>Trovate <strong>{sourceAgencies.length}</strong> agenzie nel file; <strong>{readyRows.length}</strong> email sono pronte.</div>}
-                {!!unassociatedSourceAgencies.length && <div style={{ marginTop: 8, color: "#9a3412" }}><strong>Agenzie del file senza nominativo associato ({unassociatedSourceAgencies.length}):</strong> {unassociatedSourceAgencies.map((item) => item.label).join(", ")}</div>}
+                {!!unassociatedSourceAgencies.length && nonAssignedConfigured && <div style={{ marginTop: 8, color: "#166534" }}><strong>{unassociatedSourceAgencies.length} agenzie non associate</strong> saranno raccolte nel file <strong>NON ASSEGNATI.xlsx</strong> e inviate a <strong>{nonAssignedAgent?.email}</strong>.</div>}
+                {!!unassociatedSourceAgencies.length && !nonAssignedConfigured && <div style={{ marginTop: 8, color: "#9a3412" }}><strong>Agenzie del file senza nominativo associato ({unassociatedSourceAgencies.length}):</strong> {unassociatedSourceAgencies.map((item) => item.label).join(", ")}<div style={{ marginTop: 4 }}>Aggiungi un nominativo chiamato <strong>NON ASSEGNATI</strong> e inserisci la tua email.</div></div>}
                 {!!probableSourceMatches.length && <div style={{ marginTop: 8, color: "#92400e" }}>Possibili corrispondenze da verificare: {probableSourceMatches.join("; ")}</div>}
                 {!!unmatchedManualFiles.length && <div style={{ marginTop: 8, color: "#9a3412" }}><strong>File non associati ({unmatchedManualFiles.length}):</strong> {unmatchedManualFiles.map((file) => file.name).join(", ")}</div>}
                 {!!splitWarnings.length && <div style={{ marginTop: 8, color: "#92400e" }}>{splitWarnings.join(" ")}</div>}

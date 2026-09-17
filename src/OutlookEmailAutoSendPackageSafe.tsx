@@ -119,7 +119,7 @@ function commonModeIsActive() {
   return Boolean(panel && panel.offsetParent !== null && panel.style.display !== "none");
 }
 
-async function splitWorkbook(sourceFile: File) {
+async function splitWorkbook(sourceFile: File, recipients: Recipient[]) {
   const data = await sourceFile.arrayBuffer();
   const workbook = XLSX.read(data, { type: "array", cellDates: true });
   const preferredHeader = findPreferredAgencyHeader();
@@ -145,6 +145,7 @@ async function splitWorkbook(sourceFile: File) {
   }
 
   const generated = new Map<string, File>();
+  const generatedNameByKey = new Map<string, string>();
   for (const [key, group] of groups) {
     const outWorkbook = XLSX.utils.book_new();
     for (const [sheetName, rows] of group.sheets) {
@@ -153,12 +154,58 @@ async function splitWorkbook(sourceFile: File) {
       if (originalSheet?.["!cols"]) (outSheet as any)["!cols"] = originalSheet["!cols"];
       XLSX.utils.book_append_sheet(outWorkbook, outSheet, sheetName);
     }
-    const fileName = `${sanitizeFileName(group.label || key).replace(/\.xlsx$/i, "")}.xlsx`;
+    const fileName = sanitizeFileName(group.label || key).replace(/\.xlsx$/i, "") + ".xlsx";
     const outData = XLSX.write(outWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
     generated.set(normalize(fileName), new File([outData], fileName, {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }));
+    generatedNameByKey.set(key, fileName);
   }
+
+  const wantsNonAssigned = recipients.some((row) => normalize(row.agency) === "NONASSEGNATI");
+  if (wantsNonAssigned) {
+    const assignedFileNames = new Set(
+      recipients
+        .filter((row) => normalize(row.agency) !== "NONASSEGNATI")
+        .map((row) => normalize(row.fileName || ""))
+        .filter(Boolean)
+    );
+    const mergedSheets = new Map<string, { rows: unknown[][]; cols?: any }>();
+
+    for (const [key, group] of groups) {
+      const generatedName = generatedNameByKey.get(key) || "";
+      if (assignedFileNames.has(normalize(generatedName))) continue;
+
+      for (const [sheetName, rows] of group.sheets) {
+        const current = mergedSheets.get(sheetName);
+        if (!current) {
+          mergedSheets.set(sheetName, {
+            rows: rows.map((row) => [...row]),
+            cols: (workbook.Sheets[sheetName] as any)?.["!cols"],
+          });
+          continue;
+        }
+        const detected = detectAgencyColumn(rows, preferredHeader);
+        const dataStart = detected ? detected.rowIndex + 1 : 1;
+        current.rows.push(...rows.slice(dataStart).map((row) => [...row]));
+      }
+    }
+
+    if (mergedSheets.size) {
+      const outWorkbook = XLSX.utils.book_new();
+      for (const [sheetName, value] of mergedSheets) {
+        const outSheet = XLSX.utils.aoa_to_sheet(value.rows as any[][]);
+        if (value.cols) (outSheet as any)["!cols"] = value.cols;
+        XLSX.utils.book_append_sheet(outWorkbook, outSheet, sheetName);
+      }
+      const outData = XLSX.write(outWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+      const fileName = "NON ASSEGNATI.xlsx";
+      generated.set(normalize(fileName), new File([outData], fileName, {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }));
+    }
+  }
+
   return generated;
 }
 
@@ -283,7 +330,7 @@ export default function OutlookEmailAutoSendPackageSafe() {
           recipients.forEach((row) => manifestRecipients.push({ agency: row.agency, email: row.email, attachments: paths }));
         } else {
           let available = separateFilesRef.current;
-          if (sourceFileRef.current) available = await splitWorkbook(sourceFileRef.current);
+          if (sourceFileRef.current) available = await splitWorkbook(sourceFileRef.current, recipients);
           if (!available.size) throw new Error("Ricarica il file unico o i file separati e riprova.");
           for (let i = 0; i < recipients.length; i += 1) {
             const row = recipients[i];

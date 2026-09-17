@@ -109,12 +109,39 @@ async function parseWorkbookFile(file: File): Promise<PreviewSheet[]> {
   });
 }
 
+function readAssignedNormalFileNames() {
+  const table = Array.from(document.querySelectorAll<HTMLTableElement>("table")).find((candidate) =>
+    Array.from(candidate.querySelectorAll("thead th")).some((cell) =>
+      (cell.textContent || "").includes("File associato / Stato")
+    )
+  );
+  if (!table) return new Set<string>();
+
+  const headers = Array.from(table.querySelectorAll<HTMLTableCellElement>("thead th"));
+  const agencyIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Agenzia");
+  const statusIndex = headers.findIndex((cell) => (cell.textContent || "").includes("File associato / Stato"));
+  if (agencyIndex < 0 || statusIndex < 0) return new Set<string>();
+
+  const names = new Set<string>();
+  Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr")).forEach((row) => {
+    const cells = Array.from(row.querySelectorAll<HTMLTableCellElement>("td"));
+    const agencyInput = cells[agencyIndex]?.querySelector<HTMLInputElement>("input");
+    const agency = (agencyInput?.value || cells[agencyIndex]?.textContent || "").trim();
+    if (normalize(agency) === "NONASSEGNATI") return;
+    const fileName = extractFileName((cells[statusIndex]?.textContent || "").trim());
+    if (fileName) names.add(normalize(stripExtension(fileName)));
+  });
+  return names;
+}
+
 async function parseSplitPreview(sourceFile: File, targetFileName: string): Promise<PreviewSheet[]> {
   const data = await sourceFile.arrayBuffer();
   const workbook = XLSX.read(data, { type: "array", cellDates: true });
   const targetStem = normalize(stripExtension(targetFileName));
   const preferredHeader = findPreferredAgencyHeader();
   const sheets: PreviewSheet[] = [];
+  const isNonAssignedTarget = targetStem === normalize("NON ASSEGNATI");
+  const assignedNormalFiles = isNonAssignedTarget ? readAssignedNormalFileNames() : new Set<string>();
 
   for (const sheetName of workbook.SheetNames) {
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
@@ -131,7 +158,8 @@ async function parseSplitPreview(sourceFile: File, targetFileName: string): Prom
     const matchedRows = matrix.slice(detected.rowIndex + 1).filter((row) => {
       const label = String((row || [])[detected.colIndex] ?? "").trim();
       if (!label) return false;
-      const generatedStem = normalize(stripExtension(`${sanitizeFileName(label)}.xlsx`));
+      const generatedStem = normalize(stripExtension(sanitizeFileName(label) + ".xlsx"));
+      if (isNonAssignedTarget) return !assignedNormalFiles.has(generatedStem);
       return generatedStem === targetStem || normalize(label) === targetStem;
     });
 
