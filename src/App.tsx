@@ -1562,7 +1562,7 @@ return (
                   gap: 12,
                 }}
               >
-                {field(isFixedDedicatedOffer(s.offerta) ? "PREZZO FISSO AD HOC" : "Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                {field(isFixedDedicatedOffer(s.offerta) ? "PREZZO FISSO AD HOC SENZA PERDITE" : "Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                 {field(
                   "Maggiorazione Capacity Market (senza perdite)",
                   s.dedicataCapacityMarket,
@@ -2420,7 +2420,7 @@ function Gas({
                     gap: 12,
                   }}
                 >
-                  {field(isFixedDedicatedOffer(s.offerta) ? "PREZZO FISSO AD HOC" : "Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                  {field(isFixedDedicatedOffer(s.offerta) ? "PREZZO FISSO AD HOC SENZA PERDITE" : "Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                   {field("Quota variabile", s.dedicataQuotaVariabile, (v) => set("dedicataQuotaVariabile", v), "number")}
                   {field("Quota fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
                 </div>
