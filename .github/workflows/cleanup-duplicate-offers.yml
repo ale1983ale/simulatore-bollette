@@ -1,0 +1,112 @@
+name: Cleanup duplicate offers
+on:
+  push:
+    branches: [feature/cleanup-duplicate-offers]
+    paths: [.github/workflows/cleanup-duplicate-offers.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cleanup-duplicate-offers
+      - name: Cleanup duplicate offers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('src/App.tsx')
+          s = p.read_text()
+
+          # Rename the dedicated offer everywhere in current UI/calculation checks.
+          s = s.replace('"SICURADEDICATA"', '"+SICURADEDICATA"')
+
+          energy_remove = {
+            'IMPRESA','IMPRESAUNICA','IMPRESASPECIAL','SCELTA','SCELTAUNICA','SCELTASPECIAL',
+            'VALORE','VALOREUNICA','VALORESPECIAL','CASA','CASAUNICA','CASASPECIAL',
+            'DEDICATA','SICURADOMESTICO','SICURABUSINESS','CONDOMINI 5','CONDOMINI 10','CONDOMINI 15'
+          }
+          gas_remove = {
+            'IMPRESA','IMPRESAUNICA','SCELTA','SCELTAUNICA','VALORE','VALOREUNICA',
+            'DEDICATA','CASA','CASAUNICA','SICURADOMESTICO','SICURABUSINESS',
+            'CONDOMINI 5','CONDOMINI 10','CONDOMINI 15'
+          }
+
+          def clean_initial_block(text, const_name, remove_names):
+              m = re.search(rf'(const {const_name}:.*?= \[)(.*?)(\n\];)', text, re.S)
+              if not m:
+                  raise SystemExit(f'Block {const_name} not found')
+              body = m.group(2)
+              lines = body.splitlines()
+              out = []
+              for line in lines:
+                  nm = re.search(r'nome:\s*"([^"]+)"', line)
+                  if nm and nm.group(1) in remove_names:
+                      continue
+                  out.append(line)
+              # Deduplicate dedicated row if needed.
+              seen = False
+              deduped = []
+              for line in out:
+                  if 'nome: "+SICURADEDICATA"' in line:
+                      if seen:
+                          continue
+                      seen = True
+                  deduped.append(line)
+              new_body = '\n'.join(deduped)
+              return text[:m.start(2)] + new_body + text[m.end(2):]
+
+          s = clean_initial_block(s, 'INITIAL_ENERGY_OFFERS', energy_remove)
+          s = clean_initial_block(s, 'INITIAL_GAS_OFFERS', gas_remove)
+
+          energy_names = sorted(energy_remove - {'DEDICATA'})
+          gas_names = sorted(gas_remove - {'DEDICATA'})
+          energy_array = ', '.join(repr(x) for x in energy_names)
+          gas_array = ', '.join(repr(x) for x in gas_names)
+
+          energy_repl = f'''const obsoleteEnergyOfferNames = new Set([{energy_array}]);
+        const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
+          .map((offer) =>
+            ["+FISSO DEDICATA", "SICURADEDICATA", "DEDICATA"].includes(offer.nome)
+              ? {{ ...offer, nome: "+SICURADEDICATA" }}
+              : offer
+          )
+          .filter((offer) => !obsoleteEnergyOfferNames.has(offer.nome))
+          .filter(
+            (offer, index, arr) =>
+              arr.findIndex((item) => item.nome === offer.nome) === index
+          );'''
+
+          gas_repl = f'''const obsoleteGasOfferNames = new Set([{gas_array}]);
+        const savedGasOffers = (map.gasOffers as GasOffer[])
+          .map((offer) =>
+            ["+FISSO DEDICATA", "SICURADEDICATA", "DEDICATA"].includes(offer.nome)
+              ? {{ ...offer, nome: "+SICURADEDICATA" }}
+              : offer
+          )
+          .filter((offer) => !obsoleteGasOfferNames.has(offer.nome))
+          .filter(
+            (offer, index, arr) =>
+              arr.findIndex((item) => item.nome === offer.nome) === index
+          );'''
+
+          s, n1 = re.subn(r'const savedEnergyOffers = \(map\.energyOffers as EnergyOffer\[\]\).*?;\n\s*const mergedEnergyOffers', energy_repl + '\n        const mergedEnergyOffers', s, count=1, flags=re.S)
+          s, n2 = re.subn(r'const savedGasOffers = \(map\.gasOffers as GasOffer\[\]\).*?;\n\s*const mergedGasOffers', gas_repl + '\n        const mergedGasOffers', s, count=1, flags=re.S)
+          if n1 != 1 or n2 != 1:
+              raise SystemExit(f'Could not patch saved offers blocks: energy={n1}, gas={n2}')
+
+          p.write_text(s)
+          PY
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git commit -m "Remove duplicate legacy offers and rename dedicated offer"
+          git push
