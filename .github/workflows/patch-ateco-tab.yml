@@ -22,66 +22,18 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           path = Path('src/App.tsx')
           text = path.read_text()
-
-          old_button = '''  <button
-    onClick={() => setTab("punpsvPublic")}
-    style={{
-      ...baseBtn,
-      ...(tab === "punpsvPublic" ? activeBtn : {}),
-    }}
-  >
-    PUN / PSV
-  </button>
-'''
-
-          new_button = old_button + '''
-  <button
-    onClick={() => setTab("ateco")}
-    style={{
-      ...baseBtn,
-      ...(tab === "ateco" ? activeBtn : {}),
-    }}
-  >
-    ATECO
-  </button>
-'''
-
+          old_button = '  <button\n    onClick={() => setTab("punpsvPublic")}\n    style={{\n      ...baseBtn,\n      ...(tab === "punpsvPublic" ? activeBtn : {}),\n    }}\n  >\n    PUN / PSV\n  </button>\n'
+          new_button = old_button + '\n  <button\n    onClick={() => setTab("ateco")}\n    style={{\n      ...baseBtn,\n      ...(tab === "ateco" ? activeBtn : {}),\n    }}\n  >\n    ATECO\n  </button>\n'
           if old_button not in text:
               raise SystemExit('Pulsante PUN/PSV non trovato')
           text = text.replace(old_button, new_button, 1)
-
-          old_render = ''') : tab === "report" ? (
-  <ReportAgent agentSession={agentSession} />
-        ) : tab === "punpsvPublic" ? (
-'''
-
-          new_render = ''') : tab === "report" ? (
-  <ReportAgent agentSession={agentSession} />
-        ) : tab === "ateco" ? (
-          <div
-            style={{
-              background: "white",
-              padding: 24,
-              borderRadius: 16,
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-            }}
-          >
-            <h2 style={{ marginTop: 0, marginBottom: 12 }}>ATECO</h2>
-            <div style={{ color: "#64748b" }}>
-              Sezione ATECO pronta per le prossime funzioni.
-            </div>
-          </div>
-        ) : tab === "punpsvPublic" ? (
-'''
-
+          old_render = ') : tab === "report" ? (\n  <ReportAgent agentSession={agentSession} />\n        ) : tab === "punpsvPublic" ? (\n'
+          new_render = ') : tab === "report" ? (\n  <ReportAgent agentSession={agentSession} />\n        ) : tab === "ateco" ? (\n          <div\n            style={{\n              background: "white",\n              padding: 24,\n              borderRadius: 16,\n              border: "1px solid #e2e8f0",\n              boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",\n            }}\n          >\n            <h2 style={{ marginTop: 0, marginBottom: 12 }}>ATECO</h2>\n            <div style={{ color: "#64748b" }}>\n              Sezione ATECO pronta per le prossime funzioni.\n            </div>\n          </div>\n        ) : tab === "punpsvPublic" ? (\n'
           if old_render not in text:
               raise SystemExit('Blocco render Report/PUN non trovato')
           text = text.replace(old_render, new_render, 1)
-
           path.write_text(text)
           PY
 
