@@ -128,7 +128,7 @@ function readAssignedNormalFileNames() {
     const agencyInput = cells[agencyIndex]?.querySelector<HTMLInputElement>("input");
     const agency = (agencyInput?.value || cells[agencyIndex]?.textContent || "").trim();
     if (normalize(agency) === "NONASSEGNATI") return;
-    const fileName = extractFileName((cells[statusIndex]?.textContent || "").trim());
+    const fileName = row.dataset.emailFileName || extractFileName((cells[statusIndex]?.textContent || "").trim());
     if (fileName) names.add(normalize(stripExtension(fileName)));
   });
   return names;
@@ -280,47 +280,77 @@ export default function OutlookEmailPreview() {
         const headerRow = table.querySelector("thead tr");
         if (headerRow && !headerRow.querySelector('[data-email-preview-header="true"]')) {
           const th = document.createElement("th");
-          th.textContent = "Anteprima";
+          th.textContent = "Anteprima / Invio";
           th.style.padding = "8px";
           th.setAttribute("data-email-preview-header", "true");
           headerRow.appendChild(th);
         }
 
         const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr"));
-        rows.forEach((row) => {
-          if (row.querySelector('[data-email-preview-cell="true"]')) return;
+        rows.forEach((row, fallbackIndex) => {
           const cells = Array.from(row.querySelectorAll<HTMLTableCellElement>("td"));
           if (cells.length <= statusIndex) return;
 
           const statusText = (cells[statusIndex]?.textContent || "").trim();
-          const fileName = extractFileName(statusText);
-          const td = document.createElement("td");
+          const fileName = row.dataset.emailFileName || extractFileName(statusText);
+          const removed = row.dataset.emailRemoved === "true";
+          const rowIndex = Number(row.dataset.emailRowIndex ?? fallbackIndex);
+
+          let td = row.querySelector<HTMLTableCellElement>('[data-email-preview-cell="true"]');
+          if (!td) {
+            td = document.createElement("td");
+            td.setAttribute("data-email-preview-cell", "true");
+            row.appendChild(td);
+          }
+          td.replaceChildren();
           td.style.padding = "8px";
           td.style.whiteSpace = "nowrap";
-          td.setAttribute("data-email-preview-cell", "true");
+          td.style.display = "flex";
+          td.style.gap = "6px";
+          td.style.alignItems = "center";
 
           if (fileName) {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.textContent = "👁 Anteprima";
-            button.style.border = "0";
-            button.style.borderRadius = "9px";
-            button.style.padding = "7px 10px";
-            button.style.fontWeight = "700";
-            button.style.cursor = "pointer";
-            button.style.background = "#dbeafe";
-            button.style.color = "#1d4ed8";
-            button.addEventListener("click", () => {
-              const agency = (cells[0]?.textContent || "").trim();
-              openPreviewRef.current(agency, statusText);
+            const previewButton = document.createElement("button");
+            previewButton.type = "button";
+            previewButton.textContent = "👁 Anteprima";
+            previewButton.style.border = "0";
+            previewButton.style.borderRadius = "9px";
+            previewButton.style.padding = "7px 10px";
+            previewButton.style.fontWeight = "700";
+            previewButton.style.cursor = "pointer";
+            previewButton.style.background = "#dbeafe";
+            previewButton.style.color = "#1d4ed8";
+            previewButton.addEventListener("click", () => {
+              const agencyInput = cells[0]?.querySelector<HTMLInputElement>("input");
+              const agency = (agencyInput?.value || cells[0]?.textContent || "").trim();
+              openPreviewRef.current(agency, `✓ ${fileName}`);
             });
-            td.appendChild(button);
-          } else {
+            td.appendChild(previewButton);
+          }
+
+          if (fileName || removed) {
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.textContent = removed ? "↩ Ripristina" : "✕ Rimuovi";
+            removeButton.style.border = "0";
+            removeButton.style.borderRadius = "9px";
+            removeButton.style.padding = "7px 10px";
+            removeButton.style.fontWeight = "700";
+            removeButton.style.cursor = "pointer";
+            removeButton.style.background = removed ? "#dcfce7" : "#fee2e2";
+            removeButton.style.color = removed ? "#166534" : "#991b1b";
+            removeButton.addEventListener("click", () => {
+              window.dispatchEvent(new CustomEvent("outlook-email-toggle-remove", {
+                detail: { index: rowIndex, removed: !removed },
+              }));
+            });
+            td.appendChild(removeButton);
+          }
+
+          if (!fileName && !removed) {
             td.textContent = "—";
             td.style.color = "#94a3b8";
           }
-
-          row.appendChild(td);
         });
       });
     };

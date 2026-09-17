@@ -106,6 +106,7 @@ function readRecipients(): Recipient[] {
   if (agencyIndex < 0 || emailIndex < 0) return [];
 
   return Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr"))
+    .filter((row) => row.dataset.emailRemoved !== "true")
     .map((row) => {
       const cells = Array.from(row.querySelectorAll<HTMLTableCellElement>("td"));
       const agencyInput = cells[agencyIndex]?.querySelector<HTMLInputElement>("input");

@@ -346,6 +346,29 @@ export default function OutlookEmail() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [removedRows, setRemovedRows] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const onToggleRemoved = (event: Event) => {
+      const detail = (event as CustomEvent<{ index?: number; removed?: boolean }>).detail;
+      const rowIndex = Number(detail?.index);
+      if (!Number.isInteger(rowIndex) || rowIndex < 0) return;
+
+      setRemovedRows((current) => {
+        const next = new Set(current);
+        if (detail?.removed === false) next.delete(rowIndex);
+        else next.add(rowIndex);
+        return next;
+      });
+    };
+
+    window.addEventListener('outlook-email-toggle-remove', onToggleRemoved as EventListener);
+    return () => window.removeEventListener('outlook-email-toggle-remove', onToggleRemoved as EventListener);
+  }, []);
+
+  useEffect(() => {
+    setRemovedRows(new Set());
+  }, [fileMode, sourceFile, files]);
 
   useEffect(() => {
     let host: HTMLElement | null = null;
@@ -401,6 +424,7 @@ export default function OutlookEmail() {
         }))
         .filter((item) => item.agenzia || item.email || item.allegato);
       setAgents(cleaned);
+      setRemovedRows(new Set());
       setDirty(false);
       setSavedAt(row?.updated_at || null);
       if (showMessage) setNotice(cleaned.length ? `Caricati ${cleaned.length} nominativi salvati online.` : "Nessun nominativo salvato online.");
@@ -493,8 +517,14 @@ export default function OutlookEmail() {
     });
   }, [agents, files, fileMode, sourceAgencies, generatedByAgency, assignment, manualAssignment, manualSources, nonAssignedFile]);
 
-  const readyRows = useMemo(() => matched.filter((row) => row.file && row.email.trim()), [matched]);
-  const filesWithMissingEmail = useMemo(() => matched.filter((row) => row.file && !row.email.trim()), [matched]);
+  const readyRows = useMemo(
+    () => matched.filter((row, index) => !removedRows.has(index) && row.file && row.email.trim()),
+    [matched, removedRows]
+  );
+  const filesWithMissingEmail = useMemo(
+    () => matched.filter((row, index) => !removedRows.has(index) && row.file && !row.email.trim()),
+    [matched, removedRows]
+  );
 
   const unassociatedSourceAgencies = useMemo(
     () => sourceAgencies.filter((_, sourceIndex) => !assignment.usedSources.has(sourceIndex)),
@@ -566,6 +596,7 @@ export default function OutlookEmail() {
         .filter((row) => row.agenzia || row.email || row.allegato);
       if (!parsed.length) throw new Error("Il file deve avere le colonne AGENZIA, EMAIL e ALLEGATO.");
       setAgents(parsed);
+      setRemovedRows(new Set());
       setDirty(true);
       setEditingRecipients(false);
       setNotice(`Importati ${parsed.length} destinatari. Premi “Salva elenco online” per conservarli.`);
@@ -700,6 +731,7 @@ export default function OutlookEmail() {
 
   const deleteAgent = (index: number) => {
     setAgents((current) => current.filter((_, i) => i !== index));
+    setRemovedRows(new Set());
     setDirty(true);
   };
 
@@ -872,12 +904,12 @@ export default function OutlookEmail() {
                 <thead><tr style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0" }}><th style={{ padding: 8 }}>Agenzia</th><th style={{ padding: 8 }}>Email</th><th style={{ padding: 8 }}>Allegato previsto</th><th style={{ padding: 8 }}>File associato / Stato</th>{editingRecipients && <th style={{ padding: 8 }}>Azioni</th>}</tr></thead>
                 <tbody>
                   {matched.map((row, index) => (
-                    <tr key={index} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <tr key={index} data-email-row-index={index} data-email-removed={removedRows.has(index) ? "true" : "false"} data-email-file-name={row.file?.name || ""} style={{ borderBottom: "1px solid #f1f5f9", opacity: removedRows.has(index) ? 0.62 : 1 }}>
                       <td style={{ padding: 8 }}>{editingRecipients ? <input style={smallField} value={agents[index]?.agenzia ?? ""} onChange={(e) => updateAgent(index, "agenzia", e.target.value)} placeholder="Agenzia" /> : row.agenzia || "—"}</td>
                       <td style={{ padding: 8 }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 220 }} value={agents[index]?.email ?? ""} onChange={(e) => updateAgent(index, "email", e.target.value)} placeholder="email@esempio.it" type="email" /> : row.email || "—"}</td>
                       <td style={{ padding: 8 }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 210 }} value={agents[index]?.allegato ?? ""} onChange={(e) => updateAgent(index, "allegato", e.target.value)} placeholder="NOMEFILE.xlsx" /> : row.allegato || "—"}</td>
-                      <td style={{ padding: 8, fontWeight: 700, color: row.file && row.email ? "#15803d" : row.file && !row.email ? "#b91c1c" : "#64748b", whiteSpace: "nowrap" }}>
-                        {row.file && row.email ? `✓ ${row.file.name}` : row.file && !row.email ? `Email mancante — ${row.file.name}` : fileMode === "single" && sourceAgencies.length ? "Nessun dato nel file — non inviata" : files.length ? "Nessun file associato — non inviata" : "File non caricati"}
+                      <td style={{ padding: 8, fontWeight: 700, color: removedRows.has(index) ? "#b91c1c" : row.file && row.email ? "#15803d" : row.file && !row.email ? "#b91c1c" : "#64748b", whiteSpace: "nowrap" }}>
+                        {removedRows.has(index) ? "Rimosso manualmente — non inviata" : row.file && row.email ? `✓ ${row.file.name}` : row.file && !row.email ? `Email mancante — ${row.file.name}` : fileMode === "single" && sourceAgencies.length ? "Nessun dato nel file — non inviata" : files.length ? "Nessun file associato — non inviata" : "File non caricati"}
                       </td>
                       {editingRecipients && <td style={{ padding: 8 }}><button onClick={() => deleteAgent(index)} style={{ ...button, background: "#fee2e2", color: "#991b1b", padding: "7px 10px" }}>Elimina</button></td>}
                     </tr>
