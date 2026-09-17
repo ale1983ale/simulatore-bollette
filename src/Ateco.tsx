@@ -17,6 +17,7 @@ type TaxCard = {
   status: Status;
   title: string;
   detail: string;
+  vatRate?: "10%" | "22%" | "ESENTE" | "DA VERIFICARE";
 };
 
 const normalizeCode = (value: string) => {
@@ -55,6 +56,7 @@ function vatEligibility(code: string, product: "luce" | "gas"): TaxCard {
     return {
       status: "yes",
       title: "IVA RIDOTTA 10%",
+      vatRate: "10%",
       detail:
         "Il settore rientra tra imprese estrattive, agricole, manifatturiere oppure editoriali/poligrafiche previste dalla Tabella A. Va comunque verificato che la fornitura sia utilizzata nell'attività agevolata.",
     };
@@ -64,6 +66,7 @@ function vatEligibility(code: string, product: "luce" | "gas"): TaxCard {
     return {
       status: "conditional",
       title: "DA VERIFICARE",
+      vatRate: "DA VERIFICARE",
       detail:
         "La pesca non va equiparata automaticamente alle imprese agricole ai fini dell'IVA energia/gas: serve verifica della specifica posizione e dell'impiego.",
     };
@@ -73,6 +76,7 @@ function vatEligibility(code: string, product: "luce" | "gas"): TaxCard {
     return {
       status: "conditional",
       title: "POSSIBILE IVA 10%",
+      vatRate: "DA VERIFICARE",
       detail:
         "Il gas destinato a imprese che lo impiegano per produrre energia elettrica può rientrare nell'aliquota ridotta, ma l'agevolazione dipende dall'impiego effettivo del gas.",
     };
@@ -81,6 +85,7 @@ function vatEligibility(code: string, product: "luce" | "gas"): TaxCard {
   return {
     status: "no",
     title: "IVA ORDINARIA",
+    vatRate: "22%",
     detail:
       "Dal solo codice ATECO non emerge una delle categorie d'impresa che accedono normalmente all'IVA ridotta per questa fornitura.",
   };
@@ -209,6 +214,22 @@ function StatusBox({ label, card, color }: { label: string; card: TaxCard; color
           {answer}
         </div>
       </div>
+      {card.vatRate && (
+        <div
+          style={{
+            marginBottom: 10,
+            padding: "9px 12px",
+            borderRadius: 10,
+            background: "#ffffff",
+            border: `1px solid ${border}`,
+            fontWeight: 900,
+            color: accent,
+            fontSize: 14,
+          }}
+        >
+          ALIQUOTA IVA: <span style={{ fontSize: 18 }}>{card.vatRate}</span>
+        </div>
+      )}
       <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{card.title}</div>
       <div style={{ fontSize: 13, lineHeight: 1.45, color: "#475569" }}>{card.detail}</div>
     </div>
