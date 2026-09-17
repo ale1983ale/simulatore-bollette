@@ -1,0 +1,73 @@
+name: Patch ATECO IVA aliquota
+
+on:
+  push:
+    branches:
+      - feature/ateco-iva-aliquota
+    paths:
+      - .github/workflows/patch-ateco-iva-aliquota.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/ateco-iva-aliquota
+
+      - name: Patch ATECO IVA cards
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/Ateco.tsx')
+          s = p.read_text()
+
+          old = 'type TaxCard = {\n  status: Status;\n  title: string;\n  detail: string;\n};'
+          new = 'type TaxCard = {\n  status: Status;\n  title: string;\n  detail: string;\n  vatRate?: "10%" | "22%" | "ESENTE" | "DA VERIFICARE";\n};'
+          if old not in s:
+              raise SystemExit('TaxCard block not found')
+          s = s.replace(old, new, 1)
+
+          start = s.index('function vatEligibility(')
+          end = s.index('\nfunction electricityExciseEligibility', start)
+          vat = s[start:end]
+
+          replacements = [
+              ('title: "IVA RIDOTTA 10%",', 'title: "IVA RIDOTTA 10%",\n      vatRate: "10%",'),
+              ('title: "DA VERIFICARE",', 'title: "DA VERIFICARE",\n      vatRate: "DA VERIFICARE",'),
+              ('title: "POSSIBILE IVA 10%",', 'title: "POSSIBILE IVA 10%",\n      vatRate: "DA VERIFICARE",'),
+              ('title: "IVA ORDINARIA",', 'title: "IVA ORDINARIA",\n    vatRate: "22%",'),
+          ]
+          for a, b in replacements:
+              if a not in vat:
+                  raise SystemExit(f'VAT marker not found: {a}')
+              vat = vat.replace(a, b, 1)
+          s = s[:start] + vat + s[end:]
+
+          marker = '      <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{card.title}</div>'
+          rate_block = '''      {card.vatRate && (\n        <div\n          style={{\n            marginBottom: 10,\n            padding: "9px 12px",\n            borderRadius: 10,\n            background: "#ffffff",\n            border: `1px solid ${border}`,\n            fontWeight: 900,\n            color: accent,\n            fontSize: 14,\n          }}\n        >\n          ALIQUOTA IVA: <span style={{ fontSize: 18 }}>{card.vatRate}</span>\n        </div>\n      )}\n      <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{card.title}</div>'''
+          if marker not in s:
+              raise SystemExit('StatusBox title marker not found')
+          s = s.replace(marker, rate_block, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/Ateco.tsx
+          git commit -m "Show explicit IVA rate in ATECO cards"
+          git push
