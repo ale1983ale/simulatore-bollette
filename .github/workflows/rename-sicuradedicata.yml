@@ -1,0 +1,67 @@
+name: Rename SICURADEDICATA
+
+on:
+  push:
+    branches:
+      - feature/rename-sicuradedicata
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rename offer and migrate saved settings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/App.tsx')
+          s = p.read_text()
+
+          old = '+FISSO DEDICATA'
+          new = 'SICURADEDICATA'
+          s = s.replace(old, new)
+
+          energy_old = 'const savedEnergyOffers = map.energyOffers as EnergyOffer[];'
+          energy_new = '''const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
+          .map((offer) =>
+            offer.nome === "+FISSO DEDICATA"
+              ? { ...offer, nome: "SICURADEDICATA" }
+              : offer
+          )
+          .filter(
+            (offer, index, arr) =>
+              arr.findIndex((item) => item.nome === offer.nome) === index
+          );'''
+          if energy_old in s:
+              s = s.replace(energy_old, energy_new, 1)
+
+          gas_old = 'const savedGasOffers = map.gasOffers as GasOffer[];'
+          gas_new = '''const savedGasOffers = (map.gasOffers as GasOffer[])
+          .map((offer) =>
+            offer.nome === "+FISSO DEDICATA"
+              ? { ...offer, nome: "SICURADEDICATA" }
+              : offer
+          )
+          .filter(
+            (offer, index, arr) =>
+              arr.findIndex((item) => item.nome === offer.nome) === index
+          );'''
+          if gas_old in s:
+              s = s.replace(gas_old, gas_new, 1)
+
+          p.write_text(s)
+          PY
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git diff --cached --quiet || git commit -m "Rename +FISSO DEDICATA to SICURADEDICATA"
+          git push
