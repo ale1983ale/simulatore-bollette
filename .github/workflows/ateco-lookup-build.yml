@@ -1,0 +1,13 @@
+name: Integrate ATECO lookup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "ATECO lookup integration is managed from the feature branch."
