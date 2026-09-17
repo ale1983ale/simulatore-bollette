@@ -290,11 +290,13 @@ const INITIAL_DISP_CP_ROWS: DispCpRow[] = [
 ];
 
 const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
+  { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },
   { nome: "+SICURADEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },
   { nome: "BILANCIATA", canone: 18.5, spread: 0, maggiorazioneCapacityMarket: 0 },
 ];
 
 const INITIAL_GAS_OFFERS: GasOffer[] = [
+  { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },
   { nome: "+SICURADEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },
 ];
 
@@ -346,8 +348,13 @@ const numFormat = (v: number, decimals: number) =>
 
 const isSi = (v: string) => String(v).trim().toUpperCase() === "SI";
 
+const normalizeOfferName = (offer: string) => String(offer || "").trim().toUpperCase();
+
+const isFixedDedicatedOffer = (offer: string) =>
+  ["+SICURADEDICATA", "SICURADEDICATA", "+FISSO DEDICATA", "FISSO DEDICATA"].includes(normalizeOfferName(offer));
+
 const isDedicatedOffer = (offer: string) =>
-  offer === "DEDICATA" || offer === "+SICURADEDICATA";
+  normalizeOfferName(offer) === "DEDICATA" || isFixedDedicatedOffer(offer);
 
 const energyMonths = (f: string) =>
   f === "BIMESTRALE" || f === "MULTI POD BIMESTRALE" ? 2 : 1;
@@ -1555,7 +1562,7 @@ return (
                   gap: 12,
                 }}
               >
-                {field(s.offerta === "+SICURADEDICATA" ? "PREZZO FISSO AD HOC" : "Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                {field(isFixedDedicatedOffer(s.offerta) ? "PREZZO FISSO AD HOC" : "Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                 {field(
                   "Maggiorazione Capacity Market (senza perdite)",
                   s.dedicataCapacityMarket,
@@ -1840,7 +1847,7 @@ Base suggerito
         <>
           {previewBox(
             <>
-              {row(s.offerta === "+SICURADEDICATA" ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}
+              {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}
               {row("Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
               {row("Quota fissa usata", money(r.quotaFissaEff))}
             </>
@@ -1848,7 +1855,7 @@ Base suggerito
 
           {previewBox(
             <>
-              {row(s.offerta === "+SICURADEDICATA" ? "Prezzo energia fisso" : "Pun+Spread", money(r.H22_base))}
+              {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo energia fisso" : "Pun+Spread", money(r.H22_base))}
               {row("Perdite di rete", money(r.perditeEnergia))}
               {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
               {row("Reattiva", money(r.H24))}
@@ -2413,7 +2420,7 @@ function Gas({
                     gap: 12,
                   }}
                 >
-                  {field(s.offerta === "+SICURADEDICATA" ? "PREZZO FISSO AD HOC" : "Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
+                  {field(isFixedDedicatedOffer(s.offerta) ? "PREZZO FISSO AD HOC" : "Spread", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                   {field("Quota variabile", s.dedicataQuotaVariabile, (v) => set("dedicataQuotaVariabile", v), "number")}
                   {field("Quota fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
                 </div>
@@ -2613,7 +2620,7 @@ border: "1px solid #bfd8f6",
           <>
             {previewBox(
               <>
-                {row(s.offerta === "+SICURADEDICATA" ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 2))}
+                {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 2))}
                 {row("Quota variabile usata", numFormat(r.quotaVarEff, 2))}
                 {row("Quota fissa usata", money(r.quotaFissaEff))}
               </>
@@ -2621,7 +2628,7 @@ border: "1px solid #bfd8f6",
   
             {previewBox(
               <>
-                {row(s.offerta === "+SICURADEDICATA" ? "Prezzo gas fisso" : "PSV+Spread", money(r.X55))}
+                {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo gas fisso" : "PSV+Spread", money(r.X55))}
                 {row("Quota variabile offerta", money(r.X56))}
               </>
             )}
@@ -5713,7 +5720,7 @@ useEffect(() => {
         const obsoleteEnergyOfferNames = new Set(["CASA", "CASASPECIAL", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESASPECIAL", "IMPRESAUNICA", "SCELTA", "SCELTASPECIAL", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALORESPECIAL", "VALOREUNICA"]);
         const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
           .map((offer) =>
-            ["+FISSO DEDICATA", "SICURADEDICATA", "DEDICATA"].includes(offer.nome)
+            ["+FISSO DEDICATA", "SICURADEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURADEDICATA" }
               : offer
           )
@@ -5732,7 +5739,7 @@ useEffect(() => {
         const obsoleteGasOfferNames = new Set(["CASA", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESAUNICA", "SCELTA", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALOREUNICA"]);
         const savedGasOffers = (map.gasOffers as GasOffer[])
           .map((offer) =>
-            ["+FISSO DEDICATA", "SICURADEDICATA", "DEDICATA"].includes(offer.nome)
+            ["+FISSO DEDICATA", "SICURADEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURADEDICATA" }
               : offer
           )
