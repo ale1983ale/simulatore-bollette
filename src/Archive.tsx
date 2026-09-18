@@ -908,6 +908,8 @@ export default function Archive() {
   const [customerTypesSelected, setCustomerTypesSelected] = useState<string[]>([]);
   const [consumptionMin, setConsumptionMin] = useState("");
   const [consumptionMax, setConsumptionMax] = useState("");
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
   const [search, setSearch] = useState("");
 
   const loadLegacy = async () => {
@@ -1169,6 +1171,8 @@ export default function Archive() {
       if (customerTypesSelected.length && !customerTypesSelected.includes(row.tipoCliente)) return false;
       if (min !== null && Number.isFinite(min) && (row.consumo === null || row.consumo < min)) return false;
       if (max !== null && Number.isFinite(max) && (row.consumo === null || row.consumo > max)) return false;
+      if (periodStart && (!row.monthKey || row.monthKey < periodStart)) return false;
+      if (periodEnd && (!row.monthKey || row.monthKey > periodEnd)) return false;
 
       if (needle) {
         const haystack = [
@@ -1204,6 +1208,8 @@ export default function Archive() {
     customerTypesSelected,
     consumptionMin,
     consumptionMax,
+    periodStart,
+    periodEnd,
     search,
   ]);
 
@@ -1445,6 +1451,8 @@ export default function Archive() {
     setCustomerTypesSelected([]);
     setConsumptionMin("");
     setConsumptionMax("");
+    setPeriodStart("");
+    setPeriodEnd("");
     setSearch("");
   };
 
@@ -1979,6 +1987,26 @@ export default function Archive() {
               value={consumptionMax}
               onChange={(e) => setConsumptionMax(e.target.value)}
               placeholder="A"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={labelStyle}>Periodo iniziale</div>
+            <input
+              type="month"
+              value={periodStart}
+              onChange={(e) => setPeriodStart(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={labelStyle}>Periodo finale</div>
+            <input
+              type="month"
+              value={periodEnd}
+              onChange={(e) => setPeriodEnd(e.target.value)}
               style={inputStyle}
             />
           </div>
