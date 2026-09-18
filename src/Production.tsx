@@ -380,6 +380,7 @@ export default function Production() {
   const [zonesDirty, setZonesDirty] = useState(false);
   const [savingZones, setSavingZones] = useState(false);
   const [zoneMessage, setZoneMessage] = useState("");
+  const [agentZoneFilter, setAgentZoneFilter] = useState<string[]>([]);
 
   const [periodsSelected, setPeriodsSelected] = useState<string[]>([]);
   const [commoditiesSelected, setCommoditiesSelected] = useState<string[]>([]);
@@ -467,6 +468,15 @@ export default function Production() {
     agentZones.forEach((item) => map.set(item.agentKey, item.regione));
     return map;
   }, [agentZones]);
+
+  const filteredAgentZones = useMemo(() => {
+    if (!agentZoneFilter.length) return agentZones;
+
+    return agentZones.filter((agent) => {
+      const zoneValue = agent.regione || "__UNASSIGNED__";
+      return agentZoneFilter.includes(zoneValue);
+    });
+  }, [agentZones, agentZoneFilter]);
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -953,11 +963,37 @@ export default function Production() {
               {zoneMessage}
             </div>
           )}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(240px, 360px)",
+              gap: 10,
+              marginBottom: 14,
+            }}
+          >
+            <MultiSelectFilter
+              label="Filtra per zona"
+              allLabel="Tutte le zone"
+              selected={agentZoneFilter}
+              onChange={setAgentZoneFilter}
+              options={[
+                { value: "__UNASSIGNED__", label: "Zona non assegnata" },
+                ...ITALIAN_REGIONS.map((region) => ({
+                  value: region,
+                  label: region,
+                })),
+              ]}
+            />
+          </div>
+
           <div style={{ display: "grid", gap: 7 }}>
             {agentZones.length === 0 ? (
               <div style={{ color: "#64748b" }}>Nessun agente ancora presente. Importa almeno un report PRODUZIONE.</div>
+            ) : filteredAgentZones.length === 0 ? (
+              <div style={{ color: "#64748b" }}>Nessun agente corrisponde al filtro Zona selezionato.</div>
             ) : (
-              agentZones.map((agent) => (
+              filteredAgentZones.map((agent) => (
                 <div
                   key={agent.agentKey}
                   style={{
