@@ -1124,9 +1124,99 @@ export default function Archive() {
     }));
 
     const sheet = XLSX.utils.json_to_sheet(exportRows);
+
+    // Larghezze colonne automatiche, con minimi leggibili e un limite
+    // massimo per evitare colonne enormi in presenza di testi molto lunghi.
+    const headers = Object.keys(exportRows[0] || {});
+    const minWidths: Record<string, number> = {
+      "LUCE/GAS": 12,
+      "POD/PDR": 20,
+      "DATA VALIDITA": 15,
+      "MESE RIFERIMENTO": 18,
+      AGENTE: 18,
+      "DENOMINAZIONE CLIENTE": 28,
+      "TIPOLOGIA CLIENTE": 22,
+      CONSUMO: 16,
+      "FILE ORIGINE": 28,
+      FOGLIO: 18,
+    };
+
+    sheet["!cols"] = headers.map((header) => {
+      let maxLength = header.length;
+
+      for (const row of exportRows) {
+        const value = (row as Record<string, unknown>)[header];
+        const text = String(value ?? "");
+        if (text.length > maxLength) maxLength = text.length;
+      }
+
+      const minWidth = minWidths[header] ?? 14;
+      return {
+        wch: Math.min(42, Math.max(minWidth, maxLength + 2)),
+      };
+    });
+
+    const validMonths = filteredRows
+      .map((row) => row.monthKey)
+      .filter((value) => /^\d{4}-\d{2}$/.test(value))
+      .sort();
+
+    const shortMonth = (monthKey: string) => {
+      const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+      if (!match) return "";
+
+      const monthNames = [
+        "gen",
+        "feb",
+        "mar",
+        "apr",
+        "mag",
+        "giu",
+        "lug",
+        "ago",
+        "set",
+        "ott",
+        "nov",
+        "dic",
+      ];
+
+      const year = match[1].slice(-2);
+      const monthIndex = Number(match[2]) - 1;
+      return `${monthNames[monthIndex] || ""}${year}`;
+    };
+
+    let periodPart = "";
+    if (validMonths.length) {
+      const oldest = shortMonth(validMonths[0]);
+      const newest = shortMonth(validMonths[validMonths.length - 1]);
+      periodPart = oldest === newest ? oldest : `${oldest}-${newest}`;
+    }
+
+    const rowAgents = filteredRows.map((row) => row.agente.trim());
+    const uniqueAgents = Array.from(new Set(rowAgents.filter(Boolean)));
+    const singleAgent =
+      uniqueAgents.length === 1 &&
+      rowAgents.every((value) => value === uniqueAgents[0])
+        ? uniqueAgents[0]
+        : "";
+
+    const sanitizeFilePart = (value: string) =>
+      value
+        .trim()
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+        .replace(/\s+/g, "_")
+        .replace(/_+/g, "_")
+        .slice(0, 60);
+
+    const fileParts = ["RECESSI"];
+    if (periodPart) fileParts.push(periodPart);
+    if (singleAgent) fileParts.push(sanitizeFilePart(singleAgent));
+
+    const fileName = `${fileParts.filter(Boolean).join("_")}.xlsx`;
+
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, "RECESSI");
-    XLSX.writeFile(book, `RECESSI_FILTRATI_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(book, fileName);
   };
 
   if (loading || storageMode === "loading") {
