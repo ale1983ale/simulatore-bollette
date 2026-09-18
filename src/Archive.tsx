@@ -1177,12 +1177,19 @@ export default function Archive() {
   const totals = useMemo(() => {
     return filteredRows.reduce(
       (acc, row) => {
-        if (row.consumo === null) return acc;
-        if (row.commodity === "LUCE") acc.luce += row.consumo;
-        if (row.commodity === "GAS") acc.gas += row.consumo;
+        if (row.commodity === "LUCE") {
+          acc.luceCount += 1;
+          if (row.consumo !== null) acc.luce += row.consumo;
+        }
+
+        if (row.commodity === "GAS") {
+          acc.gasCount += 1;
+          if (row.consumo !== null) acc.gas += row.consumo;
+        }
+
         return acc;
       },
-      { luce: 0, gas: 0 }
+      { luce: 0, gas: 0, luceCount: 0, gasCount: 0 }
     );
   }, [filteredRows]);
 
@@ -1957,14 +1964,42 @@ export default function Archive() {
           }}
         >
           <div style={{ padding: 12, borderRadius: 10, background: "#eff6ff" }}>
-            <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO LUCE</div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO LUCE</div>
+              <div style={{ fontSize: 13, color: "#1e40af", fontWeight: 800 }}>
+                {totals.luceCount.toLocaleString("it-IT")}{" "}
+                {totals.luceCount === 1 ? "recesso luce" : "recessi luce"}
+              </div>
+            </div>
             <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
               {totals.luce.toLocaleString("it-IT", { maximumFractionDigits: 2 })} kWh
             </div>
           </div>
 
           <div style={{ padding: 12, borderRadius: 10, background: "#f0fdf4" }}>
-            <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO GAS</div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO GAS</div>
+              <div style={{ fontSize: 13, color: "#166534", fontWeight: 800 }}>
+                {totals.gasCount.toLocaleString("it-IT")}{" "}
+                {totals.gasCount === 1 ? "recesso gas" : "recessi gas"}
+              </div>
+            </div>
             <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
               {totals.gas.toLocaleString("it-IT", { maximumFractionDigits: 2 })} Smc
             </div>
