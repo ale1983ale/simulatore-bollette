@@ -32,6 +32,7 @@ type AgentZone = {
   agentKey: string;
   agente: string;
   regione: string;
+  includeInReport: boolean;
 };
 
 type MultiSelectOption = { value: string; label: string };
@@ -406,13 +407,14 @@ export default function Production() {
   const fetchAgentZones = async () => {
     const { data, error } = await supabase
       .from(AGENT_ZONE_TABLE)
-      .select("agent_key,agente,regione")
+      .select("agent_key,agente,regione,include_in_report")
       .order("agente", { ascending: true });
     if (error) throw error;
     const loaded = (data || []).map((item: any) => ({
       agentKey: String(item.agent_key || ""),
       agente: String(item.agente || ""),
       regione: String(item.regione || ""),
+      includeInReport: item.include_in_report !== false,
     }));
     setAgentZones(loaded);
     setZonesDirty(false);
@@ -441,9 +443,23 @@ export default function Production() {
       .sort((a, b) => b.value.localeCompare(a.value));
   }, [rows]);
 
+  const includedByAgentKey = useMemo(() => {
+    const map = new Map<string, boolean>();
+    agentZones.forEach((item) => map.set(item.agentKey, item.includeInReport));
+    return map;
+  }, [agentZones]);
+
   const agents = useMemo(
-    () => Array.from(new Set<string>(rows.map((row) => row.agente).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "it")),
-    [rows]
+    () =>
+      Array.from(
+        new Set<string>(
+          rows
+            .filter((row) => includedByAgentKey.get(row.agentKey) !== false)
+            .map((row) => row.agente)
+            .filter(Boolean) as string[]
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [rows, includedByAgentKey]
   );
 
   const zoneByAgentKey = useMemo(() => {
@@ -454,6 +470,8 @@ export default function Production() {
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
+      if (includedByAgentKey.get(row.agentKey) === false) return false;
+
       const periodKey = row.periodStart + "|" + row.periodEnd;
       if (periodsSelected.length && !periodsSelected.includes(periodKey)) return false;
       if (commoditiesSelected.length && !commoditiesSelected.includes(row.commodity)) return false;
@@ -462,7 +480,7 @@ export default function Production() {
       if (zonesSelected.length && !zonesSelected.includes(zone)) return false;
       return true;
     });
-  }, [rows, periodsSelected, commoditiesSelected, agentsSelected, zonesSelected, zoneByAgentKey]);
+  }, [rows, periodsSelected, commoditiesSelected, agentsSelected, zonesSelected, zoneByAgentKey, includedByAgentKey]);
 
   const totals = useMemo(() => {
     return filteredRows.reduce(
@@ -733,6 +751,23 @@ export default function Production() {
     setZoneMessage("");
   };
 
+  const updateAgentInReport = (agent: AgentZone, includeInReport: boolean) => {
+    setAgentZones((current) =>
+      current.map((item) =>
+        item.agentKey === agent.agentKey ? { ...item, includeInReport } : item
+      )
+    );
+
+    if (!includeInReport) {
+      setAgentsSelected((current) =>
+        current.filter((name) => name !== agent.agente)
+      );
+    }
+
+    setZonesDirty(true);
+    setZoneMessage("");
+  };
+
   const saveAgentZones = async () => {
     if (!zonesDirty || savingZones) return;
 
@@ -744,6 +779,7 @@ export default function Production() {
         agent_key: agent.agentKey,
         agente: agent.agente,
         regione: agent.regione || null,
+        include_in_report: agent.includeInReport,
         updated_at: new Date().toISOString(),
       }));
 
@@ -883,7 +919,7 @@ export default function Production() {
           </div>
 
           <div style={{ color: "#64748b", fontSize: 13, marginBottom: 10 }}>
-            Gli agenti vengono aggiunti automaticamente quando importi i report. Assegna a ciascuno la regione di appartenenza: verrà usata dal filtro ZONA nella PRODUZIONE.
+            Gli agenti vengono aggiunti automaticamente quando importi i report. Assegna la regione e usa la spunta Report generale per decidere quali agenti devono concorrere ai risultati PRODUZIONE e comparire nel filtro Agente.
           </div>
 
           {zonesDirty && (
@@ -926,7 +962,7 @@ export default function Production() {
                   key={agent.agentKey}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "minmax(280px,1fr) minmax(220px,320px)",
+                    gridTemplateColumns: "minmax(280px,1fr) minmax(220px,320px) minmax(160px,190px)",
                     gap: 12,
                     alignItems: "center",
                     padding: "9px 10px",
@@ -935,12 +971,38 @@ export default function Production() {
                   }}
                 >
                   <strong>{agent.agente}</strong>
-                  <select value={agent.regione} onChange={(e) => updateAgentRegion(agent, e.target.value)} style={inputStyle}>
+
+                  <select
+                    value={agent.regione}
+                    onChange={(e) => updateAgentRegion(agent, e.target.value)}
+                    style={inputStyle}
+                  >
                     <option value="">Zona non assegnata</option>
                     {ITALIAN_REGIONS.map((region) => (
                       <option key={region} value={region}>{region}</option>
                     ))}
                   </select>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontWeight: 800,
+                      whiteSpace: "nowrap",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={agent.includeInReport}
+                      onChange={(e) =>
+                        updateAgentInReport(agent, e.target.checked)
+                      }
+                      style={{ width: 18, height: 18 }}
+                    />
+                    Report generale
+                  </label>
                 </div>
               ))
             )}
