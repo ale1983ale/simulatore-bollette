@@ -568,7 +568,7 @@ export default function Archive() {
   const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [rows, setRows] = useState<RecessoRow[]>([]);
   const [legacyArchive, setLegacyArchive] = useState<LegacyArchive>({ version: 1, files: [] });
-  const [pendingFile, setPendingFile] = useState<ParsedFile | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<ParsedFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -853,23 +853,37 @@ export default function Archive() {
     );
   }, [filteredRows]);
 
-  const onChooseFile = async (file?: File) => {
-    if (!file) return;
+  const onChooseFiles = async (files?: FileList | File[]) => {
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
 
     setParsing(true);
     setLastImportMessage("");
 
     try {
-      const parsed = await parseRecessiFile(file);
-      setPendingFile(parsed);
+      const parsedFiles: ParsedFile[] = [];
+      const emptyFiles: string[] = [];
 
-      if (!parsed.rows.length) {
-        alert("Il file è stato letto ma non trovo righe dati.");
+      for (const file of selected) {
+        const parsed = await parseRecessiFile(file);
+        if (parsed.rows.length) {
+          parsedFiles.push(parsed);
+        } else {
+          emptyFiles.push(file.name);
+        }
+      }
+
+      setPendingFiles(parsedFiles);
+
+      if (emptyFiles.length) {
+        alert(
+          `Questi file sono stati letti ma non contengono righe dati riconosciute:\n${emptyFiles.join("\n")}`
+        );
       }
     } catch (error: any) {
       console.error(error);
-      alert("Errore nella lettura del file: " + (error?.message || error));
-      setPendingFile(null);
+      alert("Errore nella lettura dei file: " + (error?.message || error));
+      setPendingFiles([]);
     } finally {
       setParsing(false);
     }
@@ -886,35 +900,51 @@ export default function Archive() {
     setRows(next.files.flatMap((file) => file.rows as RecessoRow[]));
   };
 
-  const addPendingFile = async () => {
-    if (!pendingFile) return;
+  const addPendingFiles = async () => {
+    if (!pendingFiles.length) return;
 
     setSaving(true);
 
     try {
+      let insertedTotal = 0;
+      let duplicateTotal = 0;
+
       if (storageMode === "database") {
-        const result = await importRowsToDatabase(pendingFile.name, pendingFile.rows);
+        for (const pendingFile of pendingFiles) {
+          const result = await importRowsToDatabase(pendingFile.name, pendingFile.rows);
+          insertedTotal += result.inserted;
+          duplicateTotal += result.duplicates + pendingFile.duplicateRowsInFile;
+        }
+
         await fetchDatabaseRows();
 
-        const duplicateTotal = result.duplicates + pendingFile.duplicateRowsInFile;
         setLastImportMessage(
-          `Import completato: ${result.inserted} nuove righe salvate, ${duplicateTotal} duplicati ignorati.`
+          `Import completato: ${pendingFiles.length} file elaborati, ${insertedTotal} nuove righe salvate, ${duplicateTotal} duplicati ignorati.`
         );
       } else {
+        let nextArchive: LegacyArchive = {
+          version: 1,
+          files: [...legacyArchive.files],
+        };
         const existingKeys = new Set(rows.map((row) => row.dedupKey));
-        const uniqueNewRows = pendingFile.rows.filter((row) => !existingKeys.has(row.dedupKey));
-        const duplicateDb = pendingFile.rows.length - uniqueNewRows.length;
-        const duplicateTotal = duplicateDb + pendingFile.duplicateRowsInFile;
 
-        if (uniqueNewRows.length) {
-          const withoutSameName = legacyArchive.files.filter(
-            (file) => file.name.toLocaleLowerCase("it") !== pendingFile.name.toLocaleLowerCase("it")
-          );
+        for (const pendingFile of pendingFiles) {
+          const uniqueNewRows = pendingFile.rows.filter((row) => {
+            if (existingKeys.has(row.dedupKey)) return false;
+            existingKeys.add(row.dedupKey);
+            return true;
+          });
 
-          const next: LegacyArchive = {
+          const duplicateDb = pendingFile.rows.length - uniqueNewRows.length;
+          duplicateTotal += duplicateDb + pendingFile.duplicateRowsInFile;
+          insertedTotal += uniqueNewRows.length;
+
+          nextArchive = {
             version: 1,
             files: [
-              ...withoutSameName,
+              ...nextArchive.files.filter(
+                (file) => file.name.toLocaleLowerCase("it") !== pendingFile.name.toLocaleLowerCase("it")
+              ),
               {
                 id: pendingFile.id,
                 name: pendingFile.name,
@@ -923,19 +953,71 @@ export default function Archive() {
               },
             ],
           };
-
-          await saveLegacyArchive(next);
         }
 
+        await saveLegacyArchive(nextArchive);
+
         setLastImportMessage(
-          `Import completato in modalità compatibilità: ${uniqueNewRows.length} nuove righe salvate, ${duplicateTotal} duplicati ignorati.`
+          `Import completato in modalità compatibilità: ${pendingFiles.length} file elaborati, ${insertedTotal} nuove righe salvate, ${duplicateTotal} duplicati ignorati.`
         );
       }
 
-      setPendingFile(null);
+      setPendingFiles([]);
     } catch (error: any) {
       console.error("SAVE ARCHIVE ERROR:", error);
       alert("Errore nel salvataggio dell'archivio: " + (error?.message || error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearAllArchive = async () => {
+    if (!rows.length) return;
+
+    const firstConfirm = window.confirm(
+      `Vuoi eliminare TUTTO l'archivio RECESSI? Verranno cancellate ${rows.length.toLocaleString("it-IT")} righe.`
+    );
+    if (!firstConfirm) return;
+
+    const secondConfirm = window.confirm(
+      "Conferma definitiva: questa operazione cancellerà tutti i dati dell'archivio RECESSI."
+    );
+    if (!secondConfirm) return;
+
+    setSaving(true);
+
+    try {
+      if (storageMode === "database") {
+        const { data, error } = await supabase.rpc("archive_recessi_clear_all", {
+          p_confirmation: "ELIMINA TUTTO",
+        });
+
+        if (error) throw error;
+
+        const { error: legacyClearError } = await supabase
+          .from("app_settings")
+          .upsert([{ key: LEGACY_KEY, value_json: { version: 1, files: [] } }]);
+
+        if (legacyClearError) {
+          console.warn("CLEAR LEGACY ARCHIVE ERROR:", legacyClearError);
+        }
+
+        await fetchDatabaseRows();
+        const deleted = Number(data?.deleted || 0);
+        setLastImportMessage(
+          `Archivio eliminato: ${deleted.toLocaleString("it-IT")} righe cancellate.`
+        );
+      } else {
+        const emptyArchive: LegacyArchive = { version: 1, files: [] };
+        await saveLegacyArchive(emptyArchive);
+        setLastImportMessage("Archivio eliminato.");
+      }
+
+      setPendingFiles([]);
+      resetFilters();
+    } catch (error: any) {
+      console.error("CLEAR ARCHIVE ERROR:", error);
+      alert("Errore nell'eliminazione dell'archivio: " + (error?.message || error));
     } finally {
       setSaving(false);
     }
@@ -1026,17 +1108,37 @@ export default function Archive() {
             </div>
           </div>
 
-          <div
-            style={{
-              padding: "7px 10px",
-              borderRadius: 999,
-              fontSize: 12,
-              fontWeight: 800,
-              background: storageMode === "database" ? "#dcfce7" : "#fff7ed",
-              color: storageMode === "database" ? "#166534" : "#9a3412",
-            }}
-          >
-            {storageMode === "database" ? "Database Supabase" : "Modalità compatibilità"}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div
+              style={{
+                padding: "7px 10px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 800,
+                background: storageMode === "database" ? "#dcfce7" : "#fff7ed",
+                color: storageMode === "database" ? "#166534" : "#9a3412",
+              }}
+            >
+              {storageMode === "database" ? "Database Supabase" : "Modalità compatibilità"}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void clearAllArchive()}
+              disabled={saving || !rows.length}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid #dc2626",
+                background: rows.length ? "#dc2626" : "#fecaca",
+                color: "white",
+                fontWeight: 800,
+                cursor: saving || !rows.length ? "default" : "pointer",
+                opacity: saving ? 0.65 : 1,
+              }}
+            >
+              Elimina tutto
+            </button>
           </div>
         </div>
       </div>
@@ -1044,23 +1146,23 @@ export default function Archive() {
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>RECESSI · Carica file</h3>
         <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-          Puoi aggiungere tutti i file che vuoi. Se una riga ha lo stesso cliente, lo stesso POD/PDR e la stessa data di validità di una riga già presente, viene riconosciuta come duplicato e non viene creata una seconda voce.
+          Puoi selezionare e caricare più file insieme. Se una riga ha lo stesso cliente, lo stesso POD/PDR e lo stesso mese/anno di validità di una riga già presente, viene riconosciuta come duplicato e non viene creata una seconda voce.
         </div>
 
         <input
           type="file"
           accept=".xlsx,.xls,.csv"
+          multiple
           disabled={parsing || saving}
           onChange={(event) => {
-            const file = event.target.files?.[0];
-            void onChooseFile(file);
+            void onChooseFiles(event.target.files || undefined);
             event.currentTarget.value = "";
           }}
         />
 
-        {parsing && <div style={{ marginTop: 10, fontWeight: 700 }}>Analizzo il file...</div>}
+        {parsing && <div style={{ marginTop: 10, fontWeight: 700 }}>Analizzo i file...</div>}
 
-        {pendingFile && (
+        {pendingFiles.length > 0 && (
           <div
             style={{
               marginTop: 14,
@@ -1070,23 +1172,42 @@ export default function Archive() {
               background: "#eff6ff",
             }}
           >
-            <div style={{ fontWeight: 800 }}>{pendingFile.name}</div>
-            <div style={{ marginTop: 4, color: "#475569", fontSize: 13 }}>
-              {pendingFile.originalRowCount.toLocaleString("it-IT")} righe lette ·{" "}
-              {pendingFile.rows.length.toLocaleString("it-IT")} righe uniche nel file ·{" "}
-              {pendingFile.duplicateRowsInFile.toLocaleString("it-IT")} duplicati interni già esclusi
+            <div style={{ fontWeight: 800 }}>
+              {pendingFiles.length.toLocaleString("it-IT")} file pronti per l'importazione
             </div>
 
-            <div style={{ marginTop: 6, color: "#475569", fontSize: 13 }}>
-              LUCE {pendingFile.rows.filter((row) => row.commodity === "LUCE").length.toLocaleString("it-IT")} · GAS{" "}
-              {pendingFile.rows.filter((row) => row.commodity === "GAS").length.toLocaleString("it-IT")} · N/D{" "}
-              {pendingFile.rows.filter((row) => row.commodity === "N/D").length.toLocaleString("it-IT")}
+            <div style={{ display: "grid", gap: 6, marginTop: 9 }}>
+              {pendingFiles.map((pendingFile) => (
+                <div
+                  key={pendingFile.id}
+                  style={{
+                    padding: "8px 9px",
+                    borderRadius: 8,
+                    background: "white",
+                    border: "1px solid #dbeafe",
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 13 }}>{pendingFile.name}</div>
+                  <div style={{ marginTop: 3, color: "#475569", fontSize: 12 }}>
+                    {pendingFile.originalRowCount.toLocaleString("it-IT")} righe lette ·{" "}
+                    {pendingFile.rows.length.toLocaleString("it-IT")} righe uniche ·{" "}
+                    {pendingFile.duplicateRowsInFile.toLocaleString("it-IT")} duplicati interni esclusi
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 9, color: "#475569", fontSize: 13 }}>
+              Totale righe uniche nei file:{" "}
+              {pendingFiles
+                .reduce((sum, file) => sum + file.rows.length, 0)
+                .toLocaleString("it-IT")}
             </div>
 
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <button
                 type="button"
-                onClick={() => void addPendingFile()}
+                onClick={() => void addPendingFiles()}
                 disabled={saving}
                 style={{
                   padding: "9px 13px",
@@ -1099,12 +1220,14 @@ export default function Archive() {
                   opacity: saving ? 0.6 : 1,
                 }}
               >
-                {saving ? "Salvataggio..." : "Salva file nell'archivio"}
+                {saving
+                  ? "Salvataggio..."
+                  : `Salva ${pendingFiles.length} file nell'archivio`}
               </button>
 
               <button
                 type="button"
-                onClick={() => setPendingFile(null)}
+                onClick={() => setPendingFiles([])}
                 disabled={saving}
                 style={{
                   padding: "9px 13px",
