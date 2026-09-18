@@ -373,10 +373,10 @@ export default function OutlookEmail() {
   useEffect(() => {
     let host: HTMLElement | null = null;
     const placeInAdminToolbar = () => {
-      const reportAdminButton = Array.from(document.querySelectorAll("button")).find(
-        (node) => node.textContent?.trim() === "Report Admin" && (node as HTMLElement).offsetParent !== null
+      const dataButton = Array.from(document.querySelectorAll("button")).find(
+        (node) => node.textContent?.trim() === "DATI" && (node as HTMLElement).offsetParent !== null
       ) as HTMLElement | undefined;
-      if (!reportAdminButton?.parentElement) {
+      if (!dataButton?.parentElement) {
         if (host?.isConnected) host.remove();
         host = null;
         setPortalHost(null);
@@ -388,8 +388,8 @@ export default function OutlookEmail() {
         host.setAttribute("data-outlook-email-admin-slot", "true");
         host.style.display = "contents";
       }
-      if (host.parentElement !== reportAdminButton.parentElement || host.nextSibling !== reportAdminButton) {
-        reportAdminButton.parentElement.insertBefore(host, reportAdminButton);
+      if (host.parentElement !== dataButton.parentElement || host.nextSibling !== dataButton) {
+        dataButton.parentElement.insertBefore(host, dataButton);
       }
       setPortalHost(host);
     };
