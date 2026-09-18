@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
 import Production from "./Production";
@@ -750,6 +750,36 @@ function MultiSelectFilter({
   containerStyle?: React.CSSProperties;
   menuMinWidth?: number;
 }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const closeIfOutside = (event: MouseEvent | TouchEvent) => {
+      const details = detailsRef.current;
+      if (!details?.open) return;
+
+      const target = event.target as Node | null;
+      if (target && !details.contains(target)) {
+        details.removeAttribute("open");
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        detailsRef.current?.removeAttribute("open");
+      }
+    };
+
+    document.addEventListener("mousedown", closeIfOutside);
+    document.addEventListener("touchstart", closeIfOutside);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeIfOutside);
+      document.removeEventListener("touchstart", closeIfOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
   const selectedLabels = options
     .filter((option) => selected.includes(option.value))
     .map((option) => option.label);
@@ -773,6 +803,7 @@ function MultiSelectFilter({
     <div style={containerStyle}>
       <div style={labelStyle}>{label}</div>
       <details
+        ref={detailsRef}
         style={{
           position: "relative",
           width: "100%",
