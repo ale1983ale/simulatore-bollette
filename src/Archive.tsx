@@ -692,7 +692,12 @@ export default function Archive() {
     try {
       const databaseRows = await fetchDatabaseRows();
       setStorageMode("database");
+
+      // La migrazione può modificare il database dopo il primo caricamento.
+      // Rileggiamo sempre l'archivio al termine per evitare che la UI
+      // rimanga ferma sul risultato iniziale vuoto.
       await migrateLegacyIfNeeded(databaseRows);
+      await fetchDatabaseRows();
     } catch (error: any) {
       console.warn("ARCHIVE DB NOT READY, FALLBACK LEGACY:", error);
       setStorageMode("legacy");
