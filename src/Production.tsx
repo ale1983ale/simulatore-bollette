@@ -22,6 +22,7 @@ type ProductionRow = {
 type ParsedProductionFile = {
   id: string;
   name: string;
+  originalFile: File;
   rows: ProductionRow[];
   originalRowCount: number;
   duplicateRowsInFile: number;
@@ -37,6 +38,8 @@ type MultiSelectOption = { value: string; label: string };
 
 const PROD_TABLE = "archive_produzione";
 const AGENT_ZONE_TABLE = "production_agent_zones";
+const SOURCE_FILES_TABLE = "production_source_files";
+const STORAGE_BUCKET = "production-reports";
 const PAGE_SIZE = 1000;
 const IMPORT_CHUNK = 200;
 
@@ -216,7 +219,15 @@ async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
       const agentKey = normalize(agente);
       if (!agentKey) continue;
 
-      const dedupKey = [report.periodStart, report.periodEnd, report.commodity, agentKey].join("|");
+      const inAttivazioneCount = Math.round(parseNumber(sourceRow[1]));
+      const dedupKey = [
+        report.periodStart,
+        report.periodEnd,
+        report.commodity,
+        agentKey,
+        inAttivazioneCount,
+      ].join("|");
+
       const row: ProductionRow = {
         id: dedupKey,
         dedupKey,
@@ -226,7 +237,7 @@ async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
         commodity: report.commodity,
         agente,
         agentKey,
-        inAttivazioneCount: Math.round(parseNumber(sourceRow[1])),
+        inAttivazioneCount,
         inAttivazioneConsumo: parseNumber(sourceRow[2]),
         consumoTotale: parseNumber(sourceRow[6]),
         sourceFiles: [file.name],
@@ -243,6 +254,7 @@ async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
   return {
     id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 9),
     name: file.name,
+    originalFile: file,
     rows,
     originalRowCount,
     duplicateRowsInFile: originalRowCount - rows.length,
@@ -510,6 +522,76 @@ export default function Production() {
     if (error) throw error;
   };
 
+  const storagePathForFile = (fileName: string) => {
+    const safeName = fileName
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9._-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+    return "reports/" + (safeName || "report.xlsx");
+  };
+
+  const uploadOriginalFileToCloud = async (parsedFile: ParsedProductionFile) => {
+    const storagePath = storagePathForFile(parsedFile.name);
+    const contentType =
+      parsedFile.originalFile.type ||
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, parsedFile.originalFile, {
+        upsert: true,
+        cacheControl: "3600",
+        contentType,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { error: metadataError } = await supabase
+      .from(SOURCE_FILES_TABLE)
+      .upsert(
+        {
+          file_name: parsedFile.name,
+          storage_path: storagePath,
+          file_size: parsedFile.originalFile.size,
+          content_type: contentType,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "file_name" }
+      );
+
+    if (metadataError) throw metadataError;
+
+    return storagePath;
+  };
+
+  const removeOriginalFileFromCloud = async (fileName: string) => {
+    const { data, error: lookupError } = await supabase
+      .from(SOURCE_FILES_TABLE)
+      .select("storage_path")
+      .eq("file_name", fileName)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+
+    const storagePath = String(data?.storage_path || "");
+    if (storagePath) {
+      const { error: removeError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .remove([storagePath]);
+      if (removeError) throw removeError;
+    }
+
+    const { error: metadataDeleteError } = await supabase
+      .from(SOURCE_FILES_TABLE)
+      .delete()
+      .eq("file_name", fileName);
+
+    if (metadataDeleteError) throw metadataDeleteError;
+  };
+
   const importRows = async (fileName: string, importRows: ProductionRow[]) => {
     let inserted = 0;
     let duplicates = 0;
@@ -565,17 +647,25 @@ export default function Production() {
       let inserted = 0;
       let duplicates = 0;
       const fileCount = pendingFiles.length;
+      let cloudUploaded = 0;
+
       for (const file of pendingFiles) {
+        await uploadOriginalFileToCloud(file);
+        cloudUploaded += 1;
+
         const result = await importRows(file.name, file.rows);
         inserted += result.inserted;
         duplicates += result.duplicates + file.duplicateRowsInFile;
       }
+
       await Promise.all([fetchRows(), fetchAgentZones()]);
       setPendingFiles([]);
       setMessage(
         "Import PRODUZIONE completato: " +
           fileCount +
           " file elaborati, " +
+          cloudUploaded +
+          " file originali salvati nel cloud, " +
           inserted +
           " righe nuove, " +
           duplicates +
@@ -608,6 +698,8 @@ export default function Production() {
     if (!window.confirm('Rimuovere il file "' + fileName + '" dall\'archivio PRODUZIONE?')) return;
     setSaving(true);
     try {
+      await removeOriginalFileFromCloud(fileName);
+
       const affected = rows.filter((row) => row.sourceFiles.includes(fileName));
       for (const row of affected) {
         const remaining = row.sourceFiles.filter((name) => name !== fileName);
@@ -765,7 +857,7 @@ export default function Production() {
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0 }}>PRODUZIONE · Carica file</h3>
             <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-              Puoi selezionare più report insieme. La chiave duplicato è Periodo + Luce/Gas + Agente.
+              Puoi selezionare più report insieme. Una riga è considerata duplicata quando coincidono Periodo + Luce/Gas + Agente + N° POD/PDR in attivazione. Il file Excel originale viene salvato anche nel cloud.
             </div>
             <input
               type="file"
