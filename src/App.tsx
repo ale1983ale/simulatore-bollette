@@ -349,6 +349,12 @@ const numFormat = (v: number, decimals: number) =>
     maximumFractionDigits: decimals,
   });
 
+const referencePriceFormat = (v: number) =>
+  Number(v || 0).toLocaleString("it-IT", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 6,
+  });
+
 const isSi = (v: string) => String(v).trim().toUpperCase() === "SI";
 
 const normalizeOfferName = (offer: string) => String(offer || "").trim().toUpperCase();
@@ -1236,6 +1242,46 @@ function Energia({
     [s, punPsvRows, energyOffers, dispCpRows]
   );
 
+  const energyReferenceRows = useMemo(() => {
+    const isDomestic = ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(s.tipo);
+    const actualFixedLabel = isDomestic ? "FISSO DOMESTICO" : "FISSO BUSINESS";
+    const actualFixedRow =
+      punPsvRows.find((row) => row.mese === actualFixedLabel) || punPsvRows[0];
+
+    const buildRow = (selectedMonth: string, index: number) => {
+      if (!selectedMonth) return null;
+
+      if (selectedMonth === "FISSO DOMESTICO" || selectedMonth === "FISSO BUSINESS") {
+        return {
+          label: `Mese ${index} · ${actualFixedLabel}`,
+          value: `Prezzo fisso ${referencePriceFormat(n(actualFixedRow?.mono))} €/kWh`,
+        };
+      }
+
+      if (selectedMonth === "FISSO AD HOC") {
+        return {
+          label: `Mese ${index} · FISSO AD HOC`,
+          value: `Prezzo fisso ${referencePriceFormat(r.spreadEff)} €/kWh`,
+        };
+      }
+
+      const source = punPsvRows.find((row) => row.mese === selectedMonth);
+      return {
+        label: `Mese ${index} · ${selectedMonth}`,
+        value: source
+          ? `F1 ${referencePriceFormat(n(source.f1))} · F2 ${referencePriceFormat(n(source.f2))} · F3 ${referencePriceFormat(n(source.f3))} · F0 ${referencePriceFormat(n(source.mono))} €/kWh`
+          : "-",
+      };
+    };
+
+    const result = [buildRow(s.mese1, 1)];
+    if (sLikeBimestrale(s.fatturazione) && s.mese2) {
+      result.push(buildRow(s.mese2, 2));
+    }
+
+    return result.filter(Boolean) as Array<{ label: string; value: string }>;
+  }, [s.mese1, s.mese2, s.fatturazione, s.tipo, punPsvRows, r.spreadEff]);
+
     useEffect(() => {
     if (!s.dispacciamentoCapacityMarket || s.dispacciamentoCapacityMarket === "0") {
       setS((prev) => ({
@@ -1859,6 +1905,18 @@ Base suggerito
         "anteprima",
         "Anteprima Energia",
         <>
+          {energyReferenceRows.length > 0 &&
+            previewBox(
+              <>
+                {energyReferenceRows.map((item) => (
+                  <React.Fragment key={item.label}>
+                    {row(item.label, item.value)}
+                  </React.Fragment>
+                ))}
+              </>,
+              "#cbd5e1"
+            )}
+
           {previewBox(
             <>
               {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}
@@ -2175,6 +2233,47 @@ function Gas({
   );
 
   const r = useMemo(() => calcGas(s, punPsvRows, gasOffers), [s, punPsvRows, gasOffers]);
+
+  const gasReferenceRows = useMemo(() => {
+    const selectedPeriods = [s.periodo1, s.periodo2, s.periodo3, s.periodo4];
+    const periodCount = gasMonths(s.fatturazione);
+
+    return selectedPeriods
+      .slice(0, periodCount)
+      .map((selectedPeriod, index) => {
+        if (!selectedPeriod) return null;
+
+        if (selectedPeriod === "FISSO AD HOC") {
+          return {
+            label: `Mese ${index + 1} · FISSO AD HOC`,
+            value: `Prezzo fisso ${referencePriceFormat(r.spreadEff)} €/Smc`,
+          };
+        }
+
+        const source = punPsvRows.find((row) => row.mese === selectedPeriod);
+        const isFixed =
+          selectedPeriod === "FISSO DOMESTICO" ||
+          selectedPeriod === "FISSO BUSINESS";
+
+        return {
+          label: `Mese ${index + 1} · ${selectedPeriod}`,
+          value: source
+            ? isFixed
+              ? `Prezzo fisso ${referencePriceFormat(n(source.psv))} €/Smc`
+              : `PSV ${referencePriceFormat(n(source.psv))} €/Smc`
+            : "-",
+        };
+      })
+      .filter(Boolean) as Array<{ label: string; value: string }>;
+  }, [
+    s.periodo1,
+    s.periodo2,
+    s.periodo3,
+    s.periodo4,
+    s.fatturazione,
+    punPsvRows,
+    r.spreadEff,
+  ]);
 
   const gasMonthOptions = mesiOrdinati
   .filter((m) => {
@@ -2646,6 +2745,18 @@ border: "1px solid #bfd8f6",
           "anteprima",
           "Anteprima Gas",
           <>
+            {gasReferenceRows.length > 0 &&
+              previewBox(
+                <>
+                  {gasReferenceRows.map((item) => (
+                    <React.Fragment key={item.label}>
+                      {row(item.label, item.value)}
+                    </React.Fragment>
+                  ))}
+                </>,
+                "#cbd5e1"
+              )}
+
             {previewBox(
               <>
                 {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 2))}
