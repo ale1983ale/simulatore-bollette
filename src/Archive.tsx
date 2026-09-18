@@ -865,6 +865,7 @@ export default function Archive() {
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
+  const [archiveSection, setArchiveSection] = useState<"recessi" | "produzione">("recessi");
 
   const [commodities, setCommodities] = useState<string[]>([]);
   const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
@@ -1574,6 +1575,48 @@ export default function Archive() {
         </div>
       </div>
 
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setArchiveSection("recessi")}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 9,
+            border: archiveSection === "recessi" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+            background: archiveSection === "recessi" ? "#0f172a" : "white",
+            color: archiveSection === "recessi" ? "white" : "#0f172a",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          RECESSI
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setArchiveSection("produzione")}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 9,
+            border: archiveSection === "produzione" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+            background: archiveSection === "produzione" ? "#0f172a" : "white",
+            color: archiveSection === "produzione" ? "white" : "#0f172a",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          PRODUZIONE
+        </button>
+      </div>
+
+      {archiveSection === "recessi" ? (
+        <>
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>RECESSI · Carica file</h3>
         <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
@@ -2115,6 +2158,15 @@ export default function Archive() {
           </>
         )}
       </div>
+        </>
+      ) : (
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>PRODUZIONE</h3>
+          <div style={{ color: "#64748b", fontSize: 14 }}>
+            Sezione PRODUZIONE pronta per essere sviluppata.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
