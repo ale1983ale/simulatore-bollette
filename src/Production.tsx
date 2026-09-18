@@ -376,6 +376,9 @@ export default function Production() {
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [zonesDirty, setZonesDirty] = useState(false);
+  const [savingZones, setSavingZones] = useState(false);
+  const [zoneMessage, setZoneMessage] = useState("");
 
   const [periodsSelected, setPeriodsSelected] = useState<string[]>([]);
   const [commoditiesSelected, setCommoditiesSelected] = useState<string[]>([]);
@@ -412,6 +415,7 @@ export default function Production() {
       regione: String(item.regione || ""),
     }));
     setAgentZones(loaded);
+    setZonesDirty(false);
     return loaded;
   };
 
@@ -719,15 +723,43 @@ export default function Production() {
     }
   };
 
-  const updateAgentRegion = async (agent: AgentZone, regione: string) => {
-    setAgentZones((current) => current.map((item) => (item.agentKey === agent.agentKey ? { ...item, regione } : item)));
-    const { error } = await supabase
-      .from(AGENT_ZONE_TABLE)
-      .update({ regione: regione || null, updated_at: new Date().toISOString() })
-      .eq("agent_key", agent.agentKey);
-    if (error) {
-      alert("Errore nel salvataggio della zona: " + error.message);
-      await fetchAgentZones();
+  const updateAgentRegion = (agent: AgentZone, regione: string) => {
+    setAgentZones((current) =>
+      current.map((item) =>
+        item.agentKey === agent.agentKey ? { ...item, regione } : item
+      )
+    );
+    setZonesDirty(true);
+    setZoneMessage("");
+  };
+
+  const saveAgentZones = async () => {
+    if (!zonesDirty || savingZones) return;
+
+    setSavingZones(true);
+    setZoneMessage("");
+
+    try {
+      const payload = agentZones.map((agent) => ({
+        agent_key: agent.agentKey,
+        agente: agent.agente,
+        regione: agent.regione || null,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase
+        .from(AGENT_ZONE_TABLE)
+        .upsert(payload, { onConflict: "agent_key" });
+
+      if (error) throw error;
+
+      setZonesDirty(false);
+      setZoneMessage("Zone agenti salvate correttamente.");
+    } catch (error: any) {
+      console.error("SAVE AGENT ZONES ERROR", error);
+      alert("Errore nel salvataggio delle zone: " + (error?.message || error));
+    } finally {
+      setSavingZones(false);
     }
   };
 
@@ -819,10 +851,72 @@ export default function Production() {
 
       {section === "zone" ? (
         <div style={cardStyle}>
-          <h3 style={{ marginTop: 0 }}>AGENTI / ZONE</h3>
-          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 8,
+            }}
+          >
+            <h3 style={{ margin: 0 }}>AGENTI / ZONE</h3>
+
+            <button
+              type="button"
+              onClick={() => void saveAgentZones()}
+              disabled={!zonesDirty || savingZones}
+              style={{
+                padding: "9px 14px",
+                borderRadius: 8,
+                border: 0,
+                background: zonesDirty ? "#16a34a" : "#cbd5e1",
+                color: "white",
+                fontWeight: 900,
+                cursor: !zonesDirty || savingZones ? "default" : "pointer",
+                opacity: savingZones ? 0.7 : 1,
+              }}
+            >
+              {savingZones ? "Salvataggio..." : "Salva modifiche"}
+            </button>
+          </div>
+
+          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 10 }}>
             Gli agenti vengono aggiunti automaticamente quando importi i report. Assegna a ciascuno la regione di appartenenza: verrà usata dal filtro ZONA nella PRODUZIONE.
           </div>
+
+          {zonesDirty && (
+            <div
+              style={{
+                marginBottom: 10,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "#fff7ed",
+                color: "#9a3412",
+                fontWeight: 800,
+                fontSize: 13,
+              }}
+            >
+              Hai modifiche non ancora salvate.
+            </div>
+          )}
+
+          {zoneMessage && !zonesDirty && (
+            <div
+              style={{
+                marginBottom: 10,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "#f0fdf4",
+                color: "#166534",
+                fontWeight: 800,
+                fontSize: 13,
+              }}
+            >
+              {zoneMessage}
+            </div>
+          )}
           <div style={{ display: "grid", gap: 7 }}>
             {agentZones.length === 0 ? (
               <div style={{ color: "#64748b" }}>Nessun agente ancora presente. Importa almeno un report PRODUZIONE.</div>
@@ -841,7 +935,7 @@ export default function Production() {
                   }}
                 >
                   <strong>{agent.agente}</strong>
-                  <select value={agent.regione} onChange={(e) => void updateAgentRegion(agent, e.target.value)} style={inputStyle}>
+                  <select value={agent.regione} onChange={(e) => updateAgentRegion(agent, e.target.value)} style={inputStyle}>
                     <option value="">Zona non assegnata</option>
                     {ITALIAN_REGIONS.map((region) => (
                       <option key={region} value={region}>{region}</option>
