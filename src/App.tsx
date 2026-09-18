@@ -6208,23 +6208,13 @@ const renderAdminContent = () => {
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
-            onClick={() => setTab("reportAdmin")}
-            style={{
-              ...baseBtn,
-              ...(tab === "reportAdmin" ? activeBtn : {}),
-            }}
-          >
-            Report Admin
-          </button>
-
-          <button
             onClick={() => setTab("archive")}
             style={{
               ...baseBtn,
               ...(tab === "archive" ? activeBtn : {}),
             }}
           >
-            ARCHIVIO
+            DATI
           </button>
 
           <button
@@ -6235,6 +6225,16 @@ const renderAdminContent = () => {
             }}
           >
             DATABASE
+          </button>
+
+          <button
+            onClick={() => setTab("reportAdmin")}
+            style={{
+              ...baseBtn,
+              ...(tab === "reportAdmin" ? activeBtn : {}),
+            }}
+          >
+            Report Admin
           </button>
 
 {(agentSession || adminSession) && (
