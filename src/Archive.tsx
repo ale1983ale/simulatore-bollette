@@ -3,34 +3,49 @@ import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
 
 type Commodity = "LUCE" | "GAS" | "N/D";
+type StorageMode = "loading" | "database" | "legacy";
 
 type RecessoRow = {
   id: string;
+  dedupKey: string;
   sourceFile: string;
+  sourceFiles: string[];
   sourceSheet: string;
   commodity: Commodity;
   validita: string;
+  validitaDate: string;
   monthKey: string;
   agente: string;
   denominazione: string;
+  podPdr: string;
   tipoCliente: string;
   consumo: number | null;
   raw: Record<string, string>;
 };
 
-type RecessiFile = {
+type ParsedFile = {
   id: string;
   name: string;
   uploadedAt: string;
   rows: RecessoRow[];
+  originalRowCount: number;
+  duplicateRowsInFile: number;
 };
 
-type RecessiArchive = {
+type LegacyArchive = {
   version: 1;
-  files: RecessiFile[];
+  files: Array<{
+    id: string;
+    name: string;
+    uploadedAt: string;
+    rows: any[];
+  }>;
 };
 
-const ARCHIVE_KEY = "archive_recessi_v1";
+const LEGACY_KEY = "archive_recessi_v1";
+const DB_TABLE = "archive_recessi";
+const PAGE_SIZE = 1000;
+const IMPORT_CHUNK = 400;
 
 const MONTHS_IT = [
   "GENNAIO",
@@ -66,11 +81,12 @@ const stringifyCell = (value: unknown) => {
 
 const aliasGroups = {
   validita: [
+    "DATA_VALIDITA_RECESSO",
+    "DATA VALIDITA RECESSO",
     "DATA VALIDITA",
     "DATA VALIDITÀ",
     "VALIDITA",
     "VALIDITÀ",
-    "DATA VALIDITA RECESSO",
     "DATA FINE VALIDITA",
     "DATA FINE",
     "DATA CESSAZIONE",
@@ -93,6 +109,15 @@ const aliasGroups = {
     "DENOMINAZIONE CLIENTE",
     "NOME CLIENTE",
     "CLIENTE",
+  ],
+  podPdr: [
+    "POD",
+    "PDR",
+    "POD/PDR",
+    "POD PDR",
+    "CODICE POD",
+    "CODICE PDR",
+    "CODICE FORNITURA",
   ],
   tipoCliente: [
     "TIPOLOGIA CLIENTE",
@@ -147,6 +172,7 @@ function findHeaderRow(matrix: unknown[][]) {
   for (let rowIndex = 0; rowIndex < maxRows; rowIndex += 1) {
     const row = matrix[rowIndex] || [];
     let score = 0;
+
     row.forEach((cell) => {
       const key = normalize(cell);
       if (!key) return;
@@ -171,6 +197,7 @@ function findHeaderRow(matrix: unknown[][]) {
 
 function makeHeaders(row: unknown[]) {
   const used = new Map<string, number>();
+
   return row.map((cell, index) => {
     const base = stringifyCell(cell) || `COLONNA_${index + 1}`;
     const key = normalize(base);
@@ -182,7 +209,6 @@ function makeHeaders(row: unknown[]) {
 
 function findRawValue(raw: Record<string, string>, aliases: string[]) {
   const entries = Object.entries(raw).map(([key, value]) => ({
-    key,
     normalized: normalize(key),
     value,
   }));
@@ -233,28 +259,25 @@ function parseNumber(value: unknown): number | null {
 }
 
 function parseDate(value: unknown) {
+  const build = (year: number, month: number, day: number) => ({
+    display: `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`,
+    monthKey: `${year}-${String(month).padStart(2, "0")}`,
+    dateKey: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  });
+
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const year = value.getFullYear();
-    const month = value.getMonth() + 1;
-    const day = value.getDate();
-    return {
-      display: `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`,
-      monthKey: `${year}-${String(month).padStart(2, "0")}`,
-    };
+    return build(value.getFullYear(), value.getMonth() + 1, value.getDate());
   }
 
   if (typeof value === "number" && Number.isFinite(value)) {
     const decoded = XLSX.SSF.parse_date_code(value);
     if (decoded?.y && decoded?.m && decoded?.d) {
-      return {
-        display: `${String(decoded.d).padStart(2, "0")}/${String(decoded.m).padStart(2, "0")}/${decoded.y}`,
-        monthKey: `${decoded.y}-${String(decoded.m).padStart(2, "0")}`,
-      };
+      return build(decoded.y, decoded.m, decoded.d);
     }
   }
 
   const text = String(value ?? "").trim();
-  if (!text) return { display: "", monthKey: "" };
+  if (!text) return { display: "", monthKey: "", dateKey: "" };
 
   const ita = text.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
   if (ita) {
@@ -263,46 +286,37 @@ function parseDate(value: unknown) {
     let year = Number(ita[3]);
     if (year < 100) year += year < 70 ? 2000 : 1900;
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return {
-        display: `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`,
-        monthKey: `${year}-${String(month).padStart(2, "0")}`,
-      };
+      return build(year, month, day);
     }
   }
 
   const iso = text.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
   if (iso) {
-    const year = Number(iso[1]);
-    const month = Number(iso[2]);
-    const day = Number(iso[3]);
-    return {
-      display: `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`,
-      monthKey: `${year}-${String(month).padStart(2, "0")}`,
-    };
+    return build(Number(iso[1]), Number(iso[2]), Number(iso[3]));
   }
 
   const parsed = new Date(text);
   if (!Number.isNaN(parsed.getTime())) {
-    return {
-      display: `${String(parsed.getDate()).padStart(2, "0")}/${String(parsed.getMonth() + 1).padStart(2, "0")}/${parsed.getFullYear()}`,
-      monthKey: `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`,
-    };
+    return build(parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate());
   }
 
-  return { display: text, monthKey: "" };
+  return { display: text, monthKey: "", dateKey: "" };
 }
 
 function friendlyCustomerType(value: string, commodity: Commodity) {
   const code = normalize(value);
+
   if (commodity === "LUCE") {
     if (code === "RES") return "RESIDENZIALE (RES)";
     if (code === "ALTRE") return "ALTRI USI (ALTRE)";
   }
+
   if (commodity === "GAS") {
     if (code === "CIV") return "CIVILE (CIV)";
     if (code === "ART") return "ARTIGIANALE (ART)";
     if (code === "IND") return "INDUSTRIALE (IND)";
   }
+
   return String(value || "").trim();
 }
 
@@ -317,18 +331,87 @@ function inferCommodity(sheetName: string, raw: Record<string, string>): Commodi
 }
 
 function monthLabel(monthKey: string) {
-  const match = monthKey.match(/^(\d{4})-(\d{2})$/);
+  const match = String(monthKey || "").match(/^(\d{4})-(\d{2})$/);
   if (!match) return "N/D";
   const year = Number(match[1]);
   const month = Number(match[2]);
   return `${MONTHS_IT[month - 1] || ""} ${year}`.trim();
 }
 
-async function parseRecessiFile(file: File): Promise<RecessiFile> {
+function createDedupKey(
+  commodity: Commodity,
+  denominazione: string,
+  podPdr: string,
+  validitaDate: string,
+  fallback: string
+) {
+  const customer = normalize(denominazione);
+  const point = normalize(podPdr);
+  const date = String(validitaDate || "").trim();
+
+  if (customer && point && date) {
+    return `${commodity}|${customer}|${point}|${date}`;
+  }
+
+  return `ROW|${normalize(fallback)}`;
+}
+
+function toRowFromRaw(
+  raw: Record<string, string>,
+  sourceFile: string,
+  sourceSheet: string,
+  rowFallback: string
+): RecessoRow {
+  const commodity = inferCommodity(sourceSheet, raw);
+  const dateRaw = findRawValue(raw, aliasGroups.validita);
+  const parsedDate = parseDate(dateRaw);
+  const agente = findRawValue(raw, aliasGroups.agente);
+  const denominazione = findRawValue(raw, aliasGroups.denominazione);
+  const podPdr = findRawValue(raw, aliasGroups.podPdr);
+  const tipoClienteRaw = findRawValue(raw, aliasGroups.tipoCliente);
+  const tipoCliente = friendlyCustomerType(tipoClienteRaw, commodity);
+
+  const consumptionAliases =
+    commodity === "GAS"
+      ? ["CONSUMO_ANNUO", "CONSUMO ANNUO", "CONSUMO ANNUO SMC", "CONSUMO SMC", "SMC", ...aliasGroups.consumo]
+      : commodity === "LUCE"
+      ? ["KWH_ANNUI", "KWH ANNUI", "CONSUMO ANNUO KWH", "CONSUMO KWH", "KWH", ...aliasGroups.consumo]
+      : aliasGroups.consumo;
+
+  const consumo = parseNumber(findRawValue(raw, consumptionAliases));
+  const dedupKey = createDedupKey(
+    commodity,
+    denominazione,
+    podPdr,
+    parsedDate.dateKey,
+    `${sourceFile}|${sourceSheet}|${rowFallback}`
+  );
+
+  return {
+    id: dedupKey,
+    dedupKey,
+    sourceFile,
+    sourceFiles: [sourceFile],
+    sourceSheet,
+    commodity,
+    validita: parsedDate.display || dateRaw,
+    validitaDate: parsedDate.dateKey,
+    monthKey: parsedDate.monthKey,
+    agente,
+    denominazione,
+    podPdr,
+    tipoCliente,
+    consumo,
+    raw,
+  };
+}
+
+async function parseRecessiFile(file: File): Promise<ParsedFile> {
   const data = await file.arrayBuffer();
   const workbook = XLSX.read(data, { type: "array", cellDates: true });
-  const rows: RecessoRow[] = [];
-  const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+  const byKey = new Map<string, RecessoRow>();
+  let originalRowCount = 0;
 
   workbook.SheetNames.forEach((sheetName, sheetIndex) => {
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
@@ -338,54 +421,104 @@ async function parseRecessiFile(file: File): Promise<RecessiFile> {
     }) as unknown[][];
 
     if (!matrix.length) return;
+
     const headerIndex = findHeaderRow(matrix);
     const headers = makeHeaders(matrix[headerIndex] || []);
 
     matrix.slice(headerIndex + 1).forEach((sourceRow, rowIndex) => {
       if (!sourceRow || sourceRow.every((cell) => stringifyCell(cell) === "")) return;
 
+      originalRowCount += 1;
       const raw: Record<string, string> = {};
+
       headers.forEach((header, colIndex) => {
         raw[header] = stringifyCell(sourceRow[colIndex]);
       });
 
-      const commodity = inferCommodity(sheetName, raw);
-      const dateRaw = findRawValue(raw, aliasGroups.validita);
-      const parsedDate = parseDate(sourceRow[headers.findIndex((h) => normalize(h) === normalize(Object.keys(raw).find((key) => raw[key] === dateRaw) || ""))] ?? dateRaw);
-      const agente = findRawValue(raw, aliasGroups.agente);
-      const denominazione = findRawValue(raw, aliasGroups.denominazione);
-      const tipoClienteRaw = findRawValue(raw, aliasGroups.tipoCliente);
-      const tipoCliente = friendlyCustomerType(tipoClienteRaw, commodity);
-
-      const consumptionAliases =
-        commodity === "GAS"
-          ? ["CONSUMO_ANNUO", "CONSUMO ANNUO", "CONSUMO ANNUO SMC", "CONSUMO SMC", "SMC", ...aliasGroups.consumo]
-          : commodity === "LUCE"
-          ? ["KWH_ANNUI", "KWH ANNUI", "CONSUMO ANNUO KWH", "CONSUMO KWH", "KWH", ...aliasGroups.consumo]
-          : aliasGroups.consumo;
-      const consumo = parseNumber(findRawValue(raw, consumptionAliases));
-
-      rows.push({
-        id: `${fileId}-${sheetIndex}-${rowIndex}`,
-        sourceFile: file.name,
-        sourceSheet: sheetName,
-        commodity,
-        validita: parsedDate.display || dateRaw,
-        monthKey: parsedDate.monthKey,
-        agente,
-        denominazione,
-        tipoCliente,
-        consumo,
+      const row = toRowFromRaw(
         raw,
-      });
+        file.name,
+        sheetName,
+        `${sheetIndex}-${rowIndex}`
+      );
+
+      if (!byKey.has(row.dedupKey)) {
+        byKey.set(row.dedupKey, row);
+      }
     });
   });
 
+  const rows = Array.from(byKey.values());
+
   return {
-    id: fileId,
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     name: file.name,
     uploadedAt: new Date().toISOString(),
     rows,
+    originalRowCount,
+    duplicateRowsInFile: originalRowCount - rows.length,
+  };
+}
+
+function dbRowToRecesso(row: any): RecessoRow {
+  const sourceFiles = Array.isArray(row.source_files) ? row.source_files : [];
+  const sourceSheets = Array.isArray(row.source_sheets) ? row.source_sheets : [];
+
+  return {
+    id: String(row.id),
+    dedupKey: String(row.dedup_key || ""),
+    sourceFile: sourceFiles[0] || "",
+    sourceFiles,
+    sourceSheet: sourceSheets.join(", "),
+    commodity: (row.commodity || "N/D") as Commodity,
+    validita: String(row.validita_text || ""),
+    validitaDate: String(row.validita_date || ""),
+    monthKey: String(row.month_key || ""),
+    agente: String(row.agente || ""),
+    denominazione: String(row.denominazione || ""),
+    podPdr: String(row.pod_pdr || ""),
+    tipoCliente: String(row.tipo_cliente || ""),
+    consumo: row.consumo === null || row.consumo === undefined ? null : Number(row.consumo),
+    raw: (row.raw || {}) as Record<string, string>,
+  };
+}
+
+function normalizeLegacyArchive(saved: any): LegacyArchive {
+  if (!saved || saved.version !== 1 || !Array.isArray(saved.files)) {
+    return { version: 1, files: [] };
+  }
+
+  return {
+    version: 1,
+    files: saved.files.map((file: any, fileIndex: number) => {
+      const name = String(file?.name || `File ${fileIndex + 1}`);
+      const rows = Array.isArray(file?.rows)
+        ? file.rows.map((old: any, rowIndex: number) => {
+            if (old?.dedupKey && old?.podPdr !== undefined) return old;
+
+            const raw = (old?.raw || {}) as Record<string, string>;
+            const rebuilt = toRowFromRaw(
+              raw,
+              name,
+              String(old?.sourceSheet || ""),
+              `${fileIndex}-${rowIndex}`
+            );
+
+            return {
+              ...rebuilt,
+              sourceFile: name,
+              sourceFiles: [name],
+            };
+          })
+        : [];
+
+      return {
+        id: String(file?.id || `legacy-${fileIndex}`),
+        name,
+        uploadedAt: String(file?.uploadedAt || new Date().toISOString()),
+        rows,
+      };
+    }),
   };
 }
 
@@ -413,12 +546,14 @@ const cardStyle: React.CSSProperties = {
 };
 
 export default function Archive() {
-  const [subTab, setSubTab] = useState<"recessi">("recessi");
-  const [archive, setArchive] = useState<RecessiArchive>({ version: 1, files: [] });
-  const [pendingFile, setPendingFile] = useState<RecessiFile | null>(null);
+  const [storageMode, setStorageMode] = useState<StorageMode>("loading");
+  const [rows, setRows] = useState<RecessoRow[]>([]);
+  const [legacyArchive, setLegacyArchive] = useState<LegacyArchive>({ version: 1, files: [] });
+  const [pendingFile, setPendingFile] = useState<ParsedFile | null>(null);
   const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [lastImportMessage, setLastImportMessage] = useState("");
 
   const [commodity, setCommodity] = useState("ALL");
   const [month, setMonth] = useState("ALL");
@@ -429,62 +564,194 @@ export default function Archive() {
   const [consumptionMax, setConsumptionMax] = useState("");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+  const loadLegacy = async () => {
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("value_json")
+      .eq("key", LEGACY_KEY)
+      .limit(1);
+
+    if (error) {
+      console.error("LOAD LEGACY ARCHIVE ERROR:", error);
+      setLegacyArchive({ version: 1, files: [] });
+      setRows([]);
+      return;
+    }
+
+    const archive = normalizeLegacyArchive(data?.[0]?.value_json);
+    setLegacyArchive(archive);
+    setRows(archive.files.flatMap((file) => file.rows as RecessoRow[]));
+  };
+
+  const fetchDatabaseRows = async () => {
+    const loaded: RecessoRow[] = [];
+
+    for (let start = 0; ; start += PAGE_SIZE) {
       const { data, error } = await supabase
-        .from("app_settings")
-        .select("value_json")
-        .eq("key", ARCHIVE_KEY)
-        .limit(1);
+        .from(DB_TABLE)
+        .select(
+          "id,dedup_key,commodity,validita_date,validita_text,month_key,agente,denominazione,pod_pdr,tipo_cliente,consumo,raw,source_files,source_sheets,first_seen_at,updated_at"
+        )
+        .order("id", { ascending: true })
+        .range(start, start + PAGE_SIZE - 1);
 
-      if (error) {
-        console.error("LOAD ARCHIVE RECESSI ERROR:", error);
-      } else {
-        const saved = data?.[0]?.value_json as RecessiArchive | undefined;
-        if (saved?.version === 1 && Array.isArray(saved.files)) {
-          setArchive(saved);
-        }
+      if (error) throw error;
+
+      const page = (data || []).map(dbRowToRecesso);
+      loaded.push(...page);
+
+      if (page.length < PAGE_SIZE) break;
+    }
+
+    setRows(loaded);
+    return loaded;
+  };
+
+  const importRowsToDatabase = async (fileName: string, importRows: RecessoRow[]) => {
+    let inserted = 0;
+    let duplicates = 0;
+
+    for (let start = 0; start < importRows.length; start += IMPORT_CHUNK) {
+      const chunk = importRows.slice(start, start + IMPORT_CHUNK).map((row) => ({
+        dedup_key: row.dedupKey,
+        commodity: row.commodity,
+        validita_date: row.validitaDate || null,
+        validita_text: row.validita,
+        month_key: row.monthKey,
+        agente: row.agente,
+        denominazione: row.denominazione,
+        pod_pdr: row.podPdr,
+        tipo_cliente: row.tipoCliente,
+        consumo: row.consumo,
+        raw: row.raw,
+        source_sheet: row.sourceSheet,
+      }));
+
+      const { data, error } = await supabase.rpc("archive_recessi_import_rows", {
+        p_file_name: fileName,
+        p_rows: chunk,
+      });
+
+      if (error) throw error;
+
+      inserted += Number(data?.inserted || 0);
+      duplicates += Number(data?.duplicates || 0);
+    }
+
+    return { inserted, duplicates };
+  };
+
+  const migrateLegacyIfNeeded = async (databaseRows: RecessoRow[]) => {
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("value_json")
+      .eq("key", LEGACY_KEY)
+      .limit(1);
+
+    if (error) return;
+
+    const legacy = normalizeLegacyArchive(data?.[0]?.value_json);
+    if (!legacy.files.length) return;
+
+    let migrated = 0;
+    let duplicates = 0;
+
+    try {
+      for (const file of legacy.files) {
+        const normalizedRows = (file.rows as RecessoRow[]).map((row, index) => {
+          if (row.dedupKey) return row;
+          return toRowFromRaw(row.raw || {}, file.name, row.sourceSheet || "", `legacy-${index}`);
+        });
+
+        const result = await importRowsToDatabase(file.name, normalizedRows);
+        migrated += result.inserted;
+        duplicates += result.duplicates;
       }
+
+      const { error: clearError } = await supabase
+        .from("app_settings")
+        .upsert([{ key: LEGACY_KEY, value_json: { version: 1, files: [] } }]);
+
+      if (!clearError) {
+        await fetchDatabaseRows();
+        setLastImportMessage(
+          `Archivio precedente migrato nel database: ${migrated} righe importate, ${duplicates} duplicati già presenti.`
+        );
+      }
+    } catch (migrationError) {
+      console.error("LEGACY MIGRATION ERROR:", migrationError);
+      if (!databaseRows.length) {
+        setLastImportMessage("La nuova tabella è attiva, ma la migrazione automatica del vecchio archivio non è riuscita.");
+      }
+    }
+  };
+
+  const loadArchive = async () => {
+    setLoading(true);
+
+    try {
+      const databaseRows = await fetchDatabaseRows();
+      setStorageMode("database");
+      await migrateLegacyIfNeeded(databaseRows);
+    } catch (error: any) {
+      console.warn("ARCHIVE DB NOT READY, FALLBACK LEGACY:", error);
+      setStorageMode("legacy");
+      await loadLegacy();
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    void load();
+  useEffect(() => {
+    void loadArchive();
   }, []);
-
-  const allRows = useMemo(() => archive.files.flatMap((file) => file.rows || []), [archive]);
 
   const months = useMemo(
     () =>
-      Array.from(new Set(allRows.map((row) => row.monthKey).filter(Boolean))).sort((a, b) =>
+      Array.from(new Set(rows.map((row) => row.monthKey).filter(Boolean))).sort((a, b) =>
         b.localeCompare(a)
       ),
-    [allRows]
+    [rows]
   );
 
   const agents = useMemo(
     () =>
-      Array.from(new Set(allRows.map((row) => row.agente.trim()).filter(Boolean))).sort((a, b) =>
+      Array.from(new Set(rows.map((row) => row.agente.trim()).filter(Boolean))).sort((a, b) =>
         a.localeCompare(b, "it")
       ),
-    [allRows]
+    [rows]
   );
 
   const customerNames = useMemo(
     () =>
-      Array.from(
-        new Set(allRows.map((row) => String(row.denominazione || "").trim()).filter(Boolean))
-      ).sort((a, b) => a.localeCompare(b, "it")),
-    [allRows]
+      Array.from(new Set(rows.map((row) => row.denominazione.trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, "it")
+      ),
+    [rows]
   );
 
   const customerTypes = useMemo(
     () =>
-      Array.from(new Set(allRows.map((row) => String(row.tipoCliente || "").trim()).filter(Boolean))).sort((a, b) =>
+      Array.from(new Set(rows.map((row) => row.tipoCliente.trim()).filter(Boolean))).sort((a, b) =>
         a.localeCompare(b, "it")
       ),
-    [allRows]
+    [rows]
   );
+
+  const fileStats = useMemo(() => {
+    const map = new Map<string, number>();
+
+    rows.forEach((row) => {
+      const sources = row.sourceFiles.length ? row.sourceFiles : row.sourceFile ? [row.sourceFile] : [];
+      sources.forEach((name) => {
+        map.set(name, (map.get(name) || 0) + 1);
+      });
+    });
+
+    return Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+  }, [rows]);
 
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
@@ -492,38 +759,52 @@ export default function Archive() {
     const customerNeedle = customerName.trim().toLocaleLowerCase("it");
     const needle = search.trim().toLocaleLowerCase("it");
 
-    return allRows.filter((row) => {
+    return rows.filter((row) => {
       if (commodity !== "ALL" && row.commodity !== commodity) return false;
       if (month !== "ALL" && row.monthKey !== month) return false;
       if (agent !== "ALL" && row.agente !== agent) return false;
       if (
         customerNeedle &&
         !String(row.denominazione || "").toLocaleLowerCase("it").includes(customerNeedle)
-      ) return false;
+      ) {
+        return false;
+      }
       if (customerType !== "ALL" && row.tipoCliente !== customerType) return false;
       if (min !== null && Number.isFinite(min) && (row.consumo === null || row.consumo < min)) return false;
       if (max !== null && Number.isFinite(max) && (row.consumo === null || row.consumo > max)) return false;
 
       if (needle) {
         const haystack = [
-          row.sourceFile,
+          row.sourceFiles.join(" "),
           row.sourceSheet,
           row.commodity,
           row.validita,
           row.agente,
-          row.denominazione || "",
+          row.denominazione,
+          row.podPdr,
           row.tipoCliente,
           row.consumo ?? "",
           ...Object.values(row.raw),
         ]
           .join(" ")
           .toLocaleLowerCase("it");
+
         if (!haystack.includes(needle)) return false;
       }
 
       return true;
     });
-  }, [allRows, commodity, month, agent, customerName, customerType, consumptionMin, consumptionMax, search]);
+  }, [
+    rows,
+    commodity,
+    month,
+    agent,
+    customerName,
+    customerType,
+    consumptionMin,
+    consumptionMax,
+    search,
+  ]);
 
   const totals = useMemo(() => {
     return filteredRows.reduce(
@@ -537,29 +818,16 @@ export default function Archive() {
     );
   }, [filteredRows]);
 
-  const saveArchive = async (next: RecessiArchive) => {
-    setSaving(true);
-    const { error } = await supabase
-      .from("app_settings")
-      .upsert([{ key: ARCHIVE_KEY, value_json: next }]);
-    setSaving(false);
-
-    if (error) {
-      console.error("SAVE ARCHIVE RECESSI ERROR:", error);
-      alert("Errore nel salvataggio online dell'archivio");
-      return false;
-    }
-
-    setArchive(next);
-    return true;
-  };
-
   const onChooseFile = async (file?: File) => {
     if (!file) return;
+
     setParsing(true);
+    setLastImportMessage("");
+
     try {
       const parsed = await parseRecessiFile(file);
       setPendingFile(parsed);
+
       if (!parsed.rows.length) {
         alert("Il file è stato letto ma non trovo righe dati.");
       }
@@ -572,39 +840,98 @@ export default function Archive() {
     }
   };
 
+  const saveLegacyArchive = async (next: LegacyArchive) => {
+    const { error } = await supabase
+      .from("app_settings")
+      .upsert([{ key: LEGACY_KEY, value_json: next }]);
+
+    if (error) throw error;
+
+    setLegacyArchive(next);
+    setRows(next.files.flatMap((file) => file.rows as RecessoRow[]));
+  };
+
   const addPendingFile = async () => {
     if (!pendingFile) return;
 
-    let files = [...archive.files];
-    const duplicateIndex = files.findIndex(
-      (item) => item.name.toLocaleLowerCase("it") === pendingFile.name.toLocaleLowerCase("it")
-    );
+    setSaving(true);
 
-    if (duplicateIndex >= 0) {
-      const ok = window.confirm(
-        `Esiste già un file chiamato "${pendingFile.name}". Vuoi sostituirlo con quello appena caricato?`
-      );
-      if (!ok) return;
-      files.splice(duplicateIndex, 1, pendingFile);
-    } else {
-      files.push(pendingFile);
-    }
+    try {
+      if (storageMode === "database") {
+        const result = await importRowsToDatabase(pendingFile.name, pendingFile.rows);
+        await fetchDatabaseRows();
 
-    const ok = await saveArchive({ version: 1, files });
-    if (ok) {
+        const duplicateTotal = result.duplicates + pendingFile.duplicateRowsInFile;
+        setLastImportMessage(
+          `Import completato: ${result.inserted} nuove righe salvate, ${duplicateTotal} duplicati ignorati.`
+        );
+      } else {
+        const existingKeys = new Set(rows.map((row) => row.dedupKey));
+        const uniqueNewRows = pendingFile.rows.filter((row) => !existingKeys.has(row.dedupKey));
+        const duplicateDb = pendingFile.rows.length - uniqueNewRows.length;
+        const duplicateTotal = duplicateDb + pendingFile.duplicateRowsInFile;
+
+        if (uniqueNewRows.length) {
+          const withoutSameName = legacyArchive.files.filter(
+            (file) => file.name.toLocaleLowerCase("it") !== pendingFile.name.toLocaleLowerCase("it")
+          );
+
+          const next: LegacyArchive = {
+            version: 1,
+            files: [
+              ...withoutSameName,
+              {
+                id: pendingFile.id,
+                name: pendingFile.name,
+                uploadedAt: pendingFile.uploadedAt,
+                rows: uniqueNewRows,
+              },
+            ],
+          };
+
+          await saveLegacyArchive(next);
+        }
+
+        setLastImportMessage(
+          `Import completato in modalità compatibilità: ${uniqueNewRows.length} nuove righe salvate, ${duplicateTotal} duplicati ignorati.`
+        );
+      }
+
       setPendingFile(null);
-      alert("File salvato nell'archivio RECESSI");
+    } catch (error: any) {
+      console.error("SAVE ARCHIVE ERROR:", error);
+      alert("Errore nel salvataggio dell'archivio: " + (error?.message || error));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const removeFile = async (id: string) => {
-    const target = archive.files.find((file) => file.id === id);
-    if (!target) return;
-    if (!window.confirm(`Eliminare "${target.name}" dall'archivio RECESSI?`)) return;
-    await saveArchive({
-      version: 1,
-      files: archive.files.filter((file) => file.id !== id),
-    });
+  const removeFile = async (fileName: string) => {
+    if (!window.confirm(`Rimuovere "${fileName}" dall'archivio RECESSI?`)) return;
+
+    setSaving(true);
+
+    try {
+      if (storageMode === "database") {
+        const { error } = await supabase.rpc("archive_recessi_remove_file", {
+          p_file_name: fileName,
+        });
+
+        if (error) throw error;
+        await fetchDatabaseRows();
+      } else {
+        const next: LegacyArchive = {
+          version: 1,
+          files: legacyArchive.files.filter((file) => file.name !== fileName),
+        };
+        await saveLegacyArchive(next);
+      }
+    } catch (error: any) {
+      console.error("REMOVE ARCHIVE FILE ERROR:", error);
+      alert("Errore nella rimozione del file: " + (error?.message || error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const resetFilters = () => {
@@ -620,15 +947,17 @@ export default function Archive() {
 
   const exportFiltered = () => {
     if (!filteredRows.length) return;
+
     const exportRows = filteredRows.map((row) => ({
       "LUCE/GAS": row.commodity,
+      "POD/PDR": row.podPdr,
       "DATA VALIDITA": row.validita,
       "MESE RIFERIMENTO": monthLabel(row.monthKey),
       AGENTE: row.agente,
-      "DENOMINAZIONE CLIENTE": row.denominazione || "",
+      "DENOMINAZIONE CLIENTE": row.denominazione,
       "TIPOLOGIA CLIENTE": row.tipoCliente,
       CONSUMO: row.consumo ?? "",
-      "FILE ORIGINE": row.sourceFile,
+      "FILE ORIGINE": row.sourceFiles.join(", "),
       FOGLIO: row.sourceSheet,
       ...row.raw,
     }));
@@ -639,402 +968,469 @@ export default function Archive() {
     XLSX.writeFile(book, `RECESSI_FILTRATI_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  if (loading) {
+  if (loading || storageMode === "loading") {
     return <div style={cardStyle}>Caricamento archivio...</div>;
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={cardStyle}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
           <div>
             <h2 style={{ margin: 0 }}>ARCHIVIO</h2>
             <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
-              Archivio dati amministrativi con ricerca e filtri.
+              RECESSI · archivio cumulativo con eliminazione automatica dei duplicati.
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => setSubTab("recessi")}
-              style={{
-                padding: "9px 14px",
-                borderRadius: 8,
-                border: "1px solid #0f172a",
-                background: subTab === "recessi" ? "#0f172a" : "white",
-                color: subTab === "recessi" ? "white" : "#0f172a",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              RECESSI
-            </button>
+          <div
+            style={{
+              padding: "7px 10px",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 800,
+              background: storageMode === "database" ? "#dcfce7" : "#fff7ed",
+              color: storageMode === "database" ? "#166534" : "#9a3412",
+            }}
+          >
+            {storageMode === "database" ? "Database Supabase" : "Modalità compatibilità"}
           </div>
         </div>
       </div>
 
-      {subTab === "recessi" && (
-        <>
-          <div style={cardStyle}>
-            <h3 style={{ marginTop: 0 }}>Carica file RECESSI</h3>
-            <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-              Puoi caricare Excel .xlsx/.xls oppure CSV. Ho aggiunto il riconoscimento delle colonne reali dei tuoi file: RAGIONE_SOCIALE, AGENZIA, DATA_VALIDITA_RECESSO, KWH_ANNUI/CONSUMO_ANNUO e CD_TP_UTENZA/CD_TP_UTILIZZO.
+      <div style={cardStyle}>
+        <h3 style={{ marginTop: 0 }}>RECESSI · Carica file</h3>
+        <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
+          Puoi aggiungere tutti i file che vuoi. Se una riga ha lo stesso cliente, lo stesso POD/PDR e la stessa data di validità di una riga già presente, viene riconosciuta come duplicato e non viene creata una seconda voce.
+        </div>
+
+        <input
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          disabled={parsing || saving}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            void onChooseFile(file);
+            event.currentTarget.value = "";
+          }}
+        />
+
+        {parsing && <div style={{ marginTop: 10, fontWeight: 700 }}>Analizzo il file...</div>}
+
+        {pendingFile && (
+          <div
+            style={{
+              marginTop: 14,
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid #bfdbfe",
+              background: "#eff6ff",
+            }}
+          >
+            <div style={{ fontWeight: 800 }}>{pendingFile.name}</div>
+            <div style={{ marginTop: 4, color: "#475569", fontSize: 13 }}>
+              {pendingFile.originalRowCount.toLocaleString("it-IT")} righe lette ·{" "}
+              {pendingFile.rows.length.toLocaleString("it-IT")} righe uniche nel file ·{" "}
+              {pendingFile.duplicateRowsInFile.toLocaleString("it-IT")} duplicati interni già esclusi
             </div>
 
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              disabled={parsing || saving}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                void onChooseFile(file);
-                event.currentTarget.value = "";
-              }}
-            />
+            <div style={{ marginTop: 6, color: "#475569", fontSize: 13 }}>
+              LUCE {pendingFile.rows.filter((row) => row.commodity === "LUCE").length.toLocaleString("it-IT")} · GAS{" "}
+              {pendingFile.rows.filter((row) => row.commodity === "GAS").length.toLocaleString("it-IT")} · N/D{" "}
+              {pendingFile.rows.filter((row) => row.commodity === "N/D").length.toLocaleString("it-IT")}
+            </div>
 
-            {parsing && <div style={{ marginTop: 10, fontWeight: 700 }}>Analizzo il file...</div>}
-
-            {pendingFile && (
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: 12,
-                  borderRadius: 10,
-                  border: "1px solid #bfdbfe",
-                  background: "#eff6ff",
-                }}
-              >
-                <div style={{ fontWeight: 800 }}>{pendingFile.name}</div>
-                <div style={{ marginTop: 4, color: "#475569", fontSize: 13 }}>
-                  {pendingFile.rows.length.toLocaleString("it-IT")} righe lette · LUCE{" "}
-                  {pendingFile.rows.filter((row) => row.commodity === "LUCE").length.toLocaleString("it-IT")} · GAS{" "}
-                  {pendingFile.rows.filter((row) => row.commodity === "GAS").length.toLocaleString("it-IT")} · N/D{" "}
-                  {pendingFile.rows.filter((row) => row.commodity === "N/D").length.toLocaleString("it-IT")}
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => void addPendingFile()}
-                    disabled={saving}
-                    style={{
-                      padding: "9px 13px",
-                      borderRadius: 8,
-                      border: 0,
-                      background: "#16a34a",
-                      color: "white",
-                      fontWeight: 800,
-                      cursor: saving ? "default" : "pointer",
-                      opacity: saving ? 0.6 : 1,
-                    }}
-                  >
-                    {saving ? "Salvataggio..." : "Salva file nell'archivio"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingFile(null)}
-                    disabled={saving}
-                    style={{
-                      padding: "9px 13px",
-                      borderRadius: 8,
-                      border: "1px solid #cbd5e1",
-                      background: "white",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Annulla
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {archive.files.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 7 }}>
-                  FILE PRESENTI NELL'ARCHIVIO
-                </div>
-                <div style={{ display: "grid", gap: 7 }}>
-                  {archive.files.map((file) => (
-                    <div
-                      key={file.id}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "9px 10px",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 8,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div>
-                        <strong>{file.name}</strong>
-                        <span style={{ color: "#64748b", marginLeft: 8, fontSize: 12 }}>
-                          {file.rows.length.toLocaleString("it-IT")} righe ·{" "}
-                          {new Date(file.uploadedAt).toLocaleString("it-IT")}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void removeFile(file.id)}
-                        disabled={saving}
-                        style={{
-                          border: "1px solid #fecaca",
-                          background: "#fff1f2",
-                          color: "#b91c1c",
-                          borderRadius: 8,
-                          padding: "6px 10px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Rimuovi file
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div style={cardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <h3 style={{ margin: 0 }}>Ricerca RECESSI</h3>
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <button
                 type="button"
-                onClick={resetFilters}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e1",
-                  background: "white",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                Azzera filtri
-              </button>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-                gap: 10,
-                marginTop: 14,
-              }}
-            >
-              <div>
-                <div style={labelStyle}>Luce / Gas</div>
-                <select value={commodity} onChange={(e) => setCommodity(e.target.value)} style={inputStyle}>
-                  <option value="ALL">Tutti</option>
-                  <option value="LUCE">Luce</option>
-                  <option value="GAS">Gas</option>
-                  <option value="N/D">Non riconosciuti</option>
-                </select>
-              </div>
-
-              <div>
-                <div style={labelStyle}>Mese di riferimento</div>
-                <select value={month} onChange={(e) => setMonth(e.target.value)} style={inputStyle}>
-                  <option value="ALL">Tutti i mesi</option>
-                  {months.map((item) => (
-                    <option key={item} value={item}>
-                      {monthLabel(item)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div style={labelStyle}>Nome agente</div>
-                <select value={agent} onChange={(e) => setAgent(e.target.value)} style={inputStyle}>
-                  <option value="ALL">Tutti gli agenti</option>
-                  {agents.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div style={labelStyle}>Denominazione cliente</div>
-                <input
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  list="recessi-customer-names"
-                  placeholder="Es. LACOLE, GIUGLIARELLI..."
-                  style={inputStyle}
-                />
-                <datalist id="recessi-customer-names">
-                  {customerNames.slice(0, 1000).map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
-              </div>
-
-              <div>
-                <div style={labelStyle}>Tipologia cliente</div>
-                <select value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={inputStyle}>
-                  <option value="ALL">Tutte le tipologie</option>
-                  {customerTypes.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div style={labelStyle}>Consumo minimo</div>
-                <input
-                  type="number"
-                  value={consumptionMin}
-                  onChange={(e) => setConsumptionMin(e.target.value)}
-                  placeholder="Da"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <div style={labelStyle}>Consumo massimo</div>
-                <input
-                  type="number"
-                  value={consumptionMax}
-                  onChange={(e) => setConsumptionMax(e.target.value)}
-                  placeholder="A"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div style={{ gridColumn: "1 / -1" }}>
-                <div style={labelStyle}>Ricerca libera</div>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cerca cliente, POD/PDR, indirizzo o qualsiasi testo presente nel file..."
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div style={cardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div>
-                <h3 style={{ margin: 0 }}>Risultati</h3>
-                <div style={{ marginTop: 5, color: "#64748b", fontSize: 13 }}>
-                  {filteredRows.length.toLocaleString("it-IT")} risultati su {allRows.length.toLocaleString("it-IT")}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={exportFiltered}
-                disabled={!filteredRows.length}
+                onClick={() => void addPendingFile()}
+                disabled={saving}
                 style={{
                   padding: "9px 13px",
                   borderRadius: 8,
                   border: 0,
-                  background: filteredRows.length ? "#0f172a" : "#cbd5e1",
+                  background: "#16a34a",
                   color: "white",
                   fontWeight: 800,
-                  cursor: filteredRows.length ? "pointer" : "default",
+                  cursor: saving ? "default" : "pointer",
+                  opacity: saving ? 0.6 : 1,
                 }}
               >
-                Esporta risultati Excel
+                {saving ? "Salvataggio..." : "Salva file nell'archivio"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPendingFile(null)}
+                disabled={saving}
+                style={{
+                  padding: "9px 13px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "white",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Annulla
               </button>
             </div>
+          </div>
+        )}
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-                gap: 10,
-                marginTop: 14,
-              }}
-            >
-              <div style={{ padding: 12, borderRadius: 10, background: "#eff6ff" }}>
-                <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO LUCE</div>
-                <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
-                  {totals.luce.toLocaleString("it-IT", { maximumFractionDigits: 2 })} kWh
-                </div>
-              </div>
-              <div style={{ padding: 12, borderRadius: 10, background: "#f0fdf4" }}>
-                <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO GAS</div>
-                <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
-                  {totals.gas.toLocaleString("it-IT", { maximumFractionDigits: 2 })} Smc
-                </div>
-              </div>
+        {lastImportMessage && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "10px 12px",
+              borderRadius: 9,
+              background: "#f0fdf4",
+              color: "#166534",
+              fontWeight: 700,
+              fontSize: 13,
+            }}
+          >
+            {lastImportMessage}
+          </div>
+        )}
+
+        {fileStats.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 7 }}>
+              FILE PRESENTI NELL'ARCHIVIO
             </div>
 
-            {!allRows.length ? (
-              <div style={{ marginTop: 16, color: "#64748b" }}>
-                Nessun file presente nell'archivio RECESSI.
-              </div>
-            ) : (
-              <>
-                <div style={{ overflowX: "auto", marginTop: 14 }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 950 }}>
-                    <thead>
-                      <tr style={{ background: "#f8fafc" }}>
-                        {["Luce/Gas", "Data validità", "Mese", "Agente", "Denominazione cliente", "Tipologia cliente", "Consumo", "File origine", "Foglio"].map(
-                          (header) => (
-                            <th
-                              key={header}
-                              style={{
-                                textAlign: "left",
-                                padding: "9px 10px",
-                                borderBottom: "1px solid #cbd5e1",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {header}
-                            </th>
-                          )
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRows.slice(0, 500).map((row) => (
-                        <tr key={row.id}>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 800 }}>
-                            {row.commodity}
-                          </td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
-                            {row.validita || "—"}
-                          </td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
-                            {monthLabel(row.monthKey)}
-                          </td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.agente || "—"}</td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.denominazione || "—"}</td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.tipoCliente || "—"}</td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
-                            {row.consumo === null
-                              ? "—"
-                              : row.consumo.toLocaleString("it-IT", { maximumFractionDigits: 2 })}
-                          </td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.sourceFile}</td>
-                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.sourceSheet}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {filteredRows.length > 500 && (
-                  <div style={{ marginTop: 10, color: "#b45309", fontSize: 13, fontWeight: 700 }}>
-                    A video mostro le prime 500 righe. L'esportazione Excel contiene tutti i {filteredRows.length.toLocaleString("it-IT")} risultati.
+            <div style={{ display: "grid", gap: 7 }}>
+              {fileStats.map((file) => (
+                <div
+                  key={file.name}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "9px 10px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div>
+                    <strong>{file.name}</strong>
+                    <span style={{ color: "#64748b", marginLeft: 8, fontSize: 12 }}>
+                      {file.count.toLocaleString("it-IT")} righe collegate
+                    </span>
                   </div>
-                )}
-              </>
-            )}
+
+                  <button
+                    type="button"
+                    onClick={() => void removeFile(file.name)}
+                    disabled={saving}
+                    style={{
+                      border: "1px solid #fecaca",
+                      background: "#fff1f2",
+                      color: "#b91c1c",
+                      borderRadius: 8,
+                      padding: "6px 10px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Rimuovi file
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
+
+      <div style={cardStyle}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <h3 style={{ margin: 0 }}>Ricerca RECESSI</h3>
+          <button
+            type="button"
+            onClick={resetFilters}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: "white",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Azzera filtri
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+            gap: 10,
+            marginTop: 14,
+          }}
+        >
+          <div>
+            <div style={labelStyle}>Luce / Gas</div>
+            <select value={commodity} onChange={(e) => setCommodity(e.target.value)} style={inputStyle}>
+              <option value="ALL">Tutti</option>
+              <option value="LUCE">Luce</option>
+              <option value="GAS">Gas</option>
+              <option value="N/D">Non riconosciuti</option>
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Mese di riferimento</div>
+            <select value={month} onChange={(e) => setMonth(e.target.value)} style={inputStyle}>
+              <option value="ALL">Tutti i mesi</option>
+              {months.map((item) => (
+                <option key={item} value={item}>
+                  {monthLabel(item)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Nome agente</div>
+            <select value={agent} onChange={(e) => setAgent(e.target.value)} style={inputStyle}>
+              <option value="ALL">Tutti gli agenti</option>
+              {agents.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Denominazione cliente</div>
+            <input
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              list="recessi-customer-names"
+              placeholder="Digita anche solo una parte del nome"
+              style={inputStyle}
+            />
+            <datalist id="recessi-customer-names">
+              {customerNames.slice(0, 1000).map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Tipologia cliente</div>
+            <select value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={inputStyle}>
+              <option value="ALL">Tutte le tipologie</option>
+              {customerTypes.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Consumo minimo</div>
+            <input
+              type="number"
+              value={consumptionMin}
+              onChange={(e) => setConsumptionMin(e.target.value)}
+              placeholder="Da"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={labelStyle}>Consumo massimo</div>
+            <input
+              type="number"
+              value={consumptionMax}
+              onChange={(e) => setConsumptionMax(e.target.value)}
+              placeholder="A"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={labelStyle}>Ricerca libera</div>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cerca cliente, POD/PDR, indirizzo, codice fiscale o altro testo..."
+              style={inputStyle}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0 }}>Risultati</h3>
+            <div style={{ marginTop: 5, color: "#64748b", fontSize: 13 }}>
+              {filteredRows.length.toLocaleString("it-IT")} risultati su {rows.length.toLocaleString("it-IT")} righe uniche
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={exportFiltered}
+            disabled={!filteredRows.length}
+            style={{
+              padding: "9px 13px",
+              borderRadius: 8,
+              border: 0,
+              background: filteredRows.length ? "#0f172a" : "#cbd5e1",
+              color: "white",
+              fontWeight: 800,
+              cursor: filteredRows.length ? "pointer" : "default",
+            }}
+          >
+            Esporta risultati Excel
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+            gap: 10,
+            marginTop: 14,
+          }}
+        >
+          <div style={{ padding: 12, borderRadius: 10, background: "#eff6ff" }}>
+            <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO LUCE</div>
+            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+              {totals.luce.toLocaleString("it-IT", { maximumFractionDigits: 2 })} kWh
+            </div>
+          </div>
+
+          <div style={{ padding: 12, borderRadius: 10, background: "#f0fdf4" }}>
+            <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO GAS</div>
+            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+              {totals.gas.toLocaleString("it-IT", { maximumFractionDigits: 2 })} Smc
+            </div>
+          </div>
+        </div>
+
+        {!rows.length ? (
+          <div style={{ marginTop: 16, color: "#64748b" }}>
+            Nessun dato presente nell'archivio RECESSI.
+          </div>
+        ) : (
+          <>
+            <div style={{ overflowX: "auto", marginTop: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120 }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    {[
+                      "Luce/Gas",
+                      "POD/PDR",
+                      "Data validità",
+                      "Mese",
+                      "Agente",
+                      "Denominazione cliente",
+                      "Tipologia cliente",
+                      "Consumo",
+                      "File origine",
+                    ].map((header) => (
+                      <th
+                        key={header}
+                        style={{
+                          textAlign: "left",
+                          padding: "9px 10px",
+                          borderBottom: "1px solid #cbd5e1",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredRows.slice(0, 500).map((row) => (
+                    <tr key={row.id}>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 800 }}>
+                        {row.commodity}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                        {row.podPdr || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                        {row.validita || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                        {monthLabel(row.monthKey)}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.agente || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.denominazione || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.tipoCliente || "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 10px",
+                          borderBottom: "1px solid #f1f5f9",
+                          textAlign: "right",
+                        }}
+                      >
+                        {row.consumo === null
+                          ? "—"
+                          : row.consumo.toLocaleString("it-IT", { maximumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.sourceFiles.join(", ") || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredRows.length > 500 && (
+              <div style={{ marginTop: 10, color: "#b45309", fontSize: 13, fontWeight: 700 }}>
+                A video mostro le prime 500 righe. L'esportazione Excel contiene tutti i{" "}
+                {filteredRows.length.toLocaleString("it-IT")} risultati filtrati.
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
