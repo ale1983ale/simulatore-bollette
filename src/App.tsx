@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { supabase } from "./supabase";
 import Ateco from "./Ateco";
+import Archive from "./Archive";
 
 
 type MonthlyRow = {
@@ -5636,7 +5637,7 @@ useEffect(() => {
   localStorage.setItem("app_tab", tab);
 }, [tab]);
 
-  const adminTabs = ["reportAdmin", "listini", "agents", "adminUsers"];
+  const adminTabs = ["reportAdmin", "listini", "agents", "adminUsers", "archive"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -5840,6 +5841,16 @@ const renderAdminContent = () => {
           </button>
 
           <button
+            onClick={() => setTab("archive")}
+            style={{
+              ...baseBtn,
+              ...(tab === "archive" ? activeBtn : {}),
+            }}
+          >
+            ARCHIVIO
+          </button>
+
+          <button
             onClick={() => setTab("agents")}
             style={{
               ...baseBtn,
@@ -5899,6 +5910,8 @@ const renderAdminContent = () => {
       </div>
 
       {tab === "reportAdmin" && <ReportAdmin adminProfile={adminProfile} />}
+
+      {tab === "archive" && <Archive />}
 
       {tab === "agents" && (
         <>
