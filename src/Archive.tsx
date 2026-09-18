@@ -738,12 +738,16 @@ function MultiSelectFilter({
   selected,
   onChange,
   allLabel,
+  containerStyle,
+  menuMinWidth,
 }: {
   label: string;
   options: MultiSelectOption[];
   selected: string[];
   onChange: (values: string[]) => void;
   allLabel: string;
+  containerStyle?: React.CSSProperties;
+  menuMinWidth?: number;
 }) {
   const selectedLabels = options
     .filter((option) => selected.includes(option.value))
@@ -765,7 +769,7 @@ function MultiSelectFilter({
   };
 
   return (
-    <div>
+    <div style={containerStyle}>
       <div style={labelStyle}>{label}</div>
       <details
         style={{
@@ -793,8 +797,11 @@ function MultiSelectFilter({
             top: "calc(100% + 4px)",
             left: 0,
             right: 0,
+            minWidth: menuMinWidth ? `${menuMinWidth}px` : undefined,
+            maxWidth: "calc(100vw - 48px)",
             maxHeight: 240,
             overflowY: "auto",
+            overflowX: "auto",
             padding: 8,
             background: "white",
             border: "1px solid #cbd5e1",
@@ -810,6 +817,7 @@ function MultiSelectFilter({
               padding: "7px 6px",
               cursor: "pointer",
               fontWeight: 700,
+              whiteSpace: "nowrap",
             }}
           >
             <input
@@ -830,6 +838,7 @@ function MultiSelectFilter({
                 padding: "7px 6px",
                 cursor: "pointer",
                 borderTop: "1px solid #f1f5f9",
+                whiteSpace: "nowrap",
               }}
             >
               <input
@@ -1810,6 +1819,11 @@ export default function Archive() {
             allLabel="Tutti gli agenti"
             selected={agentsSelected}
             onChange={setAgentsSelected}
+            containerStyle={{
+              gridColumn: "span 2",
+              minWidth: 360,
+            }}
+            menuMinWidth={420}
             options={agents.map((item) => ({
               value: item,
               label: item,
