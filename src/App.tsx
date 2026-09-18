@@ -27,6 +27,7 @@ type EnergyOffer = {
   canone: number;
   spread: number;
   maggiorazioneCapacityMarket: number;
+  visibile?: boolean;
 };
 
 type GasOffer = {
@@ -34,6 +35,7 @@ type GasOffer = {
   canone: number;
   spread: number;
   quotaVariabile: number;
+  visibile?: boolean;
 };
 
 type GasAcciseSettings = {
@@ -291,14 +293,14 @@ const INITIAL_DISP_CP_ROWS: DispCpRow[] = [
 ];
 
 const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
-  { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },
-  { nome: "+SICURADEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0 },
-  { nome: "BILANCIATA", canone: 18.5, spread: 0, maggiorazioneCapacityMarket: 0 },
+  { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
+  { nome: "+SICURADEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
+  { nome: "BILANCIATA", canone: 18.5, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
 ];
 
 const INITIAL_GAS_OFFERS: GasOffer[] = [
-  { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },
-  { nome: "+SICURADEDICATA", canone: 0, spread: 0, quotaVariabile: 0 },
+  { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0, visibile: true },
+  { nome: "+SICURADEDICATA", canone: 0, spread: 0, quotaVariabile: 0, visibile: true },
 ];
 
 const energyTypes = [
@@ -1017,6 +1019,8 @@ function Energia({
   energyOffers: EnergyOffer[];
   dispCpRows: DispCpRow[];
 }) {
+  const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
+
   const [s, setS] = useState({
     iva: "22",
     nome: "",
@@ -1024,7 +1028,7 @@ function Energia({
     fatturazione: "MENSILE",
     numeroPod: "1",
     tipo: "BTA2",
-    offerta: energyOffers[0]?.nome || "",
+    offerta: visibleEnergyOffers[0]?.nome || "",
     mese1: "",
     mese2: "",
     meseRifTabella1: "GENNAIO",
@@ -1056,6 +1060,15 @@ function Energia({
     acciseManualiValore: "",
     canoneRaiGiaPagato: "0",
   });
+  useEffect(() => {
+    if (visibleEnergyOffers.some((offer) => offer.nome === s.offerta)) return;
+
+    setS((prev) => ({
+      ...prev,
+      offerta: visibleEnergyOffers[0]?.nome || "",
+    }));
+  }, [energyOffers, s.offerta]);
+
   useEffect(() => {
     const validMonthOptions = [...punPsvRows]
       .filter((row) => {
@@ -1549,7 +1562,7 @@ return (
             {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
             {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
             {selectField("Tipo", s.tipo, (v) => set("tipo", v), energyTypes)}
-            {selectField("Offerta", s.offerta, (v) => set("offerta", v), energyOffers.map((x) => x.nome))}
+            {selectField("Offerta", s.offerta, (v) => set("offerta", v), visibleEnergyOffers.map((x) => x.nome))}
             {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
           </div>
 
@@ -1959,13 +1972,15 @@ function Gas({
   gasOffers: GasOffer[];
   gasAcciseSettings: GasAcciseSettings;
 }) {
+  const visibleGasOffers = gasOffers.filter((offer) => offer.visibile !== false);
+
   const [s, setS] = useState({
     iva: "10",
     nome: "",
     pdr: "",
     uso: "DOMESTICO",
     fatturazione: "MENSILE",
-    offerta: gasOffers[0]?.nome || "",
+    offerta: visibleGasOffers[0]?.nome || "",
     periodo1: "",
     periodo2: "",
     periodo3: "",
@@ -1991,6 +2006,15 @@ function Gas({
     ricalcoloFlag: "NO",
     ricalcoloValore: "",
   });
+  useEffect(() => {
+    if (visibleGasOffers.some((offer) => offer.nome === s.offerta)) return;
+
+    setS((prev) => ({
+      ...prev,
+      offerta: visibleGasOffers[0]?.nome || "",
+    }));
+  }, [gasOffers, s.offerta]);
+
   useEffect(() => {
     const validMonthOptions = [...punPsvRows]
       .filter((row) => {
@@ -2405,7 +2429,7 @@ function Gas({
               {selectField("Uso", s.uso, (v) => set("uso", v), ["DOMESTICO", "BUSINESS"])}
               {field("IVA %", s.iva, (v) => set("iva", v), "number")}
               {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), gasBilling)}
-              {selectField("Offerta", s.offerta, (v) => set("offerta", v), gasOffers.map((x) => x.nome))}
+              {selectField("Offerta", s.offerta, (v) => set("offerta", v), visibleGasOffers.map((x) => x.nome))}
               {selectField("Accisa agevolata", s.accisaAgevolata, (v) => set("accisaAgevolata", v), ["NO", "SI"])}
               {field("Valore accisa", s.accisaValore, (v) => set("accisaValore", v), "number")}
               {field("Adeguamento parametro", s.adeguamentoParametro, (v) => set("adeguamentoParametro", v), "number")}
@@ -2764,6 +2788,20 @@ function Listini({
     markDirty();
   };
 
+  const updateEnergyOfferVisibility = (index: number, visibile: boolean) => {
+    setDraftEnergyOffers((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, visibile } : row))
+    );
+    markDirty();
+  };
+
+  const updateGasOfferVisibility = (index: number, visibile: boolean) => {
+    setDraftGasOffers((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, visibile } : row))
+    );
+    markDirty();
+  };
+
   const updateGasOffer = (index: number, key: keyof GasOffer, value: string) => {
     setDraftGasOffers((prev) =>
       prev.map((row, i) =>
@@ -2955,7 +2993,7 @@ function Listini({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Nome offerta", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
+                {["Visibile", "Nome offerta", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -2963,6 +3001,15 @@ function Listini({
             <tbody>
               {draftEnergyOffers.map((row, i) => (
                 <tr key={row.nome + i}>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={row.visibile !== false}
+                      onChange={(e) => updateEnergyOfferVisibility(i, e.target.checked)}
+                      style={{ width: 18, height: 18, cursor: "pointer" }}
+                      aria-label={"Mostra " + row.nome + " nei menu Offerta Energia"}
+                    />
+                  </td>
                   <td style={tdStyle}>
                     <input
                       style={{ ...inputStyle, width: 180 }}
@@ -3010,7 +3057,7 @@ function Listini({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Nome offerta", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
+                {["Visibile", "Nome offerta", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -3018,6 +3065,15 @@ function Listini({
             <tbody>
               {draftGasOffers.map((row, i) => (
                 <tr key={row.nome + i}>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={row.visibile !== false}
+                      onChange={(e) => updateGasOfferVisibility(i, e.target.checked)}
+                      style={{ width: 18, height: 18, cursor: "pointer" }}
+                      aria-label={"Mostra " + row.nome + " nei menu Offerta Gas"}
+                    />
+                  </td>
                   <td style={tdStyle}>
                     <input
                       style={{ ...inputStyle, width: 180 }}
@@ -5720,6 +5776,7 @@ useEffect(() => {
       if (Array.isArray(map.energyOffers)) {
         const obsoleteEnergyOfferNames = new Set(["CASA", "CASASPECIAL", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESASPECIAL", "IMPRESAUNICA", "SCELTA", "SCELTASPECIAL", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALORESPECIAL", "VALOREUNICA"]);
         const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
+          .map((offer) => ({ ...offer, visibile: offer.visibile !== false }))
           .map((offer) =>
             ["+FISSO DEDICATA", "SICURADEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURADEDICATA" }
@@ -5739,6 +5796,7 @@ useEffect(() => {
       if (Array.isArray(map.gasOffers)) {
         const obsoleteGasOfferNames = new Set(["CASA", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESAUNICA", "SCELTA", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALOREUNICA"]);
         const savedGasOffers = (map.gasOffers as GasOffer[])
+          .map((offer) => ({ ...offer, visibile: offer.visibile !== false }))
           .map((offer) =>
             ["+FISSO DEDICATA", "SICURADEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURADEDICATA" }
