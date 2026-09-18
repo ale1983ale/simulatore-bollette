@@ -342,15 +342,15 @@ function createDedupKey(
   commodity: Commodity,
   denominazione: string,
   podPdr: string,
-  validitaDate: string,
+  validitaMonth: string,
   fallback: string
 ) {
   const customer = normalize(denominazione);
   const point = normalize(podPdr);
-  const date = String(validitaDate || "").trim();
+  const month = String(validitaMonth || "").trim();
 
-  if (customer && point && date) {
-    return `${commodity}|${customer}|${point}|${date}`;
+  if (customer && point && month) {
+    return `${commodity}|${customer}|${point}|${month}`;
   }
 
   return `ROW|${normalize(fallback)}`;
@@ -383,7 +383,7 @@ function toRowFromRaw(
     commodity,
     denominazione,
     podPdr,
-    parsedDate.dateKey,
+    parsedDate.monthKey,
     `${sourceFile}|${sourceSheet}|${rowFallback}`
   );
 
@@ -494,7 +494,26 @@ function normalizeLegacyArchive(saved: any): LegacyArchive {
       const name = String(file?.name || `File ${fileIndex + 1}`);
       const rows = Array.isArray(file?.rows)
         ? file.rows.map((old: any, rowIndex: number) => {
-            if (old?.dedupKey && old?.podPdr !== undefined) return old;
+            if (old?.podPdr !== undefined) {
+              const dedupKey = createDedupKey(
+                (old?.commodity || "N/D") as Commodity,
+                String(old?.denominazione || ""),
+                String(old?.podPdr || ""),
+                String(old?.monthKey || ""),
+                `${name}|${String(old?.sourceSheet || "")}|${fileIndex}-${rowIndex}`
+              );
+
+              return {
+                ...old,
+                id: dedupKey,
+                dedupKey,
+                sourceFile: name,
+                sourceFiles:
+                  Array.isArray(old?.sourceFiles) && old.sourceFiles.length
+                    ? old.sourceFiles
+                    : [name],
+              };
+            }
 
             const raw = (old?.raw || {}) as Record<string, string>;
             const rebuilt = toRowFromRaw(
@@ -659,8 +678,19 @@ export default function Archive() {
     try {
       for (const file of legacy.files) {
         const normalizedRows = (file.rows as RecessoRow[]).map((row, index) => {
-          if (row.dedupKey) return row;
-          return toRowFromRaw(row.raw || {}, file.name, row.sourceSheet || "", `legacy-${index}`);
+          const dedupKey = createDedupKey(
+            row.commodity,
+            row.denominazione,
+            row.podPdr,
+            row.monthKey,
+            `${file.name}|${row.sourceSheet || ""}|legacy-${index}`
+          );
+
+          return {
+            ...row,
+            id: dedupKey,
+            dedupKey,
+          };
         });
 
         const result = await importRowsToDatabase(file.name, normalizedRows);
