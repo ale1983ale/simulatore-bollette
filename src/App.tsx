@@ -6218,6 +6218,16 @@ const renderAdminContent = () => {
           </button>
 
           <button
+            onClick={() => setTab("reportAdmin")}
+            style={{
+              ...baseBtn,
+              ...(tab === "reportAdmin" ? activeBtn : {}),
+            }}
+          >
+            REPORT ADMIN
+          </button>
+
+          <button
             onClick={() => setTab("agents")}
             style={{
               ...baseBtn,
@@ -6225,16 +6235,6 @@ const renderAdminContent = () => {
             }}
           >
             DATABASE
-          </button>
-
-          <button
-            onClick={() => setTab("reportAdmin")}
-            style={{
-              ...baseBtn,
-              ...(tab === "reportAdmin" ? activeBtn : {}),
-            }}
-          >
-            Report Admin
           </button>
 
 {(agentSession || adminSession) && (
