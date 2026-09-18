@@ -2843,16 +2843,16 @@ border: "1px solid #bfd8f6",
 
             {previewBox(
               <>
-                {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 2))}
-                {row("Quota variabile usata", numFormat(r.quotaVarEff, 2))}
+                {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}
+                {row("Quota variabile usata", numFormat(r.quotaVarEff, 3))}
                 {row("Quota fissa usata", money(r.quotaFissaEff))}
               </>
             )}
   
             {previewBox(
               <>
-                {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo gas fisso" : "PSV+Spread", money(r.X55))}
-                {row("Quota variabile offerta", money(r.X56))}
+                {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo gas fisso" : "PSV+Spread", `${numFormat(r.X55, 3)} €`)}
+                {row("Quota variabile offerta", `${numFormat(r.X56, 3)} €`)}
               </>
             )}
   
