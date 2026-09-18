@@ -1974,7 +1974,7 @@ export default function Archive() {
               }}
             >
               <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO LUCE</div>
-              <div style={{ fontSize: 13, color: "#1e40af", fontWeight: 800 }}>
+              <div style={{ fontSize: 18, color: "#1e40af", fontWeight: 900 }}>
                 {totals.luceCount.toLocaleString("it-IT")}{" "}
                 {totals.luceCount === 1 ? "recesso luce" : "recessi luce"}
               </div>
@@ -1995,7 +1995,7 @@ export default function Archive() {
               }}
             >
               <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO GAS</div>
-              <div style={{ fontSize: 13, color: "#166534", fontWeight: 800 }}>
+              <div style={{ fontSize: 18, color: "#166534", fontWeight: 900 }}>
                 {totals.gasCount.toLocaleString("it-IT")}{" "}
                 {totals.gasCount === 1 ? "recesso gas" : "recessi gas"}
               </div>
