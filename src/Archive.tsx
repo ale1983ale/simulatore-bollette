@@ -1974,12 +1974,12 @@ export default function Archive() {
               }}
             >
               <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO LUCE</div>
-              <div style={{ fontSize: 18, color: "#1e40af", fontWeight: 900 }}>
+              <div style={{ fontSize: 22, color: "#1e40af", fontWeight: 900 }}>
                 {totals.luceCount.toLocaleString("it-IT")}{" "}
                 {totals.luceCount === 1 ? "recesso luce" : "recessi luce"}
               </div>
             </div>
-            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+            <div style={{ fontSize: 24, fontWeight: 900, marginTop: 3 }}>
               {totals.luce.toLocaleString("it-IT", { maximumFractionDigits: 2 })} kWh
             </div>
           </div>
@@ -1995,12 +1995,12 @@ export default function Archive() {
               }}
             >
               <div style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>CONSUMO GAS</div>
-              <div style={{ fontSize: 18, color: "#166534", fontWeight: 900 }}>
+              <div style={{ fontSize: 22, color: "#166534", fontWeight: 900 }}>
                 {totals.gasCount.toLocaleString("it-IT")}{" "}
                 {totals.gasCount === 1 ? "recesso gas" : "recessi gas"}
               </div>
             </div>
-            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 3 }}>
+            <div style={{ fontSize: 24, fontWeight: 900, marginTop: 3 }}>
               {totals.gas.toLocaleString("it-IT", { maximumFractionDigits: 2 })} Smc
             </div>
           </div>
