@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
+import Production from "./Production";
 
 type Commodity = "LUCE" | "GAS" | "N/D";
 type StorageMode = "loading" | "database" | "legacy";
@@ -2160,12 +2161,7 @@ export default function Archive() {
       </div>
         </>
       ) : (
-        <div style={cardStyle}>
-          <h3 style={{ marginTop: 0 }}>PRODUZIONE</h3>
-          <div style={{ color: "#64748b", fontSize: 14 }}>
-            Sezione PRODUZIONE pronta per essere sviluppata.
-          </div>
-        </div>
+        <Production />
       )}
     </div>
   );
