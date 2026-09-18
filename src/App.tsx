@@ -1254,7 +1254,7 @@ function Energia({
       if (selectedMonth === "FISSO DOMESTICO" || selectedMonth === "FISSO BUSINESS") {
         return {
           label: `Mese ${index} · ${actualFixedLabel}`,
-          value: `Prezzo fisso ${referencePriceFormat(n(actualFixedRow?.mono))} €/kWh`,
+          value: `FISSO · F1 ${referencePriceFormat(n(actualFixedRow?.f1))} · F2 ${referencePriceFormat(n(actualFixedRow?.f2))} · F3 ${referencePriceFormat(n(actualFixedRow?.f3))} · F0 ${referencePriceFormat(n(actualFixedRow?.mono))} €/kWh`,
         };
       }
 
