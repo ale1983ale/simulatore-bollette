@@ -6003,7 +6003,8 @@ useEffect(() => {
   localStorage.setItem("app_tab", tab);
 }, [tab]);
 
-  const adminTabs = ["reportAdmin", "listini", "agents", "adminUsers", "archive"];
+  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin"];
+  const adminTabs = ["reportAdmin", "archive", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6230,35 +6231,11 @@ const renderAdminContent = () => {
             onClick={() => setTab("agents")}
             style={{
               ...baseBtn,
-              ...(tab === "agents" ? activeBtn : {}),
+              ...(databaseAdminTabs.includes(tab) ? activeBtn : {}),
             }}
           >
-            Agent Admin
+            DATABASE
           </button>
-
-          {adminProfile?.role === "super_admin" && (
-  <button
-    onClick={() => setTab("listini")}
-    style={{
-      ...baseBtn,
-      ...(tab === "listini" ? activeBtn : {}),
-    }}
-  >
-    Listini
-  </button>
-)}
-
-{adminProfile?.role === "super_admin" && (
-  <button
-    onClick={() => setTab("punpsvAdmin")}
-    style={{
-      ...baseBtn,
-      ...(tab === "punpsvAdmin" ? activeBtn : {}),
-    }}
-  >
-    PUN / PSV Admin
-  </button>
-)}  
 
 {(agentSession || adminSession) && (
   <button
@@ -6285,6 +6262,58 @@ const renderAdminContent = () => {
 )}
       </div>
       </div>
+
+      {databaseAdminTabs.includes(tab) && (
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: 10,
+          }}
+        >
+          <button
+            onClick={() => setTab("agents")}
+            style={{
+              ...baseBtn,
+              padding: "9px 14px",
+              ...(tab === "agents" ? activeBtn : {}),
+            }}
+          >
+            Agent Admin
+          </button>
+
+          {adminProfile?.role === "super_admin" && (
+            <button
+              onClick={() => setTab("listini")}
+              style={{
+                ...baseBtn,
+                padding: "9px 14px",
+                ...(tab === "listini" ? activeBtn : {}),
+              }}
+            >
+              Listini
+            </button>
+          )}
+
+          {adminProfile?.role === "super_admin" && (
+            <button
+              onClick={() => setTab("punpsvAdmin")}
+              style={{
+                ...baseBtn,
+                padding: "9px 14px",
+                ...(tab === "punpsvAdmin" ? activeBtn : {}),
+              }}
+            >
+              PUN / PSV Admin
+            </button>
+          )}
+        </div>
+      )}
 
       {tab === "reportAdmin" && <ReportAdmin adminProfile={adminProfile} />}
 
