@@ -214,25 +214,63 @@ async function splitWorkbook(sourceFile: File, recipients: Recipient[]) {
   return generated;
 }
 
-const psScript = String.raw`param([int]$Limit = 0)
+const psScript = String.raw`param([ValidateSet('TEST','INVIA')][string]$Mode = '')
+
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$manifest = Get-Content -LiteralPath (Join-Path $root 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$manifestPath = Join-Path $root 'manifest.json'
+if (-not (Test-Path -LiteralPath $manifestPath)) {
+  Write-Host 'manifest.json non trovato. Estrai tutto lo ZIP in una cartella prima di avviare.' -ForegroundColor Red
+  [void](Read-Host 'Premi INVIO per chiudere')
+  exit 1
+}
+
+$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $items = @($manifest.recipients)
-if ($Limit -gt 0 -and $items.Count -gt $Limit) { $items = @($items | Select-Object -First $Limit) }
+
+if (-not $Mode) {
+  Write-Host ''
+  Write-Host 'INVIO EMAIL TRAMITE OUTLOOK CLASSICO' -ForegroundColor Cyan
+  Write-Host ('Email disponibili: ' + $items.Count)
+  Write-Host ('Oggetto: ' + [string]$manifest.subject)
+  Write-Host ''
+  Write-Host 'Digita TEST per inviare solo la prima email.' -ForegroundColor Yellow
+  Write-Host 'Digita INVIA per inviare tutte le email.' -ForegroundColor Yellow
+  Write-Host 'Qualsiasi altro testo annulla l''operazione.'
+  $Mode = (Read-Host 'Scelta').Trim().ToUpperInvariant()
+}
+
+if ($Mode -eq 'TEST') {
+  if ($items.Count -gt 1) { $items = @($items | Select-Object -First 1) }
+} elseif ($Mode -ne 'INVIA') {
+  Write-Host 'Operazione annullata.'
+  [void](Read-Host 'Premi INVIO per chiudere')
+  exit 0
+}
+
 Write-Host ''
-Write-Host 'INVIO EMAIL TRAMITE OUTLOOK CLASSICO' -ForegroundColor Cyan
 Write-Host ('Email da inviare: ' + $items.Count)
-Write-Host ('Oggetto: ' + [string]$manifest.subject)
-Write-Host ''
 Write-Host 'La firma predefinita di Outlook verra aggiunta automaticamente, compreso il logo.' -ForegroundColor Yellow
-$confirm = Read-Host 'Per procedere digita INVIA'
-if ($confirm -cne 'INVIA') { Write-Host 'Operazione annullata.'; exit 0 }
+
+$confirmWord = if ($Mode -eq 'TEST') { 'TEST' } else { 'INVIA' }
+$confirm = Read-Host ('Per confermare digita ' + $confirmWord)
+if ($confirm.Trim().ToUpperInvariant() -ne $confirmWord) {
+  Write-Host 'Operazione annullata.'
+  [void](Read-Host 'Premi INVIO per chiudere')
+  exit 0
+}
+
 try { $outlook = New-Object -ComObject Outlook.Application }
-catch { Write-Host 'Outlook classico non disponibile.' -ForegroundColor Red; exit 1 }
+catch {
+  Write-Host 'Outlook classico non disponibile.' -ForegroundColor Red
+  [void](Read-Host 'Premi INVIO per chiudere')
+  exit 1
+}
+
 $bodyHtml = [System.Net.WebUtility]::HtmlEncode([string]$manifest.body)
 $bodyHtml = [regex]::Replace($bodyHtml, '\r\n|\n|\r', '<br>')
 $sent = 0
+
 foreach ($item in $items) {
   try {
     $mail = $outlook.CreateItem(0)
@@ -243,12 +281,14 @@ foreach ($item in $items) {
     Start-Sleep -Milliseconds 450
     $signatureHtml = [string]$mail.HTMLBody
     $mail.HTMLBody = "<div style='font-family:Calibri,Arial,sans-serif;font-size:11pt;'>$bodyHtml</div><br>" + $signatureHtml
+
     foreach ($rel in @($item.attachments)) {
-      $relative = ([string]$rel) -replace '/', '\\'
+      $relative = ([string]$rel) -replace '/', '\'
       $path = Join-Path $root $relative
       if (-not (Test-Path -LiteralPath $path)) { throw "Allegato non trovato: $path" }
       [void]$mail.Attachments.Add($path)
     }
+
     $mail.Send()
     $sent++
     Write-Host ("OK " + $sent + '/' + $items.Count + ' - ' + [string]$item.email) -ForegroundColor Green
@@ -256,27 +296,14 @@ foreach ($item in $items) {
   } catch {
     Write-Host ('ERRORE per ' + [string]$item.email + ': ' + $_.Exception.Message) -ForegroundColor Red
     Write-Host 'Invio interrotto. Le email gia inviate restano inviate.' -ForegroundColor Yellow
+    [void](Read-Host 'Premi INVIO per chiudere')
     exit 1
   }
 }
+
 Write-Host ''
 Write-Host ("Operazione completata. Email inviate: $sent") -ForegroundColor Green
-Write-Host 'Premi INVIO per chiudere.'
-[void](Read-Host)
-`;
-
-const sendAllBat = String.raw`@echo off
-chcp 65001 >nul
-cd /d "%~dp0"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0invia_tutte.ps1"
-if errorlevel 1 pause
-`;
-
-const testOneBat = String.raw`@echo off
-chcp 65001 >nul
-cd /d "%~dp0"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0invia_tutte.ps1" -Limit 1
-if errorlevel 1 pause
+[void](Read-Host 'Premi INVIO per chiudere')
 `;
 
 export default function OutlookEmailAutoSendPackageSafe() {
@@ -353,20 +380,23 @@ export default function OutlookEmailAutoSendPackageSafe() {
         }
 
         zip.file("manifest.json", JSON.stringify({ subject, body, recipients: manifestRecipients }, null, 2));
-        zip.file("invia_tutte.ps1", psScript);
-        zip.file("INVIA_TUTTE.bat", sendAllBat);
-        zip.file("TEST_1_EMAIL.bat", testOneBat);
+        zip.file("INVIO_OUTLOOK.ps1", psScript);
         zip.file("LEGGIMI.txt", [
-          "INVIO AUTOMATICO CON OUTLOOK CLASSICO",
+          "INVIO AUTOMATICO CON OUTLOOK CLASSICO - VERSIONE SENZA .BAT",
           "",
           "1) Estrai completamente lo ZIP in una cartella.",
-          "2) Fai prima doppio clic su TEST_1_EMAIL.bat.",
-          "3) Se la prima email e corretta, usa INVIA_TUTTE.bat.",
-          "4) Digita INVIA quando richiesto.",
+          "2) Fai clic destro su INVIO_OUTLOOK.ps1 e scegli 'Esegui con PowerShell'.",
+          "3) Digita TEST per inviare soltanto la prima email.",
+          "4) Se il test e corretto, riapri INVIO_OUTLOOK.ps1 e digita INVIA.",
+          "5) Conferma una seconda volta quando richiesto.",
           "",
+          "Il pacchetto non contiene file .BAT e non usa ExecutionPolicy Bypass.",
           "La firma predefinita di Outlook viene aggiunta automaticamente, compreso il logo.",
           "Outlook puo aprire per un istante ogni messaggio per inserire la firma.",
           "La webapp non accede alla casella Microsoft e non richiede autorizzazioni Entra.",
+          "",
+          "Se Windows blocca anche il file .ps1 in base alle policy aziendali, non disattivare Defender:",
+          "in quel caso usa le bozze .eml oppure la procedura Android.",
         ].join("\r\n"));
 
         const blob = await zip.generateAsync({ type: "blob" });
@@ -391,7 +421,7 @@ export default function OutlookEmailAutoSendPackageSafe() {
         button = document.createElement("button");
         button.type = "button";
         button.dataset.autoSendOutlook = "true";
-        button.textContent = "⚡ Invio unico Outlook + firma";
+        button.textContent = "⚡ Pacchetto Windows Outlook";
         button.style.border = "0";
         button.style.borderRadius = "10px";
         button.style.padding = "10px 14px";
@@ -399,7 +429,7 @@ export default function OutlookEmailAutoSendPackageSafe() {
         button.style.cursor = "pointer";
         button.style.background = "#2563eb";
         button.style.color = "white";
-        button.title = "Prepara un pacchetto per inviare tutte le email tramite Outlook classico usando la firma predefinita";
+        button.title = "Prepara un pacchetto Windows senza file .BAT per Outlook classico, con firma predefinita";
         button.addEventListener("click", () => void makePackage(button!));
         row.insertBefore(button, row.lastElementChild || null);
       }
