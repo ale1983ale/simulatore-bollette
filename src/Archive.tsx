@@ -727,6 +727,125 @@ const cardStyle: React.CSSProperties = {
   padding: 16,
 };
 
+type MultiSelectOption = {
+  value: string;
+  label: string;
+};
+
+function MultiSelectFilter({
+  label,
+  options,
+  selected,
+  onChange,
+  allLabel,
+}: {
+  label: string;
+  options: MultiSelectOption[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  allLabel: string;
+}) {
+  const selectedLabels = options
+    .filter((option) => selected.includes(option.value))
+    .map((option) => option.label);
+
+  const summary =
+    selectedLabels.length === 0
+      ? allLabel
+      : selectedLabels.length === 1
+      ? selectedLabels[0]
+      : `${selectedLabels.length} selezionati`;
+
+  const toggleValue = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((item) => item !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  return (
+    <div>
+      <div style={labelStyle}>{label}</div>
+      <details
+        style={{
+          position: "relative",
+          width: "100%",
+        }}
+      >
+        <summary
+          style={{
+            ...inputStyle,
+            cursor: "pointer",
+            userSelect: "none",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {summary}
+        </summary>
+
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 30,
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            maxHeight: 240,
+            overflowY: "auto",
+            padding: 8,
+            background: "white",
+            border: "1px solid #cbd5e1",
+            borderRadius: 8,
+            boxShadow: "0 10px 25px rgba(15, 23, 42, 0.14)",
+          }}
+        >
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "7px 6px",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={selected.length === 0}
+              onChange={() => onChange([])}
+            />
+            {allLabel}
+          </label>
+
+          {options.map((option) => (
+            <label
+              key={option.value}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 6px",
+                cursor: "pointer",
+                borderTop: "1px solid #f1f5f9",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(option.value)}
+                onChange={() => toggleValue(option.value)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
 export default function Archive() {
   const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [rows, setRows] = useState<RecessoRow[]>([]);
@@ -738,13 +857,13 @@ export default function Archive() {
   const [saving, setSaving] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
 
-  const [commodity, setCommodity] = useState("ALL");
-  const [month, setMonth] = useState("ALL");
-  const [agent, setAgent] = useState("ALL");
-  const [province, setProvince] = useState("ALL");
-  const [region, setRegion] = useState("ALL");
+  const [commodities, setCommodities] = useState<string[]>([]);
+  const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
+  const [agentsSelected, setAgentsSelected] = useState<string[]>([]);
+  const [provincesSelected, setProvincesSelected] = useState<string[]>([]);
+  const [regionsSelected, setRegionsSelected] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
-  const [customerType, setCustomerType] = useState("ALL");
+  const [customerTypesSelected, setCustomerTypesSelected] = useState<string[]>([]);
   const [consumptionMin, setConsumptionMin] = useState("");
   const [consumptionMax, setConsumptionMax] = useState("");
   const [search, setSearch] = useState("");
@@ -991,13 +1110,13 @@ export default function Archive() {
     const needle = search.trim().toLocaleLowerCase("it");
 
     return rows.filter((row) => {
-      if (commodity !== "ALL" && row.commodity !== commodity) return false;
-      if (month !== "ALL" && row.monthKey !== month) return false;
-      if (agent !== "ALL" && row.agente !== agent) return false;
+      if (commodities.length && !commodities.includes(row.commodity)) return false;
+      if (monthsSelected.length && !monthsSelected.includes(row.monthKey)) return false;
+      if (agentsSelected.length && !agentsSelected.includes(row.agente)) return false;
 
       const geo = deriveLegalSeatGeo(row.raw);
-      if (province !== "ALL" && geo.provinceCode !== province) return false;
-      if (region !== "ALL" && geo.region !== region) return false;
+      if (provincesSelected.length && !provincesSelected.includes(geo.provinceCode)) return false;
+      if (regionsSelected.length && !regionsSelected.includes(geo.region)) return false;
 
       if (
         customerNeedle &&
@@ -1005,7 +1124,7 @@ export default function Archive() {
       ) {
         return false;
       }
-      if (customerType !== "ALL" && row.tipoCliente !== customerType) return false;
+      if (customerTypesSelected.length && !customerTypesSelected.includes(row.tipoCliente)) return false;
       if (min !== null && Number.isFinite(min) && (row.consumo === null || row.consumo < min)) return false;
       if (max !== null && Number.isFinite(max) && (row.consumo === null || row.consumo > max)) return false;
 
@@ -1034,13 +1153,13 @@ export default function Archive() {
     });
   }, [
     rows,
-    commodity,
-    month,
-    agent,
-    province,
-    region,
+    commodities,
+    monthsSelected,
+    agentsSelected,
+    provincesSelected,
+    regionsSelected,
     customerName,
-    customerType,
+    customerTypesSelected,
     consumptionMin,
     consumptionMax,
     search,
@@ -1268,13 +1387,13 @@ export default function Archive() {
   };
 
   const resetFilters = () => {
-    setCommodity("ALL");
-    setMonth("ALL");
-    setAgent("ALL");
-    setProvince("ALL");
-    setRegion("ALL");
+    setCommodities([]);
+    setMonthsSelected([]);
+    setAgentsSelected([]);
+    setProvincesSelected([]);
+    setRegionsSelected([]);
     setCustomerName("");
-    setCustomerType("ALL");
+    setCustomerTypesSelected([]);
     setConsumptionMin("");
     setConsumptionMax("");
     setSearch("");
@@ -1663,63 +1782,61 @@ export default function Archive() {
             marginTop: 14,
           }}
         >
-          <div>
-            <div style={labelStyle}>Luce / Gas</div>
-            <select value={commodity} onChange={(e) => setCommodity(e.target.value)} style={inputStyle}>
-              <option value="ALL">Tutti</option>
-              <option value="LUCE">Luce</option>
-              <option value="GAS">Gas</option>
-              <option value="N/D">Non riconosciuti</option>
-            </select>
-          </div>
+          <MultiSelectFilter
+            label="Luce / Gas"
+            allLabel="Tutti"
+            selected={commodities}
+            onChange={setCommodities}
+            options={[
+              { value: "LUCE", label: "Luce" },
+              { value: "GAS", label: "Gas" },
+              { value: "N/D", label: "Non riconosciuti" },
+            ]}
+          />
 
-          <div>
-            <div style={labelStyle}>Mese di riferimento</div>
-            <select value={month} onChange={(e) => setMonth(e.target.value)} style={inputStyle}>
-              <option value="ALL">Tutti i mesi</option>
-              {months.map((item) => (
-                <option key={item} value={item}>
-                  {monthLabel(item)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MultiSelectFilter
+            label="Mese di riferimento"
+            allLabel="Tutti i mesi"
+            selected={monthsSelected}
+            onChange={setMonthsSelected}
+            options={months.map((item) => ({
+              value: item,
+              label: monthLabel(item),
+            }))}
+          />
 
-          <div>
-            <div style={labelStyle}>Nome agente</div>
-            <select value={agent} onChange={(e) => setAgent(e.target.value)} style={inputStyle}>
-              <option value="ALL">Tutti gli agenti</option>
-              {agents.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MultiSelectFilter
+            label="Nome agente"
+            allLabel="Tutti gli agenti"
+            selected={agentsSelected}
+            onChange={setAgentsSelected}
+            options={agents.map((item) => ({
+              value: item,
+              label: item,
+            }))}
+          />
 
-          <div>
-            <div style={labelStyle}>Provincia</div>
-            <select value={province} onChange={(e) => setProvince(e.target.value)} style={inputStyle}>
-              <option value="ALL">Tutte le province</option>
-              {provinces.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MultiSelectFilter
+            label="Provincia"
+            allLabel="Tutte le province"
+            selected={provincesSelected}
+            onChange={setProvincesSelected}
+            options={provinces.map((item) => ({
+              value: item.code,
+              label: item.label,
+            }))}
+          />
 
-          <div>
-            <div style={labelStyle}>Regione</div>
-            <select value={region} onChange={(e) => setRegion(e.target.value)} style={inputStyle}>
-              <option value="ALL">Tutte le regioni</option>
-              {regions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MultiSelectFilter
+            label="Regione"
+            allLabel="Tutte le regioni"
+            selected={regionsSelected}
+            onChange={setRegionsSelected}
+            options={regions.map((item) => ({
+              value: item,
+              label: item,
+            }))}
+          />
 
           <div>
             <div style={labelStyle}>Denominazione cliente</div>
@@ -1737,17 +1854,16 @@ export default function Archive() {
             </datalist>
           </div>
 
-          <div>
-            <div style={labelStyle}>Tipologia cliente</div>
-            <select value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={inputStyle}>
-              <option value="ALL">Tutte le tipologie</option>
-              {customerTypes.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MultiSelectFilter
+            label="Tipologia cliente"
+            allLabel="Tutte le tipologie"
+            selected={customerTypesSelected}
+            onChange={setCustomerTypesSelected}
+            options={customerTypes.map((item) => ({
+              value: item,
+              label: item,
+            }))}
+          />
 
           <div>
             <div style={labelStyle}>Consumo minimo</div>
