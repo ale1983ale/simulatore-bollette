@@ -294,13 +294,13 @@ const INITIAL_DISP_CP_ROWS: DispCpRow[] = [
 
 const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
   { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
-  { nome: "+SICURADEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
+  { nome: "+SICURA DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
   { nome: "BILANCIATA", canone: 18.5, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
 ];
 
 const INITIAL_GAS_OFFERS: GasOffer[] = [
   { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0, visibile: true },
-  { nome: "+SICURADEDICATA", canone: 0, spread: 0, quotaVariabile: 0, visibile: true },
+  { nome: "+SICURA DEDICATA", canone: 0, spread: 0, quotaVariabile: 0, visibile: true },
 ];
 
 const energyTypes = [
@@ -354,7 +354,7 @@ const isSi = (v: string) => String(v).trim().toUpperCase() === "SI";
 const normalizeOfferName = (offer: string) => String(offer || "").trim().toUpperCase();
 
 const isFixedDedicatedOffer = (offer: string) =>
-  ["+SICURADEDICATA", "SICURADEDICATA", "+FISSO DEDICATA", "FISSO DEDICATA"].includes(normalizeOfferName(offer));
+  ["+SICURA DEDICATA", "SICURA DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+FISSO DEDICATA", "FISSO DEDICATA"].includes(normalizeOfferName(offer));
 
 const isDedicatedOffer = (offer: string) =>
   normalizeOfferName(offer) === "DEDICATA" || isFixedDedicatedOffer(offer);
@@ -5890,8 +5890,8 @@ useEffect(() => {
         const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
           .map((offer) => ({ ...offer, visibile: offer.visibile !== false }))
           .map((offer) =>
-            ["+FISSO DEDICATA", "SICURADEDICATA"].includes(offer.nome)
-              ? { ...offer, nome: "+SICURADEDICATA" }
+            ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
+              ? { ...offer, nome: "+SICURA DEDICATA" }
               : offer
           )
           .filter((offer) => !obsoleteEnergyOfferNames.has(offer.nome))
@@ -5910,8 +5910,8 @@ useEffect(() => {
         const savedGasOffers = (map.gasOffers as GasOffer[])
           .map((offer) => ({ ...offer, visibile: offer.visibile !== false }))
           .map((offer) =>
-            ["+FISSO DEDICATA", "SICURADEDICATA"].includes(offer.nome)
-              ? { ...offer, nome: "+SICURADEDICATA" }
+            ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
+              ? { ...offer, nome: "+SICURA DEDICATA" }
               : offer
           )
           .filter((offer) => !obsoleteGasOfferNames.has(offer.nome))
