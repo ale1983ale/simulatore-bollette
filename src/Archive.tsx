@@ -237,6 +237,137 @@ function findRawValue(raw: Record<string, string>, aliases: string[]) {
   return "";
 }
 
+const PROVINCE_META: Record<string, { name: string; region: string }> = {
+  AG: { name: "Agrigento", region: "Sicilia" },
+  AL: { name: "Alessandria", region: "Piemonte" },
+  AN: { name: "Ancona", region: "Marche" },
+  AO: { name: "Aosta", region: "Valle d'Aosta" },
+  AP: { name: "Ascoli Piceno", region: "Marche" },
+  AQ: { name: "L'Aquila", region: "Abruzzo" },
+  AR: { name: "Arezzo", region: "Toscana" },
+  AT: { name: "Asti", region: "Piemonte" },
+  AV: { name: "Avellino", region: "Campania" },
+  BA: { name: "Bari", region: "Puglia" },
+  BG: { name: "Bergamo", region: "Lombardia" },
+  BI: { name: "Biella", region: "Piemonte" },
+  BL: { name: "Belluno", region: "Veneto" },
+  BN: { name: "Benevento", region: "Campania" },
+  BO: { name: "Bologna", region: "Emilia-Romagna" },
+  BR: { name: "Brindisi", region: "Puglia" },
+  BS: { name: "Brescia", region: "Lombardia" },
+  BT: { name: "Barletta-Andria-Trani", region: "Puglia" },
+  BZ: { name: "Bolzano", region: "Trentino-Alto Adige" },
+  CA: { name: "Cagliari", region: "Sardegna" },
+  CB: { name: "Campobasso", region: "Molise" },
+  CE: { name: "Caserta", region: "Campania" },
+  CH: { name: "Chieti", region: "Abruzzo" },
+  CI: { name: "Carbonia-Iglesias", region: "Sardegna" },
+  CL: { name: "Caltanissetta", region: "Sicilia" },
+  CN: { name: "Cuneo", region: "Piemonte" },
+  CO: { name: "Como", region: "Lombardia" },
+  CR: { name: "Cremona", region: "Lombardia" },
+  CS: { name: "Cosenza", region: "Calabria" },
+  CT: { name: "Catania", region: "Sicilia" },
+  CZ: { name: "Catanzaro", region: "Calabria" },
+  EN: { name: "Enna", region: "Sicilia" },
+  FC: { name: "Forlì-Cesena", region: "Emilia-Romagna" },
+  FE: { name: "Ferrara", region: "Emilia-Romagna" },
+  FG: { name: "Foggia", region: "Puglia" },
+  FI: { name: "Firenze", region: "Toscana" },
+  FM: { name: "Fermo", region: "Marche" },
+  FR: { name: "Frosinone", region: "Lazio" },
+  GE: { name: "Genova", region: "Liguria" },
+  GO: { name: "Gorizia", region: "Friuli-Venezia Giulia" },
+  GR: { name: "Grosseto", region: "Toscana" },
+  IM: { name: "Imperia", region: "Liguria" },
+  IS: { name: "Isernia", region: "Molise" },
+  KR: { name: "Crotone", region: "Calabria" },
+  LC: { name: "Lecco", region: "Lombardia" },
+  LE: { name: "Lecce", region: "Puglia" },
+  LI: { name: "Livorno", region: "Toscana" },
+  LO: { name: "Lodi", region: "Lombardia" },
+  LT: { name: "Latina", region: "Lazio" },
+  LU: { name: "Lucca", region: "Toscana" },
+  MB: { name: "Monza e della Brianza", region: "Lombardia" },
+  MC: { name: "Macerata", region: "Marche" },
+  ME: { name: "Messina", region: "Sicilia" },
+  MI: { name: "Milano", region: "Lombardia" },
+  MN: { name: "Mantova", region: "Lombardia" },
+  MO: { name: "Modena", region: "Emilia-Romagna" },
+  MS: { name: "Massa-Carrara", region: "Toscana" },
+  MT: { name: "Matera", region: "Basilicata" },
+  NA: { name: "Napoli", region: "Campania" },
+  NO: { name: "Novara", region: "Piemonte" },
+  NU: { name: "Nuoro", region: "Sardegna" },
+  OG: { name: "Ogliastra", region: "Sardegna" },
+  OR: { name: "Oristano", region: "Sardegna" },
+  OT: { name: "Olbia-Tempio", region: "Sardegna" },
+  PA: { name: "Palermo", region: "Sicilia" },
+  PC: { name: "Piacenza", region: "Emilia-Romagna" },
+  PD: { name: "Padova", region: "Veneto" },
+  PE: { name: "Pescara", region: "Abruzzo" },
+  PG: { name: "Perugia", region: "Umbria" },
+  PI: { name: "Pisa", region: "Toscana" },
+  PN: { name: "Pordenone", region: "Friuli-Venezia Giulia" },
+  PO: { name: "Prato", region: "Toscana" },
+  PR: { name: "Parma", region: "Emilia-Romagna" },
+  PT: { name: "Pistoia", region: "Toscana" },
+  PU: { name: "Pesaro e Urbino", region: "Marche" },
+  PV: { name: "Pavia", region: "Lombardia" },
+  PZ: { name: "Potenza", region: "Basilicata" },
+  RA: { name: "Ravenna", region: "Emilia-Romagna" },
+  RC: { name: "Reggio Calabria", region: "Calabria" },
+  RE: { name: "Reggio Emilia", region: "Emilia-Romagna" },
+  RG: { name: "Ragusa", region: "Sicilia" },
+  RI: { name: "Rieti", region: "Lazio" },
+  RM: { name: "Roma", region: "Lazio" },
+  RN: { name: "Rimini", region: "Emilia-Romagna" },
+  RO: { name: "Rovigo", region: "Veneto" },
+  SA: { name: "Salerno", region: "Campania" },
+  SI: { name: "Siena", region: "Toscana" },
+  SO: { name: "Sondrio", region: "Lombardia" },
+  SP: { name: "La Spezia", region: "Liguria" },
+  SR: { name: "Siracusa", region: "Sicilia" },
+  SS: { name: "Sassari", region: "Sardegna" },
+  SU: { name: "Sud Sardegna", region: "Sardegna" },
+  SV: { name: "Savona", region: "Liguria" },
+  TA: { name: "Taranto", region: "Puglia" },
+  TE: { name: "Teramo", region: "Abruzzo" },
+  TN: { name: "Trento", region: "Trentino-Alto Adige" },
+  TO: { name: "Torino", region: "Piemonte" },
+  TP: { name: "Trapani", region: "Sicilia" },
+  TR: { name: "Terni", region: "Umbria" },
+  TS: { name: "Trieste", region: "Friuli-Venezia Giulia" },
+  TV: { name: "Treviso", region: "Veneto" },
+  UD: { name: "Udine", region: "Friuli-Venezia Giulia" },
+  VA: { name: "Varese", region: "Lombardia" },
+  VB: { name: "Verbano-Cusio-Ossola", region: "Piemonte" },
+  VC: { name: "Vercelli", region: "Piemonte" },
+  VE: { name: "Venezia", region: "Veneto" },
+  VI: { name: "Vicenza", region: "Veneto" },
+  VR: { name: "Verona", region: "Veneto" },
+  VS: { name: "Medio Campidano", region: "Sardegna" },
+  VT: { name: "Viterbo", region: "Lazio" },
+  VV: { name: "Vibo Valentia", region: "Calabria" },
+};
+
+function deriveLegalSeatGeo(raw: Record<string, string>) {
+  const sede =
+    raw["CAP_LOCALITA_SEDE_LEGALE"] ||
+    findRawValue(raw, ["CAP_LOCALITA_SEDE_LEGALE", "CAP LOCALITA SEDE LEGALE"]);
+
+  const text = String(sede || "").trim().toUpperCase();
+  const match = text.match(/\(([A-Z]{2})\)\s*$/) || text.match(/\b([A-Z]{2})\s*$/);
+  const provinceCode = match?.[1] || "";
+  const meta = provinceCode ? PROVINCE_META[provinceCode] : undefined;
+
+  return {
+    provinceCode,
+    provinceLabel: meta ? `${meta.name} (${provinceCode})` : provinceCode,
+    region: meta?.region || "",
+  };
+}
+
 function parseNumber(value: unknown): number | null {
   let text = String(value ?? "").trim();
   if (!text) return null;
@@ -610,6 +741,8 @@ export default function Archive() {
   const [commodity, setCommodity] = useState("ALL");
   const [month, setMonth] = useState("ALL");
   const [agent, setAgent] = useState("ALL");
+  const [province, setProvince] = useState("ALL");
+  const [region, setRegion] = useState("ALL");
   const [customerName, setCustomerName] = useState("");
   const [customerType, setCustomerType] = useState("ALL");
   const [consumptionMin, setConsumptionMin] = useState("");
@@ -790,6 +923,36 @@ export default function Archive() {
     [rows]
   );
 
+  const provinces = useMemo(() => {
+    const map = new Map<string, { code: string; label: string; region: string }>();
+
+    rows.forEach((row) => {
+      const geo = deriveLegalSeatGeo(row.raw);
+      if (!geo.provinceCode) return;
+      map.set(geo.provinceCode, {
+        code: geo.provinceCode,
+        label: geo.provinceLabel || geo.provinceCode,
+        region: geo.region,
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, "it")
+    );
+  }, [rows]);
+
+  const regions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          rows
+            .map((row) => deriveLegalSeatGeo(row.raw).region)
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [rows]
+  );
+
   const customerNames = useMemo(
     () =>
       Array.from(new Set(rows.map((row) => row.denominazione.trim()).filter(Boolean))).sort((a, b) =>
@@ -831,6 +994,11 @@ export default function Archive() {
       if (commodity !== "ALL" && row.commodity !== commodity) return false;
       if (month !== "ALL" && row.monthKey !== month) return false;
       if (agent !== "ALL" && row.agente !== agent) return false;
+
+      const geo = deriveLegalSeatGeo(row.raw);
+      if (province !== "ALL" && geo.provinceCode !== province) return false;
+      if (region !== "ALL" && geo.region !== region) return false;
+
       if (
         customerNeedle &&
         !String(row.denominazione || "").toLocaleLowerCase("it").includes(customerNeedle)
@@ -848,6 +1016,8 @@ export default function Archive() {
           row.commodity,
           row.validita,
           row.agente,
+          geo.provinceLabel,
+          geo.region,
           row.denominazione,
           row.podPdr,
           row.tipoCliente,
@@ -867,6 +1037,8 @@ export default function Archive() {
     commodity,
     month,
     agent,
+    province,
+    region,
     customerName,
     customerType,
     consumptionMin,
@@ -1099,6 +1271,8 @@ export default function Archive() {
     setCommodity("ALL");
     setMonth("ALL");
     setAgent("ALL");
+    setProvince("ALL");
+    setRegion("ALL");
     setCustomerName("");
     setCustomerType("ALL");
     setConsumptionMin("");
@@ -1109,19 +1283,25 @@ export default function Archive() {
   const exportFiltered = () => {
     if (!filteredRows.length) return;
 
-    const exportRows = filteredRows.map((row) => ({
-      "LUCE/GAS": row.commodity,
-      "POD/PDR": row.podPdr,
-      "DATA VALIDITA": row.validita,
-      "MESE RIFERIMENTO": monthLabel(row.monthKey),
-      AGENTE: row.agente,
-      "DENOMINAZIONE CLIENTE": row.denominazione,
-      "TIPOLOGIA CLIENTE": row.tipoCliente,
-      CONSUMO: row.consumo ?? "",
-      "FILE ORIGINE": row.sourceFiles.join(", "),
-      FOGLIO: row.sourceSheet,
-      ...row.raw,
-    }));
+    const exportRows = filteredRows.map((row) => {
+      const geo = deriveLegalSeatGeo(row.raw);
+
+      return {
+        "LUCE/GAS": row.commodity,
+        "POD/PDR": row.podPdr,
+        "DATA VALIDITA": row.validita,
+        "MESE RIFERIMENTO": monthLabel(row.monthKey),
+        AGENTE: row.agente,
+        PROVINCIA: geo.provinceLabel,
+        REGIONE: geo.region,
+        "DENOMINAZIONE CLIENTE": row.denominazione,
+        "TIPOLOGIA CLIENTE": row.tipoCliente,
+        CONSUMO: row.consumo ?? "",
+        "FILE ORIGINE": row.sourceFiles.join(", "),
+        FOGLIO: row.sourceSheet,
+        ...row.raw,
+      };
+    });
 
     const sheet = XLSX.utils.json_to_sheet(exportRows);
 
@@ -1134,6 +1314,8 @@ export default function Archive() {
       "DATA VALIDITA": 15,
       "MESE RIFERIMENTO": 18,
       AGENTE: 18,
+      PROVINCIA: 22,
+      REGIONE: 20,
       "DENOMINAZIONE CLIENTE": 28,
       "TIPOLOGIA CLIENTE": 22,
       CONSUMO: 16,
@@ -1508,6 +1690,30 @@ export default function Archive() {
             <select value={agent} onChange={(e) => setAgent(e.target.value)} style={inputStyle}>
               <option value="ALL">Tutti gli agenti</option>
               {agents.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Provincia</div>
+            <select value={province} onChange={(e) => setProvince(e.target.value)} style={inputStyle}>
+              <option value="ALL">Tutte le province</option>
+              {provinces.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Regione</div>
+            <select value={region} onChange={(e) => setRegion(e.target.value)} style={inputStyle}>
+              <option value="ALL">Tutte le regioni</option>
+              {regions.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
