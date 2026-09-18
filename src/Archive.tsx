@@ -1158,11 +1158,11 @@ export default function Archive() {
 
     const validMonths = filteredRows
       .map((row) => row.monthKey)
-      .filter((value) => /^\\d{4}-\\d{2}$/.test(value))
+      .filter((value) => /^\d{4}-\d{2}$/.test(value))
       .sort();
 
     const shortMonth = (monthKey: string) => {
-      const match = monthKey.match(/^(\\d{4})-(\\d{2})$/);
+      const match = monthKey.match(/^(\d{4})-(\d{2})$/);
       if (!match) return "";
 
       const monthNames = [
@@ -1203,7 +1203,7 @@ export default function Archive() {
     const sanitizeFilePart = (value: string) =>
       value
         .trim()
-        .replace(/[<>:"/\\\\|?*\\x00-\\x1F]/g, "")
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
         .replace(/\\s+/g, "_")
         .replace(/_+/g, "_")
         .slice(0, 60);
