@@ -200,10 +200,14 @@ async function splitWorkbook(sourceFile: File, recipients: Recipient[]) {
         XLSX.utils.book_append_sheet(outWorkbook, outSheet, sheetName);
       }
       const outData = XLSX.write(outWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-      const fileName = "NON ASSEGNATI.xlsx";
-      generated.set(normalize(fileName), new File([outData], fileName, {
+      const originalStem = sanitizeFileName(sourceFile.name.replace(/\.[^.]+$/, "")).trim();
+      const fileName = originalStem ? `NON ASSEGNATI ${originalStem}.xlsx` : "NON ASSEGNATI.xlsx";
+      const nonAssignedFile = new File([outData], fileName, {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      }));
+      });
+      generated.set(normalize(fileName), nonAssignedFile);
+      // Alias di sicurezza per pacchetti/righe creati da versioni precedenti.
+      generated.set(normalize("NON ASSEGNATI.xlsx"), nonAssignedFile);
     }
   }
 
@@ -335,7 +339,12 @@ export default function OutlookEmailAutoSendPackageSafe() {
           if (!available.size) throw new Error("Ricarica il file unico o i file separati e riprova.");
           for (let i = 0; i < recipients.length; i += 1) {
             const row = recipients[i];
-            const file = available.get(normalize(row.fileName || ""));
+            const requestedKey = normalize(row.fileName || "");
+            const file =
+              available.get(requestedKey) ||
+              (normalize(row.agency) === "NONASSEGNATI"
+                ? Array.from(available.entries()).find(([key]) => key.startsWith("NONASSEGNATI"))?.[1]
+                : undefined);
             if (!file) throw new Error(`Non trovo l'allegato per ${row.agency}: ${row.fileName || "file non indicato"}`);
             const rel = `allegati/${String(i + 1).padStart(3, "0")}_${sanitizeFileName(file.name)}`;
             zip.file(rel, file);
