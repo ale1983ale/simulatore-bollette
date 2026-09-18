@@ -971,53 +971,52 @@ export default function Archive() {
     }
   };
 
-  const clearAllArchive = async () => {
-    if (!rows.length) return;
+  const removeRow = async (row: RecessoRow) => {
+    const customer = row.denominazione || "Cliente non indicato";
+    const point = row.podPdr || "POD/PDR non indicato";
+    const validity = row.validita || monthLabel(row.monthKey);
 
-    const firstConfirm = window.confirm(
-      `Vuoi eliminare TUTTO l'archivio RECESSI? Verranno cancellate ${rows.length.toLocaleString("it-IT")} righe.`
+    const confirmed = window.confirm(
+      `Eliminare questa voce dall'archivio RECESSI?\n\nCliente: ${customer}\nPOD/PDR: ${point}\nValidità: ${validity}`
     );
-    if (!firstConfirm) return;
-
-    const secondConfirm = window.confirm(
-      "Conferma definitiva: questa operazione cancellerà tutti i dati dell'archivio RECESSI."
-    );
-    if (!secondConfirm) return;
+    if (!confirmed) return;
 
     setSaving(true);
 
     try {
       if (storageMode === "database") {
-        const { data, error } = await supabase.rpc("archive_recessi_clear_all", {
-          p_confirmation: "ELIMINA TUTTO",
+        const { data, error } = await supabase.rpc("archive_recessi_delete_row", {
+          p_id: Number(row.id),
         });
 
         if (error) throw error;
 
-        const { error: legacyClearError } = await supabase
-          .from("app_settings")
-          .upsert([{ key: LEGACY_KEY, value_json: { version: 1, files: [] } }]);
-
-        if (legacyClearError) {
-          console.warn("CLEAR LEGACY ARCHIVE ERROR:", legacyClearError);
-        }
-
         await fetchDatabaseRows();
+
         const deleted = Number(data?.deleted || 0);
-        setLastImportMessage(
-          `Archivio eliminato: ${deleted.toLocaleString("it-IT")} righe cancellate.`
-        );
+        if (!deleted) {
+          alert("La voce non è stata trovata nel database.");
+        }
       } else {
-        const emptyArchive: LegacyArchive = { version: 1, files: [] };
-        await saveLegacyArchive(emptyArchive);
-        setLastImportMessage("Archivio eliminato.");
+        const nextFiles = legacyArchive.files
+          .map((file) => ({
+            ...file,
+            rows: (file.rows as RecessoRow[]).filter(
+              (item) => item.dedupKey !== row.dedupKey
+            ),
+          }))
+          .filter((file) => file.rows.length > 0);
+
+        await saveLegacyArchive({
+          version: 1,
+          files: nextFiles,
+        });
       }
 
-      setPendingFiles([]);
-      resetFilters();
+      setLastImportMessage("Voce eliminata dall'archivio.");
     } catch (error: any) {
-      console.error("CLEAR ARCHIVE ERROR:", error);
-      alert("Errore nell'eliminazione dell'archivio: " + (error?.message || error));
+      console.error("REMOVE ARCHIVE ROW ERROR:", error);
+      alert("Errore nell'eliminazione della voce: " + (error?.message || error));
     } finally {
       setSaving(false);
     }
@@ -1108,37 +1107,17 @@ export default function Archive() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div
-              style={{
-                padding: "7px 10px",
-                borderRadius: 999,
-                fontSize: 12,
-                fontWeight: 800,
-                background: storageMode === "database" ? "#dcfce7" : "#fff7ed",
-                color: storageMode === "database" ? "#166534" : "#9a3412",
-              }}
-            >
-              {storageMode === "database" ? "Database Supabase" : "Modalità compatibilità"}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void clearAllArchive()}
-              disabled={saving || !rows.length}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1px solid #dc2626",
-                background: rows.length ? "#dc2626" : "#fecaca",
-                color: "white",
-                fontWeight: 800,
-                cursor: saving || !rows.length ? "default" : "pointer",
-                opacity: saving ? 0.65 : 1,
-              }}
-            >
-              Elimina tutto
-            </button>
+          <div
+            style={{
+              padding: "7px 10px",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 800,
+              background: storageMode === "database" ? "#dcfce7" : "#fff7ed",
+              color: storageMode === "database" ? "#166534" : "#9a3412",
+            }}
+          >
+            {storageMode === "database" ? "Database Supabase" : "Modalità compatibilità"}
           </div>
         </div>
       </div>
@@ -1507,7 +1486,7 @@ export default function Archive() {
         ) : (
           <>
             <div style={{ overflowX: "auto", marginTop: 14 }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1210 }}>
                 <thead>
                   <tr style={{ background: "#f8fafc" }}>
                     {[
@@ -1520,6 +1499,7 @@ export default function Archive() {
                       "Tipologia cliente",
                       "Consumo",
                       "File origine",
+                      "Azioni",
                     ].map((header) => (
                       <th
                         key={header}
@@ -1573,6 +1553,25 @@ export default function Archive() {
                       </td>
                       <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
                         {row.sourceFiles.join(", ") || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
+                          onClick={() => void removeRow(row)}
+                          disabled={saving}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #fecaca",
+                            background: "#fff1f2",
+                            color: "#b91c1c",
+                            fontWeight: 800,
+                            cursor: saving ? "default" : "pointer",
+                            opacity: saving ? 0.6 : 1,
+                          }}
+                        >
+                          Elimina
+                        </button>
                       </td>
                     </tr>
                   ))}
