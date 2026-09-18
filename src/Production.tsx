@@ -691,7 +691,7 @@ export default function Production() {
   if (loading) return <div style={cardStyle}>Caricamento PRODUZIONE...</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", minWidth: 0 }}>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button
           type="button"
