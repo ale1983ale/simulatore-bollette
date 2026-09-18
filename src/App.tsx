@@ -2759,6 +2759,8 @@ function Listini({
   const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draggingEnergyIndex, setDraggingEnergyIndex] = useState<number | null>(null);
+  const [draggingGasIndex, setDraggingGasIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (dirty) return;
@@ -2769,6 +2771,32 @@ function Listini({
   }, [dispCpRows, energyOffers, gasOffers, gasAcciseSettings, dirty]);
 
   const markDirty = () => setDirty(true);
+
+  const reorderEnergyOffer = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    setDraftEnergyOffers((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+
+    markDirty();
+  };
+
+  const reorderGasOffer = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    setDraftGasOffers((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+
+    markDirty();
+  };
 
   const updateDispCp = (index: number, key: keyof DispCpRow, value: string) => {
     setDraftDispCpRows((prev) =>
@@ -2993,14 +3021,56 @@ function Listini({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Visibile", "Nome offerta", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
+                {["Ordina", "Visibile", "Nome offerta", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {draftEnergyOffers.map((row, i) => (
-                <tr key={row.nome + i}>
+                <tr
+                  key={row.nome + i}
+                  onDragOver={(e) => {
+                    if (draggingEnergyIndex !== null) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggingEnergyIndex === null) return;
+                    reorderEnergyOffer(draggingEnergyIndex, i);
+                    setDraggingEnergyIndex(null);
+                  }}
+                  style={{
+                    opacity: draggingEnergyIndex === i ? 0.55 : 1,
+                  }}
+                >
+                  <td style={{ ...tdStyle, textAlign: "center", width: 64 }}>
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggingEnergyIndex(i);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", String(i));
+                      }}
+                      onDragEnd={() => setDraggingEnergyIndex(null)}
+                      title="Tieni premuto e trascina per spostare il listino"
+                      aria-label={"Sposta il listino " + row.nome}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        border: "1px solid #cbd5e1",
+                        background: "#f8fafc",
+                        fontSize: 20,
+                        lineHeight: 1,
+                        fontWeight: 900,
+                        cursor: "grab",
+                        touchAction: "none",
+                      }}
+                    >
+                      ☰
+                    </button>
+                  </td>
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <input
                       type="checkbox"
@@ -3057,14 +3127,56 @@ function Listini({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Visibile", "Nome offerta", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
+                {["Ordina", "Visibile", "Nome offerta", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {draftGasOffers.map((row, i) => (
-                <tr key={row.nome + i}>
+                <tr
+                  key={row.nome + i}
+                  onDragOver={(e) => {
+                    if (draggingGasIndex !== null) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggingGasIndex === null) return;
+                    reorderGasOffer(draggingGasIndex, i);
+                    setDraggingGasIndex(null);
+                  }}
+                  style={{
+                    opacity: draggingGasIndex === i ? 0.55 : 1,
+                  }}
+                >
+                  <td style={{ ...tdStyle, textAlign: "center", width: 64 }}>
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggingGasIndex(i);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", String(i));
+                      }}
+                      onDragEnd={() => setDraggingGasIndex(null)}
+                      title="Tieni premuto e trascina per spostare il listino"
+                      aria-label={"Sposta il listino " + row.nome}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        border: "1px solid #cbd5e1",
+                        background: "#f8fafc",
+                        fontSize: 20,
+                        lineHeight: 1,
+                        fontWeight: 900,
+                        cursor: "grab",
+                        touchAction: "none",
+                      }}
+                    >
+                      ☰
+                    </button>
+                  </td>
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     <input
                       type="checkbox"
