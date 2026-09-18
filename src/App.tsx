@@ -801,8 +801,16 @@ function calcEnergia(
   const mese1IsFisso = d.mese1 === "FISSO DOMESTICO" || d.mese1 === "FISSO BUSINESS";
   const mese2IsFisso = d.mese2 === "FISSO DOMESTICO" || d.mese2 === "FISSO BUSINESS";
 
-  const meseTabella1 = mese1IsFisso ? d.meseRifTabella1 : String(d.mese1 || "").split(" ")[0];
-  const meseTabella2 = mese2IsFisso ? d.meseRifTabella2 : String(d.mese2 || "").split(" ")[0];
+  const mese1UsaMeseDisp = mese1IsFisso || d.mese1 === "FISSO AD HOC";
+  const mese2UsaMeseDisp = mese2IsFisso || d.mese2 === "FISSO AD HOC";
+
+  const meseTabella1 = mese1UsaMeseDisp
+    ? d.meseRifTabella1
+    : String(d.mese1 || "").split(" ")[0];
+
+  const meseTabella2 = mese2UsaMeseDisp
+    ? d.meseRifTabella2
+    : String(d.mese2 || "").split(" ")[0];
 
   const dispRow1 = dispCpRows.find((x) => x.mese === meseTabella1);
   const dispRow2 = dispCpRows.find((x) => x.mese === meseTabella2);
@@ -866,7 +874,15 @@ function calcEnergia(
 
   let dispCpBase = 0;
   if (sLikeBimestrale(d.fatturazione) && d.mese2) {
-    dispCpBase = (totDispCp1 + totDispCp2) / 2;
+    if (consumiMese1 > 0 || consumiMese2 > 0) {
+      const denom = consumiMese1 + consumiMese2;
+      dispCpBase =
+        denom > 0
+          ? (consumiMese1 * totDispCp1 + consumiMese2 * totDispCp2) / denom
+          : 0;
+    } else {
+      dispCpBase = (totDispCp1 + totDispCp2) / 2;
+    }
   } else {
     dispCpBase = totDispCp1;
   }
@@ -1725,7 +1741,7 @@ return (
       style={{
         display: "grid",
         gridTemplateColumns:
-          s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS"
+          s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS" || s.mese1 === "FISSO AD HOC"
             ? isMobile
               ? "1fr"
               : "1fr 1fr"
@@ -1740,7 +1756,7 @@ return (
         [...mesiOrdinati.map((m) => m.mese)]
       )}
 
-      {(s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS") &&
+      {(s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS" || s.mese1 === "FISSO AD HOC") &&
         selectField(
           "Mese DISP + CP.Mrk",
           s.meseRifTabella1,
@@ -1769,7 +1785,7 @@ return (
       style={{
         display: "grid",
         gridTemplateColumns:
-          s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS"
+          s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS" || s.mese2 === "FISSO AD HOC"
             ? isMobile
               ? "1fr"
               : "1fr 1fr"
@@ -1784,7 +1800,7 @@ return (
         ["", ...mesiOrdinati.map((m) => m.mese)]
       )}
 
-      {(s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS") &&
+      {(s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS" || s.mese2 === "FISSO AD HOC") &&
         selectField(
           "Mese DISP + CP.Mrk",
           s.meseRifTabella2,
