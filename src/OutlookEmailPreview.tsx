@@ -302,6 +302,13 @@ export default function OutlookEmailPreview() {
             td.setAttribute("data-email-preview-cell", "true");
             row.appendChild(td);
           }
+
+          // Evita un ciclo continuo del MutationObserver: se lo stato della riga
+          // non è cambiato, non ricreare i pulsanti e non mutare il DOM.
+          const previewState = `${fileName}|${removed ? "1" : "0"}|${rowIndex}`;
+          if (td.dataset.previewState === previewState) return;
+          td.dataset.previewState = previewState;
+
           td.replaceChildren();
           td.style.padding = "8px";
           td.style.whiteSpace = "nowrap";
