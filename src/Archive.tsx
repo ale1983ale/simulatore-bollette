@@ -70,6 +70,11 @@ const normalize = (value: unknown) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^A-Z0-9]/g, "");
 
+const yieldToBrowser = () =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 0);
+  });
+
 const stringifyCell = (value: unknown) => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     const dd = String(value.getDate()).padStart(2, "0");
@@ -408,33 +413,54 @@ function toRowFromRaw(
 
 async function parseRecessiFile(file: File): Promise<ParsedFile> {
   const data = await file.arrayBuffer();
-  const workbook = XLSX.read(data, { type: "array", cellDates: true });
+
+  // Lascia al browser il tempo di aggiornare la UI prima delle operazioni
+  // XLSX più pesanti, soprattutto quando vengono selezionati molti file.
+  await yieldToBrowser();
+
+  const workbook = XLSX.read(data, {
+    type: "array",
+    cellDates: true,
+    dense: true,
+  });
+
+  await yieldToBrowser();
 
   const byKey = new Map<string, RecessoRow>();
   let originalRowCount = 0;
+  const ROW_CHUNK = 200;
 
-  workbook.SheetNames.forEach((sheetName, sheetIndex) => {
+  for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex += 1) {
+    const sheetName = workbook.SheetNames[sheetIndex];
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
       header: 1,
       defval: "",
       raw: true,
     }) as unknown[][];
 
-    if (!matrix.length) return;
+    if (!matrix.length) {
+      await yieldToBrowser();
+      continue;
+    }
 
     const headerIndex = findHeaderRow(matrix);
     const headers = makeHeaders(matrix[headerIndex] || []);
 
-    matrix.slice(headerIndex + 1).forEach((sourceRow, rowIndex) => {
-      if (!sourceRow || sourceRow.every((cell) => stringifyCell(cell) === "")) return;
+    for (let matrixIndex = headerIndex + 1; matrixIndex < matrix.length; matrixIndex += 1) {
+      const sourceRow = matrix[matrixIndex];
+      if (!sourceRow || sourceRow.every((cell) => stringifyCell(cell) === "")) {
+        continue;
+      }
 
       originalRowCount += 1;
       const raw: Record<string, string> = {};
 
       headers.forEach((header, colIndex) => {
-        raw[header] = stringifyCell(sourceRow[colIndex]);
+        const value = stringifyCell(sourceRow[colIndex]);
+        if (value !== "") raw[header] = value;
       });
 
+      const rowIndex = matrixIndex - headerIndex - 1;
       const row = toRowFromRaw(
         raw,
         file.name,
@@ -445,8 +471,14 @@ async function parseRecessiFile(file: File): Promise<ParsedFile> {
       if (!byKey.has(row.dedupKey)) {
         byKey.set(row.dedupKey, row);
       }
-    });
-  });
+
+      if (originalRowCount % ROW_CHUNK === 0) {
+        await yieldToBrowser();
+      }
+    }
+
+    await yieldToBrowser();
+  }
 
   const rows = Array.from(byKey.values());
 
@@ -571,6 +603,7 @@ export default function Archive() {
   const [pendingFiles, setPendingFiles] = useState<ParsedFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
+  const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
 
@@ -858,19 +891,30 @@ export default function Archive() {
     if (!selected.length) return;
 
     setParsing(true);
+    setParsingProgress("");
     setLastImportMessage("");
 
     try {
       const parsedFiles: ParsedFile[] = [];
       const emptyFiles: string[] = [];
 
-      for (const file of selected) {
+      for (let index = 0; index < selected.length; index += 1) {
+        const file = selected[index];
+        setParsingProgress(
+          `Analizzo file ${index + 1} di ${selected.length}: ${file.name}`
+        );
+
+        // Forza il repaint prima di iniziare l'analisi del file successivo.
+        await yieldToBrowser();
+
         const parsed = await parseRecessiFile(file);
         if (parsed.rows.length) {
           parsedFiles.push(parsed);
         } else {
           emptyFiles.push(file.name);
         }
+
+        await yieldToBrowser();
       }
 
       setPendingFiles(parsedFiles);
@@ -886,6 +930,7 @@ export default function Archive() {
       setPendingFiles([]);
     } finally {
       setParsing(false);
+      setParsingProgress("");
     }
   };
 
@@ -1139,7 +1184,11 @@ export default function Archive() {
           }}
         />
 
-        {parsing && <div style={{ marginTop: 10, fontWeight: 700 }}>Analizzo i file...</div>}
+        {parsing && (
+          <div style={{ marginTop: 10, fontWeight: 700 }}>
+            {parsingProgress || "Analizzo i file..."}
+          </div>
+        )}
 
         {pendingFiles.length > 0 && (
           <div
