@@ -806,7 +806,7 @@ export default function OutlookEmail() {
   return (
     <>
       {portalHost && createPortal(
-        <button onClick={() => setOpen(true)} style={{ ...button, background: "#2563eb", color: "white", marginRight: 8 }}>✉️ Invio Email</button>,
+        <button onClick={() => setOpen(true)} style={{ ...button, background: "#2563eb", color: "white", marginRight: 8 }}>✉️ INVIO EMAIL</button>,
         portalHost
       )}
 
