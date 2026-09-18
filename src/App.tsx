@@ -1869,10 +1869,13 @@ Base suggerito
 
           {previewBox(
             <>
-              {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo energia fisso" : "Pun+Spread", money(r.H22_base))}
-              {row("Perdite di rete", money(r.perditeEnergia))}
-              {row("DISP+CP.Mrk totale", money(r.dispCpTotale))}
-              {row("Reattiva", money(r.H24))}
+              {row(
+                isFixedDedicatedOffer(s.offerta) ? "Prezzo energia fisso" : "Pun+Spread",
+                `${numFormat(r.H22_base, 3)} €`
+              )}
+              {row("Perdite di rete", `${numFormat(r.perditeEnergia, 3)} €`)}
+              {row("DISP+CP.Mrk totale", `${numFormat(r.dispCpTotale, 3)} €`)}
+              {row("Reattiva", `${numFormat(r.H24, 3)} €`)}
             </>
           )}
 
