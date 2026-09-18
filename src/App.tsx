@@ -5813,7 +5813,15 @@ const renderAdminContent = () => {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr)",
+        gap: 12,
+        width: "100%",
+        minWidth: 0,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -5911,7 +5919,11 @@ const renderAdminContent = () => {
 
       {tab === "reportAdmin" && <ReportAdmin adminProfile={adminProfile} />}
 
-      {tab === "archive" && <Archive />}
+      {tab === "archive" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Archive />
+        </div>
+      )}
 
       {tab === "agents" && (
         <>
