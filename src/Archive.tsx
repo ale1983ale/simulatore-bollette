@@ -1240,12 +1240,28 @@ export default function Archive() {
         )}
 
         {fileStats.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 7 }}>
-              FILE PRESENTI NELL'ARCHIVIO
-            </div>
+          <details
+            style={{
+              marginTop: 16,
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              background: "#f8fafc",
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                padding: "11px 12px",
+                fontSize: 12,
+                fontWeight: 800,
+                color: "#475569",
+                userSelect: "none",
+              }}
+            >
+              FILE PRESENTI NELL'ARCHIVIO ({fileStats.length})
+            </summary>
 
-            <div style={{ display: "grid", gap: 7 }}>
+            <div style={{ display: "grid", gap: 7, padding: "0 12px 12px" }}>
               {fileStats.map((file) => (
                 <div
                   key={file.name}
@@ -1257,6 +1273,7 @@ export default function Archive() {
                     padding: "9px 10px",
                     border: "1px solid #e2e8f0",
                     borderRadius: 8,
+                    background: "white",
                     flexWrap: "wrap",
                   }}
                 >
@@ -1286,7 +1303,7 @@ export default function Archive() {
                 </div>
               ))}
             </div>
-          </div>
+          </details>
         )}
       </div>
 
