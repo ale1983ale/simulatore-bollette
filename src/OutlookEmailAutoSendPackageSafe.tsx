@@ -214,97 +214,108 @@ async function splitWorkbook(sourceFile: File, recipients: Recipient[]) {
   return generated;
 }
 
-const psScript = String.raw`param([ValidateSet('TEST','INVIA')][string]$Mode = '')
+const escapeHtmlForOutlook = (value: string) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/\r\n|\n|\r/g, "<br>");
 
-$ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$manifestPath = Join-Path $root 'manifest.json'
-if (-not (Test-Path -LiteralPath $manifestPath)) {
-  Write-Host 'manifest.json non trovato. Estrai tutto lo ZIP in una cartella prima di avviare.' -ForegroundColor Red
-  [void](Read-Host 'Premi INVIO per chiudere')
-  exit 1
+const vbString = (value: string) => `"${String(value || "").replace(/"/g, '""')}"`;
+
+function buildVbsScript(
+  recipients: Array<{ agency: string; email: string; attachments: string[] }>,
+  subject: string,
+  body: string
+) {
+  const rows = recipients
+    .map((item, index) => {
+      const attachmentList = item.attachments.map((rel) => rel.replace(/\//g, "\\\\")).join("|");
+      return [
+        `recipients(${index}) = Array(${vbString(item.agency)}, ${vbString(item.email)}, ${vbString(attachmentList)})`,
+      ].join("");
+    })
+    .join("\r\n");
+
+  const htmlBody = `<div style='font-family:Calibri,Arial,sans-serif;font-size:11pt;'>${escapeHtmlForOutlook(body)}</div><br>`;
+
+  return [
+    "' INVIO EMAIL TRAMITE OUTLOOK CLASSICO",
+    "Option Explicit",
+    "",
+    "Dim fso, root, outlook, recipients(), mode, confirm, maxItems, i, item, mail, signatureHtml",
+    "Dim rels, rel, fullPath, sent, bodyHtml",
+    "Set fso = CreateObject(\"Scripting.FileSystemObject\")",
+    "root = fso.GetParentFolderName(WScript.ScriptFullName)",
+    `ReDim recipients(${Math.max(0, recipients.length - 1)})`,
+    rows,
+    "",
+    `bodyHtml = ${vbString(htmlBody)}`,
+    "",
+    'mode = UCase(Trim(InputBox("Scrivi TEST per inviare solo la prima email oppure INVIA per inviarle tutte.", "Invio Email Outlook", "TEST")))',
+    'If mode <> "TEST" And mode <> "INVIA" Then',
+    '  MsgBox "Operazione annullata.", vbInformation, "Invio Email Outlook"',
+    "  WScript.Quit 0",
+    "End If",
+    "",
+    'If mode = "TEST" Then',
+    "  maxItems = 1",
+    "Else",
+    "  maxItems = UBound(recipients) + 1",
+    "End If",
+    "",
+    'confirm = MsgBox("Stai per inviare " & maxItems & " email tramite Outlook." & vbCrLf & vbCrLf & "Oggetto: " & ' + vbString(subject) + ' & vbCrLf & vbCrLf & "Continuare?", vbYesNo + vbQuestion + vbDefaultButton2, "Conferma invio")',
+    "If confirm <> vbYes Then WScript.Quit 0",
+    "",
+    "On Error Resume Next",
+    'Set outlook = CreateObject("Outlook.Application")',
+    "If Err.Number <> 0 Then",
+    '  MsgBox "Outlook classico non disponibile: " & Err.Description, vbCritical, "Errore"',
+    "  WScript.Quit 1",
+    "End If",
+    "On Error GoTo 0",
+    "",
+    "sent = 0",
+    "For i = 0 To maxItems - 1",
+    "  item = recipients(i)",
+    "  On Error Resume Next",
+    "  Err.Clear",
+    "  Set mail = outlook.CreateItem(0)",
+    "  mail.To = CStr(item(1))",
+    "  mail.Subject = " + vbString(subject),
+    "  mail.BodyFormat = 2",
+    "  mail.Display False",
+    "  WScript.Sleep 600",
+    "  signatureHtml = CStr(mail.HTMLBody)",
+    "  mail.HTMLBody = bodyHtml & signatureHtml",
+    "",
+    "  rels = Split(CStr(item(2)), \"|\")",
+    "  For Each rel In rels",
+    '    If Len(Trim(CStr(rel))) > 0 Then',
+    "      fullPath = fso.BuildPath(root, CStr(rel))",
+    "      If Not fso.FileExists(fullPath) Then",
+    '        MsgBox "Allegato non trovato per " & CStr(item(0)) & ":" & vbCrLf & fullPath, vbCritical, "Errore allegato"',
+    "        WScript.Quit 1",
+    "      End If",
+    "      mail.Attachments.Add fullPath",
+    "    End If",
+    "  Next",
+    "",
+    "  mail.Send",
+    "  If Err.Number <> 0 Then",
+    '    MsgBox "Errore per " & CStr(item(1)) & ":" & vbCrLf & Err.Description, vbCritical, "Invio interrotto"',
+    "    WScript.Quit 1",
+    "  End If",
+    "  On Error GoTo 0",
+    "  sent = sent + 1",
+    "  WScript.Sleep 250",
+    "Next",
+    "",
+    'MsgBox "Operazione completata." & vbCrLf & "Email inviate: " & sent, vbInformation, "Invio Email Outlook"',
+    "",
+  ].join("\r\n");
 }
-
-$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$items = @($manifest.recipients)
-
-if (-not $Mode) {
-  Write-Host ''
-  Write-Host 'INVIO EMAIL TRAMITE OUTLOOK CLASSICO' -ForegroundColor Cyan
-  Write-Host ('Email disponibili: ' + $items.Count)
-  Write-Host ('Oggetto: ' + [string]$manifest.subject)
-  Write-Host ''
-  Write-Host 'Digita TEST per inviare solo la prima email.' -ForegroundColor Yellow
-  Write-Host 'Digita INVIA per inviare tutte le email.' -ForegroundColor Yellow
-  Write-Host 'Qualsiasi altro testo annulla l''operazione.'
-  $Mode = (Read-Host 'Scelta').Trim().ToUpperInvariant()
-}
-
-if ($Mode -eq 'TEST') {
-  if ($items.Count -gt 1) { $items = @($items | Select-Object -First 1) }
-} elseif ($Mode -ne 'INVIA') {
-  Write-Host 'Operazione annullata.'
-  [void](Read-Host 'Premi INVIO per chiudere')
-  exit 0
-}
-
-Write-Host ''
-Write-Host ('Email da inviare: ' + $items.Count)
-Write-Host 'La firma predefinita di Outlook verra aggiunta automaticamente, compreso il logo.' -ForegroundColor Yellow
-
-$confirmWord = if ($Mode -eq 'TEST') { 'TEST' } else { 'INVIA' }
-$confirm = Read-Host ('Per confermare digita ' + $confirmWord)
-if ($confirm.Trim().ToUpperInvariant() -ne $confirmWord) {
-  Write-Host 'Operazione annullata.'
-  [void](Read-Host 'Premi INVIO per chiudere')
-  exit 0
-}
-
-try { $outlook = New-Object -ComObject Outlook.Application }
-catch {
-  Write-Host 'Outlook classico non disponibile.' -ForegroundColor Red
-  [void](Read-Host 'Premi INVIO per chiudere')
-  exit 1
-}
-
-$bodyHtml = [System.Net.WebUtility]::HtmlEncode([string]$manifest.body)
-$bodyHtml = [regex]::Replace($bodyHtml, '\r\n|\n|\r', '<br>')
-$sent = 0
-
-foreach ($item in $items) {
-  try {
-    $mail = $outlook.CreateItem(0)
-    $mail.To = [string]$item.email
-    $mail.Subject = [string]$manifest.subject
-    $mail.BodyFormat = 2
-    $mail.Display($false)
-    Start-Sleep -Milliseconds 450
-    $signatureHtml = [string]$mail.HTMLBody
-    $mail.HTMLBody = "<div style='font-family:Calibri,Arial,sans-serif;font-size:11pt;'>$bodyHtml</div><br>" + $signatureHtml
-
-    foreach ($rel in @($item.attachments)) {
-      $relative = ([string]$rel) -replace '/', '\'
-      $path = Join-Path $root $relative
-      if (-not (Test-Path -LiteralPath $path)) { throw "Allegato non trovato: $path" }
-      [void]$mail.Attachments.Add($path)
-    }
-
-    $mail.Send()
-    $sent++
-    Write-Host ("OK " + $sent + '/' + $items.Count + ' - ' + [string]$item.email) -ForegroundColor Green
-    Start-Sleep -Milliseconds 250
-  } catch {
-    Write-Host ('ERRORE per ' + [string]$item.email + ': ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host 'Invio interrotto. Le email gia inviate restano inviate.' -ForegroundColor Yellow
-    [void](Read-Host 'Premi INVIO per chiudere')
-    exit 1
-  }
-}
-
-Write-Host ''
-Write-Host ("Operazione completata. Email inviate: $sent") -ForegroundColor Green
-[void](Read-Host 'Premi INVIO per chiudere')
-`;
 
 export default function OutlookEmailAutoSendPackageSafe() {
   const sourceFileRef = useRef<File | null>(null);
@@ -380,23 +391,20 @@ export default function OutlookEmailAutoSendPackageSafe() {
         }
 
         zip.file("manifest.json", JSON.stringify({ subject, body, recipients: manifestRecipients }, null, 2));
-        zip.file("INVIO_OUTLOOK.ps1", psScript);
+        zip.file("INVIA_EMAIL_OUTLOOK.vbs", buildVbsScript(manifestRecipients, subject, body));
         zip.file("LEGGIMI.txt", [
-          "INVIO AUTOMATICO CON OUTLOOK CLASSICO - VERSIONE SENZA .BAT",
+          "INVIO RAPIDO CON OUTLOOK CLASSICO",
           "",
           "1) Estrai completamente lo ZIP in una cartella.",
-          "2) Fai clic destro su INVIO_OUTLOOK.ps1 e scegli 'Esegui con PowerShell'.",
-          "3) Digita TEST per inviare soltanto la prima email.",
-          "4) Se il test e corretto, riapri INVIO_OUTLOOK.ps1 e digita INVIA.",
-          "5) Conferma una seconda volta quando richiesto.",
+          "2) Fai doppio clic su INVIA_EMAIL_OUTLOOK.vbs.",
+          "3) Scrivi TEST per inviare solo la prima email.",
+          "4) Se il test e corretto, riapri lo stesso file e scrivi INVIA.",
+          "5) Conferma nella finestra che compare.",
           "",
-          "Il pacchetto non contiene file .BAT e non usa ExecutionPolicy Bypass.",
+          "Non serve PowerShell e non devi aprire il Prompt dei comandi.",
           "La firma predefinita di Outlook viene aggiunta automaticamente, compreso il logo.",
-          "Outlook puo aprire per un istante ogni messaggio per inserire la firma.",
+          "Gli allegati vengono presi dalla cartella allegati del pacchetto.",
           "La webapp non accede alla casella Microsoft e non richiede autorizzazioni Entra.",
-          "",
-          "Se Windows blocca anche il file .ps1 in base alle policy aziendali, non disattivare Defender:",
-          "in quel caso usa le bozze .eml oppure la procedura Android.",
         ].join("\r\n"));
 
         const blob = await zip.generateAsync({ type: "blob" });
@@ -421,7 +429,7 @@ export default function OutlookEmailAutoSendPackageSafe() {
         button = document.createElement("button");
         button.type = "button";
         button.dataset.autoSendOutlook = "true";
-        button.textContent = "⚡ Pacchetto Windows Outlook";
+        button.textContent = "⚡ INVIO RAPIDO PC";
         button.style.border = "0";
         button.style.borderRadius = "10px";
         button.style.padding = "10px 14px";
@@ -429,7 +437,7 @@ export default function OutlookEmailAutoSendPackageSafe() {
         button.style.cursor = "pointer";
         button.style.background = "#2563eb";
         button.style.color = "white";
-        button.title = "Prepara un pacchetto Windows senza file .BAT per Outlook classico, con firma predefinita";
+        button.title = "Prepara il pacchetto Windows: estrai lo ZIP e fai doppio clic su INVIA_EMAIL_OUTLOOK.vbs";
         button.addEventListener("click", () => void makePackage(button!));
         row.insertBefore(button, row.lastElementChild || null);
       }
