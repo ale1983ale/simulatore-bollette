@@ -12,6 +12,7 @@ type RecessoRow = {
   validita: string;
   monthKey: string;
   agente: string;
+  denominazione: string;
   tipoCliente: string;
   consumo: number | null;
   raw: Record<string, string>;
@@ -85,10 +86,22 @@ const aliasGroups = {
     "CONSULENTE",
     "COMMERCIALE",
   ],
+  denominazione: [
+    "RAGIONE_SOCIALE",
+    "RAGIONE SOCIALE",
+    "DENOMINAZIONE",
+    "DENOMINAZIONE CLIENTE",
+    "NOME CLIENTE",
+    "CLIENTE",
+  ],
   tipoCliente: [
     "TIPOLOGIA CLIENTE",
     "TIPO CLIENTE",
     "CATEGORIA CLIENTE",
+    "CD_TP_UTENZA",
+    "CD TP UTENZA",
+    "CD_TP_UTILIZZO",
+    "CD TP UTILIZZO",
     "TIPOLOGIA",
     "TIPOLOGIA UTENZA",
     "TIPO USO",
@@ -98,7 +111,10 @@ const aliasGroups = {
   ],
   consumo: [
     "CONSUMO ANNUO",
+    "CONSUMO_ANNUO",
     "CONSUMO ANNUALE",
+    "KWH_ANNUI",
+    "KWH ANNUI",
     "CONSUMO",
     "CONSUMI",
     "CONSUMO KWH",
@@ -276,6 +292,20 @@ function parseDate(value: unknown) {
   return { display: text, monthKey: "" };
 }
 
+function friendlyCustomerType(value: string, commodity: Commodity) {
+  const code = normalize(value);
+  if (commodity === "LUCE") {
+    if (code === "RES") return "RESIDENZIALE (RES)";
+    if (code === "ALTRE") return "ALTRI USI (ALTRE)";
+  }
+  if (commodity === "GAS") {
+    if (code === "CIV") return "CIVILE (CIV)";
+    if (code === "ART") return "ARTIGIANALE (ART)";
+    if (code === "IND") return "INDUSTRIALE (IND)";
+  }
+  return String(value || "").trim();
+}
+
 function inferCommodity(sheetName: string, raw: Record<string, string>): Commodity {
   const explicit = findRawValue(raw, aliasGroups.commodity);
   const probe = `${sheetName} ${explicit}`.toUpperCase();
@@ -323,13 +353,15 @@ async function parseRecessiFile(file: File): Promise<RecessiFile> {
       const dateRaw = findRawValue(raw, aliasGroups.validita);
       const parsedDate = parseDate(sourceRow[headers.findIndex((h) => normalize(h) === normalize(Object.keys(raw).find((key) => raw[key] === dateRaw) || ""))] ?? dateRaw);
       const agente = findRawValue(raw, aliasGroups.agente);
-      const tipoCliente = findRawValue(raw, aliasGroups.tipoCliente);
+      const denominazione = findRawValue(raw, aliasGroups.denominazione);
+      const tipoClienteRaw = findRawValue(raw, aliasGroups.tipoCliente);
+      const tipoCliente = friendlyCustomerType(tipoClienteRaw, commodity);
 
       const consumptionAliases =
         commodity === "GAS"
-          ? ["CONSUMO ANNUO SMC", "CONSUMO SMC", "SMC", ...aliasGroups.consumo]
+          ? ["CONSUMO_ANNUO", "CONSUMO ANNUO", "CONSUMO ANNUO SMC", "CONSUMO SMC", "SMC", ...aliasGroups.consumo]
           : commodity === "LUCE"
-          ? ["CONSUMO ANNUO KWH", "CONSUMO KWH", "KWH", ...aliasGroups.consumo]
+          ? ["KWH_ANNUI", "KWH ANNUI", "CONSUMO ANNUO KWH", "CONSUMO KWH", "KWH", ...aliasGroups.consumo]
           : aliasGroups.consumo;
       const consumo = parseNumber(findRawValue(raw, consumptionAliases));
 
@@ -341,6 +373,7 @@ async function parseRecessiFile(file: File): Promise<RecessiFile> {
         validita: parsedDate.display || dateRaw,
         monthKey: parsedDate.monthKey,
         agente,
+        denominazione,
         tipoCliente,
         consumo,
         raw,
@@ -390,6 +423,7 @@ export default function Archive() {
   const [commodity, setCommodity] = useState("ALL");
   const [month, setMonth] = useState("ALL");
   const [agent, setAgent] = useState("ALL");
+  const [customerName, setCustomerName] = useState("");
   const [customerType, setCustomerType] = useState("ALL");
   const [consumptionMin, setConsumptionMin] = useState("");
   const [consumptionMax, setConsumptionMax] = useState("");
@@ -436,9 +470,17 @@ export default function Archive() {
     [allRows]
   );
 
+  const customerNames = useMemo(
+    () =>
+      Array.from(
+        new Set(allRows.map((row) => String(row.denominazione || "").trim()).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [allRows]
+  );
+
   const customerTypes = useMemo(
     () =>
-      Array.from(new Set(allRows.map((row) => row.tipoCliente.trim()).filter(Boolean))).sort((a, b) =>
+      Array.from(new Set(allRows.map((row) => String(row.tipoCliente || "").trim()).filter(Boolean))).sort((a, b) =>
         a.localeCompare(b, "it")
       ),
     [allRows]
@@ -447,12 +489,17 @@ export default function Archive() {
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
     const max = consumptionMax.trim() === "" ? null : Number(consumptionMax.replace(",", "."));
+    const customerNeedle = customerName.trim().toLocaleLowerCase("it");
     const needle = search.trim().toLocaleLowerCase("it");
 
     return allRows.filter((row) => {
       if (commodity !== "ALL" && row.commodity !== commodity) return false;
       if (month !== "ALL" && row.monthKey !== month) return false;
       if (agent !== "ALL" && row.agente !== agent) return false;
+      if (
+        customerNeedle &&
+        !String(row.denominazione || "").toLocaleLowerCase("it").includes(customerNeedle)
+      ) return false;
       if (customerType !== "ALL" && row.tipoCliente !== customerType) return false;
       if (min !== null && Number.isFinite(min) && (row.consumo === null || row.consumo < min)) return false;
       if (max !== null && Number.isFinite(max) && (row.consumo === null || row.consumo > max)) return false;
@@ -464,6 +511,7 @@ export default function Archive() {
           row.commodity,
           row.validita,
           row.agente,
+          row.denominazione || "",
           row.tipoCliente,
           row.consumo ?? "",
           ...Object.values(row.raw),
@@ -475,7 +523,7 @@ export default function Archive() {
 
       return true;
     });
-  }, [allRows, commodity, month, agent, customerType, consumptionMin, consumptionMax, search]);
+  }, [allRows, commodity, month, agent, customerName, customerType, consumptionMin, consumptionMax, search]);
 
   const totals = useMemo(() => {
     return filteredRows.reduce(
@@ -563,6 +611,7 @@ export default function Archive() {
     setCommodity("ALL");
     setMonth("ALL");
     setAgent("ALL");
+    setCustomerName("");
     setCustomerType("ALL");
     setConsumptionMin("");
     setConsumptionMax("");
@@ -576,6 +625,7 @@ export default function Archive() {
       "DATA VALIDITA": row.validita,
       "MESE RIFERIMENTO": monthLabel(row.monthKey),
       AGENTE: row.agente,
+      "DENOMINAZIONE CLIENTE": row.denominazione || "",
       "TIPOLOGIA CLIENTE": row.tipoCliente,
       CONSUMO: row.consumo ?? "",
       "FILE ORIGINE": row.sourceFile,
@@ -629,7 +679,7 @@ export default function Archive() {
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0 }}>Carica file RECESSI</h3>
             <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-              Puoi caricare Excel .xlsx/.xls oppure CSV. Se il file contiene fogli Energia/Luce e Gas, la tipologia viene riconosciuta automaticamente.
+              Puoi caricare Excel .xlsx/.xls oppure CSV. Ho aggiunto il riconoscimento delle colonne reali dei tuoi file: RAGIONE_SOCIALE, AGENZIA, DATA_VALIDITA_RECESSO, KWH_ANNUI/CONSUMO_ANNUO e CD_TP_UTENZA/CD_TP_UTILIZZO.
             </div>
 
             <input
@@ -811,6 +861,22 @@ export default function Archive() {
               </div>
 
               <div>
+                <div style={labelStyle}>Denominazione cliente</div>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  list="recessi-customer-names"
+                  placeholder="Es. LACOLE, GIUGLIARELLI..."
+                  style={inputStyle}
+                />
+                <datalist id="recessi-customer-names">
+                  {customerNames.slice(0, 1000).map((item) => (
+                    <option key={item} value={item} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div>
                 <div style={labelStyle}>Tipologia cliente</div>
                 <select value={customerType} onChange={(e) => setCustomerType(e.target.value)} style={inputStyle}>
                   <option value="ALL">Tutte le tipologie</option>
@@ -914,7 +980,7 @@ export default function Archive() {
                   <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 950 }}>
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
-                        {["Luce/Gas", "Data validità", "Mese", "Agente", "Tipologia cliente", "Consumo", "File origine", "Foglio"].map(
+                        {["Luce/Gas", "Data validità", "Mese", "Agente", "Denominazione cliente", "Tipologia cliente", "Consumo", "File origine", "Foglio"].map(
                           (header) => (
                             <th
                               key={header}
@@ -944,6 +1010,7 @@ export default function Archive() {
                             {monthLabel(row.monthKey)}
                           </td>
                           <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.agente || "—"}</td>
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.denominazione || "—"}</td>
                           <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>{row.tipoCliente || "—"}</td>
                           <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                             {row.consumo === null
