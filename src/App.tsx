@@ -866,15 +866,7 @@ function calcEnergia(
 
   let dispCpBase = 0;
   if (sLikeBimestrale(d.fatturazione) && d.mese2) {
-    if (consumiMese1 > 0 || consumiMese2 > 0) {
-      const denom = consumiMese1 + consumiMese2;
-      dispCpBase =
-        denom > 0
-          ? (consumiMese1 * totDispCp1 + consumiMese2 * totDispCp2) / denom
-          : 0;
-    } else {
-      dispCpBase = (totDispCp1 + totDispCp2) / 2;
-    }
+    dispCpBase = (totDispCp1 + totDispCp2) / 2;
   } else {
     dispCpBase = totDispCp1;
   }
@@ -1129,6 +1121,8 @@ function Energia({
   }, [punPsvRows, s.mese1]);
   
   
+  const dispCpMonthOptions = dispCpRows.map((row) => row.mese);
+
   const mesiOrdinati = [...punPsvRows]
   .filter((m) => {
     if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS" || m.mese === "FISSO AD HOC") return true;
@@ -1236,6 +1230,28 @@ function Energia({
       {(!isMobile || openSections[key]) && children}
     </div>
   );
+
+  useEffect(() => {
+    if (!dispCpMonthOptions.length) return;
+
+    setS((prev) => {
+      let changed = false;
+      let meseRifTabella1 = prev.meseRifTabella1;
+      let meseRifTabella2 = prev.meseRifTabella2;
+
+      if (!dispCpMonthOptions.includes(meseRifTabella1)) {
+        meseRifTabella1 = dispCpMonthOptions[0];
+        changed = true;
+      }
+
+      if (!dispCpMonthOptions.includes(meseRifTabella2)) {
+        meseRifTabella2 = dispCpMonthOptions[0];
+        changed = true;
+      }
+
+      return changed ? { ...prev, meseRifTabella1, meseRifTabella2 } : prev;
+    });
+  }, [dispCpRows]);
 
   const r = useMemo(
     () => calcEnergia(s, punPsvRows, energyOffers, dispCpRows),
@@ -1705,7 +1721,33 @@ return (
       gap: 12,
     }}
   >
-    {selectField("Mese 1", s.mese1, (v) => set("mese1", v), [...mesiOrdinati.map((m) => m.mese)])}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns:
+          s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS"
+            ? isMobile
+              ? "1fr"
+              : "1fr 1fr"
+            : "1fr",
+        gap: 10,
+      }}
+    >
+      {selectField(
+        "Mese 1",
+        s.mese1,
+        (v) => set("mese1", v),
+        [...mesiOrdinati.map((m) => m.mese)]
+      )}
+
+      {(s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS") &&
+        selectField(
+          "Mese DISP + CP.Mrk",
+          s.meseRifTabella1,
+          (v) => set("meseRifTabella1", v),
+          dispCpMonthOptions
+        )}
+    </div>
 
     {field("F1 mese 1", s.f1Mese1, (v) => set("f1Mese1", v), "number")}
     {field("F2 mese 1", s.f2Mese1, (v) => set("f2Mese1", v), "number")}
@@ -1723,7 +1765,33 @@ return (
       gap: 12,
     }}
   >
-    {selectField("Mese 2", s.mese2, (v) => set("mese2", v), ["", ...mesiOrdinati.map((m) => m.mese)])}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns:
+          s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS"
+            ? isMobile
+              ? "1fr"
+              : "1fr 1fr"
+            : "1fr",
+        gap: 10,
+      }}
+    >
+      {selectField(
+        "Mese 2",
+        s.mese2,
+        (v) => set("mese2", v),
+        ["", ...mesiOrdinati.map((m) => m.mese)]
+      )}
+
+      {(s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS") &&
+        selectField(
+          "Mese DISP + CP.Mrk",
+          s.meseRifTabella2,
+          (v) => set("meseRifTabella2", v),
+          dispCpMonthOptions
+        )}
+    </div>
 
     {field("F1 mese 2", s.f1Mese2, (v) => set("f1Mese2", v), "number")}
     {field("F2 mese 2", s.f2Mese2, (v) => set("f2Mese2", v), "number")}
