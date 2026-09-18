@@ -5916,6 +5916,7 @@ const renderAdminContent = () => {
   </button>
 )}
       </div>
+      </div>
 
       {tab === "reportAdmin" && <ReportAdmin adminProfile={adminProfile} />}
 
