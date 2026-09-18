@@ -6257,7 +6257,7 @@ const renderAdminContent = () => {
       border: "1px solid #ef4444",
     }}
   >
-    Esci
+    ESCI
   </button>
 )}
       </div>
@@ -6571,8 +6571,8 @@ if (!agentSession && !adminSession) {
         border: "1px solid #ef4444",
       }}
     >
-      Esci
-    </button>
+    ESCI
+  </button>
   )}
 </div>
   
