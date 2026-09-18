@@ -1543,7 +1543,7 @@ export default function Archive() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", minWidth: 0 }}>
       <div style={cardStyle}>
         <div
           style={{
