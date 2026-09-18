@@ -270,10 +270,13 @@ async function splitWorkbook(sourceFile: File, recipients: DraftRow[]) {
         XLSX.utils.book_append_sheet(outWorkbook, outSheet, sheetName);
       }
       const outData = XLSX.write(outWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-      const fileName = "NON ASSEGNATI.xlsx";
-      generated.set(normalize(fileName), new File([outData], fileName, {
+      const originalStem = sanitizeFileName(sourceFile.name.replace(/\.[^.]+$/, "")).trim();
+      const fileName = originalStem ? `NON ASSEGNATI ${originalStem}.xlsx` : "NON ASSEGNATI.xlsx";
+      const nonAssignedFile = new File([outData], fileName, {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      }));
+      });
+      generated.set(normalize(fileName), nonAssignedFile);
+      generated.set(normalize("NON ASSEGNATI.xlsx"), nonAssignedFile);
     }
   }
 
@@ -334,7 +337,12 @@ export default function OutlookEmailSingleDraftFix() {
 
         try {
           const splitFiles = await splitWorkbook(sourceFile, readyRows);
-          const missing = readyRows.filter((row) => !splitFiles.has(normalize(row.fileName)));
+          const getSplitFile = (row: DraftRow) =>
+            splitFiles.get(normalize(row.fileName)) ||
+            (normalize(row.agency) === "NONASSEGNATI"
+              ? Array.from(splitFiles.entries()).find(([key]) => key.startsWith("NONASSEGNATI"))?.[1]
+              : undefined);
+          const missing = readyRows.filter((row) => !getSplitFile(row));
           if (missing.length) {
             throw new Error(
               `Non riesco a ricostruire ${missing.length} file: ${missing
@@ -348,7 +356,7 @@ export default function OutlookEmailSingleDraftFix() {
           const usedNames = new Set<string>();
           for (let index = 0; index < readyRows.length; index += 1) {
             const row = readyRows[index];
-            const file = splitFiles.get(normalize(row.fileName))!;
+            const file = getSplitFile(row)!;
             const eml = await buildEml(row, file, subject, body);
             const baseName = sanitizeFileName(row.agency || `email-${index + 1}`);
             let emlName = `${baseName}.eml`;
