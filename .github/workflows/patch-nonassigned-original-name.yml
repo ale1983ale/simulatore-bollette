@@ -23,7 +23,7 @@ jobs:
         run: node scripts/patch-nonassigned-original-name.mjs
       - name: Validate build
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
       - name: Commit patched OutlookEmail
         run: |

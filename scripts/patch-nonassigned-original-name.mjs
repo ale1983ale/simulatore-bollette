@@ -1,5 +1,6 @@
 import fs from "node:fs";
 
+// Patch v2: mantiene il nome del file unico originale nel file NON ASSEGNATI.
 const path = "src/OutlookEmail.tsx";
 let source = fs.readFileSync(path, "utf8");
 const original = source;
