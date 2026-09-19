@@ -751,6 +751,23 @@ function MultiSelectFilter({
   menuMinWidth?: number;
 }) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [filterSearch, setFilterSearch] = useState("");
+
+  const normalizedFilterSearch = filterSearch
+    .trim()
+    .toLocaleLowerCase("it")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  const visibleOptions = normalizedFilterSearch
+    ? options.filter((option) =>
+        `${option.label} ${option.value}`
+          .toLocaleLowerCase("it")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .includes(normalizedFilterSearch)
+      )
+    : options;
 
   useEffect(() => {
     const closeIfOutside = (event: MouseEvent | TouchEvent) => {
@@ -841,6 +858,21 @@ function MultiSelectFilter({
             boxShadow: "0 10px 25px rgba(15, 23, 42, 0.14)",
           }}
         >
+          <div style={{ padding: "2px 2px 8px" }}>
+            <input
+              type="search"
+              value={filterSearch}
+              onChange={(event) => setFilterSearch(event.target.value)}
+              placeholder={`Cerca in ${label.toLocaleLowerCase("it")}...`}
+              aria-label={`Cerca in ${label}`}
+              style={{
+                ...inputStyle,
+                padding: "8px 10px",
+                background: "#f8fafc",
+              }}
+            />
+          </div>
+
           <label
             style={{
               display: "flex",
@@ -860,7 +892,7 @@ function MultiSelectFilter({
             {allLabel}
           </label>
 
-          {options.map((option) => (
+          {visibleOptions.map((option) => (
             <label
               key={option.value}
               style={{
@@ -881,6 +913,19 @@ function MultiSelectFilter({
               <span>{option.label}</span>
             </label>
           ))}
+
+          {visibleOptions.length === 0 && (
+            <div
+              style={{
+                padding: "10px 6px",
+                color: "#64748b",
+                fontSize: 13,
+                borderTop: "1px solid #f1f5f9",
+              }}
+            >
+              Nessun risultato
+            </div>
+          )}
         </div>
       </details>
     </div>
