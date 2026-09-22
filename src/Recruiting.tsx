@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
-import { geocodeItalianZone, ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
+import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
 import RecruitingManagement from "./RecruitingManagement";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
@@ -146,6 +146,146 @@ const CANDIDATE_STATUS_OPTIONS = Object.entries(CANDIDATE_STATUS) as Array<
 function phoneHref(value: string) {
   const clean = String(value || "").replace(/[^\d+]/g, "");
   return clean ? `tel:${clean}` : "";
+}
+
+function normalizePlaceName(value: string) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("it")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(comune|citta|city|provincia|province|di|del|della)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function geocodeRecruitingCandidateZone(zone: string) {
+  const query = String(zone || "").trim();
+  if (!query) {
+    return {
+      latitude: null as number | null,
+      longitude: null as number | null,
+      region: "",
+      displayName: "",
+    };
+  }
+
+  const exactNeedle = normalizePlaceName(query);
+
+  const fetchRows = async (url: URL) => {
+    const response = await fetch(url.toString(), {
+      headers: { "Accept-Language": "it" },
+    });
+
+    if (!response.ok) {
+      throw new Error("Servizio di geolocalizzazione non disponibile");
+    }
+
+    const rows = await response.json();
+    return Array.isArray(rows) ? rows : [];
+  };
+
+  // Prima prova: ricerca strutturata come città/comune.
+  const structuredUrl = new URL("https://nominatim.openstreetmap.org/search");
+  structuredUrl.searchParams.set("format", "jsonv2");
+  structuredUrl.searchParams.set("city", query);
+  structuredUrl.searchParams.set("country", "Italia");
+  structuredUrl.searchParams.set("countrycodes", "it");
+  structuredUrl.searchParams.set("limit", "8");
+  structuredUrl.searchParams.set("addressdetails", "1");
+  structuredUrl.searchParams.set("namedetails", "1");
+
+  let rows = await fetchRows(structuredUrl);
+
+  // Fallback: ricerca libera più ampia se la query strutturata non trova nulla.
+  if (!rows.length) {
+    const fallbackUrl = new URL("https://nominatim.openstreetmap.org/search");
+    fallbackUrl.searchParams.set("format", "jsonv2");
+    fallbackUrl.searchParams.set("q", `${query}, Italia`);
+    fallbackUrl.searchParams.set("countrycodes", "it");
+    fallbackUrl.searchParams.set("limit", "12");
+    fallbackUrl.searchParams.set("addressdetails", "1");
+    fallbackUrl.searchParams.set("namedetails", "1");
+    rows = await fetchRows(fallbackUrl);
+  }
+
+  if (!rows.length) {
+    return {
+      latitude: null as number | null,
+      longitude: null as number | null,
+      region: "",
+      displayName: "",
+    };
+  }
+
+  const scoredRows = rows
+    .map((row: any) => {
+      const address = row?.address || {};
+      const names = [
+        address.city,
+        address.town,
+        address.village,
+        address.municipality,
+        address.hamlet,
+        row?.name,
+        row?.namedetails?.name,
+      ]
+        .filter(Boolean)
+        .map((value: string) => normalizePlaceName(value));
+
+      const addressType = normalizePlaceName(
+        String(row?.addresstype || row?.type || "")
+      );
+
+      let score = 0;
+
+      if (names.some((name: string) => name === exactNeedle)) score += 100;
+      if (names.some((name: string) => name.startsWith(exactNeedle))) score += 35;
+
+      if (
+        ["city", "town", "village", "municipality"].includes(addressType)
+      ) {
+        score += 30;
+      }
+
+      if (
+        ["county", "state district", "province", "provincia"].includes(
+          addressType
+        )
+      ) {
+        score -= 80;
+      }
+
+      if (row?.class === "place") score += 20;
+      if (row?.class === "boundary" && addressType === "administrative") {
+        score -= 10;
+      }
+
+      return { row, score };
+    })
+    .sort((a: any, b: any) => b.score - a.score);
+
+  const first = scoredRows[0]?.row;
+  if (!first) {
+    return {
+      latitude: null as number | null,
+      longitude: null as number | null,
+      region: "",
+      displayName: "",
+    };
+  }
+
+  const address = first.address || {};
+  const region = normalizeItalianRegion(
+    address.state || address.region || address.state_district || ""
+  );
+
+  return {
+    latitude: Number(first.lat),
+    longitude: Number(first.lon),
+    region,
+    displayName: String(first.display_name || query),
+  };
 }
 
 const cardStyle: React.CSSProperties = {
@@ -941,7 +1081,7 @@ export default function Recruiting() {
     setMessage("Posiziono il nominativo sulla mappa...");
 
     try {
-      const geo = await geocodeItalianZone(zone);
+      const geo = await geocodeRecruitingCandidateZone(zone);
 
       if (
         geo.latitude === null ||
@@ -1616,6 +1756,7 @@ export default function Recruiting() {
 
                   return (
                     <div
+                      id={`recruiting-candidate-${candidate.id}`}
                       key={candidate.id}
                       role="button"
                       tabIndex={0}
@@ -2268,7 +2409,45 @@ export default function Recruiting() {
               }}
             />
 
-            {mapReturnView && mapMode === "region" && (
+            {focusedCandidateMap && (
+              <button
+                type="button"
+                aria-label="Indietro alla lista nominativi"
+                onClick={() => {
+                  const candidateId = focusedCandidateMap.candidateId;
+                  setFocusedCandidateMap(null);
+                  setMapReturnView(null);
+                  setSection("contacts");
+
+                  window.setTimeout(() => {
+                    document
+                      .getElementById(`recruiting-candidate-${candidateId}`)
+                      ?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
+                  }, 80);
+                }}
+                style={{
+                  position: "absolute",
+                  right: 22,
+                  bottom: 22,
+                  zIndex: 1001,
+                  border: "1px solid #0f172a",
+                  borderRadius: 999,
+                  padding: "10px 15px",
+                  background: "#0f172a",
+                  color: "white",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                  boxShadow: "0 5px 18px rgba(15,23,42,.28)",
+                }}
+              >
+                ← INDIETRO
+              </button>
+            )}
+
+            {!focusedCandidateMap && mapReturnView && mapMode === "region" && (
               <button
                 type="button"
                 onClick={() => {
