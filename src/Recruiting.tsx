@@ -1305,6 +1305,24 @@ export default function Recruiting() {
       calledByMeFilter
   );
 
+  const resetContactFilters = () => {
+    setNameFilter("");
+    setZoneFilter("");
+    setRegionFilter("");
+    setSectorFilter("");
+    setSectorOtherFilter("");
+    setCompanyFilter("");
+    setStatusFilter("");
+    setForwardedToFilter("");
+    setCalledByMeFilter("");
+  };
+
+  const resetCalendarFilters = () => {
+    setCalendarSearchFilter("");
+    setCalendarCandidateFilter("");
+    setCalendarTypeFilter("");
+  };
+
   const selectedNotes = useMemo(
     () =>
       notes
@@ -3269,6 +3287,39 @@ export default function Recruiting() {
                   </select>
                 </div>
               )}
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "end",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={resetContactFilters}
+                  disabled={!hasActiveContactFilters}
+                  style={{
+                    ...buttonStyle,
+                    width: "100%",
+                    minHeight: 40,
+                    background: hasActiveContactFilters
+                      ? "#fee2e2"
+                      : "#f1f5f9",
+                    color: hasActiveContactFilters
+                      ? "#b91c1c"
+                      : "#94a3b8",
+                    border: hasActiveContactFilters
+                      ? "1px solid #fecaca"
+                      : "1px solid #e2e8f0",
+                    opacity: hasActiveContactFilters ? 1 : 0.7,
+                    cursor: hasActiveContactFilters
+                      ? "pointer"
+                      : "default",
+                  }}
+                >
+                  AZZERA FILTRI
+                </button>
+              </div>
             </div>
           </div>
 
@@ -4964,6 +5015,54 @@ export default function Recruiting() {
                     )
                   )}
                 </select>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "end",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={resetCalendarFilters}
+                  disabled={
+                    !calendarSearchFilter.trim() &&
+                    !calendarCandidateFilter &&
+                    !calendarTypeFilter
+                  }
+                  style={{
+                    ...buttonStyle,
+                    width: "100%",
+                    minHeight: 40,
+                    background:
+                      calendarSearchFilter.trim() ||
+                      calendarCandidateFilter ||
+                      calendarTypeFilter
+                        ? "#fee2e2"
+                        : "#f1f5f9",
+                    color:
+                      calendarSearchFilter.trim() ||
+                      calendarCandidateFilter ||
+                      calendarTypeFilter
+                        ? "#b91c1c"
+                        : "#94a3b8",
+                    border:
+                      calendarSearchFilter.trim() ||
+                      calendarCandidateFilter ||
+                      calendarTypeFilter
+                        ? "1px solid #fecaca"
+                        : "1px solid #e2e8f0",
+                    cursor:
+                      calendarSearchFilter.trim() ||
+                      calendarCandidateFilter ||
+                      calendarTypeFilter
+                        ? "pointer"
+                        : "default",
+                  }}
+                >
+                  AZZERA FILTRI
+                </button>
               </div>
             </div>
 
