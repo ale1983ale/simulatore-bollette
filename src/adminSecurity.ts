@@ -174,3 +174,15 @@ export async function adminUpsertSettings(
   if (error) throw error;
   return data;
 }
+
+
+export async function adminGetSetting(key: string) {
+  const token = await getAdminSessionToken();
+  const { data, error } = await supabase.rpc("admin_get_setting", {
+    p_session_token: token,
+    p_key: key,
+  });
+
+  if (error) throw error;
+  return data;
+}
