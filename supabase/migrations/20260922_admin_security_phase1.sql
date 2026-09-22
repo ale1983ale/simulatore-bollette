@@ -32,7 +32,7 @@ begin
     raise exception 'Sessione admin mancante';
   end if;
 
-  v_hash := encode(digest(p_token, 'sha256'), 'hex');
+  v_hash := encode(extensions.digest(p_token, 'sha256'), 'hex');
 
   select s.admin_id, a.role
     into v_admin_id, v_role
@@ -86,7 +86,7 @@ begin
   end if;
 
   if coalesce(v_admin.password, '') like '$2%' then
-    v_password_ok := crypt(coalesce(p_password, ''), v_admin.password) = v_admin.password;
+    v_password_ok := extensions.crypt(coalesce(p_password, ''), v_admin.password) = v_admin.password;
   else
     v_password_ok := coalesce(v_admin.password, '') = coalesce(p_password, '');
   end if;
@@ -98,8 +98,8 @@ begin
   delete from public.admin_sessions
   where expires_at <= now();
 
-  v_token := encode(gen_random_bytes(32), 'hex');
-  v_token_hash := encode(digest(v_token, 'sha256'), 'hex');
+  v_token := encode(extensions.gen_random_bytes(32), 'hex');
+  v_token_hash := encode(extensions.digest(v_token, 'sha256'), 'hex');
 
   insert into public.admin_sessions(token_hash, admin_id)
   values (v_token_hash, v_admin.id);
@@ -135,7 +135,7 @@ begin
     return true;
   end if;
 
-  v_hash := encode(digest(p_session_token, 'sha256'), 'hex');
+  v_hash := encode(extensions.digest(p_session_token, 'sha256'), 'hex');
   delete from public.admin_sessions where token_hash = v_hash;
   return true;
 end;
@@ -227,11 +227,11 @@ begin
     role
   )
   values (
-    gen_random_uuid(),
+    pg_catalog.gen_random_uuid(),
     upper(trim(p_nome)),
     upper(trim(p_cognome)),
     trim(p_username),
-    crypt(p_password, gen_salt('bf', 12)),
+    extensions.crypt(p_password, extensions.gen_salt('bf', 12)),
     nullif(trim(coalesce(p_email, '')), ''),
     'admin'
   )
@@ -294,7 +294,7 @@ begin
     username = trim(p_username),
     email = nullif(trim(coalesce(p_email, '')), ''),
     password = case
-      when coalesce(p_password, '') <> '' then crypt(p_password, gen_salt('bf', 12))
+      when coalesce(p_password, '') <> '' then extensions.crypt(p_password, extensions.gen_salt('bf', 12))
       else password
     end
   where id = p_admin_id
