@@ -678,6 +678,7 @@ export default function Recruiting() {
   const [editingStatusLabel, setEditingStatusLabel] = useState("");
   const [editingStatusColorKey, setEditingStatusColorKey] = useState("slate");
   const [showNewContact, setShowNewContact] = useState(false);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<Candidate[]>([]);
 
   const [newName, setNewName] = useState("");
   const [newZone, setNewZone] = useState("");
@@ -1020,6 +1021,9 @@ export default function Recruiting() {
       .toLocaleLowerCase("it")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
+
+  const normalizeCandidateName = (value: string) =>
+    normalizeFilterValue(value).replace(/\s+/g, " ");
 
   const existingOtherSectors = useMemo(
     () =>
@@ -1615,12 +1619,27 @@ export default function Recruiting() {
     }
   };
 
-  const createCandidate = async () => {
+  const createCandidate = async (forceDuplicate = false) => {
     if (!ctx) return;
     if (!newName.trim()) {
       setMessage("Inserisci nome e cognome.");
       return;
     }
+
+    if (!forceDuplicate) {
+      const normalizedName = normalizeCandidateName(newName);
+      const duplicates = candidates.filter(
+        (candidate) =>
+          normalizeCandidateName(candidate.fullName) === normalizedName
+      );
+
+      if (duplicates.length) {
+        setDuplicateCandidates(duplicates);
+        return;
+      }
+    }
+
+    setDuplicateCandidates([]);
 
     const resolvedNewSector = newSectorEnergy
       ? ""
@@ -1693,6 +1712,7 @@ export default function Recruiting() {
       setNewCompanyName("");
       setNewPhone("");
       setNewEmail("");
+      setDuplicateCandidates([]);
       setShowNewContact(false);
       await loadAll(ctx);
       setSelectedCandidateId(String(data.id));
@@ -2686,7 +2706,10 @@ export default function Recruiting() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowNewContact((value) => !value)}
+                onClick={() => {
+                  setDuplicateCandidates([]);
+                  setShowNewContact((value) => !value);
+                }}
                 style={{ ...buttonStyle, background: "#16a34a", color: "white" }}
               >
                 + NUOVO CONTATTO
@@ -2708,9 +2731,12 @@ export default function Recruiting() {
                     <label style={labelStyle}>Nome e cognome</label>
                     <input
                       value={newName}
-                      onChange={(e) =>
-                        setNewName(e.target.value.toLocaleUpperCase("it"))
-                      }
+                      onChange={(e) => {
+                        setNewName(e.target.value.toLocaleUpperCase("it"));
+                        if (duplicateCandidates.length) {
+                          setDuplicateCandidates([]);
+                        }
+                      }}
                       style={{
                         ...inputStyle,
                         textTransform: "uppercase",
@@ -2848,6 +2874,143 @@ export default function Recruiting() {
                   </div>
                 </div>
 
+                {duplicateCandidates.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: 14,
+                      border: "3px solid #f59e0b",
+                      borderRadius: 12,
+                      background: "#fffbeb",
+                      boxShadow: "0 4px 14px rgba(146,64,14,.12)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "#92400e",
+                        fontWeight: 900,
+                        fontSize: 15,
+                      }}
+                    >
+                      ⚠ NOMINATIVO GIÀ PRESENTE
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 5,
+                        color: "#78350f",
+                        fontSize: 13,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Nel database esiste già un contatto con lo stesso nome.
+                      Controlla i dati prima di procedere.
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 9,
+                        marginTop: 12,
+                      }}
+                    >
+                      {duplicateCandidates.map((candidate) => (
+                        <div
+                          key={candidate.id}
+                          style={{
+                            padding: 11,
+                            borderRadius: 10,
+                            border: "1px solid #fcd34d",
+                            background: "#ffffff",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fit,minmax(170px,1fr))",
+                              gap: 9,
+                            }}
+                          >
+                            <div>
+                              <div style={labelStyle}>Nome</div>
+                              <strong>
+                                {candidate.fullName || "—"}
+                              </strong>
+                            </div>
+                            <div>
+                              <div style={labelStyle}>Cellulare</div>
+                              <strong>
+                                {candidate.phone || "—"}
+                              </strong>
+                            </div>
+                            <div>
+                              <div style={labelStyle}>Zona</div>
+                              <strong>
+                                {candidate.operationalZone || "—"}
+                              </strong>
+                            </div>
+                            <div>
+                              <div style={labelStyle}>Email</div>
+                              <strong
+                                style={{
+                                  overflowWrap: "anywhere",
+                                }}
+                              >
+                                {candidate.email || "—"}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: 12,
+                        fontWeight: 900,
+                        color: "#78350f",
+                      }}
+                    >
+                      Vuoi procedere comunque con il nuovo salvataggio?
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        marginTop: 10,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void createCandidate(true)}
+                        style={{
+                          ...buttonStyle,
+                          background: "#dc2626",
+                          color: "white",
+                          opacity: busy ? 0.6 : 1,
+                        }}
+                      >
+                        SÌ, PROCEDI COMUNQUE
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setDuplicateCandidates([])}
+                        style={{
+                          ...buttonStyle,
+                          background: "#e2e8f0",
+                          color: "#0f172a",
+                        }}
+                      >
+                        NO, NON SALVARE
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                   <button
                     type="button"
@@ -2857,7 +3020,14 @@ export default function Recruiting() {
                   >
                     Salva contatto
                   </button>
-                  <button type="button" onClick={() => setShowNewContact(false)} style={{ ...buttonStyle, background: "#e2e8f0" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDuplicateCandidates([]);
+                      setShowNewContact(false);
+                    }}
+                    style={{ ...buttonStyle, background: "#e2e8f0" }}
+                  >
                     Annulla
                   </button>
                 </div>
