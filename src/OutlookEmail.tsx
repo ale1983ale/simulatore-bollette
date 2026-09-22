@@ -374,7 +374,7 @@ export default function OutlookEmail() {
     let host: HTMLElement | null = null;
     const placeInAdminToolbar = () => {
       const dataButton = Array.from(document.querySelectorAll("button")).find(
-        (node) => node.textContent?.trim() === "DATI" && (node as HTMLElement).offsetParent !== null
+        (node) => node.textContent?.trim() === "DATI PRODUZIONE" && (node as HTMLElement).offsetParent !== null
       ) as HTMLElement | undefined;
       if (!dataButton?.parentElement) {
         if (host?.isConnected) host.remove();
