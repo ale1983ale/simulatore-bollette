@@ -38,7 +38,22 @@ export async function ensureAdminSession(): Promise<SecureAdminSession | null> {
     const parsed = JSON.parse(raw) as any;
 
     if (parsed?.token && parsed?.username) {
-      return parsed as SecureAdminSession;
+      const { data, error } = await supabase.rpc("admin_session_profile", {
+        p_session_token: parsed.token,
+      });
+
+      if (error || !data) {
+        localStorage.removeItem("admin_session");
+        return null;
+      }
+
+      const validated = {
+        ...(data as Omit<SecureAdminSession, "token">),
+        token: parsed.token,
+      } as SecureAdminSession;
+
+      localStorage.setItem("admin_session", JSON.stringify(validated));
+      return validated;
     }
 
     // Migrazione trasparente delle vecchie sessioni locali:
