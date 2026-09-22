@@ -641,6 +641,10 @@ export default function Recruiting() {
   const [noteDate, setNoteDate] = useState(localDateKey());
   const [noteText, setNoteText] = useState("");
   const [noteCalledByMe, setNoteCalledByMe] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteDate, setEditingNoteDate] = useState(localDateKey());
+  const [editingNoteText, setEditingNoteText] = useState("");
+  const [editingNoteCalledByMe, setEditingNoteCalledByMe] = useState(false);
 
   const [activityCandidateId, setActivityCandidateId] = useState("");
   const [activityType, setActivityType] = useState<EventType>("CHIAMARE");
@@ -1601,6 +1605,53 @@ export default function Recruiting() {
     }
   };
 
+  const startEditNote = (note: ContactNote) => {
+    setEditingNoteId(note.id);
+    setEditingNoteDate(note.noteDate || localDateKey());
+    setEditingNoteText(note.noteText);
+    setEditingNoteCalledByMe(note.calledByMe);
+  };
+
+  const cancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditingNoteDate(localDateKey());
+    setEditingNoteText("");
+    setEditingNoteCalledByMe(false);
+  };
+
+  const saveEditedNote = async (note: ContactNote) => {
+    if (!ctx) return;
+    if (!editingNoteText.trim()) {
+      setMessage("La nota non può essere vuota.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_notes")
+        .update({
+          note_date: editingNoteDate,
+          note_text: editingNoteText.trim(),
+          called_by_me: editingNoteCalledByMe,
+        })
+        .eq("id", note.id)
+        .eq("owner_key", ctx.ownerKey);
+
+      if (error) throw error;
+
+      cancelEditNote();
+      await loadAll(ctx);
+      setMessage("Nota modificata.");
+    } catch (error: any) {
+      setMessage(
+        "Errore nella modifica della nota: " + (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteNote = async (note: ContactNote) => {
     if (!ctx || !window.confirm("Eliminare questa nota?")) return;
     const { error } = await ctx.client.from("recruiting_notes").delete().eq("id", note.id);
@@ -1608,6 +1659,7 @@ export default function Recruiting() {
       setMessage("Errore nell'eliminazione della nota: " + error.message);
       return;
     }
+    if (editingNoteId === note.id) cancelEditNote();
     await loadAll(ctx);
   };
 
@@ -3818,52 +3870,199 @@ export default function Recruiting() {
                       </button>
 
                       <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
-                        {selectedNotes.map((note) => (
-                          <div key={note.id} style={{ border: "1px solid #e2e8f0", borderRadius: 9, padding: 11 }}>
+                        {selectedNotes.map((note) => {
+                          const isEditing = editingNoteId === note.id;
+
+                          return (
                             <div
+                              key={note.id}
                               style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                gap: 8,
-                                alignItems: "center",
-                                flexWrap: "wrap",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: 9,
+                                padding: 11,
                               }}
                             >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  gap: 8,
-                                  alignItems: "center",
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <strong>{formatDate(note.noteDate)}</strong>
-                                {note.calledByMe && (
-                                  <span
+                              {isEditing ? (
+                                <div style={{ display: "grid", gap: 9 }}>
+                                  <div
                                     style={{
-                                      color: "#6d28d9",
-                                      fontSize: 12,
-                                      fontWeight: 900,
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        "minmax(150px,220px) minmax(180px,1fr)",
+                                      gap: 10,
                                     }}
                                   >
-                                    ALESSIO CEDRONI DICE:
-                                  </span>
-                                )}
-                              </div>
+                                    <div>
+                                      <label style={labelStyle}>Data nota</label>
+                                      <input
+                                        type="date"
+                                        value={editingNoteDate}
+                                        onChange={(e) =>
+                                          setEditingNoteDate(e.target.value)
+                                        }
+                                        style={inputStyle}
+                                      />
+                                    </div>
 
-                              <button
-                                type="button"
-                                onClick={() => void deleteNote(note)}
-                                style={{ border: 0, background: "transparent", color: "#b91c1c", fontWeight: 800, cursor: "pointer" }}
-                              >
-                                Elimina
-                              </button>
+                                    <label
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        alignSelf: "end",
+                                        minHeight: 40,
+                                        fontWeight: 800,
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={editingNoteCalledByMe}
+                                        onChange={(e) =>
+                                          setEditingNoteCalledByMe(
+                                            e.target.checked
+                                          )
+                                        }
+                                        style={{ width: 18, height: 18 }}
+                                      />
+                                      Chiamato da me
+                                    </label>
+                                  </div>
+
+                                  <div>
+                                    <label style={labelStyle}>Nota</label>
+                                    <textarea
+                                      value={editingNoteText}
+                                      onChange={(e) =>
+                                        setEditingNoteText(e.target.value)
+                                      }
+                                      rows={4}
+                                      style={{
+                                        ...inputStyle,
+                                        resize: "vertical",
+                                      }}
+                                    />
+                                  </div>
+
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 8,
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        void saveEditedNote(note)
+                                      }
+                                      style={{
+                                        ...buttonStyle,
+                                        background: "#2563eb",
+                                        color: "white",
+                                        opacity: busy ? 0.6 : 1,
+                                      }}
+                                    >
+                                      Salva modifiche
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={busy}
+                                      onClick={cancelEditNote}
+                                      style={{
+                                        ...buttonStyle,
+                                        background: "#e2e8f0",
+                                        color: "#0f172a",
+                                      }}
+                                    >
+                                      Annulla
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      justifyContent: "space-between",
+                                      gap: 8,
+                                      alignItems: "center",
+                                      flexWrap: "wrap",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        gap: 8,
+                                        alignItems: "center",
+                                        flexWrap: "wrap",
+                                      }}
+                                    >
+                                      <strong>
+                                        {formatDate(note.noteDate)}
+                                      </strong>
+                                      {note.calledByMe && (
+                                        <span
+                                          style={{
+                                            color: "#6d28d9",
+                                            fontSize: 12,
+                                            fontWeight: 900,
+                                          }}
+                                        >
+                                          ALESSIO CEDRONI DICE:
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        gap: 10,
+                                        alignItems: "center",
+                                      }}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => startEditNote(note)}
+                                        style={{
+                                          border: 0,
+                                          background: "transparent",
+                                          color: "#2563eb",
+                                          fontWeight: 900,
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Modifica
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => void deleteNote(note)}
+                                        style={{
+                                          border: 0,
+                                          background: "transparent",
+                                          color: "#b91c1c",
+                                          fontWeight: 800,
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Elimina
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div
+                                    style={{
+                                      marginTop: 6,
+                                      whiteSpace: "pre-wrap",
+                                    }}
+                                  >
+                                    {note.noteText}
+                                  </div>
+                                </>
+                              )}
                             </div>
-                            <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                              {note.noteText}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                         {!selectedNotes.length && <div style={{ color: "#64748b" }}>Nessuna nota inserita.</div>}
                       </div>
                     </div>
