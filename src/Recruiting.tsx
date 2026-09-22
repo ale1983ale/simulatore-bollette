@@ -14,6 +14,7 @@ type CandidateStatus =
   | "FISSATO_APPUNTAMENTO"
   | "FISSATA_VIDEOCALL"
   | "FIRMATO_MANDATO"
+  | "INOLTRATO_A"
   | "KO"
   | "DA_RISENTIRE";
 
@@ -26,6 +27,9 @@ type Candidate = {
   phone: string;
   email: string;
   status: CandidateStatus;
+  forwardedTo: string;
+  provinceCode: string;
+  region: string;
 };
 
 type ContactNote = {
@@ -125,6 +129,12 @@ const CANDIDATE_STATUS: Record<
     color: "#166534",
     border: "#22c55e",
   },
+  INOLTRATO_A: {
+    label: "INOLTRATO A",
+    background: "#e0e7ff",
+    color: "#4338ca",
+    border: "#818cf8",
+  },
   KO: {
     label: "KO",
     background: "#fee2e2",
@@ -142,6 +152,68 @@ const CANDIDATE_STATUS: Record<
 const CANDIDATE_STATUS_OPTIONS = Object.entries(CANDIDATE_STATUS) as Array<
   [CandidateStatus, (typeof CANDIDATE_STATUS)[CandidateStatus]]
 >;
+const PROVINCE_REGION_BY_CODE: Record<string, string> = {
+  AQ: "Abruzzo", CH: "Abruzzo", PE: "Abruzzo", TE: "Abruzzo",
+  MT: "Basilicata", PZ: "Basilicata",
+  CZ: "Calabria", CS: "Calabria", KR: "Calabria", RC: "Calabria", VV: "Calabria",
+  AV: "Campania", BN: "Campania", CE: "Campania", NA: "Campania", SA: "Campania",
+  BO: "Emilia-Romagna", FC: "Emilia-Romagna", FE: "Emilia-Romagna", MO: "Emilia-Romagna",
+  PR: "Emilia-Romagna", PC: "Emilia-Romagna", RA: "Emilia-Romagna", RE: "Emilia-Romagna",
+  RN: "Emilia-Romagna",
+  GO: "Friuli-Venezia Giulia", PN: "Friuli-Venezia Giulia", TS: "Friuli-Venezia Giulia",
+  UD: "Friuli-Venezia Giulia",
+  FR: "Lazio", LT: "Lazio", RI: "Lazio", RM: "Lazio", VT: "Lazio",
+  GE: "Liguria", IM: "Liguria", SP: "Liguria", SV: "Liguria",
+  BG: "Lombardia", BS: "Lombardia", CO: "Lombardia", CR: "Lombardia", LC: "Lombardia",
+  LO: "Lombardia", MN: "Lombardia", MI: "Lombardia", MB: "Lombardia", PV: "Lombardia",
+  SO: "Lombardia", VA: "Lombardia",
+  AN: "Marche", AP: "Marche", FM: "Marche", MC: "Marche", PU: "Marche",
+  CB: "Molise", IS: "Molise",
+  AL: "Piemonte", AT: "Piemonte", BI: "Piemonte", CN: "Piemonte", NO: "Piemonte",
+  TO: "Piemonte", VB: "Piemonte", VC: "Piemonte",
+  BA: "Puglia", BT: "Puglia", BR: "Puglia", FG: "Puglia", LE: "Puglia", TA: "Puglia",
+  CA: "Sardegna", CI: "Sardegna", NU: "Sardegna", OG: "Sardegna", OR: "Sardegna",
+  OT: "Sardegna", SS: "Sardegna", SU: "Sardegna", VS: "Sardegna",
+  AG: "Sicilia", CL: "Sicilia", CT: "Sicilia", EN: "Sicilia", ME: "Sicilia",
+  PA: "Sicilia", RG: "Sicilia", SR: "Sicilia", TP: "Sicilia",
+  AR: "Toscana", FI: "Toscana", GR: "Toscana", LI: "Toscana", LU: "Toscana",
+  MS: "Toscana", PI: "Toscana", PO: "Toscana", PT: "Toscana", SI: "Toscana",
+  BZ: "Trentino-Alto Adige", TN: "Trentino-Alto Adige",
+  PG: "Umbria", TR: "Umbria",
+  AO: "Valle d'Aosta",
+  BL: "Veneto", PD: "Veneto", RO: "Veneto", TV: "Veneto", VE: "Veneto",
+  VI: "Veneto", VR: "Veneto",
+};
+
+function normalizeProvinceCode(value: string) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 2);
+}
+
+function regionFromProvinceCode(value: string) {
+  return PROVINCE_REGION_BY_CODE[normalizeProvinceCode(value)] || "";
+}
+
+function provinceCodeFromAddress(address: any) {
+  if (!address || typeof address !== "object") return "";
+
+  const isoValues = Object.entries(address)
+    .filter(([key]) => key.startsWith("ISO3166-2"))
+    .map(([, value]) => String(value || "").toUpperCase());
+
+  for (const value of isoValues) {
+    const match = value.match(/^IT-([A-Z]{2})$/);
+    if (match && PROVINCE_REGION_BY_CODE[match[1]]) {
+      return match[1];
+    }
+  }
+
+  return "";
+}
+
 
 function phoneHref(value: string) {
   const clean = String(value || "").replace(/[^\d+]/g, "");
@@ -166,6 +238,7 @@ async function geocodeRecruitingCandidateZone(zone: string) {
       latitude: null as number | null,
       longitude: null as number | null,
       region: "",
+      provinceCode: "",
       displayName: "",
     };
   }
@@ -214,6 +287,7 @@ async function geocodeRecruitingCandidateZone(zone: string) {
       latitude: null as number | null,
       longitude: null as number | null,
       region: "",
+      provinceCode: "",
       displayName: "",
     };
   }
@@ -271,19 +345,24 @@ async function geocodeRecruitingCandidateZone(zone: string) {
       latitude: null as number | null,
       longitude: null as number | null,
       region: "",
+      provinceCode: "",
       displayName: "",
     };
   }
 
   const address = first.address || {};
-  const region = normalizeItalianRegion(
-    address.state || address.region || address.state_district || ""
-  );
+  const provinceCode = provinceCodeFromAddress(address);
+  const region =
+    regionFromProvinceCode(provinceCode) ||
+    normalizeItalianRegion(
+      address.state || address.region || address.state_district || ""
+    );
 
   return {
     latitude: Number(first.lat),
     longitude: Number(first.lon),
     region,
+    provinceCode,
     displayName: String(first.display_name || query),
   };
 }
@@ -357,6 +436,9 @@ function candidateFromRow(row: any): Candidate {
     phone: String(row.phone || ""),
     email: String(row.email || ""),
     status: (String(row.contact_status || "DA_CHIAMARE") as CandidateStatus),
+    forwardedTo: String(row.forwarded_to || ""),
+    provinceCode: normalizeProvinceCode(String(row.province_code || "")),
+    region: normalizeItalianRegion(String(row.region || "")),
   };
 }
 
@@ -469,6 +551,8 @@ export default function Recruiting() {
 
   const [editName, setEditName] = useState("");
   const [editZone, setEditZone] = useState("");
+  const [editProvinceCode, setEditProvinceCode] = useState("");
+  const [editRegion, setEditRegion] = useState("");
   const [editSectorEnergy, setEditSectorEnergy] = useState(true);
   const [editSectorOther, setEditSectorOther] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -525,7 +609,7 @@ export default function Recruiting() {
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,contact_status")
+        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,contact_status,forwarded_to,province_code,region")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -613,6 +697,8 @@ export default function Recruiting() {
     if (!selectedCandidate) return;
     setEditName(selectedCandidate.fullName);
     setEditZone(selectedCandidate.operationalZone);
+    setEditProvinceCode(selectedCandidate.provinceCode);
+    setEditRegion(selectedCandidate.region);
     setEditSectorEnergy(selectedCandidate.sectorEnergy);
     setEditSectorOther(selectedCandidate.sectorOther);
     setEditPhone(selectedCandidate.phone);
@@ -645,6 +731,18 @@ export default function Recruiting() {
         new Set(
           candidates
             .map((candidate) => candidate.operationalZone.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [candidates]
+  );
+
+  const existingForwardedRecipients = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          candidates
+            .map((candidate) => candidate.forwardedTo.trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b, "it")),
@@ -765,6 +863,69 @@ export default function Recruiting() {
     }
   };
 
+  const updateCandidateForwardedTo = async (
+    candidate: Candidate,
+    forwardedTo: string
+  ) => {
+    if (!ctx) return;
+
+    const nextValue = forwardedTo.trim();
+    const previousValue = candidate.forwardedTo;
+
+    setCandidates((current) =>
+      current.map((item) =>
+        item.id === candidate.id
+          ? { ...item, forwardedTo: nextValue }
+          : item
+      )
+    );
+
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_candidates")
+        .update({
+          forwarded_to: nextValue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", candidate.id);
+
+      if (error) throw error;
+    } catch (error: any) {
+      setCandidates((current) =>
+        current.map((item) =>
+          item.id === candidate.id
+            ? { ...item, forwardedTo: previousValue }
+            : item
+        )
+      );
+      setMessage(
+        "Errore nel salvataggio del destinatario: " +
+          (error?.message || error)
+      );
+    }
+  };
+
+  const autofillEditGeography = async (zoneValue: string) => {
+    const zone = zoneValue.trim();
+    if (!zone) {
+      setEditProvinceCode("");
+      setEditRegion("");
+      return;
+    }
+
+    try {
+      const geo = await geocodeRecruitingCandidateZone(zone);
+      if (geo.provinceCode) {
+        setEditProvinceCode(geo.provinceCode);
+      }
+      if (geo.region) {
+        setEditRegion(geo.region);
+      }
+    } catch (error) {
+      console.warn("AUTO GEOGRAPHY ERROR:", error);
+    }
+  };
+
   const createCandidate = async () => {
     if (!ctx) return;
     if (!newName.trim()) {
@@ -785,6 +946,23 @@ export default function Recruiting() {
 
     setBusy(true);
     try {
+      let geography = {
+        provinceCode: "",
+        region: "",
+      };
+
+      if (newZone.trim()) {
+        try {
+          const geo = await geocodeRecruitingCandidateZone(newZone.trim());
+          geography = {
+            provinceCode: geo.provinceCode || "",
+            region: geo.region || "",
+          };
+        } catch (error) {
+          console.warn("NEW CANDIDATE GEOGRAPHY ERROR:", error);
+        }
+      }
+
       const { data, error } = await ctx.client
         .from("recruiting_candidates")
         .insert({
@@ -796,6 +974,9 @@ export default function Recruiting() {
           phone: newPhone.trim(),
           email: newEmail.trim(),
           contact_status: "DA_CHIAMARE",
+          forwarded_to: "",
+          province_code: geography.provinceCode,
+          region: geography.region,
         })
         .select("id")
         .single();
@@ -834,6 +1015,10 @@ export default function Recruiting() {
         .update({
           full_name: editName.trim(),
           operational_zone: editZone.trim(),
+          province_code: normalizeProvinceCode(editProvinceCode),
+          region:
+            editRegion ||
+            regionFromProvinceCode(editProvinceCode),
           sector_energy: editSectorEnergy,
           sector_other: editSectorEnergy ? "" : editSectorOther.trim(),
           phone: editPhone.trim(),
@@ -1746,6 +1931,11 @@ export default function Recruiting() {
           <div className="recruiting-contact-layout">
             <div style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>Lista nominativi</h3>
+              <datalist id="recruiting-forwarded-to-options">
+                {existingForwardedRecipients.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
               <div style={{ maxHeight: 720, overflow: "auto", display: "grid", gap: 7 }}>
                 {filteredCandidates.map((candidate) => {
                   const active = candidate.id === selectedCandidateId;
@@ -1791,7 +1981,25 @@ export default function Recruiting() {
                             fontWeight: 900,
                           }}
                         >
-                          {candidate.operationalZone || "Zona non indicata"}
+                          <span>
+                            {candidate.operationalZone || "Zona non indicata"}
+                          </span>
+                          {(candidate.provinceCode || candidate.region) && (
+                            <span
+                              style={{
+                                marginLeft: 7,
+                                color: "#475569",
+                                fontWeight: 800,
+                              }}
+                            >
+                              {candidate.provinceCode
+                                ? `· ${candidate.provinceCode}`
+                                : ""}
+                              {candidate.region
+                                ? ` · ${candidate.region}`
+                                : ""}
+                            </span>
+                          )}
                         </div>
 
                         <div
@@ -1912,6 +2120,56 @@ export default function Recruiting() {
                             </option>
                           ))}
                         </select>
+
+                        {candidate.status === "INOLTRATO_A" && (
+                          <div
+                            style={{
+                              width: "100%",
+                              marginTop: 8,
+                              padding: 8,
+                              boxSizing: "border-box",
+                              borderRadius: 9,
+                              background: "#eef2ff",
+                              border: "1px solid #c7d2fe",
+                            }}
+                          >
+                            <label
+                              style={{
+                                display: "block",
+                                marginBottom: 5,
+                                color: "#4338ca",
+                                fontSize: 10,
+                                fontWeight: 900,
+                              }}
+                            >
+                              INOLTRATO A
+                            </label>
+                            <input
+                              key={`${candidate.id}-${candidate.forwardedTo}`}
+                              list="recruiting-forwarded-to-options"
+                              defaultValue={candidate.forwardedTo}
+                              placeholder="Nome..."
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => {
+                                event.stopPropagation();
+                                if (event.key === "Enter") {
+                                  (event.currentTarget as HTMLInputElement).blur();
+                                }
+                              }}
+                              onBlur={(event) =>
+                                void updateCandidateForwardedTo(
+                                  candidate,
+                                  event.currentTarget.value
+                                )
+                              }
+                              style={{
+                                ...inputStyle,
+                                padding: "7px 8px",
+                                fontSize: 12,
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -1968,9 +2226,56 @@ export default function Recruiting() {
                         <input value={editName} onChange={(e) => setEditName(e.target.value)} style={inputStyle} />
                       </div>
                       <div>
-                        <label style={labelStyle}>Zona operativa</label>
-                        <input value={editZone} onChange={(e) => setEditZone(e.target.value)} style={inputStyle} />
+                        <label style={labelStyle}>Città / zona operativa</label>
+                        <input
+                          value={editZone}
+                          onChange={(e) => setEditZone(e.target.value)}
+                          onBlur={(e) =>
+                            void autofillEditGeography(e.currentTarget.value)
+                          }
+                          style={inputStyle}
+                        />
                       </div>
+
+                      <div>
+                        <label style={labelStyle}>Provincia</label>
+                        <input
+                          value={editProvinceCode}
+                          maxLength={2}
+                          placeholder="PG"
+                          onChange={(e) => {
+                            const code = normalizeProvinceCode(e.target.value);
+                            setEditProvinceCode(code);
+                            const automaticRegion =
+                              regionFromProvinceCode(code);
+                            if (automaticRegion) {
+                              setEditRegion(automaticRegion);
+                            }
+                          }}
+                          style={{
+                            ...inputStyle,
+                            textTransform: "uppercase",
+                            fontWeight: 900,
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Regione</label>
+                        <select
+                          value={editRegion}
+                          onChange={(e) => setEditRegion(e.target.value)}
+                          style={inputStyle}
+                        >
+                          <option value="">Seleziona regione...</option>
+                          {ITALIAN_REGIONS.map((region) => (
+                            <option key={region} value={region}>
+                              {region}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div>
                         <label style={labelStyle}>Settore energia</label>
                         <select
