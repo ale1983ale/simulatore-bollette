@@ -7,6 +7,16 @@ import RecruitingManagement from "./RecruitingManagement";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
 
+type CandidateStatus =
+  | "CHIAMATO"
+  | "DA_CHIAMARE"
+  | "INVIATO_MANDATO"
+  | "FISSATO_APPUNTAMENTO"
+  | "FISSATA_VIDEOCALL"
+  | "FIRMATO_MANDATO"
+  | "KO"
+  | "DA_RISENTIRE";
+
 type Candidate = {
   id: string;
   fullName: string;
@@ -15,6 +25,7 @@ type Candidate = {
   sectorOther: string;
   phone: string;
   email: string;
+  status: CandidateStatus;
 };
 
 type ContactNote = {
@@ -22,6 +33,7 @@ type ContactNote = {
   candidateId: string;
   noteDate: string;
   noteText: string;
+  calledByMe: boolean;
   createdAt: string;
 };
 
@@ -62,6 +74,69 @@ const EVENT_LABELS: Record<EventType, string> = {
   VIDEOCALL: "VIDEOCALL",
   ALTRO: "ALTRO",
 };
+
+const CANDIDATE_STATUS: Record<
+  CandidateStatus,
+  { label: string; background: string; color: string; border: string }
+> = {
+  CHIAMATO: {
+    label: "CHIAMATO",
+    background: "#ede9fe",
+    color: "#6d28d9",
+    border: "#8b5cf6",
+  },
+  DA_CHIAMARE: {
+    label: "DA CHIAMARE",
+    background: "#fef9c3",
+    color: "#854d0e",
+    border: "#facc15",
+  },
+  INVIATO_MANDATO: {
+    label: "INVIATO MANDATO",
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    border: "#60a5fa",
+  },
+  FISSATO_APPUNTAMENTO: {
+    label: "FISSATO APPUNTAMENTO",
+    background: "#ffedd5",
+    color: "#c2410c",
+    border: "#fb923c",
+  },
+  FISSATA_VIDEOCALL: {
+    label: "FISSATA VIDEOCALL",
+    background: "#dcfce7",
+    color: "#15803d",
+    border: "#4ade80",
+  },
+  FIRMATO_MANDATO: {
+    label: "FIRMATO MANDATO",
+    background: "#bbf7d0",
+    color: "#166534",
+    border: "#22c55e",
+  },
+  KO: {
+    label: "KO",
+    background: "#fee2e2",
+    color: "#b91c1c",
+    border: "#f87171",
+  },
+  DA_RISENTIRE: {
+    label: "DA RISENTIRE PIÙ AVANTI",
+    background: "#ccfbf1",
+    color: "#0f766e",
+    border: "#2dd4bf",
+  },
+};
+
+const CANDIDATE_STATUS_OPTIONS = Object.entries(CANDIDATE_STATUS) as Array<
+  [CandidateStatus, (typeof CANDIDATE_STATUS)[CandidateStatus]]
+>;
+
+function phoneHref(value: string) {
+  const clean = String(value || "").replace(/[^\d+]/g, "");
+  return clean ? `tel:${clean}` : "";
+}
 
 const cardStyle: React.CSSProperties = {
   background: "white",
@@ -131,6 +206,7 @@ function candidateFromRow(row: any): Candidate {
     sectorOther: String(row.sector_other || ""),
     phone: String(row.phone || ""),
     email: String(row.email || ""),
+    status: (String(row.contact_status || "DA_CHIAMARE") as CandidateStatus),
   };
 }
 
@@ -140,6 +216,7 @@ function noteFromRow(row: any): ContactNote {
     candidateId: String(row.candidate_id),
     noteDate: String(row.note_date || ""),
     noteText: String(row.note_text || ""),
+    calledByMe: Boolean(row.called_by_me),
     createdAt: String(row.created_at || ""),
   };
 }
@@ -244,6 +321,7 @@ export default function Recruiting() {
 
   const [noteDate, setNoteDate] = useState(localDateKey());
   const [noteText, setNoteText] = useState("");
+  const [noteCalledByMe, setNoteCalledByMe] = useState(false);
 
   const [activityType, setActivityType] = useState<EventType>("CHIAMARE");
   const [activityCustom, setActivityCustom] = useState("");
@@ -262,6 +340,10 @@ export default function Recruiting() {
   const [mapMode, setMapMode] = useState<"italy" | "region" | "macroarea">("italy");
   const [mapRegion, setMapRegion] = useState<string>("Umbria");
   const [mapMacroareaId, setMapMacroareaId] = useState("");
+  const [mapReturnView, setMapReturnView] = useState<{
+    mode: "italy" | "macroarea";
+    macroareaId: string;
+  } | null>(null);
   const [regionsGeoJson, setRegionsGeoJson] = useState<any>(null);
   const [mapBoundariesLoading, setMapBoundariesLoading] = useState(false);
   const [mapBoundariesError, setMapBoundariesError] = useState("");
@@ -284,11 +366,11 @@ export default function Recruiting() {
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email")
+        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,contact_status")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
-        .select("id,candidate_id,note_date,note_text,created_at")
+        .select("id,candidate_id,note_date,note_text,called_by_me,created_at")
         .order("note_date", { ascending: false })
         .order("created_at", { ascending: false }),
       active.client
@@ -393,6 +475,7 @@ export default function Recruiting() {
         candidate.operationalZone,
         candidate.phone,
         candidate.email,
+        CANDIDATE_STATUS[candidate.status]?.label || candidate.status,
         candidate.sectorEnergy ? "si settore energia" : candidate.sectorOther,
       ]
         .join(" ")
@@ -428,6 +511,41 @@ export default function Recruiting() {
     [events, selectedCandidateId]
   );
 
+  const updateCandidateStatus = async (
+    candidate: Candidate,
+    status: CandidateStatus
+  ) => {
+    if (!ctx || candidate.status === status) return;
+
+    const previousStatus = candidate.status;
+    setCandidates((current) =>
+      current.map((item) =>
+        item.id === candidate.id ? { ...item, status } : item
+      )
+    );
+
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_candidates")
+        .update({
+          contact_status: status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", candidate.id);
+
+      if (error) throw error;
+    } catch (error: any) {
+      setCandidates((current) =>
+        current.map((item) =>
+          item.id === candidate.id ? { ...item, status: previousStatus } : item
+        )
+      );
+      setMessage(
+        "Errore nell'aggiornamento dello stato: " + (error?.message || error)
+      );
+    }
+  };
+
   const createCandidate = async () => {
     if (!ctx) return;
     if (!newName.trim()) {
@@ -447,6 +565,7 @@ export default function Recruiting() {
           sector_other: newSectorEnergy ? "" : newSectorOther.trim(),
           phone: newPhone.trim(),
           email: newEmail.trim(),
+          contact_status: "DA_CHIAMARE",
         })
         .select("id")
         .single();
@@ -538,11 +657,13 @@ export default function Recruiting() {
         candidate_id: selectedCandidate.id,
         note_date: noteDate,
         note_text: noteText.trim(),
+        called_by_me: noteCalledByMe,
       });
       if (error) throw error;
 
       setNoteText("");
       setNoteDate(localDateKey());
+      setNoteCalledByMe(false);
       await loadAll(ctx);
       setMessage("Nota aggiunta.");
     } catch (error: any) {
@@ -790,12 +911,41 @@ export default function Recruiting() {
         fillOpacity: 0.92,
       }),
       onEachFeature: (feature: any, layer: any) => {
-        const regionName = normalizeItalianRegion(String(feature?.properties?.reg_name || ""));
+        const regionName = normalizeItalianRegion(
+          String(feature?.properties?.reg_name || "")
+        );
+
         layer.bindTooltip(regionName, {
           permanent: true,
           direction: "center",
-          opacity: 0.9,
+          opacity: 0.95,
+          interactive: false,
         });
+
+        if (mapMode === "italy" || mapMode === "macroarea") {
+          layer.on("click", () => {
+            setMapReturnView({
+              mode: mapMode,
+              macroareaId: mapMacroareaId,
+            });
+            setMapRegion(regionName);
+            setMapMode("region");
+          });
+
+          layer.on("mouseover", () => {
+            layer.setStyle({
+              fillColor: "#bfdbfe",
+              fillOpacity: 0.98,
+            });
+          });
+
+          layer.on("mouseout", () => {
+            layer.setStyle({
+              fillColor: "#e2e8f0",
+              fillOpacity: 0.92,
+            });
+          });
+        }
       },
     }).addTo(map);
 
@@ -1042,28 +1192,153 @@ export default function Recruiting() {
               <div style={{ maxHeight: 720, overflow: "auto", display: "grid", gap: 7 }}>
                 {filteredCandidates.map((candidate) => {
                   const active = candidate.id === selectedCandidateId;
+                  const statusStyle =
+                    CANDIDATE_STATUS[candidate.status] ||
+                    CANDIDATE_STATUS.DA_CHIAMARE;
+                  const href = phoneHref(candidate.phone);
+
                   return (
-                    <button
+                    <div
                       key={candidate.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedCandidateId(candidate.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          setSelectedCandidateId(candidate.id);
+                        }
+                      }}
                       style={{
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0,1fr) minmax(150px,185px)",
+                        gap: 10,
+                        alignItems: "center",
                         textAlign: "left",
-                        border: active ? "2px solid #2563eb" : "1px solid #e2e8f0",
+                        border: active
+                          ? "2px solid #2563eb"
+                          : "1px solid #e2e8f0",
                         background: active ? "#eff6ff" : "white",
                         borderRadius: 10,
                         padding: 11,
                         cursor: "pointer",
                       }}
                     >
-                      <div style={{ fontWeight: 900 }}>{candidate.fullName}</div>
-                      <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
-                        {candidate.operationalZone || "Zona non indicata"} · {candidate.phone || "Telefono non indicato"}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 900 }}>
+                          {candidate.fullName}
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 5,
+                            color: "#dc2626",
+                            fontSize: 13,
+                            fontWeight: 900,
+                          }}
+                        >
+                          {candidate.operationalZone || "Zona non indicata"}
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 7,
+                            marginTop: 5,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {candidate.phone ? (
+                            <>
+                              <a
+                                href={href}
+                                onClick={(event) => event.stopPropagation()}
+                                style={{
+                                  color: "#111827",
+                                  textDecoration: "underline",
+                                  fontSize: 13,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                {candidate.phone}
+                              </a>
+                              <a
+                                href={href}
+                                aria-label={`Chiama ${candidate.fullName}`}
+                                title="Chiama"
+                                onClick={(event) => event.stopPropagation()}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: 30,
+                                  height: 30,
+                                  borderRadius: 999,
+                                  background: "#dcfce7",
+                                  border: "1px solid #86efac",
+                                  color: "#166534",
+                                  textDecoration: "none",
+                                  fontSize: 16,
+                                }}
+                              >
+                                ☎
+                              </a>
+                            </>
+                          ) : (
+                            <span style={{ color: "#64748b", fontSize: 13 }}>
+                              Telefono non indicato
+                            </span>
+                          )}
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 12,
+                            fontWeight: 800,
+                          }}
+                        >
+                          Settore energia:{" "}
+                          {candidate.sectorEnergy
+                            ? "SI"
+                            : `NO${candidate.sectorOther ? ` · ${candidate.sectorOther}` : ""}`}
+                        </div>
                       </div>
-                      <div style={{ marginTop: 3, fontSize: 12, fontWeight: 800 }}>
-                        Settore energia: {candidate.sectorEnergy ? "SI" : `NO${candidate.sectorOther ? ` · ${candidate.sectorOther}` : ""}`}
+
+                      <div
+                        onClick={(event) => event.stopPropagation()}
+                        style={{ alignSelf: "stretch", display: "flex", alignItems: "center" }}
+                      >
+                        <select
+                          value={candidate.status}
+                          onChange={(event) =>
+                            void updateCandidateStatus(
+                              candidate,
+                              event.target.value as CandidateStatus
+                            )
+                          }
+                          aria-label={`Stato di ${candidate.fullName}`}
+                          style={{
+                            width: "100%",
+                            boxSizing: "border-box",
+                            borderRadius: 9,
+                            padding: "8px 9px",
+                            fontSize: 11,
+                            fontWeight: 900,
+                            border: `1px solid ${statusStyle.border}`,
+                            background: statusStyle.background,
+                            color: statusStyle.color,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {CANDIDATE_STATUS_OPTIONS.map(([value, option]) => (
+                            <option key={value} value={value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
 
@@ -1144,11 +1419,17 @@ export default function Recruiting() {
                   <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) minmax(280px,.75fr)", gap: 14, alignItems: "start" }}>
                     <div style={cardStyle}>
                       <h3 style={{ marginTop: 0 }}>Note del contatto</h3>
-                      <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 9, alignItems: "start" }}>
-                        <div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        <div style={{ maxWidth: 220 }}>
                           <label style={labelStyle}>Data nota</label>
-                          <input type="date" value={noteDate} onChange={(e) => setNoteDate(e.target.value)} style={inputStyle} />
+                          <input
+                            type="date"
+                            value={noteDate}
+                            onChange={(e) => setNoteDate(e.target.value)}
+                            style={inputStyle}
+                          />
                         </div>
+
                         <div>
                           <label style={labelStyle}>Nuova nota</label>
                           <textarea
@@ -1159,6 +1440,25 @@ export default function Recruiting() {
                             style={{ ...inputStyle, resize: "vertical" }}
                           />
                         </div>
+
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            width: "fit-content",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={noteCalledByMe}
+                            onChange={(e) => setNoteCalledByMe(e.target.checked)}
+                            style={{ width: 18, height: 18 }}
+                          />
+                          Chiamato da me
+                        </label>
                       </div>
                       <button
                         type="button"
@@ -1182,7 +1482,25 @@ export default function Recruiting() {
                                 Elimina
                               </button>
                             </div>
-                            <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>{note.noteText}</div>
+                            {note.calledByMe && (
+                              <div
+                                style={{
+                                  display: "inline-block",
+                                  marginTop: 7,
+                                  padding: "4px 7px",
+                                  borderRadius: 999,
+                                  background: "#ede9fe",
+                                  color: "#6d28d9",
+                                  fontSize: 11,
+                                  fontWeight: 900,
+                                }}
+                              >
+                                CHIAMATO DA ME
+                              </div>
+                            )}
+                            <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                              {note.noteText}
+                            </div>
                           </div>
                         ))}
                         {!selectedNotes.length && <div style={{ color: "#64748b" }}>Nessuna nota inserita.</div>}
@@ -1399,7 +1717,14 @@ export default function Recruiting() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
               <div>
                 <label style={labelStyle}>Visualizzazione</label>
-                <select value={mapMode} onChange={(e) => setMapMode(e.target.value as "italy" | "region" | "macroarea")} style={inputStyle}>
+                <select
+                  value={mapMode}
+                  onChange={(e) => {
+                    setMapReturnView(null);
+                    setMapMode(e.target.value as "italy" | "region" | "macroarea");
+                  }}
+                  style={inputStyle}
+                >
                   <option value="italy">ITALIA</option>
                   <option value="region">SINGOLA REGIONE</option>
                   <option value="macroarea">MACROAREA</option>
@@ -1431,7 +1756,7 @@ export default function Recruiting() {
             </div>
           </div>
 
-          <div style={{ ...cardStyle, padding: 10 }}>
+          <div style={{ ...cardStyle, padding: 10, position: "relative" }}>
             {mapBoundariesLoading && (
               <div style={{ padding: "12px 6px", fontWeight: 800, color: "#475569" }}>
                 Caricamento confini regionali italiani...
@@ -1452,6 +1777,35 @@ export default function Recruiting() {
                 background: "#f8fafc",
               }}
             />
+
+            {mapReturnView && mapMode === "region" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMapMode(mapReturnView.mode);
+                  if (mapReturnView.mode === "macroarea") {
+                    setMapMacroareaId(mapReturnView.macroareaId);
+                  }
+                  setMapReturnView(null);
+                }}
+                style={{
+                  position: "absolute",
+                  right: 22,
+                  bottom: 22,
+                  zIndex: 1000,
+                  border: "1px solid #0f172a",
+                  borderRadius: 999,
+                  padding: "10px 15px",
+                  background: "#0f172a",
+                  color: "white",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                  boxShadow: "0 5px 18px rgba(15,23,42,.28)",
+                }}
+              >
+                ← INDIETRO
+              </button>
+            )}
           </div>
 
           <div style={cardStyle}>
