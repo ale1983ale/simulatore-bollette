@@ -603,6 +603,7 @@ export default function Recruiting() {
 
   const [nameFilter, setNameFilter] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
+  const [regionFilter, setRegionFilter] = useState("");
   const [sectorFilter, setSectorFilter] = useState<"" | "SI" | "NO">("");
   const [sectorOtherFilter, setSectorOtherFilter] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
@@ -610,6 +611,7 @@ export default function Recruiting() {
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [contactEditMode, setContactEditMode] = useState(false);
   const [showStatusManager, setShowStatusManager] = useState(false);
   const [newStatusLabel, setNewStatusLabel] = useState("");
   const [newStatusColorKey, setNewStatusColorKey] = useState("slate");
@@ -931,6 +933,7 @@ export default function Recruiting() {
 
   useEffect(() => {
     if (!selectedCandidate) return;
+    setContactEditMode(false);
     setEditName(selectedCandidate.fullName);
     setEditZone(selectedCandidate.operationalZone);
     setEditProvinceCode(selectedCandidate.provinceCode);
@@ -1104,6 +1107,7 @@ export default function Recruiting() {
   const filteredCandidates = useMemo(() => {
     const nameNeedle = normalizeFilterValue(nameFilter);
     const zoneNeedle = normalizeFilterValue(zoneFilter);
+    const regionNeedle = normalizeFilterValue(regionFilter);
     const sectorOtherNeedle = normalizeFilterValue(sectorOtherFilter);
     const companyNeedle = normalizeFilterValue(companyFilter);
     const forwardedNeedle = normalizeFilterValue(forwardedToFilter);
@@ -1119,6 +1123,13 @@ export default function Recruiting() {
       if (
         zoneNeedle &&
         !normalizeFilterValue(candidate.operationalZone).includes(zoneNeedle)
+      ) {
+        return false;
+      }
+
+      if (
+        regionNeedle &&
+        normalizeFilterValue(candidate.region) !== regionNeedle
       ) {
         return false;
       }
@@ -1188,6 +1199,7 @@ export default function Recruiting() {
     lastNoteSortKeyByCandidateId,
     nameFilter,
     zoneFilter,
+    regionFilter,
     sectorFilter,
     sectorOtherFilter,
     companyFilter,
@@ -1450,7 +1462,7 @@ export default function Recruiting() {
         .insert({
           owner_key: ctx.ownerKey,
           full_name: newName.trim().toLocaleUpperCase("it"),
-          operational_zone: newZone.trim(),
+          operational_zone: newZone.trim().toLocaleUpperCase("it"),
           sector_energy: newSectorEnergy,
           sector_other: resolvedNewSector,
           company_name: resolvedNewCompany,
@@ -1510,7 +1522,7 @@ export default function Recruiting() {
         .from("recruiting_candidates")
         .update({
           full_name: editName.trim().toLocaleUpperCase("it"),
-          operational_zone: editZone.trim(),
+          operational_zone: editZone.trim().toLocaleUpperCase("it"),
           province_code: normalizeProvinceCode(editProvinceCode),
           region:
             editRegion ||
@@ -1526,6 +1538,7 @@ export default function Recruiting() {
 
       if (error) throw error;
       await loadAll(ctx);
+      setContactEditMode(false);
       setMessage("Scheda contatto aggiornata.");
     } catch (error: any) {
       setMessage("Errore nel salvataggio: " + (error?.message || error));
@@ -2442,7 +2455,16 @@ export default function Recruiting() {
                   </div>
                   <div>
                     <label style={labelStyle}>Zona operativa</label>
-                    <input value={newZone} onChange={(e) => setNewZone(e.target.value)} style={inputStyle} />
+                    <input
+                      value={newZone}
+                      onChange={(e) =>
+                        setNewZone(e.target.value.toLocaleUpperCase("it"))
+                      }
+                      style={{
+                        ...inputStyle,
+                        textTransform: "uppercase",
+                      }}
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>Settore energia</label>
@@ -2612,6 +2634,22 @@ export default function Recruiting() {
                     <option key={zone} value={zone} />
                   ))}
                 </datalist>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Regione</label>
+                <select
+                  value={regionFilter}
+                  onChange={(e) => setRegionFilter(e.target.value)}
+                  style={{ ...inputStyle, textTransform: "uppercase" }}
+                >
+                  <option value="">TUTTE LE REGIONI</option>
+                  {ITALIAN_REGIONS.map((region) => (
+                    <option key={region} value={region}>
+                      {region.toLocaleUpperCase("it")}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -2924,11 +2962,11 @@ export default function Recruiting() {
                       className="recruiting-candidate-card"
                       style={{
                         textAlign: "left",
-                        border: `4px solid ${statusStyle.border}`,
-                        background: statusStyle.background,
+                        border: `6px solid ${statusStyle.border}`,
+                        background: active ? statusStyle.background : "#ffffff",
                         boxShadow: active
-                          ? "0 0 0 3px rgba(37,99,235,.28)"
-                          : "none",
+                          ? "0 0 0 3px rgba(37,99,235,.22)"
+                          : "0 2px 7px rgba(15,23,42,.06)",
                         borderRadius: 10,
                         padding: 11,
                         cursor: "pointer",
@@ -2948,7 +2986,7 @@ export default function Recruiting() {
                           }}
                         >
                           <span>
-                            {candidate.operationalZone || "Zona non indicata"}
+                            {(candidate.operationalZone || "ZONA NON INDICATA").toLocaleUpperCase("it")}
                           </span>
                           {(candidate.provinceCode || candidate.region) && (
                             <span
@@ -2962,7 +3000,7 @@ export default function Recruiting() {
                                 ? `· ${candidate.provinceCode}`
                                 : ""}
                               {candidate.region
-                                ? ` · ${candidate.region}`
+                                ? ` · ${candidate.region.toLocaleUpperCase("it")}`
                                 : ""}
                             </span>
                           )}
@@ -3236,6 +3274,46 @@ export default function Recruiting() {
                       <h3 style={{ margin: 0 }}>Scheda contatto</h3>
 
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {!contactEditMode ? (
+                          <button
+                            type="button"
+                            onClick={() => setContactEditMode(true)}
+                            style={{
+                              ...buttonStyle,
+                              padding: "7px 10px",
+                              background: "#0f172a",
+                              color: "white",
+                            }}
+                          >
+                            MODIFICA
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditName(selectedCandidate.fullName);
+                              setEditZone(selectedCandidate.operationalZone);
+                              setEditProvinceCode(selectedCandidate.provinceCode);
+                              setEditRegion(selectedCandidate.region);
+                              setEditSectorEnergy(selectedCandidate.sectorEnergy);
+                              setEditSectorOther(selectedCandidate.sectorOther);
+                              setEditCompanyChoice(selectedCandidate.companyName || "");
+                              setEditCompanyName("");
+                              setEditPhone(selectedCandidate.phone);
+                              setEditEmail(selectedCandidate.email);
+                              setContactEditMode(false);
+                            }}
+                            style={{
+                              ...buttonStyle,
+                              padding: "7px 10px",
+                              background: "#e2e8f0",
+                              color: "#334155",
+                            }}
+                          >
+                            ANNULLA MODIFICA
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           disabled={mapCandidateBusyId === selectedCandidate.id}
@@ -3265,165 +3343,366 @@ export default function Recruiting() {
                       </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10, marginTop: 14 }}>
-                      <div>
-                        <label style={labelStyle}>Nome e cognome</label>
-                        <input
-                          value={editName}
-                          onChange={(e) =>
-                            setEditName(e.target.value.toLocaleUpperCase("it"))
-                          }
-                          style={{
-                            ...inputStyle,
-                            textTransform: "uppercase",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Città / zona operativa</label>
-                        <input
-                          value={editZone}
-                          onChange={(e) => setEditZone(e.target.value)}
-                          onBlur={(e) =>
-                            void autofillEditGeography(e.currentTarget.value)
-                          }
-                          style={inputStyle}
-                        />
-                      </div>
+                    {!contactEditMode ? (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit,minmax(190px,1fr))",
+                          gap: 10,
+                          marginTop: 14,
+                        }}
+                      >
+                        <div>
+                          <label style={labelStyle}>Nome e cognome</label>
+                          <div style={{ fontWeight: 900 }}>
+                            {selectedCandidate.fullName}
+                          </div>
+                        </div>
 
-                      <div>
-                        <label style={labelStyle}>Provincia</label>
-                        <input
-                          value={editProvinceCode}
-                          maxLength={2}
-                          placeholder="PG"
-                          onChange={(e) => {
-                            const code = normalizeProvinceCode(e.target.value);
-                            setEditProvinceCode(code);
-                            const automaticRegion =
-                              regionFromProvinceCode(code);
-                            if (automaticRegion) {
-                              setEditRegion(automaticRegion);
-                            }
-                          }}
-                          style={{
-                            ...inputStyle,
-                            textTransform: "uppercase",
-                            fontWeight: 900,
-                          }}
-                        />
-                      </div>
+                        <div>
+                          <label style={labelStyle}>Città / zona operativa</label>
+                          <div style={{ fontWeight: 900 }}>
+                            {(selectedCandidate.operationalZone || "—").toLocaleUpperCase("it")}
+                          </div>
+                        </div>
 
-                      <div>
-                        <label style={labelStyle}>Regione</label>
-                        <select
-                          value={editRegion}
-                          onChange={(e) => setEditRegion(e.target.value)}
-                          style={inputStyle}
-                        >
-                          <option value="">Seleziona regione...</option>
-                          {ITALIAN_REGIONS.map((region) => (
-                            <option key={region} value={region}>
-                              {region}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                        <div>
+                          <label style={labelStyle}>Provincia</label>
+                          <div style={{ fontWeight: 900 }}>
+                            {(selectedCandidate.provinceCode || "—").toLocaleUpperCase("it")}
+                          </div>
+                        </div>
 
-                      <div>
-                        <label style={labelStyle}>Settore energia</label>
-                        <select
-                          value={editSectorEnergy ? "SI" : "NO"}
-                          onChange={(e) => {
-                            const isEnergy = e.target.value === "SI";
-                            setEditSectorEnergy(isEnergy);
-                            if (!isEnergy) {
-                              setEditCompanyChoice("");
-                              setEditCompanyName("");
-                            } else if (selectedCandidate?.companyName) {
-                              setEditCompanyChoice(
-                                selectedCandidate.companyName
-                              );
-                            }
-                          }}
-                          style={inputStyle}
-                        >
-                          <option value="SI">SI</option>
-                          <option value="NO">NO</option>
-                        </select>
-                      </div>
-                      {editSectorEnergy ? (
-                        <>
-                          {existingCompanies.length > 0 && (
-                            <div>
-                              <label style={labelStyle}>Azienda</label>
-                              <select
-                                value={editCompanyChoice}
-                                onChange={(e) => {
-                                  setEditCompanyChoice(e.target.value);
-                                  if (e.target.value !== "__NEW__") {
-                                    setEditCompanyName("");
-                                  }
-                                }}
-                                style={inputStyle}
-                              >
-                                <option value="">Seleziona azienda...</option>
-                                {existingCompanies.map((company) => (
-                                  <option key={company} value={company}>
-                                    {company}
-                                  </option>
-                                ))}
-                                <option value="__NEW__">
-                                  + Aggiungi nuova azienda
-                                </option>
-                              </select>
-                            </div>
+                        <div>
+                          <label style={labelStyle}>Regione</label>
+                          <div style={{ fontWeight: 900 }}>
+                            {(selectedCandidate.region || "—").toLocaleUpperCase("it")}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Settore energia</label>
+                          <div style={{ fontWeight: 900 }}>
+                            {selectedCandidate.sectorEnergy
+                              ? `SI${selectedCandidate.companyName ? ` · ${selectedCandidate.companyName}` : ""}`
+                              : `NO${selectedCandidate.sectorOther ? ` · ${selectedCandidate.sectorOther}` : ""}`}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Numero di telefono</label>
+                          {selectedCandidate.phone ? (
+                            <a
+                              href={phoneHref(selectedCandidate.phone)}
+                              style={{
+                                color: "#111827",
+                                textDecoration: "underline",
+                                fontWeight: 900,
+                              }}
+                            >
+                              {selectedCandidate.phone}
+                            </a>
+                          ) : (
+                            <div>—</div>
                           )}
+                        </div>
 
-                          {(editCompanyChoice === "__NEW__" ||
-                            !existingCompanies.length) && (
-                            <div>
-                              <label style={labelStyle}>Nuova azienda</label>
-                              <input
-                                value={editCompanyName}
-                                onChange={(e) =>
-                                  setEditCompanyName(e.target.value)
+                        <div>
+                          <label style={labelStyle}>Email</label>
+                          {selectedCandidate.email ? (
+                            <a
+                              href={`mailto:${selectedCandidate.email}`}
+                              style={{
+                                color: "#1d4ed8",
+                                textDecoration: "underline",
+                                fontWeight: 800,
+                              }}
+                            >
+                              {selectedCandidate.email}
+                            </a>
+                          ) : (
+                            <div>—</div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Stato</label>
+                          <div
+                            style={{
+                              display: "inline-block",
+                              padding: "7px 10px",
+                              borderRadius: 9,
+                              border: `2px solid ${getStatusDefinition(selectedCandidate.status).border}`,
+                              background:
+                                getStatusDefinition(selectedCandidate.status)
+                                  .background,
+                              color:
+                                getStatusDefinition(selectedCandidate.status)
+                                  .color,
+                              fontWeight: 900,
+                            }}
+                          >
+                            {getStatusDefinition(selectedCandidate.status).label}
+                          </div>
+                        </div>
+
+                        {selectedCandidate.status === "INOLTRATO_A" && (
+                          <div>
+                            <label style={labelStyle}>Inoltrato a</label>
+                            <div style={{ fontWeight: 900 }}>
+                              {selectedCandidate.forwardedTo || "—"}
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <label style={labelStyle}>Chiamato da me</label>
+                          <div style={{ fontWeight: 900 }}>
+                            {calledByMeCandidateIds.has(selectedCandidate.id)
+                              ? "SI"
+                              : "NO"}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit,minmax(190px,1fr))",
+                            gap: 10,
+                            marginTop: 14,
+                          }}
+                        >
+                          <div>
+                            <label style={labelStyle}>Nome e cognome</label>
+                            <input
+                              value={editName}
+                              onChange={(e) =>
+                                setEditName(
+                                  e.target.value.toLocaleUpperCase("it")
+                                )
+                              }
+                              style={{
+                                ...inputStyle,
+                                textTransform: "uppercase",
+                              }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>
+                              Città / zona operativa
+                            </label>
+                            <input
+                              value={editZone}
+                              onChange={(e) =>
+                                setEditZone(
+                                  e.target.value.toLocaleUpperCase("it")
+                                )
+                              }
+                              onBlur={(e) =>
+                                void autofillEditGeography(
+                                  e.currentTarget.value
+                                )
+                              }
+                              style={{
+                                ...inputStyle,
+                                textTransform: "uppercase",
+                              }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Provincia</label>
+                            <input
+                              value={editProvinceCode}
+                              maxLength={2}
+                              placeholder="PG"
+                              onChange={(e) => {
+                                const code = normalizeProvinceCode(
+                                  e.target.value
+                                );
+                                setEditProvinceCode(code);
+                                const automaticRegion =
+                                  regionFromProvinceCode(code);
+                                if (automaticRegion) {
+                                  setEditRegion(automaticRegion);
                                 }
-                                placeholder="Scrivi il nome azienda"
+                              }}
+                              style={{
+                                ...inputStyle,
+                                textTransform: "uppercase",
+                                fontWeight: 900,
+                              }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Regione</label>
+                            <select
+                              value={editRegion}
+                              onChange={(e) =>
+                                setEditRegion(e.target.value)
+                              }
+                              style={{
+                                ...inputStyle,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              <option value="">SELEZIONA REGIONE...</option>
+                              {ITALIAN_REGIONS.map((region) => (
+                                <option key={region} value={region}>
+                                  {region.toLocaleUpperCase("it")}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Settore energia</label>
+                            <select
+                              value={editSectorEnergy ? "SI" : "NO"}
+                              onChange={(e) => {
+                                const isEnergy =
+                                  e.target.value === "SI";
+                                setEditSectorEnergy(isEnergy);
+                                if (!isEnergy) {
+                                  setEditCompanyChoice("");
+                                  setEditCompanyName("");
+                                } else if (
+                                  selectedCandidate?.companyName
+                                ) {
+                                  setEditCompanyChoice(
+                                    selectedCandidate.companyName
+                                  );
+                                }
+                              }}
+                              style={inputStyle}
+                            >
+                              <option value="SI">SI</option>
+                              <option value="NO">NO</option>
+                            </select>
+                          </div>
+
+                          {editSectorEnergy ? (
+                            <>
+                              {existingCompanies.length > 0 && (
+                                <div>
+                                  <label style={labelStyle}>Azienda</label>
+                                  <select
+                                    value={editCompanyChoice}
+                                    onChange={(e) => {
+                                      setEditCompanyChoice(
+                                        e.target.value
+                                      );
+                                      if (
+                                        e.target.value !== "__NEW__"
+                                      ) {
+                                        setEditCompanyName("");
+                                      }
+                                    }}
+                                    style={inputStyle}
+                                  >
+                                    <option value="">
+                                      Seleziona azienda...
+                                    </option>
+                                    {existingCompanies.map(
+                                      (company) => (
+                                        <option
+                                          key={company}
+                                          value={company}
+                                        >
+                                          {company}
+                                        </option>
+                                      )
+                                    )}
+                                    <option value="__NEW__">
+                                      + Aggiungi nuova azienda
+                                    </option>
+                                  </select>
+                                </div>
+                              )}
+
+                              {(editCompanyChoice === "__NEW__" ||
+                                !existingCompanies.length) && (
+                                <div>
+                                  <label style={labelStyle}>
+                                    Nuova azienda
+                                  </label>
+                                  <input
+                                    value={editCompanyName}
+                                    onChange={(e) =>
+                                      setEditCompanyName(
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Scrivi il nome azienda"
+                                    style={inputStyle}
+                                  />
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div>
+                              <label style={labelStyle}>
+                                Settore attuale
+                              </label>
+                              <input
+                                value={editSectorOther}
+                                onChange={(e) =>
+                                  setEditSectorOther(e.target.value)
+                                }
+                                placeholder="Scrivi il settore"
                                 style={inputStyle}
                               />
                             </div>
                           )}
-                        </>
-                      ) : (
-                        <div>
-                          <label style={labelStyle}>Settore attuale</label>
-                          <input
-                            value={editSectorOther}
-                            onChange={(e) => setEditSectorOther(e.target.value)}
-                            placeholder="Scrivi il settore"
-                            style={inputStyle}
-                          />
-                        </div>
-                      )}
-                      <div>
-                        <label style={labelStyle}>Numero di telefono</label>
-                        <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={inputStyle} />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Email</label>
-                        <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} style={inputStyle} />
-                      </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void saveCandidate()}
-                      style={{ ...buttonStyle, marginTop: 12, background: "#2563eb", color: "white", opacity: busy ? 0.6 : 1 }}
-                    >
-                      Salva modifiche
-                    </button>
+                          <div>
+                            <label style={labelStyle}>
+                              Numero di telefono
+                            </label>
+                            <input
+                              value={editPhone}
+                              onChange={(e) =>
+                                setEditPhone(e.target.value)
+                              }
+                              style={inputStyle}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Email</label>
+                            <input
+                              type="email"
+                              value={editEmail}
+                              onChange={(e) =>
+                                setEditEmail(e.target.value)
+                              }
+                              style={inputStyle}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void saveCandidate()}
+                          style={{
+                            ...buttonStyle,
+                            marginTop: 12,
+                            background: "#2563eb",
+                            color: "white",
+                            opacity: busy ? 0.6 : 1,
+                          }}
+                        >
+                          Salva modifiche
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div className="recruiting-detail-bottom-layout">
@@ -4328,9 +4607,18 @@ export default function Recruiting() {
                 marginTop: 16,
               }}
             >
-              <div><strong>Città:</strong> {calendarContactPreview.operationalZone || "—"}</div>
-              <div><strong>Provincia:</strong> {calendarContactPreview.provinceCode || "—"}</div>
-              <div><strong>Regione:</strong> {calendarContactPreview.region || "—"}</div>
+              <div>
+                <strong>Città:</strong>{" "}
+                {(calendarContactPreview.operationalZone || "—").toLocaleUpperCase("it")}
+              </div>
+              <div>
+                <strong>Provincia:</strong>{" "}
+                {(calendarContactPreview.provinceCode || "—").toLocaleUpperCase("it")}
+              </div>
+              <div>
+                <strong>Regione:</strong>{" "}
+                {(calendarContactPreview.region || "—").toLocaleUpperCase("it")}
+              </div>
               <div><strong>Telefono:</strong> {calendarContactPreview.phone || "—"}</div>
               <div><strong>Email:</strong> {calendarContactPreview.email || "—"}</div>
               <div>
