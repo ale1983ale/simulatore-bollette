@@ -3721,14 +3721,61 @@ export default function Recruiting() {
                     <div style={cardStyle}>
                       <h3 style={{ marginTop: 0 }}>Note del contatto</h3>
                       <div style={{ display: "grid", gap: 10 }}>
-                        <div style={{ maxWidth: 220 }}>
-                          <label style={labelStyle}>Data nota</label>
-                          <input
-                            type="date"
-                            value={noteDate}
-                            onChange={(e) => setNoteDate(e.target.value)}
-                            style={inputStyle}
-                          />
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 12,
+                            alignItems: "end",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ width: 220, maxWidth: "100%" }}>
+                            <label style={labelStyle}>Data nota</label>
+                            <input
+                              type="date"
+                              value={noteDate}
+                              onChange={(e) => setNoteDate(e.target.value)}
+                              style={inputStyle}
+                            />
+                          </div>
+
+                          <div style={{ width: 260, maxWidth: "100%" }}>
+                            <label style={labelStyle}>Stato</label>
+                            <select
+                              value={selectedCandidate.status}
+                              onChange={(e) =>
+                                void updateCandidateStatus(
+                                  selectedCandidate,
+                                  e.target.value
+                                )
+                              }
+                              style={{
+                                ...inputStyle,
+                                border: `2px solid ${getStatusDefinition(selectedCandidate.status).border}`,
+                                background:
+                                  getStatusDefinition(selectedCandidate.status)
+                                    .background,
+                                color:
+                                  getStatusDefinition(selectedCandidate.status)
+                                    .color,
+                                fontWeight: 900,
+                              }}
+                            >
+                              {statusDefinitions.map((option) => (
+                                <option
+                                  key={option.code}
+                                  value={option.code}
+                                  style={{
+                                    background: option.background,
+                                    color: option.color,
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
 
                         <div>
