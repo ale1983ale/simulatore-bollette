@@ -4,7 +4,7 @@ import html2canvas from "html2canvas";
 import { supabase } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
-import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminUpdateUser, adminUpsertSettings } from "./adminSecurity";
+import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
 import Recruiting from "./Recruiting";
 
 
@@ -5586,19 +5586,26 @@ export default function App() {
     return localStorage.getItem("app_tab") || "energia";
   });
   useEffect(() => {
-    const adminSaved = localStorage.getItem("admin_session");
-    const agentSaved = localStorage.getItem("agent_session");
-  
-    if (adminSaved) {
-      const admin = JSON.parse(adminSaved);
-      setAdminSession(admin);
-      setAdminProfile(admin);
-    }
-  
-    if (agentSaved) {
-      const agent = JSON.parse(agentSaved);
-      setAgentSession(agent);
-    }
+    void (async () => {
+      const admin = await ensureAdminSession();
+      if (admin) {
+        setAdminSession(admin);
+        setAdminProfile(admin);
+      } else {
+        setAdminSession(null);
+        setAdminProfile(null);
+      }
+
+      const agentSaved = localStorage.getItem("agent_session");
+      if (agentSaved) {
+        try {
+          const agent = JSON.parse(agentSaved);
+          setAgentSession(agent);
+        } catch {
+          localStorage.removeItem("agent_session");
+        }
+      }
+    })();
   }, []);
   
   const punPsvRef = useRef<HTMLDivElement>(null);
@@ -5919,20 +5926,6 @@ useEffect(() => {
 }, [tab, validMonthOptions[0]?.mese]);
 
 
-useEffect(() => {
-  const savedAdmin = localStorage.getItem("admin_session");
-
-  if (savedAdmin) {
-    try {
-      const parsed = JSON.parse(savedAdmin) as AdminProfile;
-      setAdminSession(parsed);
-      setAdminProfile(parsed);
-    } catch {
-      localStorage.removeItem("admin_session");
-    }
-  }
-}, []);
-
 const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
 const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
 const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
@@ -6160,6 +6153,7 @@ const renderAdminContent = () => {
       <LoginView
         setSession={setAdminSession}
         setAdminProfile={setAdminProfile}
+        setAgentSession={setAgentSession}
       />
     );
   }
