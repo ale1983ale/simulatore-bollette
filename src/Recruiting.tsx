@@ -7,16 +7,7 @@ import RecruitingManagement from "./RecruitingManagement";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
 
-type CandidateStatus =
-  | "CHIAMATO"
-  | "DA_CHIAMARE"
-  | "INVIATO_MANDATO"
-  | "FISSATO_APPUNTAMENTO"
-  | "FISSATA_VIDEOCALL"
-  | "FIRMATO_MANDATO"
-  | "INOLTRATO_A"
-  | "KO"
-  | "DA_RISENTIRE";
+type CandidateStatus = string;
 
 type Candidate = {
   id: string;
@@ -92,7 +83,7 @@ const EVENT_LABELS: Record<EventType, string> = {
 };
 
 const CANDIDATE_STATUS: Record<
-  CandidateStatus,
+  string,
   { label: string; background: string; color: string; border: string }
 > = {
   CHIAMATO: {
@@ -152,8 +143,69 @@ const CANDIDATE_STATUS: Record<
 };
 
 const CANDIDATE_STATUS_OPTIONS = Object.entries(CANDIDATE_STATUS) as Array<
-  [CandidateStatus, (typeof CANDIDATE_STATUS)[CandidateStatus]]
+  [string, { label: string; background: string; color: string; border: string }]
 >;
+
+type RecruitingStatusRow = {
+  code: string;
+  label: string;
+  colorKey: string;
+  sortOrder: number;
+};
+
+const STATUS_COLOR_PALETTE = [
+  { key: "purple", name: "Viola", background: "#ede9fe", color: "#6d28d9", border: "#8b5cf6" },
+  { key: "yellow", name: "Giallo", background: "#fef9c3", color: "#854d0e", border: "#facc15" },
+  { key: "blue", name: "Blu", background: "#dbeafe", color: "#1d4ed8", border: "#60a5fa" },
+  { key: "orange", name: "Arancione", background: "#ffedd5", color: "#c2410c", border: "#fb923c" },
+  { key: "green", name: "Verde", background: "#dcfce7", color: "#15803d", border: "#4ade80" },
+  { key: "emerald", name: "Verde scuro", background: "#d1fae5", color: "#047857", border: "#34d399" },
+  { key: "indigo", name: "Indaco", background: "#e0e7ff", color: "#4338ca", border: "#818cf8" },
+  { key: "red", name: "Rosso", background: "#fee2e2", color: "#b91c1c", border: "#f87171" },
+  { key: "teal", name: "Turchese", background: "#ccfbf1", color: "#0f766e", border: "#2dd4bf" },
+  { key: "cyan", name: "Ciano", background: "#cffafe", color: "#0e7490", border: "#22d3ee" },
+  { key: "sky", name: "Azzurro", background: "#e0f2fe", color: "#0369a1", border: "#38bdf8" },
+  { key: "lime", name: "Lime", background: "#ecfccb", color: "#4d7c0f", border: "#a3e635" },
+  { key: "amber", name: "Ambra", background: "#fef3c7", color: "#92400e", border: "#f59e0b" },
+  { key: "rose", name: "Rosa", background: "#ffe4e6", color: "#be123c", border: "#fb7185" },
+  { key: "pink", name: "Pink", background: "#fce7f3", color: "#be185d", border: "#f472b6" },
+  { key: "fuchsia", name: "Fucsia", background: "#fae8ff", color: "#a21caf", border: "#e879f9" },
+  { key: "violet", name: "Violetto", background: "#f3e8ff", color: "#7e22ce", border: "#c084fc" },
+  { key: "slate", name: "Ardesia", background: "#e2e8f0", color: "#334155", border: "#94a3b8" },
+  { key: "stone", name: "Pietra", background: "#e7e5e4", color: "#44403c", border: "#a8a29e" },
+  { key: "gray", name: "Grigio", background: "#f3f4f6", color: "#374151", border: "#9ca3af" },
+] as const;
+
+const DEFAULT_STATUS_COLOR_KEY: Record<string, string> = {
+  CHIAMATO: "purple",
+  DA_CHIAMARE: "yellow",
+  INVIATO_MANDATO: "blue",
+  FISSATO_APPUNTAMENTO: "orange",
+  FISSATA_VIDEOCALL: "green",
+  FIRMATO_MANDATO: "emerald",
+  INOLTRATO_A: "indigo",
+  KO: "red",
+  DA_RISENTIRE: "teal",
+};
+
+function statusPaletteByKey(key: string) {
+  return (
+    STATUS_COLOR_PALETTE.find((item) => item.key === key) ||
+    STATUS_COLOR_PALETTE.find((item) => item.key === "slate")!
+  );
+}
+
+function normalizeStatusCode(value: string) {
+  const normalized = String(value || "")
+    .trim()
+    .toLocaleUpperCase("it")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized || "STATO";
+}
 const PROVINCE_REGION_BY_CODE: Record<string, string> = {
   AQ: "Abruzzo", CH: "Abruzzo", PE: "Abruzzo", TE: "Abruzzo",
   MT: "Basilicata", PZ: "Basilicata",
@@ -536,13 +588,20 @@ export default function Recruiting() {
   const [events, setEvents] = useState<RecruitingEvent[]>([]);
   const [macroareas, setMacroareas] = useState<Macroarea[]>([]);
   const [activeAgents, setActiveAgents] = useState<ActiveAgent[]>([]);
+  const [statusRows, setStatusRows] = useState<RecruitingStatusRow[]>([]);
 
   const [nameFilter, setNameFilter] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
   const [sectorFilter, setSectorFilter] = useState<"" | "SI" | "NO">("");
   const [sectorOtherFilter, setSectorOtherFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | CandidateStatus>("");
+  const [forwardedToFilter, setForwardedToFilter] = useState("");
+  const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [showStatusManager, setShowStatusManager] = useState(false);
+  const [newStatusLabel, setNewStatusLabel] = useState("");
+  const [newStatusColorKey, setNewStatusColorKey] = useState("slate");
   const [showNewContact, setShowNewContact] = useState(false);
 
   const [newName, setNewName] = useState("");
@@ -550,6 +609,7 @@ export default function Recruiting() {
   const [newSectorEnergy, setNewSectorEnergy] = useState(true);
   const [newSectorChoice, setNewSectorChoice] = useState("");
   const [newSectorOther, setNewSectorOther] = useState("");
+  const [newCompanyChoice, setNewCompanyChoice] = useState("");
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -560,6 +620,7 @@ export default function Recruiting() {
   const [editRegion, setEditRegion] = useState("");
   const [editSectorEnergy, setEditSectorEnergy] = useState(true);
   const [editSectorOther, setEditSectorOther] = useState("");
+  const [editCompanyChoice, setEditCompanyChoice] = useState("");
   const [editCompanyName, setEditCompanyName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -581,6 +642,19 @@ export default function Recruiting() {
   const [calendarDate, setCalendarDate] = useState(localDateKey());
   const [calendarTime, setCalendarTime] = useState("");
   const [calendarNotes, setCalendarNotes] = useState("");
+
+  const [forwardedNewCandidateId, setForwardedNewCandidateId] = useState<string | null>(null);
+  const [forwardedNewName, setForwardedNewName] = useState("");
+
+  const [eventModalId, setEventModalId] = useState<string | null>(null);
+  const [eventModalMode, setEventModalMode] = useState<"view" | "edit">("view");
+  const [eventEditCandidateId, setEventEditCandidateId] = useState("");
+  const [eventEditType, setEventEditType] = useState<EventType>("CHIAMARE");
+  const [eventEditCustom, setEventEditCustom] = useState("");
+  const [eventEditDate, setEventEditDate] = useState(localDateKey());
+  const [eventEditTime, setEventEditTime] = useState("");
+  const [eventEditNotes, setEventEditNotes] = useState("");
+  const [calendarContactPreviewId, setCalendarContactPreviewId] = useState<string | null>(null);
 
   const [mapMode, setMapMode] = useState<"italy" | "region" | "macroarea">("italy");
   const [mapRegion, setMapRegion] = useState<string>("Umbria");
@@ -612,6 +686,7 @@ export default function Recruiting() {
       macroResult,
       macroRegionsResult,
       activeAgentsResult,
+      statusesResult,
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
@@ -638,6 +713,11 @@ export default function Recruiting() {
         .from("recruiting_active_agents")
         .select("id,first_name,last_name,phone,zone,region,latitude,longitude")
         .order("last_name", { ascending: true }),
+      active.client
+        .from("recruiting_statuses")
+        .select("code,label,color_key,sort_order")
+        .order("sort_order", { ascending: true })
+        .order("label", { ascending: true }),
     ]);
 
     for (const result of [
@@ -647,6 +727,7 @@ export default function Recruiting() {
       macroResult,
       macroRegionsResult,
       activeAgentsResult,
+      statusesResult,
     ]) {
       if (result.error) throw result.error;
     }
@@ -656,6 +737,14 @@ export default function Recruiting() {
     setNotes((notesResult.data || []).map(noteFromRow));
     setEvents((eventsResult.data || []).map(eventFromRow));
     setActiveAgents((activeAgentsResult.data || []).map(activeAgentFromRow));
+    setStatusRows(
+      (statusesResult.data || []).map((row: any) => ({
+        code: String(row.code || ""),
+        label: String(row.label || ""),
+        colorKey: String(row.color_key || "slate"),
+        sortOrder: Number(row.sort_order || 100),
+      }))
+    );
 
     const regionMap = new Map<string, string[]>();
     (macroRegionsResult.data || []).forEach((row: any) => {
@@ -707,7 +796,8 @@ export default function Recruiting() {
     setEditRegion(selectedCandidate.region);
     setEditSectorEnergy(selectedCandidate.sectorEnergy);
     setEditSectorOther(selectedCandidate.sectorOther);
-    setEditCompanyName(selectedCandidate.companyName);
+    setEditCompanyChoice(selectedCandidate.companyName || "");
+    setEditCompanyName("");
     setEditPhone(selectedCandidate.phone);
     setEditEmail(selectedCandidate.email);
   }, [selectedCandidateId, selectedCandidate?.fullName]);
@@ -769,6 +859,83 @@ export default function Recruiting() {
     [candidates]
   );
 
+  const alphabeticalCandidates = useMemo(
+    () =>
+      [...candidates].sort((a, b) =>
+        a.fullName.localeCompare(b.fullName, "it")
+      ),
+    [candidates]
+  );
+
+  const statusDefinitions = useMemo(() => {
+    const overrides = new Map(
+      statusRows.map((row) => [row.code, row])
+    );
+
+    const defaults = CANDIDATE_STATUS_OPTIONS.map(
+      ([code, definition], index) => {
+        const override = overrides.get(code);
+        const colorKey =
+          override?.colorKey ||
+          DEFAULT_STATUS_COLOR_KEY[code] ||
+          "slate";
+        const palette = statusPaletteByKey(colorKey);
+
+        return {
+          code,
+          label: override?.label || definition.label,
+          colorKey,
+          sortOrder: override?.sortOrder ?? index,
+          background: palette.background,
+          color: palette.color,
+          border: palette.border,
+        };
+      }
+    );
+
+    const defaultCodes = new Set(defaults.map((item) => item.code));
+    const custom = statusRows
+      .filter((row) => !defaultCodes.has(row.code))
+      .map((row) => {
+        const palette = statusPaletteByKey(row.colorKey);
+        return {
+          code: row.code,
+          label: row.label,
+          colorKey: row.colorKey,
+          sortOrder: row.sortOrder,
+          background: palette.background,
+          color: palette.color,
+          border: palette.border,
+        };
+      });
+
+    return [...defaults, ...custom].sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.label.localeCompare(b.label, "it");
+    });
+  }, [statusRows]);
+
+  const statusDefinitionMap = useMemo(
+    () => new Map(statusDefinitions.map((item) => [item.code, item])),
+    [statusDefinitions]
+  );
+
+  const getStatusDefinition = (code: string) => {
+    const existing = statusDefinitionMap.get(code);
+    if (existing) return existing;
+
+    const palette = statusPaletteByKey("slate");
+    return {
+      code,
+      label: code || "STATO",
+      colorKey: "slate",
+      sortOrder: 9999,
+      background: palette.background,
+      color: palette.color,
+      border: palette.border,
+    };
+  };
+
   const calledByMeCandidateIds = useMemo(
     () =>
       new Set(
@@ -797,6 +964,8 @@ export default function Recruiting() {
     const nameNeedle = normalizeFilterValue(nameFilter);
     const zoneNeedle = normalizeFilterValue(zoneFilter);
     const sectorOtherNeedle = normalizeFilterValue(sectorOtherFilter);
+    const companyNeedle = normalizeFilterValue(companyFilter);
+    const forwardedNeedle = normalizeFilterValue(forwardedToFilter);
 
     return candidates.filter((candidate) => {
       if (
@@ -824,7 +993,27 @@ export default function Recruiting() {
         return false;
       }
 
+      if (
+        sectorFilter === "SI" &&
+        companyNeedle &&
+        normalizeFilterValue(candidate.companyName) !== companyNeedle
+      ) {
+        return false;
+      }
+
       if (statusFilter && candidate.status !== statusFilter) return false;
+
+      if (
+        statusFilter === "INOLTRATO_A" &&
+        forwardedNeedle &&
+        normalizeFilterValue(candidate.forwardedTo) !== forwardedNeedle
+      ) {
+        return false;
+      }
+
+      const calledByMe = calledByMeCandidateIds.has(candidate.id);
+      if (calledByMeFilter === "SI" && !calledByMe) return false;
+      if (calledByMeFilter === "NO" && calledByMe) return false;
 
       return true;
     }).sort((a, b) => {
@@ -860,7 +1049,11 @@ export default function Recruiting() {
     zoneFilter,
     sectorFilter,
     sectorOtherFilter,
+    companyFilter,
     statusFilter,
+    forwardedToFilter,
+    calledByMeFilter,
+    calledByMeCandidateIds,
   ]);
 
   const selectedNotes = useMemo(
@@ -887,6 +1080,66 @@ export default function Recruiting() {
         ),
     [events, selectedCandidateId]
   );
+
+  const saveStatusDefinition = async (
+    code: string,
+    label: string,
+    colorKey: string,
+    sortOrder: number
+  ) => {
+    if (!ctx) return;
+
+    const { error } = await ctx.client
+      .from("recruiting_statuses")
+      .upsert(
+        {
+          owner_key: ctx.ownerKey,
+          code,
+          label,
+          color_key: colorKey,
+          sort_order: sortOrder,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "owner_key,code" }
+      );
+
+    if (error) {
+      setMessage("Errore nel salvataggio dello stato: " + error.message);
+      return;
+    }
+
+    await loadAll(ctx);
+  };
+
+  const addCustomStatus = async () => {
+    if (!ctx) return;
+
+    const label = newStatusLabel.trim().toLocaleUpperCase("it");
+    if (!label) {
+      setMessage("Scrivi il nome del nuovo stato.");
+      return;
+    }
+
+    let code = normalizeStatusCode(label);
+    const existingCodes = new Set(statusDefinitions.map((item) => item.code));
+    if (existingCodes.has(code)) {
+      code = `${code}_${Date.now().toString().slice(-5)}`;
+    }
+
+    const nextSort =
+      Math.max(100, ...statusDefinitions.map((item) => item.sortOrder)) + 10;
+
+    await saveStatusDefinition(
+      code,
+      label,
+      newStatusColorKey,
+      nextSort
+    );
+
+    setNewStatusLabel("");
+    setNewStatusColorKey("slate");
+    setMessage("Nuovo stato aggiunto.");
+  };
 
   const updateCandidateStatus = async (
     candidate: Candidate,
@@ -965,6 +1218,23 @@ export default function Recruiting() {
     }
   };
 
+  const beginNewForwardedRecipient = (candidateId: string) => {
+    setForwardedNewCandidateId(candidateId);
+    setForwardedNewName("");
+  };
+
+  const saveNewForwardedRecipient = async (candidate: Candidate) => {
+    const value = forwardedNewName.trim();
+    if (!value) {
+      setMessage("Scrivi il nome a cui hai inoltrato il contatto.");
+      return;
+    }
+
+    await updateCandidateForwardedTo(candidate, value);
+    setForwardedNewCandidateId(null);
+    setForwardedNewName("");
+  };
+
   const autofillEditGeography = async (zoneValue: string) => {
     const zone = zoneValue.trim();
     if (!zone) {
@@ -999,6 +1269,17 @@ export default function Recruiting() {
       ? newSectorOther.trim()
       : newSectorChoice.trim();
 
+    const resolvedNewCompany = newSectorEnergy
+      ? newCompanyChoice === "__NEW__" || !existingCompanies.length
+        ? newCompanyName.trim()
+        : newCompanyChoice.trim()
+      : "";
+
+    if (newSectorEnergy && !resolvedNewCompany) {
+      setMessage("Seleziona un'azienda oppure aggiungine una nuova.");
+      return;
+    }
+
     if (!newSectorEnergy && !resolvedNewSector) {
       setMessage("Seleziona un settore oppure aggiungine uno nuovo.");
       return;
@@ -1031,7 +1312,7 @@ export default function Recruiting() {
           operational_zone: newZone.trim(),
           sector_energy: newSectorEnergy,
           sector_other: resolvedNewSector,
-          company_name: newSectorEnergy ? newCompanyName.trim() : "",
+          company_name: resolvedNewCompany,
           phone: newPhone.trim(),
           email: newEmail.trim(),
           contact_status: "DA_CHIAMARE",
@@ -1049,6 +1330,7 @@ export default function Recruiting() {
       setNewSectorEnergy(true);
       setNewSectorChoice("");
       setNewSectorOther("");
+      setNewCompanyChoice("");
       setNewCompanyName("");
       setNewPhone("");
       setNewEmail("");
@@ -1070,6 +1352,17 @@ export default function Recruiting() {
       return;
     }
 
+    const resolvedEditCompany = editSectorEnergy
+      ? editCompanyChoice === "__NEW__" || !existingCompanies.length
+        ? editCompanyName.trim()
+        : editCompanyChoice.trim()
+      : "";
+
+    if (editSectorEnergy && !resolvedEditCompany) {
+      setMessage("Seleziona un'azienda oppure aggiungine una nuova.");
+      return;
+    }
+
     setBusy(true);
     try {
       const { error } = await ctx.client
@@ -1083,7 +1376,7 @@ export default function Recruiting() {
             regionFromProvinceCode(editProvinceCode),
           sector_energy: editSectorEnergy,
           sector_other: editSectorEnergy ? "" : editSectorOther.trim(),
-          company_name: editSectorEnergy ? editCompanyName.trim() : "",
+          company_name: resolvedEditCompany,
           phone: editPhone.trim(),
           email: editEmail.trim(),
           updated_at: new Date().toISOString(),
@@ -1279,8 +1572,113 @@ export default function Recruiting() {
     await loadAll(ctx);
   };
 
+  const openEventModal = (
+    event: RecruitingEvent,
+    mode: "view" | "edit" = "view"
+  ) => {
+    setEventModalId(event.id);
+    setEventModalMode(mode);
+    setEventEditCandidateId(event.candidateId || "");
+    setEventEditType(event.eventType);
+    setEventEditCustom(event.customType);
+    setEventEditDate(event.eventDate);
+    setEventEditTime(formatTime(event.eventTime));
+    setEventEditNotes(event.notes);
+  };
+
+  const saveEventChanges = async () => {
+    if (!ctx || !eventModalId) return;
+
+    if (!eventEditDate) {
+      setMessage("Seleziona la data dell'attività.");
+      return;
+    }
+
+    if (eventEditType === "ALTRO" && !eventEditCustom.trim()) {
+      setMessage("Scrivi il tipo di attività.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_events")
+        .update({
+          candidate_id: eventEditCandidateId || null,
+          event_date: eventEditDate,
+          event_time: eventEditTime || null,
+          event_type: eventEditType,
+          custom_type:
+            eventEditType === "ALTRO" ? eventEditCustom.trim() : "",
+          notes: eventEditNotes.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", eventModalId);
+
+      if (error) throw error;
+
+      await loadAll(ctx);
+      setEventModalMode("view");
+      setMessage("Attività aggiornata.");
+    } catch (error: any) {
+      setMessage(
+        "Errore nella modifica dell'attività: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openReadOnlyContact = (candidateId: string | null) => {
+    if (!candidateId) {
+      setMessage("Questa attività non è collegata a un nominativo.");
+      return;
+    }
+
+    setCalendarContactPreviewId(candidateId);
+  };
+
+  const openContactForEditing = (candidateId: string) => {
+    setCalendarContactPreviewId(null);
+    setEventModalId(null);
+    setSelectedCandidateId(candidateId);
+    setSection("contacts");
+
+    window.setTimeout(() => {
+      document
+        .getElementById(`recruiting-candidate-${candidateId}`)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+    }, 100);
+  };
+
   const candidateName = (candidateId: string | null) =>
     candidates.find((candidate) => candidate.id === candidateId)?.fullName || "Senza contatto";
+
+  const eventModalEvent =
+    events.find((event) => event.id === eventModalId) || null;
+
+  const calendarContactPreview =
+    candidates.find(
+      (candidate) => candidate.id === calendarContactPreviewId
+    ) || null;
+
+  const calendarContactPreviewNotes = useMemo(
+    () =>
+      notes
+        .filter(
+          (note) => note.candidateId === calendarContactPreviewId
+        )
+        .sort((a, b) =>
+          `${b.noteDate}|${b.createdAt}`.localeCompare(
+            `${a.noteDate}|${a.createdAt}`
+          )
+        ),
+    [notes, calendarContactPreviewId]
+  );
 
   const calendarCells = useMemo(() => getMonthCells(calendarMonth), [calendarMonth]);
 
@@ -1737,6 +2135,28 @@ export default function Recruiting() {
             min-height: 42px;
           }
         }
+
+        .recruiting-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 5000;
+          background: rgba(15, 23, 42, .55);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+        }
+
+        .recruiting-modal {
+          width: min(760px, 100%);
+          max-height: 88vh;
+          overflow: auto;
+          background: white;
+          border-radius: 16px;
+          border: 1px solid #cbd5e1;
+          box-shadow: 0 20px 70px rgba(15, 23, 42, .35);
+          padding: 18px;
+        }
       `}</style>
       <div style={cardStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -1811,11 +2231,6 @@ export default function Recruiting() {
 
       {section === "contacts" && (
         <>
-          <datalist id="recruiting-company-options">
-            {existingCompanies.map((company) => (
-              <option key={company} value={company} />
-            ))}
-          </datalist>
           <div style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <div>
@@ -1872,6 +2287,7 @@ export default function Recruiting() {
                           setNewSectorChoice("");
                           setNewSectorOther("");
                         } else {
+                          setNewCompanyChoice("");
                           setNewCompanyName("");
                           if (!existingOtherSectors.length) {
                             setNewSectorChoice("__NEW__");
@@ -1886,16 +2302,48 @@ export default function Recruiting() {
                   </div>
 
                   {newSectorEnergy ? (
-                    <div>
-                      <label style={labelStyle}>Azienda</label>
-                      <input
-                        list="recruiting-company-options"
-                        value={newCompanyName}
-                        onChange={(e) => setNewCompanyName(e.target.value)}
-                        placeholder="Scrivi o scegli azienda..."
-                        style={inputStyle}
-                      />
-                    </div>
+                    <>
+                      {existingCompanies.length > 0 && (
+                        <div>
+                          <label style={labelStyle}>Azienda</label>
+                          <select
+                            value={newCompanyChoice}
+                            onChange={(e) => {
+                              setNewCompanyChoice(e.target.value);
+                              if (e.target.value !== "__NEW__") {
+                                setNewCompanyName("");
+                              }
+                            }}
+                            style={inputStyle}
+                          >
+                            <option value="">Seleziona azienda...</option>
+                            {existingCompanies.map((company) => (
+                              <option key={company} value={company}>
+                                {company}
+                              </option>
+                            ))}
+                            <option value="__NEW__">
+                              + Aggiungi nuova azienda
+                            </option>
+                          </select>
+                        </div>
+                      )}
+
+                      {(newCompanyChoice === "__NEW__" ||
+                        !existingCompanies.length) && (
+                        <div>
+                          <label style={labelStyle}>Nuova azienda</label>
+                          <input
+                            value={newCompanyName}
+                            onChange={(e) =>
+                              setNewCompanyName(e.target.value)
+                            }
+                            placeholder="Scrivi il nome azienda"
+                            style={inputStyle}
+                          />
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <>
                       {existingOtherSectors.length > 0 && (
@@ -2006,6 +2454,7 @@ export default function Recruiting() {
                     const value = e.target.value as "" | "SI" | "NO";
                     setSectorFilter(value);
                     if (value !== "NO") setSectorOtherFilter("");
+                    if (value !== "SI") setCompanyFilter("");
                   }}
                   style={inputStyle}
                 >
@@ -2034,19 +2483,46 @@ export default function Recruiting() {
               )}
 
               <div>
-                <label style={labelStyle}>Stato</label>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <label style={{ ...labelStyle, marginBottom: 5 }}>Stato</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStatusManager((value) => !value)}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: "#2563eb",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    MODIFICA
+                  </button>
+                </div>
                 <select
                   value={statusFilter}
-                  onChange={(e) =>
-                    setStatusFilter(e.target.value as "" | CandidateStatus)
-                  }
+                  onChange={(e) => {
+                    const value = e.target.value as "" | CandidateStatus;
+                    setStatusFilter(value);
+                    if (value !== "INOLTRATO_A") {
+                      setForwardedToFilter("");
+                    }
+                  }}
                   style={inputStyle}
                 >
                   <option value="">Tutti gli stati</option>
-                  {CANDIDATE_STATUS_OPTIONS.map(([value, option]) => (
+                  {statusDefinitions.map((option) => (
                     <option
-                      key={value}
-                      value={value}
+                      key={option.code}
+                      value={option.code}
                       style={{
                         background: option.background,
                         color: option.color,
@@ -2058,23 +2534,211 @@ export default function Recruiting() {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label style={labelStyle}>Chiamato da me</label>
+                <select
+                  value={calledByMeFilter}
+                  onChange={(e) =>
+                    setCalledByMeFilter(
+                      e.target.value as "" | "SI" | "NO"
+                    )
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Tutti</option>
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </div>
+
+              {sectorFilter === "SI" && (
+                <div>
+                  <label style={labelStyle}>Azienda</label>
+                  <select
+                    value={companyFilter}
+                    onChange={(e) => setCompanyFilter(e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">Tutte le aziende</option>
+                    {existingCompanies.map((company) => (
+                      <option key={company} value={company}>
+                        {company}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {statusFilter === "INOLTRATO_A" && (
+                <div>
+                  <label style={labelStyle}>Inoltrato a</label>
+                  <select
+                    value={forwardedToFilter}
+                    onChange={(e) => setForwardedToFilter(e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">Tutti</option>
+                    {existingForwardedRecipients.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
+
+          {showStatusManager && (
+            <div
+              style={{
+                ...cardStyle,
+                borderColor: "#c7d2fe",
+                background: "#f8faff",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0 }}>Gestione stati</h3>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      color: "#64748b",
+                      fontSize: 12,
+                    }}
+                  >
+                    Puoi scegliere uno dei 20 colori disponibili o aggiungere
+                    un nuovo stato.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStatusManager(false)}
+                  style={{ ...buttonStyle, background: "#e2e8f0" }}
+                >
+                  Chiudi
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 9, marginTop: 14 }}>
+                {statusDefinitions.map((status) => (
+                  <div
+                    key={status.code}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "minmax(160px,1fr) minmax(180px,240px)",
+                      gap: 10,
+                      alignItems: "center",
+                      padding: 10,
+                      borderRadius: 10,
+                      border: `2px solid ${status.border}`,
+                      background: status.background,
+                    }}
+                  >
+                    <strong style={{ color: status.color }}>
+                      {status.label}
+                    </strong>
+
+                    <select
+                      value={status.colorKey}
+                      onChange={(e) =>
+                        void saveStatusDefinition(
+                          status.code,
+                          status.label,
+                          e.target.value,
+                          status.sortOrder
+                        )
+                      }
+                      style={{
+                        ...inputStyle,
+                        background: "white",
+                        color: "#0f172a",
+                      }}
+                    >
+                      {STATUS_COLOR_PALETTE.map((color) => (
+                        <option key={color.key} value={color.key}>
+                          {color.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "minmax(180px,1fr) minmax(170px,220px) auto",
+                  gap: 9,
+                  alignItems: "end",
+                  marginTop: 14,
+                }}
+              >
+                <div>
+                  <label style={labelStyle}>Nuovo stato</label>
+                  <input
+                    value={newStatusLabel}
+                    onChange={(e) =>
+                      setNewStatusLabel(
+                        e.target.value.toLocaleUpperCase("it")
+                      )
+                    }
+                    placeholder="Es. DA RICHIAMARE"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Colore</label>
+                  <select
+                    value={newStatusColorKey}
+                    onChange={(e) =>
+                      setNewStatusColorKey(e.target.value)
+                    }
+                    style={inputStyle}
+                  >
+                    {STATUS_COLOR_PALETTE.map((color) => (
+                      <option key={color.key} value={color.key}>
+                        {color.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void addCustomStatus()}
+                  style={{
+                    ...buttonStyle,
+                    background: "#2563eb",
+                    color: "white",
+                  }}
+                >
+                  + AGGIUNGI
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="recruiting-contact-layout">
             <div style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>Lista nominativi</h3>
-              <datalist id="recruiting-forwarded-to-options">
-                {existingForwardedRecipients.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
               <div style={{ maxHeight: 720, overflow: "auto", display: "grid", gap: 7 }}>
                 {filteredCandidates.map((candidate) => {
                   const active = candidate.id === selectedCandidateId;
                   const statusStyle =
-                    CANDIDATE_STATUS[candidate.status] ||
-                    CANDIDATE_STATUS.DA_CHIAMARE;
+                    getStatusDefinition(candidate.status);
                   const href = phoneHref(candidate.phone);
 
                   return (
@@ -2092,10 +2756,11 @@ export default function Recruiting() {
                       className="recruiting-candidate-card"
                       style={{
                         textAlign: "left",
-                        border: active
-                          ? "2px solid #2563eb"
-                          : "1px solid #e2e8f0",
-                        background: active ? "#eff6ff" : "white",
+                        border: `4px solid ${statusStyle.border}`,
+                        background: statusStyle.background,
+                        boxShadow: active
+                          ? "0 0 0 3px rgba(37,99,235,.28)"
+                          : "none",
                         borderRadius: 10,
                         padding: 11,
                         cursor: "pointer",
@@ -2250,14 +2915,17 @@ export default function Recruiting() {
                           </summary>
 
                           <div className="recruiting-status-options">
-                            {CANDIDATE_STATUS_OPTIONS.map(([value, option]) => (
+                            {statusDefinitions.map((option) => (
                               <button
-                                key={value}
+                                key={option.code}
                                 type="button"
                                 className="recruiting-status-option"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  void updateCandidateStatus(candidate, value);
+                                  void updateCandidateStatus(
+                                    candidate,
+                                    option.code
+                                  );
                                   event.currentTarget
                                     .closest("details")
                                     ?.removeAttribute("open");
@@ -2297,30 +2965,86 @@ export default function Recruiting() {
                             >
                               INOLTRATO A
                             </label>
-                            <input
-                              key={`${candidate.id}-${candidate.forwardedTo}`}
-                              list="recruiting-forwarded-to-options"
-                              defaultValue={candidate.forwardedTo}
-                              placeholder="Nome..."
-                              onClick={(event) => event.stopPropagation()}
-                              onKeyDown={(event) => {
+                            <select
+                              value={
+                                forwardedNewCandidateId === candidate.id
+                                  ? "__NEW__"
+                                  : candidate.forwardedTo
+                              }
+                              onChange={(event) => {
                                 event.stopPropagation();
-                                if (event.key === "Enter") {
-                                  (event.currentTarget as HTMLInputElement).blur();
+                                const value = event.target.value;
+
+                                if (value === "__NEW__") {
+                                  beginNewForwardedRecipient(candidate.id);
+                                  return;
                                 }
-                              }}
-                              onBlur={(event) =>
+
+                                setForwardedNewCandidateId(null);
+                                setForwardedNewName("");
                                 void updateCandidateForwardedTo(
                                   candidate,
-                                  event.currentTarget.value
-                                )
-                              }
+                                  value
+                                );
+                              }}
                               style={{
                                 ...inputStyle,
                                 padding: "7px 8px",
                                 fontSize: 12,
                               }}
-                            />
+                            >
+                              <option value="">Seleziona...</option>
+                              {existingForwardedRecipients.map((name) => (
+                                <option key={name} value={name}>
+                                  {name}
+                                </option>
+                              ))}
+                              <option value="__NEW__">
+                                + Aggiungi nuovo nome
+                              </option>
+                            </select>
+
+                            {forwardedNewCandidateId === candidate.id && (
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gap: 6,
+                                  marginTop: 7,
+                                }}
+                              >
+                                <input
+                                  value={forwardedNewName}
+                                  onChange={(event) =>
+                                    setForwardedNewName(
+                                      event.target.value
+                                    )
+                                  }
+                                  placeholder="Scrivi il nuovo nome"
+                                  style={{
+                                    ...inputStyle,
+                                    padding: "7px 8px",
+                                    fontSize: 12,
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void saveNewForwardedRecipient(
+                                      candidate
+                                    )
+                                  }
+                                  style={{
+                                    ...buttonStyle,
+                                    padding: "7px 9px",
+                                    background: "#4f46e5",
+                                    color: "white",
+                                    fontSize: 11,
+                                  }}
+                                >
+                                  Salva nome
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2446,7 +3170,12 @@ export default function Recruiting() {
                             const isEnergy = e.target.value === "SI";
                             setEditSectorEnergy(isEnergy);
                             if (!isEnergy) {
+                              setEditCompanyChoice("");
                               setEditCompanyName("");
+                            } else if (selectedCandidate?.companyName) {
+                              setEditCompanyChoice(
+                                selectedCandidate.companyName
+                              );
                             }
                           }}
                           style={inputStyle}
@@ -2456,16 +3185,48 @@ export default function Recruiting() {
                         </select>
                       </div>
                       {editSectorEnergy ? (
-                        <div>
-                          <label style={labelStyle}>Azienda</label>
-                          <input
-                            list="recruiting-company-options"
-                            value={editCompanyName}
-                            onChange={(e) => setEditCompanyName(e.target.value)}
-                            placeholder="Scrivi o scegli azienda..."
-                            style={inputStyle}
-                          />
-                        </div>
+                        <>
+                          {existingCompanies.length > 0 && (
+                            <div>
+                              <label style={labelStyle}>Azienda</label>
+                              <select
+                                value={editCompanyChoice}
+                                onChange={(e) => {
+                                  setEditCompanyChoice(e.target.value);
+                                  if (e.target.value !== "__NEW__") {
+                                    setEditCompanyName("");
+                                  }
+                                }}
+                                style={inputStyle}
+                              >
+                                <option value="">Seleziona azienda...</option>
+                                {existingCompanies.map((company) => (
+                                  <option key={company} value={company}>
+                                    {company}
+                                  </option>
+                                ))}
+                                <option value="__NEW__">
+                                  + Aggiungi nuova azienda
+                                </option>
+                              </select>
+                            </div>
+                          )}
+
+                          {(editCompanyChoice === "__NEW__" ||
+                            !existingCompanies.length) && (
+                            <div>
+                              <label style={labelStyle}>Nuova azienda</label>
+                              <input
+                                value={editCompanyName}
+                                onChange={(e) =>
+                                  setEditCompanyName(e.target.value)
+                                }
+                                placeholder="Scrivi il nome azienda"
+                                style={inputStyle}
+                              />
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div>
                           <label style={labelStyle}>Settore attuale</label>
@@ -2643,6 +3404,23 @@ export default function Recruiting() {
                               <strong>{formatDate(event.eventDate)}</strong>
                               {event.eventTime && <> · {formatTime(event.eventTime)}</>}
                               <div>{eventDisplayLabel(event)}</div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openEventModal(event, "edit")
+                                }
+                                style={{
+                                  ...buttonStyle,
+                                  marginTop: 6,
+                                  padding: "5px 8px",
+                                  background: "#fff",
+                                  color: "#c2410c",
+                                  border: "1px solid #fdba74",
+                                  fontSize: 10,
+                                }}
+                              >
+                                MODIFICA
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -2665,8 +3443,10 @@ export default function Recruiting() {
                 <label style={labelStyle}>Contatto</label>
                 <select value={calendarCandidateId} onChange={(e) => setCalendarCandidateId(e.target.value)} style={inputStyle}>
                   <option value="">Senza contatto</option>
-                  {candidates.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>{candidate.fullName}</option>
+                  {alphabeticalCandidates.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.fullName}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -2745,6 +3525,17 @@ export default function Recruiting() {
                       {dayEvents.map((event) => (
                         <div
                           key={event.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => openEventModal(event, "view")}
+                          onKeyDown={(keyEvent) => {
+                            if (
+                              keyEvent.key === "Enter" ||
+                              keyEvent.key === " "
+                            ) {
+                              openEventModal(event, "view");
+                            }
+                          }}
                           style={{
                             borderRadius: 7,
                             padding: 6,
@@ -2763,14 +3554,20 @@ export default function Recruiting() {
                           <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
                             <button
                               type="button"
-                              onClick={() => void toggleEventCompleted(event)}
+                              onClick={(clickEvent) => {
+                                clickEvent.stopPropagation();
+                                void toggleEventCompleted(event);
+                              }}
                               style={{ border: 0, borderRadius: 5, padding: "3px 5px", fontSize: 10, fontWeight: 800, cursor: "pointer" }}
                             >
                               {event.completed ? "Riapri" : "Fatto"}
                             </button>
                             <button
                               type="button"
-                              onClick={() => void deleteEvent(event)}
+                              onClick={(clickEvent) => {
+                                clickEvent.stopPropagation();
+                                void deleteEvent(event);
+                              }}
                               style={{ border: 0, background: "#fee2e2", color: "#991b1b", borderRadius: 5, padding: "3px 5px", fontSize: 10, fontWeight: 800, cursor: "pointer" }}
                             >
                               Elimina
@@ -2977,6 +3774,365 @@ export default function Recruiting() {
             </div>
           </div>
         </>
+      )}
+
+      {eventModalId && eventModalEvent && (
+        <div
+          className="recruiting-modal-backdrop"
+          onClick={() => setEventModalId(null)}
+        >
+          <div
+            className="recruiting-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 10,
+                alignItems: "center",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>
+                {eventModalMode === "edit"
+                  ? "Modifica attività"
+                  : "Dettaglio attività"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEventModalId(null)}
+                style={{ ...buttonStyle, background: "#e2e8f0" }}
+              >
+                Chiudi
+              </button>
+            </div>
+
+            {eventModalMode === "view" ? (
+              <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
+                <div>
+                  <strong>{eventDisplayLabel(eventModalEvent)}</strong>
+                </div>
+                <div>
+                  Data: <strong>{formatDate(eventModalEvent.eventDate)}</strong>
+                  {eventModalEvent.eventTime && (
+                    <> · {formatTime(eventModalEvent.eventTime)}</>
+                  )}
+                </div>
+                <div>
+                  Contatto:{" "}
+                  <strong>
+                    {candidateName(eventModalEvent.candidateId)}
+                  </strong>
+                </div>
+                {eventModalEvent.notes && (
+                  <div
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      padding: 10,
+                      borderRadius: 9,
+                      background: "#f8fafc",
+                    }}
+                  >
+                    {eventModalEvent.notes}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    marginTop: 6,
+                  }}
+                >
+                  {eventModalEvent.candidateId && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openReadOnlyContact(
+                          eventModalEvent.candidateId
+                        )
+                      }
+                      style={{
+                        ...buttonStyle,
+                        background: "#dbeafe",
+                        color: "#1d4ed8",
+                      }}
+                    >
+                      SCHEDA
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEventModal(eventModalEvent, "edit")
+                    }
+                    style={{
+                      ...buttonStyle,
+                      background: "#ffedd5",
+                      color: "#c2410c",
+                    }}
+                  >
+                    MODIFICA ATTIVITÀ
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit,minmax(180px,1fr))",
+                  gap: 10,
+                  marginTop: 14,
+                }}
+              >
+                <div>
+                  <label style={labelStyle}>Contatto</label>
+                  <select
+                    value={eventEditCandidateId}
+                    onChange={(e) =>
+                      setEventEditCandidateId(e.target.value)
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="">Senza contatto</option>
+                    {alphabeticalCandidates.map((candidate) => (
+                      <option
+                        key={candidate.id}
+                        value={candidate.id}
+                      >
+                        {candidate.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Tipo</label>
+                  <select
+                    value={eventEditType}
+                    onChange={(e) =>
+                      setEventEditType(
+                        e.target.value as EventType
+                      )
+                    }
+                    style={inputStyle}
+                  >
+                    {Object.entries(EVENT_LABELS).map(
+                      ([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+
+                {eventEditType === "ALTRO" && (
+                  <div>
+                    <label style={labelStyle}>Specifica</label>
+                    <input
+                      value={eventEditCustom}
+                      onChange={(e) =>
+                        setEventEditCustom(e.target.value)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label style={labelStyle}>Data</label>
+                  <input
+                    type="date"
+                    value={eventEditDate}
+                    onChange={(e) =>
+                      setEventEditDate(e.target.value)
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Ora</label>
+                  <input
+                    type="time"
+                    value={eventEditTime}
+                    onChange={(e) =>
+                      setEventEditTime(e.target.value)
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Note</label>
+                  <textarea
+                    value={eventEditNotes}
+                    onChange={(e) =>
+                      setEventEditNotes(e.target.value)
+                    }
+                    rows={4}
+                    style={{ ...inputStyle, resize: "vertical" }}
+                  />
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void saveEventChanges()}
+                    style={{
+                      ...buttonStyle,
+                      background: "#f97316",
+                      color: "white",
+                    }}
+                  >
+                    SALVA MODIFICHE
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {calendarContactPreviewId && calendarContactPreview && (
+        <div
+          className="recruiting-modal-backdrop"
+          onClick={() => setCalendarContactPreviewId(null)}
+        >
+          <div
+            className="recruiting-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 10,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0 }}>
+                  {calendarContactPreview.fullName}
+                </h3>
+                <div style={{ color: "#64748b", marginTop: 4 }}>
+                  Scheda in sola lettura
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    openContactForEditing(
+                      calendarContactPreview.id
+                    )
+                  }
+                  style={{
+                    ...buttonStyle,
+                    background: "#2563eb",
+                    color: "white",
+                  }}
+                >
+                  MODIFICA
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCalendarContactPreviewId(null)
+                  }
+                  style={{ ...buttonStyle, background: "#e2e8f0" }}
+                >
+                  Chiudi
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(180px,1fr))",
+                gap: 10,
+                marginTop: 16,
+              }}
+            >
+              <div><strong>Città:</strong> {calendarContactPreview.operationalZone || "—"}</div>
+              <div><strong>Provincia:</strong> {calendarContactPreview.provinceCode || "—"}</div>
+              <div><strong>Regione:</strong> {calendarContactPreview.region || "—"}</div>
+              <div><strong>Telefono:</strong> {calendarContactPreview.phone || "—"}</div>
+              <div><strong>Email:</strong> {calendarContactPreview.email || "—"}</div>
+              <div>
+                <strong>Settore energia:</strong>{" "}
+                {calendarContactPreview.sectorEnergy
+                  ? `SI${calendarContactPreview.companyName ? ` · ${calendarContactPreview.companyName}` : ""}`
+                  : `NO${calendarContactPreview.sectorOther ? ` · ${calendarContactPreview.sectorOther}` : ""}`}
+              </div>
+              <div>
+                <strong>Stato:</strong>{" "}
+                {getStatusDefinition(calendarContactPreview.status).label}
+              </div>
+              {calendarContactPreview.status === "INOLTRATO_A" && (
+                <div>
+                  <strong>Inoltrato a:</strong>{" "}
+                  {calendarContactPreview.forwardedTo || "—"}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: 18 }}>
+              <h4 style={{ marginBottom: 8 }}>Note</h4>
+              <div style={{ display: "grid", gap: 8 }}>
+                {calendarContactPreviewNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 9,
+                      padding: 10,
+                    }}
+                  >
+                    <strong>{formatDate(note.noteDate)}</strong>
+                    {note.calledByMe && (
+                      <span
+                        style={{
+                          marginLeft: 8,
+                          padding: "3px 6px",
+                          borderRadius: 999,
+                          background: "#ede9fe",
+                          color: "#6d28d9",
+                          fontSize: 10,
+                          fontWeight: 900,
+                        }}
+                      >
+                        CHIAMATO DA ME
+                      </span>
+                    )}
+                    <div
+                      style={{
+                        marginTop: 5,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {note.noteText}
+                    </div>
+                  </div>
+                ))}
+                {!calendarContactPreviewNotes.length && (
+                  <div style={{ color: "#64748b" }}>
+                    Nessuna nota inserita.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {section === "management" && <RecruitingManagement />}
