@@ -4,6 +4,7 @@ import html2canvas from "html2canvas";
 import { supabase } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
+import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
 import Recruiting from "./Recruiting";
 
 
@@ -61,6 +62,7 @@ type AdminProfile = {
   email?: string;
   username: string;
   password?: string;
+  token?: string;
   role?: string;
  };
 type PunPsvRow = {
@@ -3048,14 +3050,15 @@ function Listini({
       { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
     ];
 
-    const { error } = await supabase.from("app_settings").upsert(payload);
-    setSaving(false);
-
-    if (error) {
+    try {
+      await adminUpsertSettings(payload);
+    } catch (error) {
+      setSaving(false);
       console.error("SAVE LISTINI ERROR:", error);
       alert("Errore nel salvataggio dei listini");
       return;
     }
+    setSaving(false);
 
     setDispCpRows(cloneDispCpRows(draftDispCpRows));
     setEnergyOffers(cloneEnergyOffers(draftEnergyOffers));
@@ -3454,18 +3457,13 @@ function AgentsAdmin({
   const loadAdmins = async () => {
     if (adminProfile?.role !== "super_admin") return;
 
-    const { data, error } = await supabase
-      .from("admin_users")
-      .select("id, nome, username, role")
-      .order("nome", { ascending: true });
-
-    if (error) {
+    try {
+      const data = await adminListUsers();
+      setAdmins((data as AdminProfile[]) || []);
+    } catch (error) {
       console.error("LOAD ADMINS ERROR:", error);
       setAdmins([]);
-      return;
     }
-
-    setAdmins((data as AdminProfile[]) || []);
   };
 
   const loadAgents = async () => {
@@ -4094,20 +4092,14 @@ function LoginView({
       }
 
       if (mode === "admin") {
-        const { data, error } = await supabase
-          .from("admin_users")
-          .select("id, nome, username, password, role")
-          .ilike("username", user)
-          .eq("password", pass)
-          .maybeSingle();
+        const data = await adminLogin(user, pass);
 
-        if (error || !data) {
+        if (!data) {
           setErrorMsg("Credenziali admin non valide");
           setLoading(false);
           return;
         }
 
-        localStorage.setItem("admin_session", JSON.stringify(data));
         setSession(data);
         setAdminProfile(data);
         setAgentSession(null);
@@ -5045,20 +5037,15 @@ function AdminUsersManager({
 
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("admin_users")
-      .select("id, auth_id, nome, cognome, username, password, role")
-      .order("nome", { ascending: true });
-
-    if (error) {
+    try {
+      const data = await adminListUsers();
+      setAdmins(data || []);
+    } catch (error) {
       console.error("LOAD ADMINS ERROR:", error);
       setAdmins([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setAdmins(data || []);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -5076,19 +5063,15 @@ function AdminUsersManager({
       return;
     }
 
-    const { error } = await supabase.from("admin_users").insert([
-      {
-        auth_id: crypto.randomUUID(),
-        nome: newNome.trim().toUpperCase(),
-        cognome: newCognome.trim().toUpperCase(),
+    try {
+      await adminCreateUser({
+        nome: newNome.trim(),
+        cognome: newCognome.trim(),
         username: newUsername.trim(),
         password: newPassword.trim(),
-        role: "admin",
-      },
-    ]);
-
-    if (error) {
-      alert("Errore creazione admin: " + error.message);
+      });
+    } catch (error: any) {
+      alert("Errore creazione admin: " + (error?.message || error));
       return;
     }
 
@@ -5108,25 +5091,22 @@ function AdminUsersManager({
     if (
       !editAdminNome.trim() ||
       !editAdminCognome.trim() ||
-      !editAdminUsername.trim() ||
-      !editAdminPassword.trim()
+      !editAdminUsername.trim()
     ) {
-      alert("Inserisci nome, cognome, username e password");
+      alert("Inserisci nome, cognome e username");
       return;
     }
 
-    const { error } = await supabase
-      .from("admin_users")
-      .update({
-        nome: editAdminNome.trim().toUpperCase(),
-        cognome: editAdminCognome.trim().toUpperCase(),
+    try {
+      await adminUpdateUser({
+        id: Number(editingAdmin.id),
+        nome: editAdminNome.trim(),
+        cognome: editAdminCognome.trim(),
         username: editAdminUsername.trim(),
-        password: editAdminPassword.trim(),
-      })
-      .eq("id", editingAdmin.id);
-
-    if (error) {
-      alert("Errore modifica admin: " + error.message);
+        password: editAdminPassword.trim() || undefined,
+      });
+    } catch (error: any) {
+      alert("Errore modifica admin: " + (error?.message || error));
       return;
     }
 
@@ -5147,13 +5127,10 @@ function AdminUsersManager({
     const ok = window.confirm("Vuoi eliminare questo admin?");
     if (!ok) return;
 
-    const { error } = await supabase
-      .from("admin_users")
-      .delete()
-      .eq("id", adminId);
-
-    if (error) {
-      alert("Errore eliminazione admin: " + error.message);
+    try {
+      await adminDeleteUser(adminId);
+    } catch (error: any) {
+      alert("Errore eliminazione admin: " + (error?.message || error));
       return;
     }
 
@@ -5380,7 +5357,7 @@ function AdminUsersManager({
                             setEditAdminNome(a.nome || "");
                             setEditAdminCognome(a.cognome || "");
                             setEditAdminUsername(a.username || "");
-                            setEditAdminPassword(a.password || "");
+                            setEditAdminPassword("");
                           }}
                           style={{
                             padding: "8px 12px",
@@ -5499,8 +5476,11 @@ function AdminUsersManager({
                 Password
               </div>
               <input
+                type="password"
                 value={editAdminPassword}
                 onChange={(e) => setEditAdminPassword(e.target.value)}
+                placeholder="Lascia vuoto per mantenere la password attuale"
+                autoComplete="new-password"
                 style={{
                   width: "100%",
                   padding: 10,
@@ -5606,19 +5586,26 @@ export default function App() {
     return localStorage.getItem("app_tab") || "energia";
   });
   useEffect(() => {
-    const adminSaved = localStorage.getItem("admin_session");
-    const agentSaved = localStorage.getItem("agent_session");
-  
-    if (adminSaved) {
-      const admin = JSON.parse(adminSaved);
-      setAdminSession(admin);
-      setAdminProfile(admin);
-    }
-  
-    if (agentSaved) {
-      const agent = JSON.parse(agentSaved);
-      setAgentSession(agent);
-    }
+    void (async () => {
+      const admin = await ensureAdminSession();
+      if (admin) {
+        setAdminSession(admin);
+        setAdminProfile(admin);
+      } else {
+        setAdminSession(null);
+        setAdminProfile(null);
+      }
+
+      const agentSaved = localStorage.getItem("agent_session");
+      if (agentSaved) {
+        try {
+          const agent = JSON.parse(agentSaved);
+          setAgentSession(agent);
+        } catch {
+          localStorage.removeItem("agent_session");
+        }
+      }
+    })();
   }, []);
   
   const punPsvRef = useRef<HTMLDivElement>(null);
@@ -5939,20 +5926,6 @@ useEffect(() => {
 }, [tab, validMonthOptions[0]?.mese]);
 
 
-useEffect(() => {
-  const savedAdmin = localStorage.getItem("admin_session");
-
-  if (savedAdmin) {
-    try {
-      const parsed = JSON.parse(savedAdmin) as AdminProfile;
-      setAdminSession(parsed);
-      setAdminProfile(parsed);
-    } catch {
-      localStorage.removeItem("admin_session");
-    }
-  }
-}, []);
-
 const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
 const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
 const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
@@ -6160,14 +6133,16 @@ const saveSettings = async () => {
     
   ];
 
-  const { error } = await supabase.from("app_settings").upsert(payload);
-
-  setSavingSettings(false);
-
-  if (error) {
+  try {
+    await adminUpsertSettings(payload);
+  } catch (error) {
+    setSavingSettings(false);
+    console.error("SAVE PUN PSV ERROR:", error);
     alert("Errore nel salvataggio online");
     return;
   }
+
+  setSavingSettings(false);
 
   alert("Listini salvati online");
 };
@@ -6178,6 +6153,7 @@ const renderAdminContent = () => {
       <LoginView
         setSession={setAdminSession}
         setAdminProfile={setAdminProfile}
+        setAgentSession={setAgentSession}
       />
     );
   }
@@ -6251,7 +6227,7 @@ const renderAdminContent = () => {
 {(agentSession || adminSession) && (
   <button
     onClick={() => {
-      localStorage.removeItem("admin_session");
+      void adminLogout();
       localStorage.removeItem("agent_session");
 
       setAdminSession(null);

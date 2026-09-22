@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
+import { adminUpsertSettings } from "./adminSecurity";
 import Production from "./Production";
 import RecruitingManagement from "./RecruitingManagement";
 
@@ -1073,9 +1074,14 @@ export default function Archive() {
         duplicates += result.duplicates;
       }
 
-      const { error: clearError } = await supabase
-        .from("app_settings")
-        .upsert([{ key: LEGACY_KEY, value_json: { version: 1, files: [] } }]);
+      let clearError: any = null;
+      try {
+        await adminUpsertSettings([
+          { key: LEGACY_KEY, value_json: { version: 1, files: [] } },
+        ]);
+      } catch (error) {
+        clearError = error;
+      }
 
       if (!clearError) {
         await fetchDatabaseRows();
@@ -1327,11 +1333,7 @@ export default function Archive() {
   };
 
   const saveLegacyArchive = async (next: LegacyArchive) => {
-    const { error } = await supabase
-      .from("app_settings")
-      .upsert([{ key: LEGACY_KEY, value_json: next }]);
-
-    if (error) throw error;
+    await adminUpsertSettings([{ key: LEGACY_KEY, value_json: next }]);
 
     setLegacyArchive(next);
     setRows(next.files.flatMap((file) => file.rows as RecessoRow[]));
