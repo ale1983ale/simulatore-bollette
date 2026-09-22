@@ -943,7 +943,7 @@ export default function Archive() {
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
-  const [archiveSection, setArchiveSection] = useState<"recessi" | "produzione">("recessi");
+  const [archiveSection, setArchiveSection] = useState<"recessi" | "produzione" | "zone">("recessi");
 
   const [commodities, setCommodities] = useState<string[]>([]);
   const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
@@ -1641,7 +1641,9 @@ export default function Archive() {
             <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
               {archiveSection === "recessi"
                 ? "RECESSI · archivio cumulativo con eliminazione automatica dei duplicati."
-                : "PRODUZIONE · storico report e zone commerciali."}
+                : archiveSection === "produzione"
+                ? "PRODUZIONE · storico report e zone commerciali."
+                : "AGENTI / ZONE · assegnazione territoriale degli agenti della produzione."}
             </div>
           </div>
 
@@ -1697,6 +1699,23 @@ export default function Archive() {
           }}
         >
           PRODUZIONE
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setArchiveSection("zone")}
+          style={{
+            marginLeft: "auto",
+            padding: "10px 18px",
+            borderRadius: 9,
+            border: archiveSection === "zone" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+            background: archiveSection === "zone" ? "#0f172a" : "white",
+            color: archiveSection === "zone" ? "white" : "#0f172a",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          AGENTI / ZONE
         </button>
 
       </div>
@@ -2266,7 +2285,7 @@ export default function Archive() {
       </div>
         </>
       ) : (
-        <Production />
+        <Production view={archiveSection === "zone" ? "zone" : "produzione"} />
       )}
     </div>
   );
