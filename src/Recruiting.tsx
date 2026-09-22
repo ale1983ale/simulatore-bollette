@@ -4540,21 +4540,12 @@ export default function Recruiting() {
                         </div>
 
                         <div>
-                          <label style={labelStyle}>Email</label>
-                          {selectedCandidate.email ? (
-                            <a
-                              href={emailHref(selectedCandidate.email)}
-                              style={{
-                                color: "#1d4ed8",
-                                textDecoration: "underline",
-                                fontWeight: 800,
-                              }}
-                            >
-                              {selectedCandidate.email}
-                            </a>
-                          ) : (
-                            <div>—</div>
-                          )}
+                          <label style={labelStyle}>Chiamato da me</label>
+                          <div style={{ fontWeight: 900 }}>
+                            {calledByMeCandidateIds.has(selectedCandidate.id)
+                              ? "SI"
+                              : "NO"}
+                          </div>
                         </div>
 
                         <div>
@@ -4587,13 +4578,24 @@ export default function Recruiting() {
                           </div>
                         )}
 
-                        <div>
-                          <label style={labelStyle}>Chiamato da me</label>
-                          <div style={{ fontWeight: 900 }}>
-                            {calledByMeCandidateIds.has(selectedCandidate.id)
-                              ? "SI"
-                              : "NO"}
-                          </div>
+                        <div style={{ minWidth: 0 }}>
+                          <label style={labelStyle}>Email</label>
+                          {selectedCandidate.email ? (
+                            <a
+                              href={emailHref(selectedCandidate.email)}
+                              style={{
+                                color: "#1d4ed8",
+                                textDecoration: "underline",
+                                fontWeight: 800,
+                                overflowWrap: "anywhere",
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {selectedCandidate.email}
+                            </a>
+                          ) : (
+                            <div>—</div>
+                          )}
                         </div>
                       </div>
                     ) : (
