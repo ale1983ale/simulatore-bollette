@@ -704,6 +704,7 @@ export default function Recruiting() {
   const [noteDate, setNoteDate] = useState(localDateKey());
   const [noteText, setNoteText] = useState("");
   const [noteCalledByMe, setNoteCalledByMe] = useState(false);
+  const [noteStatusDraft, setNoteStatusDraft] = useState<CandidateStatus>("DA_CHIAMARE");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteDate, setEditingNoteDate] = useState(localDateKey());
   const [editingNoteText, setEditingNoteText] = useState("");
@@ -1289,6 +1290,18 @@ export default function Recruiting() {
     calledByMeCandidateIds,
   ]);
 
+  const hasActiveContactFilters = Boolean(
+    nameFilter.trim() ||
+      zoneFilter.trim() ||
+      regionFilter ||
+      sectorFilter ||
+      sectorOtherFilter ||
+      companyFilter ||
+      statusFilter ||
+      forwardedToFilter ||
+      calledByMeFilter
+  );
+
   const selectedNotes = useMemo(
     () =>
       notes
@@ -1537,6 +1550,16 @@ export default function Recruiting() {
         "Errore nell'aggiornamento dello stato: " + (error?.message || error)
       );
     }
+  };
+
+  const confirmNoteStatus = async () => {
+    if (!selectedCandidate) return;
+
+    if (noteStatusDraft) {
+      await updateCandidateStatus(selectedCandidate, noteStatusDraft);
+    }
+
+    setNoteStatusDraft("DA_CHIAMARE");
   };
 
   const updateCandidateForwardedTo = async (
@@ -1816,6 +1839,7 @@ export default function Recruiting() {
       setNoteText("");
       setNoteDate(localDateKey());
       setNoteCalledByMe(false);
+      setNoteStatusDraft("DA_CHIAMARE");
       await loadAll(ctx);
       setMessage("Nota aggiunta.");
     } catch (error: any) {
@@ -3460,7 +3484,29 @@ export default function Recruiting() {
 
           <div className="recruiting-contact-layout">
             <div style={cardStyle}>
-              <h3 style={{ marginTop: 0 }}>Lista nominativi</h3>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 9,
+                  flexWrap: "wrap",
+                }}
+              >
+                <h3 style={{ marginTop: 0, marginBottom: 0 }}>
+                  Lista nominativi
+                </h3>
+                <span
+                  style={{
+                    color: "#dc2626",
+                    fontSize: 17,
+                    fontWeight: 950,
+                  }}
+                >
+                  {hasActiveContactFilters
+                    ? `${filteredCandidates.length} SU ${candidates.length}`
+                    : candidates.length}
+                </span>
+              </div>
               <div style={{ maxHeight: 720, overflow: "auto", display: "grid", gap: 7 }}>
                 {filteredCandidates.map((candidate) => {
                   const active = candidate.id === selectedCandidateId;
@@ -4248,42 +4294,71 @@ export default function Recruiting() {
                             />
                           </div>
 
-                          <div style={{ width: 260, maxWidth: "100%" }}>
-                            <label style={labelStyle}>Stato</label>
-                            <select
-                              value={selectedCandidate.status}
-                              onChange={(e) =>
-                                void updateCandidateStatus(
-                                  selectedCandidate,
-                                  e.target.value
-                                )
-                              }
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              alignItems: "end",
+                              flexWrap: "wrap",
+                              flex: "1 1 360px",
+                            }}
+                          >
+                            <div
                               style={{
-                                ...inputStyle,
-                                border: `2px solid ${getStatusDefinition(selectedCandidate.status).border}`,
-                                background:
-                                  getStatusDefinition(selectedCandidate.status)
-                                    .background,
-                                color:
-                                  getStatusDefinition(selectedCandidate.status)
-                                    .color,
-                                fontWeight: 900,
+                                width: 260,
+                                maxWidth: "100%",
+                                flex: "1 1 240px",
                               }}
                             >
-                              {statusDefinitions.map((option) => (
-                                <option
-                                  key={option.code}
-                                  value={option.code}
-                                  style={{
-                                    background: option.background,
-                                    color: option.color,
-                                    fontWeight: 800,
-                                  }}
-                                >
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
+                              <label style={labelStyle}>Stato</label>
+                              <select
+                                value={noteStatusDraft}
+                                onChange={(e) =>
+                                  setNoteStatusDraft(e.target.value)
+                                }
+                                style={{
+                                  ...inputStyle,
+                                  border: `2px solid ${getStatusDefinition(noteStatusDraft).border}`,
+                                  background:
+                                    getStatusDefinition(noteStatusDraft)
+                                      .background,
+                                  color:
+                                    getStatusDefinition(noteStatusDraft)
+                                      .color,
+                                  fontWeight: 900,
+                                }}
+                              >
+                                {statusDefinitions.map((option) => (
+                                  <option
+                                    key={option.code}
+                                    value={option.code}
+                                    style={{
+                                      background: option.background,
+                                      color: option.color,
+                                      fontWeight: 800,
+                                    }}
+                                  >
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={busy || !noteStatusDraft}
+                              onClick={() => void confirmNoteStatus()}
+                              style={{
+                                ...buttonStyle,
+                                minHeight: 40,
+                                background: "#16a34a",
+                                color: "white",
+                                opacity:
+                                  busy || !noteStatusDraft ? 0.6 : 1,
+                              }}
+                            >
+                              OK
+                            </button>
                           </div>
                         </div>
 
