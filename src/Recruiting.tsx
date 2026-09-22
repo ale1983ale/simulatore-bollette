@@ -4,6 +4,14 @@ import "leaflet/dist/leaflet.css";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
 import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
 import RecruitingManagement from "./RecruitingManagement";
+import {
+  deleteGoogleCalendarEvent,
+  disconnectGoogleCalendar,
+  getGoogleCalendarStatus,
+  startGoogleCalendarConnection,
+  syncAllGoogleCalendarEvents,
+  syncGoogleCalendarEvent,
+} from "./googleCalendar";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
 
@@ -582,6 +590,9 @@ export default function Recruiting() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [googleCalendarConfigured, setGoogleCalendarConfigured] = useState(false);
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [googleCalendarBusy, setGoogleCalendarBusy] = useState(false);
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
@@ -699,7 +710,7 @@ export default function Recruiting() {
         .order("created_at", { ascending: false }),
       active.client
         .from("recruiting_events")
-        .select("id,candidate_id,event_date,event_time,event_type,custom_type,notes,completed")
+        .select("id,candidate_id,event_date,event_time,event_type,custom_type,notes,completed,google_sync_status,google_sync_error,google_synced_at")
         .order("event_date", { ascending: true })
         .order("event_time", { ascending: true }),
       active.client
@@ -769,6 +780,103 @@ export default function Recruiting() {
     }
   };
 
+  const refreshGoogleCalendarConnectionStatus = async () => {
+    try {
+      const status = await getGoogleCalendarStatus();
+      setGoogleCalendarConfigured(Boolean(status.configured));
+      setGoogleCalendarConnected(Boolean(status.connected));
+      return Boolean(status.connected);
+    } catch (error: any) {
+      console.error("GOOGLE CALENDAR STATUS ERROR:", error);
+      setGoogleCalendarConfigured(false);
+      setGoogleCalendarConnected(false);
+      return false;
+    }
+  };
+
+  const connectGoogleCalendar = async () => {
+    setGoogleCalendarBusy(true);
+    try {
+      const authUrl = await startGoogleCalendarConnection();
+      window.location.assign(authUrl);
+    } catch (error: any) {
+      setMessage(
+        "Errore nel collegamento a Google Calendar: " +
+          (error?.message || error)
+      );
+      setGoogleCalendarBusy(false);
+    }
+  };
+
+  const disconnectGoogle = async () => {
+    if (
+      !window.confirm(
+        "Scollegare Google Calendar? Gli eventi già creati su Google non verranno eliminati."
+      )
+    ) {
+      return;
+    }
+
+    setGoogleCalendarBusy(true);
+    try {
+      await disconnectGoogleCalendar();
+      setGoogleCalendarConnected(false);
+      setMessage("Google Calendar scollegato.");
+    } catch (error: any) {
+      setMessage(
+        "Errore durante la disconnessione da Google Calendar: " +
+          (error?.message || error)
+      );
+    } finally {
+      setGoogleCalendarBusy(false);
+    }
+  };
+
+  const syncAllGoogle = async () => {
+    setGoogleCalendarBusy(true);
+    try {
+      const result = await syncAllGoogleCalendarEvents();
+      if (!result?.connected) {
+        setGoogleCalendarConnected(false);
+        setMessage("Collega prima Google Calendar.");
+        return;
+      }
+
+      setGoogleCalendarConnected(true);
+      setMessage(
+        `Google Calendar sincronizzato: ${Number(result.synced || 0)} attività${Number(result.errors || 0) ? ` · ${Number(result.errors || 0)} errori` : ""}.`
+      );
+      await loadAll(ctx || undefined);
+    } catch (error: any) {
+      setMessage(
+        "Errore durante la sincronizzazione Google Calendar: " +
+          (error?.message || error)
+      );
+    } finally {
+      setGoogleCalendarBusy(false);
+    }
+  };
+
+  const syncEventToGoogleIfConnected = async (eventId: string) => {
+    if (!googleCalendarConnected) return true;
+
+    try {
+      const result = await syncGoogleCalendarEvent(eventId);
+      if (result?.connected === false) {
+        setGoogleCalendarConnected(false);
+        return false;
+      }
+      return true;
+    } catch (error: any) {
+      console.error("GOOGLE CALENDAR EVENT SYNC ERROR:", error);
+      setMessage(
+        "Attività salvata nella webapp, ma Google Calendar non si è sincronizzato: " +
+          (error?.message || error)
+      );
+      return false;
+    }
+  };
+
   useEffect(() => {
     void (async () => {
       setLoading(true);
@@ -781,6 +889,39 @@ export default function Recruiting() {
         setMessage("Errore nel caricamento RECRUITING: " + (error?.message || error));
       } finally {
         setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const googleResult = params.get("google_calendar");
+      const googleMessage = params.get("google_calendar_message");
+
+      const connected = await refreshGoogleCalendarConnectionStatus();
+
+      if (googleResult) {
+        setSection("calendar");
+
+        if (googleResult === "connected") {
+          setGoogleCalendarConnected(true);
+          setMessage(
+            "Google Calendar collegato. Puoi sincronizzare le attività già presenti con SINCRONIZZA ORA."
+          );
+        } else if (googleResult === "error") {
+          setMessage(
+            "Collegamento Google Calendar non riuscito" +
+              (googleMessage ? `: ${googleMessage}` : ".")
+          );
+        }
+
+        const cleanUrl =
+          window.location.pathname +
+          window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      } else {
+        setGoogleCalendarConnected(connected);
       }
     })();
   }, []);
@@ -1470,35 +1611,42 @@ export default function Recruiting() {
     time: string;
     notesText: string;
   }) => {
-    if (!ctx) return false;
+    if (!ctx) return null;
     if (!date) {
       setMessage("Seleziona la data dell'attività.");
-      return false;
+      return null;
     }
     if (type === "ALTRO" && !customType.trim()) {
       setMessage("Scrivi il tipo di attività nella voce ALTRO.");
-      return false;
+      return null;
     }
 
-    const { error } = await ctx.client.from("recruiting_events").insert({
-      owner_key: ctx.ownerKey,
-      candidate_id: candidateId,
-      event_date: date,
-      event_time: time || null,
-      event_type: type,
-      custom_type: type === "ALTRO" ? customType.trim() : "",
-      notes: notesText.trim(),
-    });
+    const { data, error } = await ctx.client
+      .from("recruiting_events")
+      .insert({
+        owner_key: ctx.ownerKey,
+        candidate_id: candidateId,
+        event_date: date,
+        event_time: time || null,
+        event_type: type,
+        custom_type: type === "ALTRO" ? customType.trim() : "",
+        notes: notesText.trim(),
+      })
+      .select("id")
+      .single();
 
     if (error) throw error;
-    return true;
+
+    const eventId = String(data.id);
+    await syncEventToGoogleIfConnected(eventId);
+    return eventId;
   };
 
   const addActivityFromContact = async () => {
     if (!selectedCandidate) return;
     setBusy(true);
     try {
-      const ok = await insertEvent({
+      const eventId = await insertEvent({
         candidateId: selectedCandidate.id,
         type: activityType,
         customType: activityCustom,
@@ -1506,7 +1654,7 @@ export default function Recruiting() {
         time: activityTime,
         notesText: activityNotes,
       });
-      if (!ok) return;
+      if (!eventId) return;
 
       setActivityType("CHIAMARE");
       setActivityCustom("");
@@ -1525,7 +1673,7 @@ export default function Recruiting() {
   const addActivityFromCalendar = async () => {
     setBusy(true);
     try {
-      const ok = await insertEvent({
+      const eventId = await insertEvent({
         candidateId: calendarCandidateId || null,
         type: calendarType,
         customType: calendarCustom,
@@ -1533,7 +1681,7 @@ export default function Recruiting() {
         time: calendarTime,
         notesText: calendarNotes,
       });
-      if (!ok) return;
+      if (!eventId) return;
 
       setCalendarType("CHIAMARE");
       setCalendarCustom("");
@@ -1559,11 +1707,26 @@ export default function Recruiting() {
       setMessage("Errore nell'aggiornamento attività: " + error.message);
       return;
     }
+
+    await syncEventToGoogleIfConnected(event.id);
     await loadAll(ctx);
   };
 
   const deleteEvent = async (event: RecruitingEvent) => {
     if (!ctx || !window.confirm("Eliminare questa attività dal calendario?")) return;
+
+    if (googleCalendarConnected) {
+      try {
+        await deleteGoogleCalendarEvent(event.id);
+      } catch (error: any) {
+        setMessage(
+          "Non ho eliminato l'attività perché Google Calendar non ha risposto correttamente: " +
+            (error?.message || error)
+        );
+        return;
+      }
+    }
+
     const { error } = await ctx.client.from("recruiting_events").delete().eq("id", event.id);
     if (error) {
       setMessage("Errore nell'eliminazione attività: " + error.message);
@@ -1617,9 +1780,14 @@ export default function Recruiting() {
 
       if (error) throw error;
 
+      await syncEventToGoogleIfConnected(eventModalId);
       await loadAll(ctx);
       setEventModalMode("view");
-      setMessage("Attività aggiornata.");
+      setMessage(
+        googleCalendarConnected
+          ? "Attività aggiornata e sincronizzata con Google Calendar."
+          : "Attività aggiornata."
+      );
     } catch (error: any) {
       setMessage(
         "Errore nella modifica dell'attività: " +
@@ -3436,6 +3604,103 @@ export default function Recruiting() {
 
       {section === "calendar" && (
         <>
+          <div
+            style={{
+              ...cardStyle,
+              borderColor: googleCalendarConnected ? "#86efac" : "#bfdbfe",
+              background: googleCalendarConnected ? "#f0fdf4" : "#eff6ff",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0 }}>Google Calendar</h3>
+                <div
+                  style={{
+                    marginTop: 5,
+                    color: googleCalendarConnected ? "#166534" : "#1e40af",
+                    fontSize: 13,
+                    fontWeight: 800,
+                  }}
+                >
+                  {googleCalendarConnected
+                    ? "● COLLEGATO · le nuove attività e le modifiche vengono sincronizzate automaticamente."
+                    : googleCalendarConfigured
+                    ? "○ NON COLLEGATO"
+                    : "Configurazione Google Calendar non disponibile."}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                {!googleCalendarConnected ? (
+                  <button
+                    type="button"
+                    disabled={googleCalendarBusy || !googleCalendarConfigured}
+                    onClick={() => void connectGoogleCalendar()}
+                    style={{
+                      ...buttonStyle,
+                      background: "#2563eb",
+                      color: "white",
+                      opacity:
+                        googleCalendarBusy || !googleCalendarConfigured
+                          ? 0.6
+                          : 1,
+                    }}
+                  >
+                    {googleCalendarBusy
+                      ? "COLLEGAMENTO..."
+                      : "COLLEGA GOOGLE CALENDAR"}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={googleCalendarBusy}
+                      onClick={() => void syncAllGoogle()}
+                      style={{
+                        ...buttonStyle,
+                        background: "#16a34a",
+                        color: "white",
+                        opacity: googleCalendarBusy ? 0.6 : 1,
+                      }}
+                    >
+                      {googleCalendarBusy
+                        ? "SINCRONIZZAZIONE..."
+                        : "↻ SINCRONIZZA ORA"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={googleCalendarBusy}
+                      onClick={() => void disconnectGoogle()}
+                      style={{
+                        ...buttonStyle,
+                        background: "white",
+                        color: "#b91c1c",
+                        border: "1px solid #fecaca",
+                      }}
+                    >
+                      DISCONNETTI
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0 }}>Nuova attività</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, alignItems: "end" }}>
