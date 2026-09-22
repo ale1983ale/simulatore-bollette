@@ -4,6 +4,7 @@ import html2canvas from "html2canvas";
 import { supabase } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
+import Recruiting from "./Recruiting";
 
 
 type MonthlyRow = {
@@ -6004,7 +6005,7 @@ useEffect(() => {
 }, [tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin"];
-  const adminTabs = ["reportAdmin", "archive", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["reportAdmin", "archive", "recruiting", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6218,6 +6219,16 @@ const renderAdminContent = () => {
           </button>
 
           <button
+            onClick={() => setTab("recruiting")}
+            style={{
+              ...baseBtn,
+              ...(tab === "recruiting" ? activeBtn : {}),
+            }}
+          >
+            RECRUITING
+          </button>
+
+          <button
             onClick={() => setTab("reportAdmin")}
             style={{
               ...baseBtn,
@@ -6320,6 +6331,12 @@ const renderAdminContent = () => {
       {tab === "archive" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <Archive />
+        </div>
+      )}
+
+      {tab === "recruiting" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Recruiting />
         </div>
       )}
 
