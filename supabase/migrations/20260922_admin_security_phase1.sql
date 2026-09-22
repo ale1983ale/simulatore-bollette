@@ -151,7 +151,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $session$
 declare
   v_admin_id bigint;
   v_admin public.admin_users%rowtype;
@@ -173,7 +173,7 @@ begin
     'role', v_admin.role
   );
 end;
-$;
+$session$;
 
 revoke all on function public.admin_session_profile(text) from public;
 grant execute on function public.admin_session_profile(text) to anon, authenticated;
