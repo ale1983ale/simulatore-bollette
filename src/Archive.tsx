@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
 import Production from "./Production";
+import RecruitingManagement from "./RecruitingManagement";
 
 type Commodity = "LUCE" | "GAS" | "N/D";
 type StorageMode = "loading" | "database" | "legacy";
@@ -942,7 +943,7 @@ export default function Archive() {
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
-  const [archiveSection, setArchiveSection] = useState<"recessi" | "produzione">("recessi");
+  const [archiveSection, setArchiveSection] = useState<"recessi" | "produzione" | "recruiting">("recessi");
 
   const [commodities, setCommodities] = useState<string[]>([]);
   const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
@@ -1639,9 +1640,13 @@ export default function Archive() {
           }}
         >
           <div>
-            <h2 style={{ margin: 0 }}>ARCHIVIO</h2>
+            <h2 style={{ margin: 0 }}>DATI</h2>
             <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
-              RECESSI · archivio cumulativo con eliminazione automatica dei duplicati.
+              {archiveSection === "recessi"
+                ? "RECESSI · archivio cumulativo con eliminazione automatica dei duplicati."
+                : archiveSection === "produzione"
+                ? "PRODUZIONE · storico report e zone commerciali."
+                : "GESTIONE RECRUITING · macroaree e agenti attivi da visualizzare sulla cartina."}
             </div>
           </div>
 
@@ -1697,6 +1702,22 @@ export default function Archive() {
           }}
         >
           PRODUZIONE
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setArchiveSection("recruiting")}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 9,
+            border: archiveSection === "recruiting" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+            background: archiveSection === "recruiting" ? "#0f172a" : "white",
+            color: archiveSection === "recruiting" ? "white" : "#0f172a",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          GESTIONE RECRUITING
         </button>
       </div>
 
@@ -2264,8 +2285,10 @@ export default function Archive() {
         )}
       </div>
         </>
-      ) : (
+      ) : archiveSection === "produzione" ? (
         <Production />
+      ) : (
+        <RecruitingManagement />
       )}
     </div>
   );
