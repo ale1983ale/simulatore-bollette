@@ -41,6 +41,7 @@ type ContactNote = {
   noteDate: string;
   noteText: string;
   calledByMe: boolean;
+  hrSyncPending: boolean;
   createdAt: string;
 };
 
@@ -589,6 +590,7 @@ function noteFromRow(row: any): ContactNote {
     noteDate: String(row.note_date || ""),
     noteText: String(row.note_text || ""),
     calledByMe: Boolean(row.called_by_me),
+    hrSyncPending: Boolean(row.hr_sync_pending),
     createdAt: String(row.created_at || ""),
   };
 }
@@ -662,7 +664,9 @@ function getMonthCells(monthKey: string) {
 
 export default function Recruiting() {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
-  const [section, setSection] = useState<"contacts" | "calendar" | "map" | "management">("contacts");
+  const [section, setSection] = useState<
+    "contacts" | "calendar" | "map" | "hr_notes" | "management"
+  >("contacts");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -806,7 +810,7 @@ export default function Recruiting() {
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
-        .select("id,candidate_id,note_date,note_text,called_by_me,created_at")
+        .select("id,candidate_id,note_date,note_text,called_by_me,hr_sync_pending,created_at")
         .order("note_date", { ascending: false })
         .order("created_at", { ascending: false }),
       active.client
@@ -1358,6 +1362,18 @@ export default function Recruiting() {
           `${b.noteDate}|${b.createdAt}`.localeCompare(`${a.noteDate}|${a.createdAt}`)
         ),
     [notes, selectedCandidateId]
+  );
+
+  const hrSyncNotes = useMemo(
+    () =>
+      notes
+        .filter((note) => note.hrSyncPending)
+        .sort((a, b) =>
+          `${b.noteDate}|${b.createdAt}`.localeCompare(
+            `${a.noteDate}|${a.createdAt}`
+          )
+        ),
+    [notes]
   );
 
   const selectedFutureEvents = useMemo(
@@ -1912,7 +1928,7 @@ export default function Recruiting() {
     }
   };
 
-  const addNote = async () => {
+  const addNote = async (sendToHr = false) => {
     if (!ctx || !selectedCandidate) return;
     if (!noteText.trim()) {
       setMessage("Scrivi la nota prima di salvarla.");
@@ -1927,6 +1943,7 @@ export default function Recruiting() {
         note_date: noteDate,
         note_text: noteText.trim(),
         called_by_me: noteCalledByMe,
+        hr_sync_pending: sendToHr,
       });
       if (error) throw error;
 
@@ -1935,7 +1952,11 @@ export default function Recruiting() {
       setNoteCalledByMe(false);
       setNoteStatusDraft("DA_CHIAMARE");
       await loadAll(ctx);
-      setMessage("Nota aggiunta.");
+      setMessage(
+        sendToHr
+          ? "Nota aggiunta e inserita nelle NOTE DA SINCRONIZZARE SU HR SPECIALIST."
+          : "Nota aggiunta."
+      );
     } catch (error: any) {
       setMessage("Errore nel salvataggio della nota: " + (error?.message || error));
     } finally {
@@ -3089,19 +3110,69 @@ export default function Recruiting() {
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setSection("management")}
+        <div
           style={{
-            ...buttonStyle,
             marginLeft: "auto",
-            background: section === "management" ? "#0f172a" : "white",
-            color: section === "management" ? "white" : "#0f172a",
-            border: section === "management" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
           }}
         >
-          GESTIONE RECRUITING
-        </button>
+          <button
+            type="button"
+            onClick={() => setSection("hr_notes")}
+            style={{
+              ...buttonStyle,
+              background:
+                section === "hr_notes" ? "#2563eb" : "white",
+              color:
+                section === "hr_notes" ? "white" : "#1d4ed8",
+              border: "1px solid #93c5fd",
+            }}
+          >
+            NOTE DA SINCRONIZZARE SU HR SPECIALIST
+            {hrSyncNotes.length > 0 && (
+              <span
+                style={{
+                  marginLeft: 7,
+                  display: "inline-flex",
+                  minWidth: 20,
+                  height: 20,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 999,
+                  padding: "0 5px",
+                  background:
+                    section === "hr_notes" ? "white" : "#2563eb",
+                  color:
+                    section === "hr_notes" ? "#2563eb" : "white",
+                  fontSize: 11,
+                  fontWeight: 900,
+                }}
+              >
+                {hrSyncNotes.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSection("management")}
+            style={{
+              ...buttonStyle,
+              background:
+                section === "management" ? "#0f172a" : "white",
+              color:
+                section === "management" ? "white" : "#0f172a",
+              border:
+                section === "management"
+                  ? "1px solid #0f172a"
+                  : "1px solid #cbd5e1",
+            }}
+          >
+            GESTIONE RECRUITING
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -3954,9 +4025,13 @@ export default function Recruiting() {
                       key={candidate.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => setSelectedCandidateId(candidate.id)}
+                      onClick={() => {
+                        setContactEditMode(false);
+                        setSelectedCandidateId(candidate.id);
+                      }}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
+                          setContactEditMode(false);
                           setSelectedCandidateId(candidate.id);
                         }
                       }}
@@ -4850,14 +4925,45 @@ export default function Recruiting() {
                           Chiamato da me
                         </label>
                       </div>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void addNote()}
-                        style={{ ...buttonStyle, marginTop: 9, background: "#0f172a", color: "white" }}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 10,
+                          flexWrap: "wrap",
+                          marginTop: 9,
+                        }}
                       >
-                        Aggiungi nota
-                      </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void addNote(false)}
+                          style={{
+                            ...buttonStyle,
+                            background: "#0f172a",
+                            color: "white",
+                            opacity: busy ? 0.6 : 1,
+                          }}
+                        >
+                          Aggiungi nota
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void addNote(true)}
+                          style={{
+                            ...buttonStyle,
+                            marginLeft: "auto",
+                            background: "#2563eb",
+                            color: "white",
+                            opacity: busy ? 0.6 : 1,
+                          }}
+                        >
+                          AGGIUNGI NOTA E SU HR
+                        </button>
+                      </div>
 
                       <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
                         {selectedNotes.map((note) => {
@@ -6511,6 +6617,195 @@ export default function Recruiting() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {section === "hr_notes" && (
+        <div style={cardStyle}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0 }}>
+                NOTE DA SINCRONIZZARE SU HR SPECIALIST
+              </h3>
+              <div
+                style={{
+                  marginTop: 4,
+                  color: "#64748b",
+                  fontSize: 13,
+                }}
+              >
+                {hrSyncNotes.length} note in attesa
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              marginTop: 14,
+            }}
+          >
+            {hrSyncNotes.map((note) => {
+              const candidate = candidates.find(
+                (item) => item.id === note.candidateId
+              );
+              const statusStyle = candidate
+                ? getStatusDefinition(candidate.status)
+                : statusPaletteByKey("slate");
+
+              return (
+                <div
+                  key={note.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setContactEditMode(false);
+                    setSelectedCandidateId(note.candidateId);
+                    setSection("contacts");
+                    window.setTimeout(() => {
+                      document
+                        .getElementById(
+                          `recruiting-candidate-${note.candidateId}`
+                        )
+                        ?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                    }, 80);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" ||
+                      event.key === " "
+                    ) {
+                      setContactEditMode(false);
+                      setSelectedCandidateId(note.candidateId);
+                      setSection("contacts");
+                    }
+                  }}
+                  style={{
+                    border: `3px solid ${
+                      candidate
+                        ? statusStyle.border
+                        : "#cbd5e1"
+                    }`,
+                    borderRadius: 11,
+                    padding: 13,
+                    background: "white",
+                    cursor: "pointer",
+                    boxShadow:
+                      "0 2px 8px rgba(15,23,42,.06)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <strong
+                        style={{
+                          fontSize: 15,
+                        }}
+                      >
+                        {candidate?.fullName ||
+                          "NOMINATIVO NON DISPONIBILE"}
+                      </strong>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {formatDate(note.noteDate)}
+                        {candidate?.operationalZone
+                          ? ` · ${candidate.operationalZone.toLocaleUpperCase(
+                              "it"
+                            )}`
+                          : ""}
+                      </div>
+                    </div>
+
+                    {candidate && (
+                      <span
+                        style={{
+                          padding: "6px 9px",
+                          borderRadius: 8,
+                          background: statusStyle.background,
+                          color: statusStyle.color,
+                          border: `2px solid ${statusStyle.border}`,
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {statusStyle.label}
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 10,
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {note.calledByMe && (
+                      <strong
+                        style={{
+                          color: "#6d28d9",
+                          marginRight: 6,
+                        }}
+                      >
+                        ALESSIO CEDRONI DICE:
+                      </strong>
+                    )}
+                    {note.noteText}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 10,
+                      color: "#2563eb",
+                      fontSize: 11,
+                      fontWeight: 900,
+                    }}
+                  >
+                    CLICCA PER APRIRE LA SCHEDA COMPLETA
+                  </div>
+                </div>
+              );
+            })}
+
+            {!hrSyncNotes.length && (
+              <div
+                style={{
+                  padding: 18,
+                  borderRadius: 10,
+                  background: "#f8fafc",
+                  color: "#64748b",
+                  textAlign: "center",
+                  fontWeight: 800,
+                }}
+              >
+                Nessuna nota da sincronizzare su HR Specialist.
+              </div>
+            )}
           </div>
         </div>
       )}
