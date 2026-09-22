@@ -167,7 +167,7 @@ const STATUS_COLOR_PALETTE = [
   { key: "blue", name: "Blu", background: "#dbeafe", color: "#1d4ed8", border: "#60a5fa" },
   { key: "orange", name: "Arancione", background: "#ffedd5", color: "#c2410c", border: "#fb923c" },
   { key: "green", name: "Verde", background: "#dcfce7", color: "#15803d", border: "#4ade80" },
-  { key: "emerald", name: "Verde scuro", background: "#d1fae5", color: "#047857", border: "#34d399" },
+  { key: "emerald", name: "Smeraldo", background: "#d1fae5", color: "#047857", border: "#34d399" },
   { key: "indigo", name: "Indaco", background: "#e0e7ff", color: "#4338ca", border: "#818cf8" },
   { key: "red", name: "Rosso", background: "#fee2e2", color: "#b91c1c", border: "#f87171" },
   { key: "teal", name: "Turchese", background: "#ccfbf1", color: "#0f766e", border: "#2dd4bf" },
@@ -182,6 +182,18 @@ const STATUS_COLOR_PALETTE = [
   { key: "slate", name: "Ardesia", background: "#e2e8f0", color: "#334155", border: "#94a3b8" },
   { key: "stone", name: "Pietra", background: "#e7e5e4", color: "#44403c", border: "#a8a29e" },
   { key: "gray", name: "Grigio", background: "#f3f4f6", color: "#374151", border: "#9ca3af" },
+  { key: "navy", name: "Blu notte", background: "#dbeafe", color: "#172554", border: "#1e3a8a" },
+  { key: "royal", name: "Blu reale", background: "#eef2ff", color: "#312e81", border: "#4f46e5" },
+  { key: "mint", name: "Menta", background: "#ecfdf5", color: "#065f46", border: "#10b981" },
+  { key: "forest", name: "Verde bosco", background: "#dcfce7", color: "#14532d", border: "#15803d" },
+  { key: "olive", name: "Oliva", background: "#f7fee7", color: "#365314", border: "#65a30d" },
+  { key: "gold", name: "Oro", background: "#fefce8", color: "#713f12", border: "#ca8a04" },
+  { key: "brown", name: "Marrone", background: "#f5ebe0", color: "#78350f", border: "#92400e" },
+  { key: "coral", name: "Corallo", background: "#fff1f2", color: "#9f1239", border: "#fb7185" },
+  { key: "salmon", name: "Salmone", background: "#fff7ed", color: "#9a3412", border: "#f97316" },
+  { key: "magenta", name: "Magenta", background: "#fdf4ff", color: "#86198f", border: "#c026d3" },
+  { key: "black", name: "Nero", background: "#f1f5f9", color: "#0f172a", border: "#0f172a" },
+  { key: "white", name: "Bianco", background: "#ffffff", color: "#0f172a", border: "#cbd5e1" },
 ] as const;
 
 const DEFAULT_STATUS_COLOR_KEY: Record<string, string> = {
@@ -200,6 +212,53 @@ function statusPaletteByKey(key: string) {
   return (
     STATUS_COLOR_PALETTE.find((item) => item.key === key) ||
     STATUS_COLOR_PALETTE.find((item) => item.key === "slate")!
+  );
+}
+
+function StatusColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill,minmax(104px,1fr))",
+        gap: 6,
+      }}
+    >
+      {STATUS_COLOR_PALETTE.map((item) => {
+        const selected = item.key === value;
+        return (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onChange(item.key)}
+            title={item.name}
+            style={{
+              border: `${selected ? 3 : 2}px solid ${item.border}`,
+              background: item.background,
+              color: item.color,
+              borderRadius: 9,
+              padding: "7px 8px",
+              fontSize: 11,
+              fontWeight: 900,
+              cursor: "pointer",
+              boxShadow: selected
+                ? "0 0 0 2px rgba(15,23,42,.14)"
+                : "none",
+              minHeight: 36,
+            }}
+          >
+            {selected ? "✓ " : ""}
+            {item.name}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -615,6 +674,9 @@ export default function Recruiting() {
   const [showStatusManager, setShowStatusManager] = useState(false);
   const [newStatusLabel, setNewStatusLabel] = useState("");
   const [newStatusColorKey, setNewStatusColorKey] = useState("slate");
+  const [editingStatusCode, setEditingStatusCode] = useState<string | null>(null);
+  const [editingStatusLabel, setEditingStatusLabel] = useState("");
+  const [editingStatusColorKey, setEditingStatusColorKey] = useState("slate");
   const [showNewContact, setShowNewContact] = useState(false);
 
   const [newName, setNewName] = useState("");
@@ -1022,16 +1084,18 @@ export default function Recruiting() {
       statusRows.map((row) => [row.code, row])
     );
 
-    const defaults = CANDIDATE_STATUS_OPTIONS.map(
+    const defaults = CANDIDATE_STATUS_OPTIONS.flatMap(
       ([code, definition], index) => {
         const override = overrides.get(code);
+        if (override?.colorKey === "__deleted__") return [];
+
         const colorKey =
           override?.colorKey ||
           DEFAULT_STATUS_COLOR_KEY[code] ||
           "slate";
         const palette = statusPaletteByKey(colorKey);
 
-        return {
+        return [{
           code,
           label: override?.label || definition.label,
           colorKey,
@@ -1039,13 +1103,19 @@ export default function Recruiting() {
           background: palette.background,
           color: palette.color,
           border: palette.border,
-        };
+        }];
       }
     );
 
-    const defaultCodes = new Set(defaults.map((item) => item.code));
+    const defaultCodes = new Set(
+      CANDIDATE_STATUS_OPTIONS.map(([code]) => code)
+    );
     const custom = statusRows
-      .filter((row) => !defaultCodes.has(row.code))
+      .filter(
+        (row) =>
+          !defaultCodes.has(row.code) &&
+          row.colorKey !== "__deleted__"
+      )
       .map((row) => {
         const palette = statusPaletteByKey(row.colorKey);
         return {
@@ -1246,7 +1316,7 @@ export default function Recruiting() {
     colorKey: string,
     sortOrder: number
   ) => {
-    if (!ctx) return;
+    if (!ctx) return false;
 
     const { error } = await ctx.client
       .from("recruiting_statuses")
@@ -1264,10 +1334,11 @@ export default function Recruiting() {
 
     if (error) {
       setMessage("Errore nel salvataggio dello stato: " + error.message);
-      return;
+      return false;
     }
 
     await loadAll(ctx);
+    return true;
   };
 
   const addCustomStatus = async () => {
@@ -1288,16 +1359,145 @@ export default function Recruiting() {
     const nextSort =
       Math.max(100, ...statusDefinitions.map((item) => item.sortOrder)) + 10;
 
-    await saveStatusDefinition(
+    const saved = await saveStatusDefinition(
       code,
       label,
       newStatusColorKey,
       nextSort
     );
+    if (!saved) return;
 
     setNewStatusLabel("");
     setNewStatusColorKey("slate");
     setMessage("Nuovo stato aggiunto.");
+  };
+
+  const startEditStatus = (status: {
+    code: string;
+    label: string;
+    colorKey: string;
+  }) => {
+    setEditingStatusCode(status.code);
+    setEditingStatusLabel(status.label);
+    setEditingStatusColorKey(status.colorKey);
+  };
+
+  const cancelEditStatus = () => {
+    setEditingStatusCode(null);
+    setEditingStatusLabel("");
+    setEditingStatusColorKey("slate");
+  };
+
+  const saveEditedStatus = async (status: {
+    code: string;
+    sortOrder: number;
+  }) => {
+    const label = editingStatusLabel.trim().toLocaleUpperCase("it");
+    if (!label) {
+      setMessage("Il nome dello stato non può essere vuoto.");
+      return;
+    }
+
+    const saved = await saveStatusDefinition(
+      status.code,
+      label,
+      editingStatusColorKey,
+      status.sortOrder
+    );
+    if (!saved) return;
+
+    cancelEditStatus();
+    setMessage("Stato modificato.");
+  };
+
+  const deleteStatusDefinition = async (status: {
+    code: string;
+    label: string;
+    colorKey: string;
+    sortOrder: number;
+  }) => {
+    if (!ctx) return;
+    if (statusDefinitions.length <= 1) {
+      setMessage("Deve rimanere almeno uno stato disponibile.");
+      return;
+    }
+
+    const affectedCount = candidates.filter(
+      (candidate) => candidate.status === status.code
+    ).length;
+    const replacement =
+      statusDefinitions.find(
+        (item) => item.code === "DA_CHIAMARE" && item.code !== status.code
+      ) ||
+      statusDefinitions.find((item) => item.code !== status.code);
+
+    if (!replacement) {
+      setMessage("Non è possibile eliminare l'ultimo stato disponibile.");
+      return;
+    }
+
+    const confirmation = affectedCount
+      ? `Eliminare lo stato "${status.label}"? I ${affectedCount} contatti che lo usano passeranno automaticamente a "${replacement.label}".`
+      : `Eliminare lo stato "${status.label}"?`;
+
+    if (!window.confirm(confirmation)) return;
+
+    setBusy(true);
+    try {
+      if (affectedCount) {
+        const { error: candidatesError } = await ctx.client
+          .from("recruiting_candidates")
+          .update({
+            contact_status: replacement.code,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("owner_key", ctx.ownerKey)
+          .eq("contact_status", status.code);
+
+        if (candidatesError) throw candidatesError;
+      }
+
+      const isBuiltIn = CANDIDATE_STATUS_OPTIONS.some(
+        ([code]) => code === status.code
+      );
+
+      if (isBuiltIn) {
+        const { error } = await ctx.client
+          .from("recruiting_statuses")
+          .upsert(
+            {
+              owner_key: ctx.ownerKey,
+              code: status.code,
+              label: status.label,
+              color_key: "__deleted__",
+              sort_order: status.sortOrder,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "owner_key,code" }
+          );
+        if (error) throw error;
+      } else {
+        const { error } = await ctx.client
+          .from("recruiting_statuses")
+          .delete()
+          .eq("owner_key", ctx.ownerKey)
+          .eq("code", status.code);
+        if (error) throw error;
+      }
+
+      if (statusFilter === status.code) setStatusFilter("");
+      if (editingStatusCode === status.code) cancelEditStatus();
+
+      await loadAll(ctx);
+      setMessage("Stato eliminato.");
+    } catch (error: any) {
+      setMessage(
+        "Errore nell'eliminazione dello stato: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const updateCandidateStatus = async (
@@ -2886,13 +3086,16 @@ export default function Recruiting() {
                       fontSize: 12,
                     }}
                   >
-                    Puoi scegliere uno dei 20 colori disponibili o aggiungere
-                    un nuovo stato.
+                    Puoi modificare nome e colore, eliminare uno stato oppure
+                    crearne uno nuovo. Sono disponibili {STATUS_COLOR_PALETTE.length} colori.
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowStatusManager(false)}
+                  onClick={() => {
+                    cancelEditStatus();
+                    setShowStatusManager(false);
+                  }}
                   style={{ ...buttonStyle, background: "#e2e8f0" }}
                 >
                   Chiudi
@@ -2900,59 +3103,149 @@ export default function Recruiting() {
               </div>
 
               <div style={{ display: "grid", gap: 9, marginTop: 14 }}>
-                {statusDefinitions.map((status) => (
-                  <div
-                    key={status.code}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "minmax(160px,1fr) minmax(180px,240px)",
-                      gap: 10,
-                      alignItems: "center",
-                      padding: 10,
-                      borderRadius: 10,
-                      border: `2px solid ${status.border}`,
-                      background: status.background,
-                    }}
-                  >
-                    <strong style={{ color: status.color }}>
-                      {status.label}
-                    </strong>
+                {statusDefinitions.map((status) => {
+                  const isEditing = editingStatusCode === status.code;
 
-                    <select
-                      value={status.colorKey}
-                      onChange={(e) =>
-                        void saveStatusDefinition(
-                          status.code,
-                          status.label,
-                          e.target.value,
-                          status.sortOrder
-                        )
-                      }
+                  return (
+                    <div
+                      key={status.code}
                       style={{
-                        ...inputStyle,
-                        background: "white",
-                        color: "#0f172a",
+                        padding: 11,
+                        borderRadius: 10,
+                        border: `3px solid ${status.border}`,
+                        background: status.background,
                       }}
                     >
-                      {STATUS_COLOR_PALETTE.map((color) => (
-                        <option key={color.key} value={color.key}>
-                          {color.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                      {isEditing ? (
+                        <div style={{ display: "grid", gap: 10 }}>
+                          <div>
+                            <label style={labelStyle}>Nome stato</label>
+                            <input
+                              value={editingStatusLabel}
+                              onChange={(e) =>
+                                setEditingStatusLabel(
+                                  e.target.value.toLocaleUpperCase("it")
+                                )
+                              }
+                              style={inputStyle}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Colore</label>
+                            <StatusColorPicker
+                              value={editingStatusColorKey}
+                              onChange={setEditingStatusColorKey}
+                            />
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void saveEditedStatus(status)}
+                              style={{
+                                ...buttonStyle,
+                                background: "#2563eb",
+                                color: "white",
+                                opacity: busy ? 0.6 : 1,
+                              }}
+                            >
+                              SALVA
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={cancelEditStatus}
+                              style={{
+                                ...buttonStyle,
+                                background: "#e2e8f0",
+                              }}
+                            >
+                              ANNULLA
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "minmax(160px,1fr) auto",
+                            gap: 10,
+                            alignItems: "center",
+                          }}
+                        >
+                          <div>
+                            <strong style={{ color: status.color }}>
+                              {status.label}
+                            </strong>
+                            <div
+                              style={{
+                                marginTop: 4,
+                                color: status.color,
+                                fontSize: 11,
+                                fontWeight: 800,
+                              }}
+                            >
+                              {statusPaletteByKey(status.colorKey).name}
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 7,
+                              flexWrap: "wrap",
+                              justifyContent: "flex-end",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => startEditStatus(status)}
+                              style={{
+                                ...buttonStyle,
+                                background: "#dbeafe",
+                                color: "#1d4ed8",
+                              }}
+                            >
+                              MODIFICA
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void deleteStatusDefinition(status)
+                              }
+                              style={{
+                                ...buttonStyle,
+                                background: "#fee2e2",
+                                color: "#b91c1c",
+                                opacity: busy ? 0.6 : 1,
+                              }}
+                            >
+                              ELIMINA
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <div
                 style={{
+                  marginTop: 16,
+                  paddingTop: 14,
+                  borderTop: "1px solid #c7d2fe",
                   display: "grid",
-                  gridTemplateColumns:
-                    "minmax(180px,1fr) minmax(170px,220px) auto",
-                  gap: 9,
-                  alignItems: "end",
-                  marginTop: 14,
+                  gap: 10,
                 }}
               >
                 <div>
@@ -2971,31 +3264,25 @@ export default function Recruiting() {
 
                 <div>
                   <label style={labelStyle}>Colore</label>
-                  <select
+                  <StatusColorPicker
                     value={newStatusColorKey}
-                    onChange={(e) =>
-                      setNewStatusColorKey(e.target.value)
-                    }
-                    style={inputStyle}
-                  >
-                    {STATUS_COLOR_PALETTE.map((color) => (
-                      <option key={color.key} value={color.key}>
-                        {color.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setNewStatusColorKey}
+                  />
                 </div>
 
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={() => void addCustomStatus()}
                   style={{
                     ...buttonStyle,
+                    width: "fit-content",
                     background: "#2563eb",
                     color: "white",
+                    opacity: busy ? 0.6 : 1,
                   }}
                 >
-                  + AGGIUNGI
+                  + AGGIUNGI STATO
                 </button>
               </div>
             </div>
