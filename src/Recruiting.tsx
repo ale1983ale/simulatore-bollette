@@ -703,6 +703,8 @@ export default function Recruiting() {
   const [message, setMessage] = useState("");
   const [googleCalendarConfigured, setGoogleCalendarConfigured] = useState(false);
   const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [googleCalendarNeedsReconnect, setGoogleCalendarNeedsReconnect] =
+    useState(false);
   const [googleCalendarBusy, setGoogleCalendarBusy] = useState(false);
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -919,13 +921,19 @@ export default function Recruiting() {
   const refreshGoogleCalendarConnectionStatus = async () => {
     try {
       const status = await getGoogleCalendarStatus();
+      const needsReconnect = Boolean(status.needs_reconnect);
+      const readyConnected =
+        Boolean(status.connected) && !needsReconnect;
+
       setGoogleCalendarConfigured(Boolean(status.configured));
-      setGoogleCalendarConnected(Boolean(status.connected));
-      return Boolean(status.connected);
+      setGoogleCalendarNeedsReconnect(needsReconnect);
+      setGoogleCalendarConnected(readyConnected);
+      return readyConnected;
     } catch (error: any) {
       console.error("GOOGLE CALENDAR STATUS ERROR:", error);
       setGoogleCalendarConfigured(false);
       setGoogleCalendarConnected(false);
+      setGoogleCalendarNeedsReconnect(false);
       return false;
     }
   };
@@ -957,6 +965,7 @@ export default function Recruiting() {
     try {
       await disconnectGoogleCalendar();
       setGoogleCalendarConnected(false);
+      setGoogleCalendarNeedsReconnect(false);
       setMessage("Google Calendar scollegato.");
     } catch (error: any) {
       setMessage(
@@ -1042,8 +1051,9 @@ export default function Recruiting() {
 
         if (googleResult === "connected") {
           setGoogleCalendarConnected(true);
+          setGoogleCalendarNeedsReconnect(false);
           setMessage(
-            "Google Calendar collegato. Puoi sincronizzare le attività già presenti con SINCRONIZZA ORA."
+            "Google Calendar collegato. Creati i calendari CHIAMARE HR, APPUNTAMENTO IN ZONA HR, APPUNTAMENTO IN SEDE HR, VIDEOCALL HR e ALTRO HR. Premi SINCRONIZZA ORA per spostare anche le attività già presenti nei calendari corretti."
           );
         } else if (googleResult === "error") {
           setMessage(
@@ -5317,8 +5327,16 @@ export default function Recruiting() {
           <div
             style={{
               ...cardStyle,
-              borderColor: googleCalendarConnected ? "#86efac" : "#bfdbfe",
-              background: googleCalendarConnected ? "#f0fdf4" : "#eff6ff",
+              borderColor: googleCalendarConnected
+                ? "#86efac"
+                : googleCalendarNeedsReconnect
+                ? "#facc15"
+                : "#bfdbfe",
+              background: googleCalendarConnected
+                ? "#f0fdf4"
+                : googleCalendarNeedsReconnect
+                ? "#fefce8"
+                : "#eff6ff",
             }}
           >
             <div
@@ -5341,11 +5359,60 @@ export default function Recruiting() {
                   }}
                 >
                   {googleCalendarConnected
-                    ? "● COLLEGATO · le nuove attività e le modifiche vengono sincronizzate automaticamente."
+                    ? "● COLLEGATO · ogni attività viene sincronizzata automaticamente nel proprio calendario HR."
+                    : googleCalendarNeedsReconnect
+                    ? "⚠ RICOLLEGA GOOGLE CALENDAR UNA VOLTA per autorizzare la creazione dei calendari separati HR."
                     : googleCalendarConfigured
                     ? "○ NON COLLEGATO"
                     : "Configurazione Google Calendar non disponibile."}
                 </div>
+
+                {(googleCalendarConnected ||
+                  googleCalendarNeedsReconnect) && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 7,
+                      flexWrap: "wrap",
+                      marginTop: 9,
+                    }}
+                  >
+                    {[
+                      ["CHIAMARE HR", "#2563eb"],
+                      ["APPUNTAMENTO IN ZONA HR", "#f97316"],
+                      ["APPUNTAMENTO IN SEDE HR", "#7c3aed"],
+                      ["VIDEOCALL HR", "#16a34a"],
+                      ["ALTRO HR", "#64748b"],
+                    ].map(([label, color]) => (
+                      <span
+                        key={label}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "4px 7px",
+                          borderRadius: 999,
+                          background: "white",
+                          border: `1px solid ${color}`,
+                          color,
+                          fontSize: 10,
+                          fontWeight: 900,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 9,
+                            height: 9,
+                            borderRadius: 999,
+                            background: color,
+                            display: "inline-block",
+                          }}
+                        />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div
@@ -5372,6 +5439,8 @@ export default function Recruiting() {
                   >
                     {googleCalendarBusy
                       ? "COLLEGAMENTO..."
+                      : googleCalendarNeedsReconnect
+                      ? "RICOLLEGA GOOGLE CALENDAR"
                       : "COLLEGA GOOGLE CALENDAR"}
                   </button>
                 ) : (
