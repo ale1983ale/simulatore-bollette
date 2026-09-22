@@ -341,6 +341,24 @@ function phoneHref(value: string) {
   return clean ? `tel:${clean}` : "";
 }
 
+function isWindowsPlatform() {
+  if (typeof navigator === "undefined") return false;
+  const platform = String(navigator.platform || "");
+  const userAgent = String(navigator.userAgent || "");
+  return /win/i.test(platform) || /windows/i.test(userAgent);
+}
+
+function emailHref(value: string) {
+  const clean = String(value || "").trim();
+  if (!clean) return "";
+
+  if (isWindowsPlatform()) {
+    return `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(clean)}`;
+  }
+
+  return `mailto:${clean}`;
+}
+
 function normalizePlaceName(value: string) {
   return String(value || "")
     .trim()
@@ -3695,7 +3713,15 @@ export default function Recruiting() {
 
                           {candidate.email && (
                             <a
-                              href={`mailto:${candidate.email}`}
+                              href={emailHref(candidate.email)}
+                              target={
+                                isWindowsPlatform() ? "_blank" : undefined
+                              }
+                              rel={
+                                isWindowsPlatform()
+                                  ? "noopener noreferrer"
+                                  : undefined
+                              }
                               aria-label={`Invia email a ${candidate.fullName}`}
                               title={`Invia email a ${candidate.email}`}
                               onClick={(event) => event.stopPropagation()}
@@ -4072,7 +4098,15 @@ export default function Recruiting() {
                           <label style={labelStyle}>Email</label>
                           {selectedCandidate.email ? (
                             <a
-                              href={`mailto:${selectedCandidate.email}`}
+                              href={emailHref(selectedCandidate.email)}
+                              target={
+                                isWindowsPlatform() ? "_blank" : undefined
+                              }
+                              rel={
+                                isWindowsPlatform()
+                                  ? "noopener noreferrer"
+                                  : undefined
+                              }
                               style={{
                                 color: "#1d4ed8",
                                 textDecoration: "underline",
