@@ -642,6 +642,7 @@ export default function Recruiting() {
   const [noteText, setNoteText] = useState("");
   const [noteCalledByMe, setNoteCalledByMe] = useState(false);
 
+  const [activityCandidateId, setActivityCandidateId] = useState("");
   const [activityType, setActivityType] = useState<EventType>("CHIAMARE");
   const [activityCustom, setActivityCustom] = useState("");
   const [activityDate, setActivityDate] = useState(localDateKey());
@@ -934,6 +935,7 @@ export default function Recruiting() {
   useEffect(() => {
     if (!selectedCandidate) return;
     setContactEditMode(false);
+    setActivityCandidateId(selectedCandidate.id);
     setEditName(selectedCandidate.fullName);
     setEditZone(selectedCandidate.operationalZone);
     setEditProvinceCode(selectedCandidate.provinceCode);
@@ -1657,10 +1659,19 @@ export default function Recruiting() {
 
   const addActivityFromContact = async () => {
     if (!selectedCandidate) return;
+
+    const linkedCandidateId =
+      activityCandidateId || selectedCandidate.id;
+
+    if (!linkedCandidateId) {
+      setMessage("Seleziona il nominativo da collegare all'attività.");
+      return;
+    }
+
     setBusy(true);
     try {
       const eventId = await insertEvent({
-        candidateId: selectedCandidate.id,
+        candidateId: linkedCandidateId,
         type: activityType,
         customType: activityCustom,
         date: activityDate,
@@ -1669,6 +1680,7 @@ export default function Recruiting() {
       });
       if (!eventId) return;
 
+      setActivityCandidateId(selectedCandidate.id);
       setActivityType("CHIAMARE");
       setActivityCustom("");
       setActivityDate(localDateKey());
@@ -3800,6 +3812,32 @@ export default function Recruiting() {
                       <h3 style={{ marginTop: 0 }}>Programma attività</h3>
                       <div style={{ color: "#9a3412", fontSize: 13, marginBottom: 11 }}>
                         La chiamata o l'appuntamento verrà inserito nel CALENDARIO.
+                      </div>
+
+                      <div style={{ marginBottom: 9 }}>
+                        <label style={labelStyle}>Contatto</label>
+                        <select
+                          value={activityCandidateId || selectedCandidate.id}
+                          onChange={(e) =>
+                            setActivityCandidateId(e.target.value)
+                          }
+                          style={inputStyle}
+                        >
+                          {alphabeticalCandidates.map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              {candidate.fullName}
+                            </option>
+                          ))}
+                        </select>
+                        <div
+                          style={{
+                            marginTop: 5,
+                            color: "#64748b",
+                            fontSize: 11,
+                          }}
+                        >
+                          Il nominativo scelto sarà collegato all'attività e potrà essere aperto dal CALENDARIO con il tasto SCHEDA.
+                        </div>
                       </div>
 
                       <div>
