@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
-import { adminUpsertSettings } from "./adminSecurity";
+import { adminGetSetting, adminUpsertSettings } from "./adminSecurity";
 import Production from "./Production";
 import RecruitingManagement from "./RecruitingManagement";
 
@@ -960,20 +960,17 @@ export default function Archive() {
   const [search, setSearch] = useState("");
 
   const loadLegacy = async () => {
-    const { data, error } = await supabase
-      .from("app_settings")
-      .select("value_json")
-      .eq("key", LEGACY_KEY)
-      .limit(1);
-
-    if (error) {
+    let value: any = null;
+    try {
+      value = await adminGetSetting(LEGACY_KEY);
+    } catch (error) {
       console.error("LOAD LEGACY ARCHIVE ERROR:", error);
       setLegacyArchive({ version: 1, files: [] });
       setRows([]);
       return;
     }
 
-    const archive = normalizeLegacyArchive(data?.[0]?.value_json);
+    const archive = normalizeLegacyArchive(value);
     setLegacyArchive(archive);
     setRows(archive.files.flatMap((file) => file.rows as RecessoRow[]));
   };
@@ -1037,15 +1034,14 @@ export default function Archive() {
   };
 
   const migrateLegacyIfNeeded = async (databaseRows: RecessoRow[]) => {
-    const { data, error } = await supabase
-      .from("app_settings")
-      .select("value_json")
-      .eq("key", LEGACY_KEY)
-      .limit(1);
+    let value: any = null;
+    try {
+      value = await adminGetSetting(LEGACY_KEY);
+    } catch {
+      return;
+    }
 
-    if (error) return;
-
-    const legacy = normalizeLegacyArchive(data?.[0]?.value_json);
+    const legacy = normalizeLegacyArchive(value);
     if (!legacy.files.length) return;
 
     let migrated = 0;
