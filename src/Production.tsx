@@ -434,8 +434,7 @@ function MultiSelectFilter({
   );
 }
 
-export default function Production() {
-  const [section, setSection] = useState<"produzione" | "zone">("produzione");
+export default function Production({ view = "produzione" }: { view?: "produzione" | "zone" }) {
   const [rows, setRows] = useState<ProductionRow[]>([]);
   const [agentZones, setAgentZones] = useState<AgentZone[]>([]);
   const [pendingFiles, setPendingFiles] = useState<ParsedProductionFile[]>([]);
@@ -929,40 +928,7 @@ export default function Production() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", minWidth: 0 }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={() => setSection("produzione")}
-          style={{
-            padding: "9px 15px",
-            borderRadius: 8,
-            border: section === "produzione" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            background: section === "produzione" ? "#0f172a" : "white",
-            color: section === "produzione" ? "white" : "#0f172a",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          PRODUZIONE
-        </button>
-        <button
-          type="button"
-          onClick={() => setSection("zone")}
-          style={{
-            padding: "9px 15px",
-            borderRadius: 8,
-            border: section === "zone" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            background: section === "zone" ? "#0f172a" : "white",
-            color: section === "zone" ? "white" : "#0f172a",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          AGENTI / ZONE
-        </button>
-      </div>
-
-      {section === "zone" ? (
+      {view === "zone" ? (
         <div style={cardStyle}>
           <div
             style={{
