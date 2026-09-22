@@ -4578,7 +4578,12 @@ export default function Recruiting() {
                           </div>
                         )}
 
-                        <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            minWidth: 0,
+                            gridColumn: "span 2",
+                          }}
+                        >
                           <label style={labelStyle}>Email</label>
                           {selectedCandidate.email ? (
                             <a
