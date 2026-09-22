@@ -5357,7 +5357,7 @@ function AdminUsersManager({
                             setEditAdminNome(a.nome || "");
                             setEditAdminCognome(a.cognome || "");
                             setEditAdminUsername(a.username || "");
-                            setEditAdminPassword(a.password || "");
+                            setEditAdminPassword("");
                           }}
                           style={{
                             padding: "8px 12px",
@@ -5476,8 +5476,11 @@ function AdminUsersManager({
                 Password
               </div>
               <input
+                type="password"
                 value={editAdminPassword}
                 onChange={(e) => setEditAdminPassword(e.target.value)}
+                placeholder="Lascia vuoto per mantenere la password attuale"
+                autoComplete="new-password"
                 style={{
                   width: "100%",
                   padding: 10,
