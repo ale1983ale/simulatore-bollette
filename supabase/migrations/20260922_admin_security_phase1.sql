@@ -144,6 +144,40 @@ $$;
 revoke all on function public.admin_logout(text) from public;
 grant execute on function public.admin_logout(text) to anon, authenticated;
 
+create or replace function public.admin_session_profile(
+  p_session_token text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_admin_id bigint;
+  v_admin public.admin_users%rowtype;
+begin
+  v_admin_id := private.admin_session_user(p_session_token, false);
+
+  select *
+    into v_admin
+  from public.admin_users
+  where id = v_admin_id;
+
+  return jsonb_build_object(
+    'id', v_admin.id,
+    'auth_id', v_admin.auth_id,
+    'nome', v_admin.nome,
+    'cognome', v_admin.cognome,
+    'email', v_admin.email,
+    'username', v_admin.username,
+    'role', v_admin.role
+  );
+end;
+$;
+
+revoke all on function public.admin_session_profile(text) from public;
+grant execute on function public.admin_session_profile(text) to anon, authenticated;
+
 create or replace function public.admin_list_users(
   p_session_token text
 )
