@@ -351,6 +351,37 @@ function emailHref(value: string) {
   return clean ? `mailto:${clean}` : "";
 }
 
+async function copyPlainText(value: string) {
+  const text = String(value || "");
+  if (!text) return false;
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (error) {
+    console.warn("CLIPBOARD API ERROR:", error);
+  }
+
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.pointerEvents = "none";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    return copied;
+  } catch (error) {
+    console.warn("CLIPBOARD FALLBACK ERROR:", error);
+    return false;
+  }
+}
+
 function normalizePlaceName(value: string) {
   return String(value || "")
     .trim()
@@ -6781,12 +6812,45 @@ export default function Recruiting() {
                   <div
                     style={{
                       marginTop: 10,
-                      color: "#2563eb",
-                      fontSize: 11,
-                      fontWeight: 900,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
                     }}
                   >
-                    CLICCA PER APRIRE LA SCHEDA COMPLETA
+                    <div
+                      style={{
+                        color: "#2563eb",
+                        fontSize: 11,
+                        fontWeight: 900,
+                      }}
+                    >
+                      CLICCA PER APRIRE LA SCHEDA COMPLETA
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={async (event) => {
+                        event.stopPropagation();
+                        const copied = await copyPlainText(
+                          note.noteText
+                        );
+                        setMessage(
+                          copied
+                            ? "Testo della nota copiato."
+                            : "Non riesco a copiare il testo della nota."
+                        );
+                      }}
+                      style={{
+                        ...buttonStyle,
+                        padding: "7px 11px",
+                        background: "#2563eb",
+                        color: "white",
+                      }}
+                    >
+                      COPIA
+                    </button>
                   </div>
                 </div>
               );
