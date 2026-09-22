@@ -718,6 +718,9 @@ export default function Recruiting() {
   const [activityNotes, setActivityNotes] = useState("");
 
   const [calendarMonth, setCalendarMonth] = useState(localMonthKey());
+  const [calendarSearchFilter, setCalendarSearchFilter] = useState("");
+  const [calendarCandidateFilter, setCalendarCandidateFilter] = useState("");
+  const [calendarTypeFilter, setCalendarTypeFilter] = useState<"" | EventType>("");
   const [calendarCandidateId, setCalendarCandidateId] = useState("");
   const [calendarType, setCalendarType] = useState<EventType>("CHIAMARE");
   const [calendarCustom, setCalendarCustom] = useState("");
@@ -2169,7 +2172,22 @@ export default function Recruiting() {
     [notes, calendarContactPreviewId]
   );
 
-  const calendarCells = useMemo(() => getMonthCells(calendarMonth), [calendarMonth]);
+  const calendarAssociatedCandidates = useMemo(() => {
+    const ids = new Set(
+      events
+        .map((event) => event.candidateId)
+        .filter((value): value is string => Boolean(value))
+    );
+
+    return candidates
+      .filter((candidate) => ids.has(candidate.id))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "it"));
+  }, [events, candidates]);
+
+  const calendarCells = useMemo(
+    () => getMonthCells(calendarMonth),
+    [calendarMonth]
+  );
 
   const resetMapInstance = () => {
     if (mapRef.current) {
@@ -3623,6 +3641,30 @@ export default function Recruiting() {
                               Telefono non indicato
                             </span>
                           )}
+
+                          {candidate.email && (
+                            <a
+                              href={`mailto:${candidate.email}`}
+                              aria-label={`Invia email a ${candidate.fullName}`}
+                              title={`Invia email a ${candidate.email}`}
+                              onClick={(event) => event.stopPropagation()}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: 30,
+                                height: 30,
+                                borderRadius: 999,
+                                background: "#dbeafe",
+                                border: "1px solid #93c5fd",
+                                color: "#1d4ed8",
+                                textDecoration: "none",
+                                fontSize: 16,
+                              }}
+                            >
+                              ✉
+                            </a>
+                          )}
                         </div>
 
                         <div
@@ -4862,6 +4904,69 @@ export default function Recruiting() {
           </div>
 
           <div style={cardStyle}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(210px,1fr))",
+                gap: 10,
+                marginBottom: 14,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>Ricerca libera</label>
+                <input
+                  type="search"
+                  value={calendarSearchFilter}
+                  onChange={(e) =>
+                    setCalendarSearchFilter(e.target.value)
+                  }
+                  placeholder="Cerca nome, attività o note..."
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Nominativo associato</label>
+                <select
+                  value={calendarCandidateFilter}
+                  onChange={(e) =>
+                    setCalendarCandidateFilter(e.target.value)
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">TUTTI I NOMINATIVI</option>
+                  {calendarAssociatedCandidates.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Tipologia attività</label>
+                <select
+                  value={calendarTypeFilter}
+                  onChange={(e) =>
+                    setCalendarTypeFilter(
+                      e.target.value as "" | EventType
+                    )
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">TUTTE LE ATTIVITÀ</option>
+                  {Object.entries(EVENT_LABELS).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+            </div>
+
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
               <button type="button" onClick={() => changeCalendarMonth(-1)} style={{ ...buttonStyle, background: "#e2e8f0" }}>← Mese precedente</button>
               <input
@@ -4879,9 +4984,53 @@ export default function Recruiting() {
               ))}
 
               {calendarCells.map((cell) => {
+                const calendarSearchNeedle =
+                  normalizeFilterValue(calendarSearchFilter);
+
                 const dayEvents = events
-                  .filter((event) => event.eventDate === cell.dateKey)
-                  .sort((a, b) => (a.eventTime || "").localeCompare(b.eventTime || ""));
+                  .filter((event) => {
+                    if (event.eventDate !== cell.dateKey) return false;
+
+                    if (
+                      calendarCandidateFilter &&
+                      event.candidateId !== calendarCandidateFilter
+                    ) {
+                      return false;
+                    }
+
+                    if (
+                      calendarTypeFilter &&
+                      event.eventType !== calendarTypeFilter
+                    ) {
+                      return false;
+                    }
+
+                    if (calendarSearchNeedle) {
+                      const searchableText = normalizeFilterValue(
+                        [
+                          candidateName(event.candidateId),
+                          eventDisplayLabel(event),
+                          event.customType,
+                          event.notes,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")
+                      );
+
+                      if (
+                        !searchableText.includes(calendarSearchNeedle)
+                      ) {
+                        return false;
+                      }
+                    }
+
+                    return true;
+                  })
+                  .sort((a, b) =>
+                    (a.eventTime || "").localeCompare(
+                      b.eventTime || ""
+                    )
+                  );
 
                 return (
                   <div
