@@ -13,6 +13,24 @@ export type GoogleCalendarStatus = {
   expires_at?: string | null;
 };
 
+export type GoogleCalendarExternalEvent = {
+  id: string;
+  calendar_id: string;
+  calendar_name: string;
+  summary: string;
+  description: string;
+  location: string;
+  start_date: string;
+  start_time: string;
+  end_date: string;
+  end_time: string;
+  all_day: boolean;
+  date_keys: string[];
+  html_link: string;
+  background_color: string;
+  foreground_color: string;
+};
+
 async function callGoogleCalendar(
   action: string,
   payload: Record<string, unknown> = {}
@@ -83,4 +101,20 @@ export async function deleteGoogleCalendarEvent(eventId: string) {
 
 export async function syncAllGoogleCalendarEvents() {
   return callGoogleCalendar("sync_all");
+}
+
+export async function listGoogleCalendarEvents(
+  timeMin: string,
+  timeMax: string
+): Promise<{
+  connected: boolean;
+  events: GoogleCalendarExternalEvent[];
+}> {
+  return (await callGoogleCalendar("list_events", {
+    time_min: timeMin,
+    time_max: timeMax,
+  })) as {
+    connected: boolean;
+    events: GoogleCalendarExternalEvent[];
+  };
 }

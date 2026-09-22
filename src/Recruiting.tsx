@@ -8,9 +8,11 @@ import {
   deleteGoogleCalendarEvent,
   disconnectGoogleCalendar,
   getGoogleCalendarStatus,
+  listGoogleCalendarEvents,
   startGoogleCalendarConnection,
   syncAllGoogleCalendarEvents,
   syncGoogleCalendarEvent,
+  type GoogleCalendarExternalEvent,
 } from "./googleCalendar";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
@@ -693,6 +695,27 @@ function getMonthCells(monthKey: string) {
   return cells;
 }
 
+function googleCalendarMonthRange(monthKey: string) {
+  const cells = getMonthCells(monthKey);
+  const firstKey = cells[0]?.dateKey || `${monthKey}-01`;
+  const lastKey =
+    cells[cells.length - 1]?.dateKey || `${monthKey}-28`;
+
+  const toLocalDate = (key: string) => {
+    const [year, month, day] = key.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const start = toLocalDate(firstKey);
+  const end = toLocalDate(lastKey);
+  end.setDate(end.getDate() + 1);
+
+  return {
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+  };
+}
+
 export default function Recruiting() {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [section, setSection] = useState<
@@ -706,6 +729,14 @@ export default function Recruiting() {
   const [googleCalendarNeedsReconnect, setGoogleCalendarNeedsReconnect] =
     useState(false);
   const [googleCalendarBusy, setGoogleCalendarBusy] = useState(false);
+  const [showFullGoogleCalendar, setShowFullGoogleCalendar] =
+    useState(false);
+  const [googleExternalEvents, setGoogleExternalEvents] = useState<
+    GoogleCalendarExternalEvent[]
+  >([]);
+  const [googleExternalLoading, setGoogleExternalLoading] =
+    useState(false);
+  const [googleExternalError, setGoogleExternalError] = useState("");
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
@@ -966,6 +997,9 @@ export default function Recruiting() {
       await disconnectGoogleCalendar();
       setGoogleCalendarConnected(false);
       setGoogleCalendarNeedsReconnect(false);
+      setShowFullGoogleCalendar(false);
+      setGoogleExternalEvents([]);
+      setGoogleExternalError("");
       setMessage("Google Calendar scollegato.");
     } catch (error: any) {
       setMessage(
@@ -974,6 +1008,39 @@ export default function Recruiting() {
       );
     } finally {
       setGoogleCalendarBusy(false);
+    }
+  };
+
+  const loadFullGoogleCalendar = async (
+    monthKey = calendarMonth
+  ) => {
+    if (!googleCalendarConnected) return;
+
+    setGoogleExternalLoading(true);
+    setGoogleExternalError("");
+
+    try {
+      const range = googleCalendarMonthRange(monthKey);
+      const result = await listGoogleCalendarEvents(
+        range.timeMin,
+        range.timeMax
+      );
+
+      if (result?.connected === false) {
+        setGoogleCalendarConnected(false);
+        setShowFullGoogleCalendar(false);
+        setGoogleExternalEvents([]);
+        return;
+      }
+
+      setGoogleExternalEvents(
+        Array.isArray(result?.events) ? result.events : []
+      );
+    } catch (error: any) {
+      console.error("GOOGLE COMPLETE CALENDAR ERROR:", error);
+      setGoogleExternalError(error?.message || String(error));
+    } finally {
+      setGoogleExternalLoading(false);
     }
   };
 
@@ -2341,6 +2408,23 @@ export default function Recruiting() {
     () => getMonthCells(calendarMonth),
     [calendarMonth]
   );
+
+  useEffect(() => {
+    if (
+      section !== "calendar" ||
+      !showFullGoogleCalendar ||
+      !googleCalendarConnected
+    ) {
+      return;
+    }
+
+    void loadFullGoogleCalendar(calendarMonth);
+  }, [
+    section,
+    showFullGoogleCalendar,
+    googleCalendarConnected,
+    calendarMonth,
+  ]);
 
   const resetMapInstance = () => {
     if (mapRef.current) {
@@ -5448,6 +5532,31 @@ export default function Recruiting() {
                     <button
                       type="button"
                       disabled={googleCalendarBusy}
+                      onClick={() => {
+                        setGoogleExternalError("");
+                        setShowFullGoogleCalendar((current) => !current);
+                      }}
+                      style={{
+                        ...buttonStyle,
+                        background: showFullGoogleCalendar
+                          ? "#2563eb"
+                          : "white",
+                        color: showFullGoogleCalendar
+                          ? "white"
+                          : "#1d4ed8",
+                        border: "1px solid #93c5fd",
+                      }}
+                    >
+                      {googleExternalLoading && showFullGoogleCalendar
+                        ? "CARICO CALENDARIO..."
+                        : showFullGoogleCalendar
+                        ? "NASCONDI CALENDARIO COMPLETO"
+                        : "MOSTRA CALENDARIO COMPLETO"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={googleCalendarBusy}
                       onClick={() => void syncAllGoogle()}
                       style={{
                         ...buttonStyle,
@@ -5478,6 +5587,30 @@ export default function Recruiting() {
                 )}
               </div>
             </div>
+
+            {showFullGoogleCalendar && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  background: googleExternalError
+                    ? "#fef2f2"
+                    : "#eff6ff",
+                  color: googleExternalError
+                    ? "#b91c1c"
+                    : "#1d4ed8",
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              >
+                {googleExternalError
+                  ? `Errore calendario completo: ${googleExternalError}`
+                  : googleExternalLoading
+                  ? "Caricamento degli eventi Google..."
+                  : `Calendario completo attivo · ${googleExternalEvents.length} eventi Google esterni visualizzati.`}
+              </div>
+            )}
           </div>
 
           <div style={cardStyle}>
@@ -5709,6 +5842,49 @@ export default function Recruiting() {
                     )
                   );
 
+                const dayGoogleEvents =
+                  showFullGoogleCalendar &&
+                  !calendarCandidateFilter &&
+                  !calendarTypeFilter
+                    ? googleExternalEvents
+                        .filter((event) => {
+                          if (
+                            !event.date_keys.includes(cell.dateKey)
+                          ) {
+                            return false;
+                          }
+
+                          if (calendarSearchNeedle) {
+                            const searchableText =
+                              normalizeFilterValue(
+                                [
+                                  event.summary,
+                                  event.description,
+                                  event.location,
+                                  event.calendar_name,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")
+                              );
+
+                            if (
+                              !searchableText.includes(
+                                calendarSearchNeedle
+                              )
+                            ) {
+                              return false;
+                            }
+                          }
+
+                          return true;
+                        })
+                        .sort((a, b) =>
+                          (a.start_time || "").localeCompare(
+                            b.start_time || ""
+                          )
+                        )
+                    : [];
+
                 return (
                   <div
                     key={cell.dateKey}
@@ -5772,6 +5948,81 @@ export default function Recruiting() {
                               Elimina
                             </button>
                           </div>
+                        </div>
+                      ))}
+
+                      {dayGoogleEvents.map((event) => (
+                        <div
+                          key={`google-${event.calendar_id}-${event.id}`}
+                          role={event.html_link ? "button" : undefined}
+                          tabIndex={event.html_link ? 0 : undefined}
+                          onClick={() => {
+                            if (event.html_link) {
+                              window.open(
+                                event.html_link,
+                                "_blank",
+                                "noopener,noreferrer"
+                              );
+                            }
+                          }}
+                          onKeyDown={(keyEvent) => {
+                            if (
+                              event.html_link &&
+                              (keyEvent.key === "Enter" ||
+                                keyEvent.key === " ")
+                            ) {
+                              window.open(
+                                event.html_link,
+                                "_blank",
+                                "noopener,noreferrer"
+                              );
+                            }
+                          }}
+                          title={
+                            event.html_link
+                              ? "Apri in Google Calendar"
+                              : undefined
+                          }
+                          style={{
+                            borderRadius: 7,
+                            padding: 6,
+                            background: "#f8fafc",
+                            border: `1px solid ${event.background_color}`,
+                            borderLeft: `5px solid ${event.background_color}`,
+                            fontSize: 11,
+                            cursor: event.html_link
+                              ? "pointer"
+                              : "default",
+                          }}
+                        >
+                          <div style={{ fontWeight: 900 }}>
+                            {!event.all_day && event.start_time
+                              ? `${event.start_time} · `
+                              : ""}
+                            {event.summary}
+                          </div>
+
+                          <div
+                            style={{
+                              marginTop: 2,
+                              color: event.background_color,
+                              fontSize: 10,
+                              fontWeight: 900,
+                            }}
+                          >
+                            GOOGLE · {event.calendar_name}
+                          </div>
+
+                          {event.location && (
+                            <div
+                              style={{
+                                marginTop: 2,
+                                color: "#475569",
+                              }}
+                            >
+                              {event.location}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
