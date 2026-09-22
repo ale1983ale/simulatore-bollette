@@ -26,6 +26,8 @@ type Candidate = {
   sectorOther: string;
   phone: string;
   email: string;
+  companyName: string;
+  createdAt: string;
   status: CandidateStatus;
   forwardedTo: string;
   provinceCode: string;
@@ -429,12 +431,14 @@ function formatTime(value: string) {
 function candidateFromRow(row: any): Candidate {
   return {
     id: String(row.id),
-    fullName: String(row.full_name || ""),
+    fullName: String(row.full_name || "").toLocaleUpperCase("it"),
     operationalZone: String(row.operational_zone || ""),
     sectorEnergy: row.sector_energy !== false,
     sectorOther: String(row.sector_other || ""),
     phone: String(row.phone || ""),
     email: String(row.email || ""),
+    companyName: String(row.company_name || ""),
+    createdAt: String(row.created_at || ""),
     status: (String(row.contact_status || "DA_CHIAMARE") as CandidateStatus),
     forwardedTo: String(row.forwarded_to || ""),
     provinceCode: normalizeProvinceCode(String(row.province_code || "")),
@@ -546,6 +550,7 @@ export default function Recruiting() {
   const [newSectorEnergy, setNewSectorEnergy] = useState(true);
   const [newSectorChoice, setNewSectorChoice] = useState("");
   const [newSectorOther, setNewSectorOther] = useState("");
+  const [newCompanyName, setNewCompanyName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
 
@@ -555,6 +560,7 @@ export default function Recruiting() {
   const [editRegion, setEditRegion] = useState("");
   const [editSectorEnergy, setEditSectorEnergy] = useState(true);
   const [editSectorOther, setEditSectorOther] = useState("");
+  const [editCompanyName, setEditCompanyName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
 
@@ -609,7 +615,7 @@ export default function Recruiting() {
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,contact_status,forwarded_to,province_code,region")
+        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,contact_status,forwarded_to,province_code,region")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -701,6 +707,7 @@ export default function Recruiting() {
     setEditRegion(selectedCandidate.region);
     setEditSectorEnergy(selectedCandidate.sectorEnergy);
     setEditSectorOther(selectedCandidate.sectorOther);
+    setEditCompanyName(selectedCandidate.companyName);
     setEditPhone(selectedCandidate.phone);
     setEditEmail(selectedCandidate.email);
   }, [selectedCandidateId, selectedCandidate?.fullName]);
@@ -719,6 +726,19 @@ export default function Recruiting() {
           candidates
             .filter((candidate) => !candidate.sectorEnergy)
             .map((candidate) => candidate.sectorOther.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [candidates]
+  );
+
+  const existingCompanies = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          candidates
+            .filter((candidate) => candidate.sectorEnergy)
+            .map((candidate) => candidate.companyName.trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b, "it")),
@@ -759,6 +779,20 @@ export default function Recruiting() {
     [notes]
   );
 
+  const lastNoteSortKeyByCandidateId = useMemo(() => {
+    const latest = new Map<string, string>();
+
+    notes.forEach((note) => {
+      const key = `${note.noteDate}|${note.createdAt}`;
+      const current = latest.get(note.candidateId);
+      if (!current || key > current) {
+        latest.set(note.candidateId, key);
+      }
+    });
+
+    return latest;
+  }, [notes]);
+
   const filteredCandidates = useMemo(() => {
     const nameNeedle = normalizeFilterValue(nameFilter);
     const zoneNeedle = normalizeFilterValue(zoneFilter);
@@ -793,9 +827,35 @@ export default function Recruiting() {
       if (statusFilter && candidate.status !== statusFilter) return false;
 
       return true;
+    }).sort((a, b) => {
+      const aPriority = a.status === "DA_CHIAMARE" ? 0 : 1;
+      const bPriority = b.status === "DA_CHIAMARE" ? 0 : 1;
+
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+
+      const aCreatedKey = a.createdAt
+        ? `${a.createdAt.slice(0, 10)}|${a.createdAt}`
+        : "";
+      const bCreatedKey = b.createdAt
+        ? `${b.createdAt.slice(0, 10)}|${b.createdAt}`
+        : "";
+
+      const aLast =
+        lastNoteSortKeyByCandidateId.get(a.id) || aCreatedKey;
+      const bLast =
+        lastNoteSortKeyByCandidateId.get(b.id) || bCreatedKey;
+
+      if (aLast !== bLast) {
+        return bLast.localeCompare(aLast);
+      }
+
+      return a.fullName.localeCompare(b.fullName, "it");
     });
   }, [
     candidates,
+    lastNoteSortKeyByCandidateId,
     nameFilter,
     zoneFilter,
     sectorFilter,
@@ -967,10 +1027,11 @@ export default function Recruiting() {
         .from("recruiting_candidates")
         .insert({
           owner_key: ctx.ownerKey,
-          full_name: newName.trim(),
+          full_name: newName.trim().toLocaleUpperCase("it"),
           operational_zone: newZone.trim(),
           sector_energy: newSectorEnergy,
           sector_other: resolvedNewSector,
+          company_name: newSectorEnergy ? newCompanyName.trim() : "",
           phone: newPhone.trim(),
           email: newEmail.trim(),
           contact_status: "DA_CHIAMARE",
@@ -988,6 +1049,7 @@ export default function Recruiting() {
       setNewSectorEnergy(true);
       setNewSectorChoice("");
       setNewSectorOther("");
+      setNewCompanyName("");
       setNewPhone("");
       setNewEmail("");
       setShowNewContact(false);
@@ -1013,7 +1075,7 @@ export default function Recruiting() {
       const { error } = await ctx.client
         .from("recruiting_candidates")
         .update({
-          full_name: editName.trim(),
+          full_name: editName.trim().toLocaleUpperCase("it"),
           operational_zone: editZone.trim(),
           province_code: normalizeProvinceCode(editProvinceCode),
           region:
@@ -1021,6 +1083,7 @@ export default function Recruiting() {
             regionFromProvinceCode(editProvinceCode),
           sector_energy: editSectorEnergy,
           sector_other: editSectorEnergy ? "" : editSectorOther.trim(),
+          company_name: editSectorEnergy ? editCompanyName.trim() : "",
           phone: editPhone.trim(),
           email: editEmail.trim(),
           updated_at: new Date().toISOString(),
@@ -1613,6 +1676,40 @@ export default function Recruiting() {
           min-width: 0;
         }
 
+        .recruiting-status-menu {
+          width: 100%;
+          position: relative;
+        }
+
+        .recruiting-status-menu > summary {
+          list-style: none;
+        }
+
+        .recruiting-status-menu > summary::-webkit-details-marker {
+          display: none;
+        }
+
+        .recruiting-status-options {
+          display: grid;
+          gap: 5px;
+          margin-top: 6px;
+          padding: 7px;
+          border-radius: 10px;
+          border: 1px solid #cbd5e1;
+          background: white;
+          box-shadow: 0 8px 22px rgba(15, 23, 42, .12);
+        }
+
+        .recruiting-status-option {
+          width: 100%;
+          border-radius: 8px;
+          padding: 8px 9px;
+          text-align: left;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
         .recruiting-detail-bottom-layout {
           display: grid;
           grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
@@ -1714,6 +1811,11 @@ export default function Recruiting() {
 
       {section === "contacts" && (
         <>
+          <datalist id="recruiting-company-options">
+            {existingCompanies.map((company) => (
+              <option key={company} value={company} />
+            ))}
+          </datalist>
           <div style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <div>
@@ -1744,7 +1846,16 @@ export default function Recruiting() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10 }}>
                   <div>
                     <label style={labelStyle}>Nome e cognome</label>
-                    <input value={newName} onChange={(e) => setNewName(e.target.value)} style={inputStyle} />
+                    <input
+                      value={newName}
+                      onChange={(e) =>
+                        setNewName(e.target.value.toLocaleUpperCase("it"))
+                      }
+                      style={{
+                        ...inputStyle,
+                        textTransform: "uppercase",
+                      }}
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>Zona operativa</label>
@@ -1760,8 +1871,11 @@ export default function Recruiting() {
                         if (isEnergy) {
                           setNewSectorChoice("");
                           setNewSectorOther("");
-                        } else if (!existingOtherSectors.length) {
-                          setNewSectorChoice("__NEW__");
+                        } else {
+                          setNewCompanyName("");
+                          if (!existingOtherSectors.length) {
+                            setNewSectorChoice("__NEW__");
+                          }
                         }
                       }}
                       style={inputStyle}
@@ -1771,7 +1885,18 @@ export default function Recruiting() {
                     </select>
                   </div>
 
-                  {!newSectorEnergy && (
+                  {newSectorEnergy ? (
+                    <div>
+                      <label style={labelStyle}>Azienda</label>
+                      <input
+                        list="recruiting-company-options"
+                        value={newCompanyName}
+                        onChange={(e) => setNewCompanyName(e.target.value)}
+                        placeholder="Scrivi o scegli azienda..."
+                        style={inputStyle}
+                      />
+                    </div>
+                  ) : (
                     <>
                       {existingOtherSectors.length > 0 && (
                         <div>
@@ -1919,7 +2044,15 @@ export default function Recruiting() {
                 >
                   <option value="">Tutti gli stati</option>
                   {CANDIDATE_STATUS_OPTIONS.map(([value, option]) => (
-                    <option key={value} value={value}>
+                    <option
+                      key={value}
+                      value={value}
+                      style={{
+                        background: option.background,
+                        color: option.color,
+                        fontWeight: 800,
+                      }}
+                    >
                       {option.label}
                     </option>
                   ))}
@@ -2063,7 +2196,7 @@ export default function Recruiting() {
                         >
                           Settore energia:{" "}
                           {candidate.sectorEnergy
-                            ? "SI"
+                            ? `SI${candidate.companyName ? ` · ${candidate.companyName}` : ""}`
                             : `NO${candidate.sectorOther ? ` · ${candidate.sectorOther}` : ""}`}
                         </div>
                       </div>
@@ -2092,34 +2225,54 @@ export default function Recruiting() {
                           </div>
                         )}
 
-                        <select
-                          value={candidate.status}
-                          onChange={(event) =>
-                            void updateCandidateStatus(
-                              candidate,
-                              event.target.value as CandidateStatus
-                            )
-                          }
-                          aria-label={`Stato di ${candidate.fullName}`}
-                          style={{
-                            width: "100%",
-                            boxSizing: "border-box",
-                            borderRadius: 9,
-                            padding: "8px 9px",
-                            fontSize: 11,
-                            fontWeight: 900,
-                            border: `1px solid ${statusStyle.border}`,
-                            background: statusStyle.background,
-                            color: statusStyle.color,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {CANDIDATE_STATUS_OPTIONS.map(([value, option]) => (
-                            <option key={value} value={value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                        <details className="recruiting-status-menu">
+                          <summary
+                            aria-label={`Stato di ${candidate.fullName}`}
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              borderRadius: 9,
+                              padding: "8px 9px",
+                              fontSize: 11,
+                              fontWeight: 900,
+                              border: `1px solid ${statusStyle.border}`,
+                              background: statusStyle.background,
+                              color: statusStyle.color,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 8,
+                            }}
+                          >
+                            <span>{statusStyle.label}</span>
+                            <span>▾</span>
+                          </summary>
+
+                          <div className="recruiting-status-options">
+                            {CANDIDATE_STATUS_OPTIONS.map(([value, option]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                className="recruiting-status-option"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void updateCandidateStatus(candidate, value);
+                                  event.currentTarget
+                                    .closest("details")
+                                    ?.removeAttribute("open");
+                                }}
+                                style={{
+                                  border: `1px solid ${option.border}`,
+                                  background: option.background,
+                                  color: option.color,
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </details>
 
                         {candidate.status === "INOLTRATO_A" && (
                           <div
@@ -2223,7 +2376,16 @@ export default function Recruiting() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10, marginTop: 14 }}>
                       <div>
                         <label style={labelStyle}>Nome e cognome</label>
-                        <input value={editName} onChange={(e) => setEditName(e.target.value)} style={inputStyle} />
+                        <input
+                          value={editName}
+                          onChange={(e) =>
+                            setEditName(e.target.value.toLocaleUpperCase("it"))
+                          }
+                          style={{
+                            ...inputStyle,
+                            textTransform: "uppercase",
+                          }}
+                        />
                       </div>
                       <div>
                         <label style={labelStyle}>Città / zona operativa</label>
@@ -2280,14 +2442,31 @@ export default function Recruiting() {
                         <label style={labelStyle}>Settore energia</label>
                         <select
                           value={editSectorEnergy ? "SI" : "NO"}
-                          onChange={(e) => setEditSectorEnergy(e.target.value === "SI")}
+                          onChange={(e) => {
+                            const isEnergy = e.target.value === "SI";
+                            setEditSectorEnergy(isEnergy);
+                            if (!isEnergy) {
+                              setEditCompanyName("");
+                            }
+                          }}
                           style={inputStyle}
                         >
                           <option value="SI">SI</option>
                           <option value="NO">NO</option>
                         </select>
                       </div>
-                      {!editSectorEnergy && (
+                      {editSectorEnergy ? (
+                        <div>
+                          <label style={labelStyle}>Azienda</label>
+                          <input
+                            list="recruiting-company-options"
+                            value={editCompanyName}
+                            onChange={(e) => setEditCompanyName(e.target.value)}
+                            placeholder="Scrivi o scegli azienda..."
+                            style={inputStyle}
+                          />
+                        </div>
+                      ) : (
                         <div>
                           <label style={labelStyle}>Settore attuale</label>
                           <input
