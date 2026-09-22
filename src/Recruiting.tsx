@@ -301,13 +301,18 @@ export default function Recruiting() {
   const [macroareas, setMacroareas] = useState<Macroarea[]>([]);
   const [activeAgents, setActiveAgents] = useState<ActiveAgent[]>([]);
 
-  const [search, setSearch] = useState("");
+  const [nameFilter, setNameFilter] = useState("");
+  const [zoneFilter, setZoneFilter] = useState("");
+  const [sectorFilter, setSectorFilter] = useState<"" | "SI" | "NO">("");
+  const [sectorOtherFilter, setSectorOtherFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | CandidateStatus>("");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [showNewContact, setShowNewContact] = useState(false);
 
   const [newName, setNewName] = useState("");
   const [newZone, setNewZone] = useState("");
   const [newSectorEnergy, setNewSectorEnergy] = useState(true);
+  const [newSectorChoice, setNewSectorChoice] = useState("");
   const [newSectorOther, setNewSectorOther] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -460,31 +465,91 @@ export default function Recruiting() {
     setEditEmail(selectedCandidate.email);
   }, [selectedCandidateId, selectedCandidate?.fullName]);
 
-  const filteredCandidates = useMemo(() => {
-    const needle = search
+  const normalizeFilterValue = (value: string) =>
+    String(value || "")
       .trim()
       .toLocaleLowerCase("it")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
 
-    if (!needle) return candidates;
+  const existingOtherSectors = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          candidates
+            .filter((candidate) => !candidate.sectorEnergy)
+            .map((candidate) => candidate.sectorOther.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [candidates]
+  );
 
-    return candidates.filter((candidate) =>
-      [
-        candidate.fullName,
-        candidate.operationalZone,
-        candidate.phone,
-        candidate.email,
-        CANDIDATE_STATUS[candidate.status]?.label || candidate.status,
-        candidate.sectorEnergy ? "si settore energia" : candidate.sectorOther,
-      ]
-        .join(" ")
-        .toLocaleLowerCase("it")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .includes(needle)
-    );
-  }, [candidates, search]);
+  const existingZones = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          candidates
+            .map((candidate) => candidate.operationalZone.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [candidates]
+  );
+
+  const calledByMeCandidateIds = useMemo(
+    () =>
+      new Set(
+        notes
+          .filter((note) => note.calledByMe)
+          .map((note) => note.candidateId)
+      ),
+    [notes]
+  );
+
+  const filteredCandidates = useMemo(() => {
+    const nameNeedle = normalizeFilterValue(nameFilter);
+    const zoneNeedle = normalizeFilterValue(zoneFilter);
+    const sectorOtherNeedle = normalizeFilterValue(sectorOtherFilter);
+
+    return candidates.filter((candidate) => {
+      if (
+        nameNeedle &&
+        !normalizeFilterValue(candidate.fullName).includes(nameNeedle)
+      ) {
+        return false;
+      }
+
+      if (
+        zoneNeedle &&
+        !normalizeFilterValue(candidate.operationalZone).includes(zoneNeedle)
+      ) {
+        return false;
+      }
+
+      if (sectorFilter === "SI" && !candidate.sectorEnergy) return false;
+      if (sectorFilter === "NO" && candidate.sectorEnergy) return false;
+
+      if (
+        sectorFilter === "NO" &&
+        sectorOtherNeedle &&
+        normalizeFilterValue(candidate.sectorOther) !== sectorOtherNeedle
+      ) {
+        return false;
+      }
+
+      if (statusFilter && candidate.status !== statusFilter) return false;
+
+      return true;
+    });
+  }, [
+    candidates,
+    nameFilter,
+    zoneFilter,
+    sectorFilter,
+    sectorOtherFilter,
+    statusFilter,
+  ]);
 
   const selectedNotes = useMemo(
     () =>
@@ -553,6 +618,17 @@ export default function Recruiting() {
       return;
     }
 
+    const resolvedNewSector = newSectorEnergy
+      ? ""
+      : newSectorChoice === "__NEW__" || !existingOtherSectors.length
+      ? newSectorOther.trim()
+      : newSectorChoice.trim();
+
+    if (!newSectorEnergy && !resolvedNewSector) {
+      setMessage("Seleziona un settore oppure aggiungine uno nuovo.");
+      return;
+    }
+
     setBusy(true);
     try {
       const { data, error } = await ctx.client
@@ -562,7 +638,7 @@ export default function Recruiting() {
           full_name: newName.trim(),
           operational_zone: newZone.trim(),
           sector_energy: newSectorEnergy,
-          sector_other: newSectorEnergy ? "" : newSectorOther.trim(),
+          sector_other: resolvedNewSector,
           phone: newPhone.trim(),
           email: newEmail.trim(),
           contact_status: "DA_CHIAMARE",
@@ -575,6 +651,7 @@ export default function Recruiting() {
       setNewName("");
       setNewZone("");
       setNewSectorEnergy(true);
+      setNewSectorChoice("");
       setNewSectorOther("");
       setNewPhone("");
       setNewEmail("");
@@ -1017,6 +1094,59 @@ export default function Recruiting() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", minWidth: 0 }}>
+      <style>{`
+        .recruiting-contact-layout {
+          display: grid;
+          grid-template-columns: minmax(290px, 38%) minmax(0, 1fr);
+          gap: 14px;
+          align-items: start;
+          min-width: 0;
+        }
+
+        .recruiting-candidate-card {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(150px, 185px);
+          gap: 10px;
+          align-items: center;
+          min-width: 0;
+        }
+
+        .recruiting-status-column {
+          align-self: stretch;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          min-width: 0;
+        }
+
+        .recruiting-detail-bottom-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+          gap: 14px;
+          align-items: start;
+          min-width: 0;
+        }
+
+        @media (max-width: 820px) {
+          .recruiting-contact-layout,
+          .recruiting-detail-bottom-layout {
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .recruiting-candidate-card {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
+          }
+
+          .recruiting-status-column {
+            width: 100%;
+          }
+
+          .recruiting-status-column select {
+            min-height: 42px;
+          }
+        }
+      `}</style>
       <div style={cardStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div>
@@ -1130,23 +1260,62 @@ export default function Recruiting() {
                     <label style={labelStyle}>Settore energia</label>
                     <select
                       value={newSectorEnergy ? "SI" : "NO"}
-                      onChange={(e) => setNewSectorEnergy(e.target.value === "SI")}
+                      onChange={(e) => {
+                        const isEnergy = e.target.value === "SI";
+                        setNewSectorEnergy(isEnergy);
+                        if (isEnergy) {
+                          setNewSectorChoice("");
+                          setNewSectorOther("");
+                        } else if (!existingOtherSectors.length) {
+                          setNewSectorChoice("__NEW__");
+                        }
+                      }}
                       style={inputStyle}
                     >
                       <option value="SI">SI</option>
                       <option value="NO">NO</option>
                     </select>
                   </div>
+
                   {!newSectorEnergy && (
-                    <div>
-                      <label style={labelStyle}>Settore attuale</label>
-                      <input
-                        value={newSectorOther}
-                        onChange={(e) => setNewSectorOther(e.target.value)}
-                        placeholder="Scrivi il settore"
-                        style={inputStyle}
-                      />
-                    </div>
+                    <>
+                      {existingOtherSectors.length > 0 && (
+                        <div>
+                          <label style={labelStyle}>Settore attuale</label>
+                          <select
+                            value={newSectorChoice}
+                            onChange={(e) => {
+                              setNewSectorChoice(e.target.value);
+                              if (e.target.value !== "__NEW__") {
+                                setNewSectorOther("");
+                              }
+                            }}
+                            style={inputStyle}
+                          >
+                            <option value="">Seleziona settore...</option>
+                            {existingOtherSectors.map((sector) => (
+                              <option key={sector} value={sector}>
+                                {sector}
+                              </option>
+                            ))}
+                            <option value="__NEW__">+ Aggiungi nuovo settore</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {(newSectorChoice === "__NEW__" ||
+                        !existingOtherSectors.length) && (
+                        <div>
+                          <label style={labelStyle}>Nuovo settore</label>
+                          <input
+                            value={newSectorOther}
+                            onChange={(e) => setNewSectorOther(e.target.value)}
+                            placeholder="Scrivi il nuovo settore"
+                            style={inputStyle}
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                   <div>
                     <label style={labelStyle}>Numero di telefono</label>
@@ -1174,19 +1343,98 @@ export default function Recruiting() {
               </div>
             )}
 
-            <div style={{ marginTop: 14 }}>
-              <label style={labelStyle}>Cerca contatto</label>
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nome, zona, telefono, email, settore..."
-                style={inputStyle}
-              />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+                gap: 10,
+                marginTop: 14,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>Nome</label>
+                <input
+                  type="search"
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  placeholder="Cerca nome..."
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Zona</label>
+                <input
+                  type="search"
+                  list="recruiting-zone-options"
+                  value={zoneFilter}
+                  onChange={(e) => setZoneFilter(e.target.value)}
+                  placeholder="Cerca zona..."
+                  style={inputStyle}
+                />
+                <datalist id="recruiting-zone-options">
+                  {existingZones.map((zone) => (
+                    <option key={zone} value={zone} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Settore energia</label>
+                <select
+                  value={sectorFilter}
+                  onChange={(e) => {
+                    const value = e.target.value as "" | "SI" | "NO";
+                    setSectorFilter(value);
+                    if (value !== "NO") setSectorOtherFilter("");
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">Tutti</option>
+                  <option value="SI">SI</option>
+                  <option value="NO">NO</option>
+                </select>
+              </div>
+
+              {sectorFilter === "NO" && (
+                <div>
+                  <label style={labelStyle}>Settore</label>
+                  <select
+                    value={sectorOtherFilter}
+                    onChange={(e) => setSectorOtherFilter(e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">Tutti i settori</option>
+                    {existingOtherSectors.map((sector) => (
+                      <option key={sector} value={sector}>
+                        {sector}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label style={labelStyle}>Stato</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as "" | CandidateStatus)
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Tutti gli stati</option>
+                  {CANDIDATE_STATUS_OPTIONS.map(([value, option]) => (
+                    <option key={value} value={value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(290px,38%) minmax(0,1fr)", gap: 14, alignItems: "start" }}>
+          <div className="recruiting-contact-layout">
             <div style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>Lista nominativi</h3>
               <div style={{ maxHeight: 720, overflow: "auto", display: "grid", gap: 7 }}>
@@ -1208,11 +1456,8 @@ export default function Recruiting() {
                           setSelectedCandidateId(candidate.id);
                         }
                       }}
+                      className="recruiting-candidate-card"
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: "minmax(0,1fr) minmax(150px,185px)",
-                        gap: 10,
-                        alignItems: "center",
                         textAlign: "left",
                         border: active
                           ? "2px solid #2563eb"
@@ -1306,9 +1551,29 @@ export default function Recruiting() {
                       </div>
 
                       <div
+                        className="recruiting-status-column"
                         onClick={(event) => event.stopPropagation()}
-                        style={{ alignSelf: "stretch", display: "flex", alignItems: "center" }}
                       >
+                        {calledByMeCandidateIds.has(candidate.id) && (
+                          <div
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              marginBottom: 7,
+                              padding: "6px 8px",
+                              borderRadius: 8,
+                              background: "#ede9fe",
+                              color: "#6d28d9",
+                              border: "1px solid #c4b5fd",
+                              fontSize: 10,
+                              fontWeight: 900,
+                              textAlign: "center",
+                            }}
+                          >
+                            CHIAMATO DA ME
+                          </div>
+                        )}
+
                         <select
                           value={candidate.status}
                           onChange={(event) =>
@@ -1416,7 +1681,7 @@ export default function Recruiting() {
                     </button>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.25fr) minmax(280px,.75fr)", gap: 14, alignItems: "start" }}>
+                  <div className="recruiting-detail-bottom-layout">
                     <div style={cardStyle}>
                       <h3 style={{ marginTop: 0 }}>Note del contatto</h3>
                       <div style={{ display: "grid", gap: 10 }}>
