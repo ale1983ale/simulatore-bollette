@@ -5,8 +5,7 @@ import { getRecruitingContext, type RecruitingContext } from "./recruitingClient
 import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
 import RecruitingManagement from "./RecruitingManagement";
 
-const ITALY_REGIONS_GEOJSON_URL =
-  "https://raw.githubusercontent.com/guglielmo/geojson-italy/main/geojson/limits_IT_regions.geojson";
+const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
 
 type Candidate = {
   id: string;
@@ -703,7 +702,7 @@ export default function Recruiting() {
   }, [activeAgents, mapMode, visibleMapRegions]);
 
   useEffect(() => {
-    if (section !== "map" || regionsGeoJson || mapBoundariesLoading) return;
+    if (section !== "map" || regionsGeoJson) return;
 
     let cancelled = false;
     setMapBoundariesLoading(true);
@@ -730,7 +729,7 @@ export default function Recruiting() {
     return () => {
       cancelled = true;
     };
-  }, [section, regionsGeoJson, mapBoundariesLoading]);
+  }, [section, regionsGeoJson]);
 
   useEffect(() => {
     if (section !== "map") return;
