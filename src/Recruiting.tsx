@@ -31,6 +31,8 @@ type Candidate = {
   forwardedTo: string;
   provinceCode: string;
   region: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type ContactNote = {
@@ -76,8 +78,10 @@ type CandidateMapPoint = {
   candidateId: string;
   fullName: string;
   phone: string;
+  email: string;
   zone: string;
   region: string;
+  status: CandidateStatus;
   latitude: number;
   longitude: number;
 };
@@ -580,6 +584,14 @@ function candidateFromRow(row: any): Candidate {
     forwardedTo: String(row.forwarded_to || ""),
     provinceCode: normalizeProvinceCode(String(row.province_code || "")),
     region: normalizeItalianRegion(String(row.region || "")),
+    latitude:
+      row.latitude === null || row.latitude === undefined
+        ? null
+        : Number(row.latitude),
+    longitude:
+      row.longitude === null || row.longitude === undefined
+        ? null
+        : Number(row.longitude),
   };
 }
 
@@ -759,6 +771,14 @@ export default function Recruiting() {
   const [eventEditNotes, setEventEditNotes] = useState("");
   const [calendarContactPreviewId, setCalendarContactPreviewId] = useState<string | null>(null);
 
+  const [mapView, setMapView] =
+    useState<"agents" | "candidates">("agents");
+  const [mapCandidateStatusFilters, setMapCandidateStatusFilters] =
+    useState<CandidateStatus[]>([]);
+  const [mapShowActiveAgents, setMapShowActiveAgents] = useState(false);
+  const [mapCandidateGeocoding, setMapCandidateGeocoding] = useState(false);
+  const [mapCandidateGeocodingProgress, setMapCandidateGeocodingProgress] =
+    useState({ done: 0, total: 0 });
   const [mapMode, setMapMode] = useState<"italy" | "region" | "macroarea">("italy");
   const [mapRegion, setMapRegion] = useState<string>("Umbria");
   const [mapMacroareaId, setMapMacroareaId] = useState("");
@@ -777,6 +797,8 @@ export default function Recruiting() {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
   const regionsLayerRef = useRef<L.GeoJSON | null>(null);
+  const candidateMapGeocodingRef = useRef(false);
+  const candidateMapFailedZonesRef = useRef<Set<string>>(new Set());
 
   const loadAll = async (context?: RecruitingContext) => {
     const active = context || ctx || (await getRecruitingContext());
@@ -793,7 +815,7 @@ export default function Recruiting() {
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,contact_status,forwarded_to,province_code,region")
+        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,contact_status,forwarded_to,province_code,region,latitude,longitude")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -1730,6 +1752,8 @@ export default function Recruiting() {
       let geography = {
         provinceCode: "",
         region: "",
+        latitude: null as number | null,
+        longitude: null as number | null,
       };
 
       if (newZone.trim()) {
@@ -1738,6 +1762,14 @@ export default function Recruiting() {
           geography = {
             provinceCode: geo.provinceCode || "",
             region: geo.region || "",
+            latitude:
+              geo.latitude !== null && Number.isFinite(geo.latitude)
+                ? geo.latitude
+                : null,
+            longitude:
+              geo.longitude !== null && Number.isFinite(geo.longitude)
+                ? geo.longitude
+                : null,
           };
         } catch (error) {
           console.warn("NEW CANDIDATE GEOGRAPHY ERROR:", error);
@@ -1759,6 +1791,8 @@ export default function Recruiting() {
           forwarded_to: "",
           province_code: geography.provinceCode,
           region: geography.region,
+          latitude: geography.latitude,
+          longitude: geography.longitude,
         })
         .select("id")
         .single();
@@ -1806,15 +1840,49 @@ export default function Recruiting() {
 
     setBusy(true);
     try {
+      let nextLatitude = selectedCandidate.latitude;
+      let nextLongitude = selectedCandidate.longitude;
+      let nextProvinceCode = normalizeProvinceCode(editProvinceCode);
+      let nextRegion =
+        editRegion || regionFromProvinceCode(editProvinceCode);
+
+      const zoneChanged =
+        normalizePlaceName(editZone) !==
+        normalizePlaceName(selectedCandidate.operationalZone);
+
+      if (
+        editZone.trim() &&
+        (zoneChanged ||
+          nextLatitude === null ||
+          nextLongitude === null)
+      ) {
+        try {
+          const geo = await geocodeRecruitingCandidateZone(editZone.trim());
+          if (
+            geo.latitude !== null &&
+            geo.longitude !== null &&
+            Number.isFinite(geo.latitude) &&
+            Number.isFinite(geo.longitude)
+          ) {
+            nextLatitude = geo.latitude;
+            nextLongitude = geo.longitude;
+          }
+          if (geo.provinceCode) nextProvinceCode = geo.provinceCode;
+          if (geo.region) nextRegion = geo.region;
+        } catch (error) {
+          console.warn("EDIT CANDIDATE GEOGRAPHY ERROR:", error);
+        }
+      }
+
       const { error } = await ctx.client
         .from("recruiting_candidates")
         .update({
           full_name: editName.trim().toLocaleUpperCase("it"),
           operational_zone: editZone.trim().toLocaleUpperCase("it"),
-          province_code: normalizeProvinceCode(editProvinceCode),
-          region:
-            editRegion ||
-            regionFromProvinceCode(editProvinceCode),
+          province_code: nextProvinceCode,
+          region: nextRegion,
+          latitude: nextLatitude,
+          longitude: nextLongitude,
           sector_energy: editSectorEnergy,
           sector_other: editSectorEnergy ? "" : editSectorOther.trim(),
           company_name: resolvedEditCompany,
@@ -2241,6 +2309,7 @@ export default function Recruiting() {
     try {
       resetMapInstance();
       setRegionsGeoJson(null);
+      candidateMapFailedZonesRef.current.clear();
       await loadAll(ctx || undefined);
     } catch (error: any) {
       console.error("REFRESH RECRUITING MAP ERROR:", error);
@@ -2289,12 +2358,53 @@ export default function Recruiting() {
         candidateId: candidate.id,
         fullName: candidate.fullName,
         phone: candidate.phone,
+        email: candidate.email,
         zone,
         region,
+        status: candidate.status,
         latitude: geo.latitude,
         longitude: geo.longitude,
       });
 
+      if (ctx) {
+        const { error: coordinateError } = await ctx.client
+          .from("recruiting_candidates")
+          .update({
+            latitude: geo.latitude,
+            longitude: geo.longitude,
+            province_code:
+              geo.provinceCode || candidate.provinceCode || "",
+            region: region || candidate.region || "",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", candidate.id)
+          .eq("owner_key", ctx.ownerKey);
+
+        if (!coordinateError) {
+          setCandidates((current) =>
+            current.map((item) =>
+              item.id === candidate.id
+                ? {
+                    ...item,
+                    latitude: geo.latitude,
+                    longitude: geo.longitude,
+                    provinceCode:
+                      geo.provinceCode ||
+                      item.provinceCode,
+                    region: region || item.region,
+                  }
+                : item
+            )
+          );
+        }
+      }
+
+      setMapView("candidates");
+      setMapCandidateStatusFilters((current) =>
+        current.length === 0 || current.includes(candidate.status)
+          ? current
+          : [...current, candidate.status]
+      );
       setMapReturnView(null);
 
       if (ITALIAN_REGIONS.includes(region as any)) {
@@ -2306,7 +2416,7 @@ export default function Recruiting() {
 
       setSection("map");
       setMessage(
-        `${candidate.fullName} è evidenziato in blu sulla mappa insieme agli agenti attivi.`
+        `${candidate.fullName} è evidenziato nella mappa NOMINATIVI IN LAVORAZIONE.`
       );
     } catch (error: any) {
       console.error("SHOW CANDIDATE MAP ERROR:", error);
@@ -2335,6 +2445,167 @@ export default function Recruiting() {
       return visibleMapRegions.includes(region);
     });
   }, [activeAgents, mapMode, visibleMapRegions]);
+
+  const mapStatusFilteredCandidates = useMemo(
+    () =>
+      candidates.filter(
+        (candidate) =>
+          mapCandidateStatusFilters.length === 0 ||
+          mapCandidateStatusFilters.includes(candidate.status)
+      ),
+    [candidates, mapCandidateStatusFilters]
+  );
+
+  const visibleMapCandidates = useMemo(() => {
+    return mapStatusFilteredCandidates.filter((candidate) => {
+      if (
+        candidate.latitude === null ||
+        candidate.longitude === null ||
+        !Number.isFinite(candidate.latitude) ||
+        !Number.isFinite(candidate.longitude)
+      ) {
+        return false;
+      }
+
+      if (mapMode === "italy") return true;
+      const region = normalizeItalianRegion(
+        candidate.region || candidate.operationalZone
+      );
+      return visibleMapRegions.includes(region);
+    });
+  }, [mapStatusFilteredCandidates, mapMode, visibleMapRegions]);
+
+  const mapAgentsToRender =
+    mapView === "agents" || mapShowActiveAgents
+      ? visibleMapAgents
+      : [];
+
+  const geocodeMissingCandidateMapPoints = async () => {
+    if (!ctx || candidateMapGeocodingRef.current) return;
+
+    const pending = mapStatusFilteredCandidates.filter(
+      (candidate) =>
+        candidate.operationalZone.trim() &&
+        (candidate.latitude === null ||
+          candidate.longitude === null ||
+          !Number.isFinite(candidate.latitude) ||
+          !Number.isFinite(candidate.longitude))
+    );
+
+    const groups = new Map<string, Candidate[]>();
+    pending.forEach((candidate) => {
+      const key = normalizePlaceName(candidate.operationalZone);
+      if (!key || candidateMapFailedZonesRef.current.has(key)) return;
+      const current = groups.get(key) || [];
+      current.push(candidate);
+      groups.set(key, current);
+    });
+
+    const entries = Array.from(groups.entries());
+    if (!entries.length) return;
+
+    candidateMapGeocodingRef.current = true;
+    setMapCandidateGeocoding(true);
+    setMapCandidateGeocodingProgress({
+      done: 0,
+      total: entries.length,
+    });
+
+    try {
+      for (let index = 0; index < entries.length; index += 1) {
+        const [zoneKey, groupedCandidates] = entries[index];
+        const zone = groupedCandidates[0]?.operationalZone.trim();
+        if (!zone) continue;
+
+        try {
+          const geo = await geocodeRecruitingCandidateZone(zone);
+
+          if (
+            geo.latitude === null ||
+            geo.longitude === null ||
+            !Number.isFinite(geo.latitude) ||
+            !Number.isFinite(geo.longitude)
+          ) {
+            throw new Error("Zona non riconosciuta");
+          }
+
+          const ids = groupedCandidates.map((candidate) => candidate.id);
+          const normalizedRegion = normalizeItalianRegion(
+            geo.region || groupedCandidates[0]?.region || ""
+          );
+
+          const { error } = await ctx.client
+            .from("recruiting_candidates")
+            .update({
+              latitude: geo.latitude,
+              longitude: geo.longitude,
+              province_code:
+                geo.provinceCode ||
+                groupedCandidates[0]?.provinceCode ||
+                "",
+              region:
+                normalizedRegion ||
+                groupedCandidates[0]?.region ||
+                "",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("owner_key", ctx.ownerKey)
+            .in("id", ids);
+
+          if (error) throw error;
+
+          setCandidates((current) =>
+            current.map((candidate) =>
+              ids.includes(candidate.id)
+                ? {
+                    ...candidate,
+                    latitude: geo.latitude,
+                    longitude: geo.longitude,
+                    provinceCode:
+                      geo.provinceCode ||
+                      candidate.provinceCode,
+                    region:
+                      normalizedRegion ||
+                      candidate.region,
+                  }
+                : candidate
+            )
+          );
+        } catch (error) {
+          console.warn(
+            "CANDIDATE MAP GEOCODING ERROR:",
+            zone,
+            error
+          );
+          candidateMapFailedZonesRef.current.add(zoneKey);
+        }
+
+        setMapCandidateGeocodingProgress({
+          done: index + 1,
+          total: entries.length,
+        });
+
+        if (index < entries.length - 1) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, 450)
+          );
+        }
+      }
+    } finally {
+      candidateMapGeocodingRef.current = false;
+      setMapCandidateGeocoding(false);
+    }
+  };
+
+  useEffect(() => {
+    if (section !== "map" || mapView !== "candidates") return;
+    void geocodeMissingCandidateMapPoints();
+  }, [
+    section,
+    mapView,
+    mapCandidateStatusFilters,
+    mapStatusFilteredCandidates.length,
+  ]);
 
   useEffect(() => {
     if (section !== "map" || regionsGeoJson) return;
@@ -2465,7 +2736,7 @@ export default function Recruiting() {
 
     regionsLayerRef.current = regionLayer;
 
-    visibleMapAgents.forEach((agent) => {
+    mapAgentsToRender.forEach((agent) => {
       if (agent.latitude === null || agent.longitude === null) return;
       const initials = `${agent.firstName.charAt(0)}${agent.lastName.charAt(0)}`.toUpperCase() || "A";
       const icon = L.divIcon({
@@ -2491,6 +2762,72 @@ export default function Recruiting() {
       );
       marker.addTo(markerLayer!);
     });
+
+    if (mapView === "candidates") {
+      visibleMapCandidates.forEach((candidate, index) => {
+        if (
+          candidate.id === focusedCandidateMap?.candidateId ||
+          candidate.latitude === null ||
+          candidate.longitude === null
+        ) {
+          return;
+        }
+
+        const statusStyle = getStatusDefinition(candidate.status);
+        const nameParts = candidate.fullName
+          .split(/\s+/)
+          .filter(Boolean);
+        const initials =
+          nameParts
+            .slice(0, 2)
+            .map((part) => part.charAt(0))
+            .join("")
+            .toUpperCase() || "N";
+
+        const hash = candidate.id
+          .split("")
+          .reduce(
+            (acc, char) =>
+              ((acc << 5) - acc + char.charCodeAt(0)) | 0,
+            0
+          );
+        const angle = ((Math.abs(hash) % 360) * Math.PI) / 180;
+        const radius = ((Math.abs(hash) % 4) + 1) * 0.0018;
+        const markerLat =
+          candidate.latitude + Math.sin(angle) * radius;
+        const markerLng =
+          candidate.longitude + Math.cos(angle) * radius;
+
+        const candidateIcon = L.divIcon({
+          className: "",
+          html: `<div style="width:34px;height:34px;border-radius:999px;background:${statusStyle.background};color:${statusStyle.color};border:4px solid ${statusStyle.border};box-shadow:0 2px 8px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;">${escapeHtml(initials)}</div>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+        });
+
+        const marker = L.marker([markerLat, markerLng], {
+          icon: candidateIcon,
+        });
+
+        marker.bindTooltip(escapeHtml(candidate.fullName), {
+          direction: "top",
+          offset: [0, -15],
+        });
+
+        marker.bindPopup(
+          `<div style="min-width:220px">
+            <div style="font-size:11px;font-weight:900;color:${statusStyle.color};margin-bottom:4px">NOMINATIVO IN LAVORAZIONE</div>
+            <div style="font-weight:900;font-size:15px;margin-bottom:7px">${escapeHtml(candidate.fullName)}</div>
+            <div><strong>Stato:</strong> ${escapeHtml(statusStyle.label)}</div>
+            <div><strong>Cellulare:</strong> ${escapeHtml(candidate.phone || "—")}</div>
+            <div><strong>Email:</strong> ${escapeHtml(candidate.email || "—")}</div>
+            <div><strong>Zona:</strong> ${escapeHtml(candidate.operationalZone || "—")}</div>
+          </div>`
+        );
+
+        marker.addTo(markerLayer!);
+      });
+    }
 
     const focusedRegion = focusedCandidateMap
       ? normalizeItalianRegion(focusedCandidateMap.region || focusedCandidateMap.zone)
@@ -2527,7 +2864,9 @@ export default function Recruiting() {
         `<div style="min-width:210px">
           <div style="font-size:11px;font-weight:900;color:#2563eb;margin-bottom:4px">CONTATTO RECRUITING</div>
           <div style="font-weight:900;font-size:15px;margin-bottom:7px">${escapeHtml(focusedCandidateMap.fullName)}</div>
+          <div><strong>Stato:</strong> ${escapeHtml(getStatusDefinition(focusedCandidateMap.status).label)}</div>
           <div><strong>Cellulare:</strong> ${escapeHtml(focusedCandidateMap.phone || "—")}</div>
+          <div><strong>Email:</strong> ${escapeHtml(focusedCandidateMap.email || "—")}</div>
           <div><strong>Zona:</strong> ${escapeHtml(focusedCandidateMap.zone || "—")}</div>
         </div>`
       );
@@ -2535,9 +2874,23 @@ export default function Recruiting() {
       candidateMarker.addTo(markerLayer!);
     }
 
-    const markerCoords: Array<[number, number]> = visibleMapAgents
+    const markerCoords: Array<[number, number]> = mapAgentsToRender
       .filter((agent) => agent.latitude !== null && agent.longitude !== null)
       .map((agent) => [agent.latitude as number, agent.longitude as number]);
+
+    if (mapView === "candidates") {
+      visibleMapCandidates.forEach((candidate) => {
+        if (
+          candidate.latitude !== null &&
+          candidate.longitude !== null
+        ) {
+          markerCoords.push([
+            candidate.latitude,
+            candidate.longitude,
+          ]);
+        }
+      });
+    }
 
     if (focusedCandidateMap && focusedCandidateVisible) {
       markerCoords.push([
@@ -2546,7 +2899,11 @@ export default function Recruiting() {
       ]);
     }
 
-    if (focusedCandidateMap && focusedCandidateVisible && markerCoords.length) {
+    if (
+      markerCoords.length &&
+      (mapView === "candidates" ||
+        (focusedCandidateMap && focusedCandidateVisible))
+    ) {
       if (markerCoords.length === 1) {
         map.setView(markerCoords[0], 9);
       } else {
@@ -2570,7 +2927,10 @@ export default function Recruiting() {
     mapMode,
     mapRegion,
     mapMacroareaId,
-    visibleMapAgents,
+    mapView,
+    mapShowActiveAgents,
+    mapAgentsToRender,
+    visibleMapCandidates,
     visibleMapRegions,
     focusedCandidateMap,
     regionsGeoJson,
@@ -5241,6 +5601,46 @@ export default function Recruiting() {
 
       {section === "map" && (
         <>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setMapView("agents");
+                setFocusedCandidateMap(null);
+              }}
+              style={{
+                ...buttonStyle,
+                background:
+                  mapView === "agents" ? "#0f172a" : "white",
+                color:
+                  mapView === "agents" ? "white" : "#0f172a",
+                border: "1px solid #0f172a",
+              }}
+            >
+              AGENTI ATTIVI
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapView("candidates")}
+              style={{
+                ...buttonStyle,
+                background:
+                  mapView === "candidates" ? "#2563eb" : "white",
+                color:
+                  mapView === "candidates" ? "white" : "#1d4ed8",
+                border: "1px solid #60a5fa",
+              }}
+            >
+              NOMINATIVI IN LAVORAZIONE
+            </button>
+          </div>
+
           <div style={cardStyle}>
             <div
               style={{
@@ -5251,18 +5651,30 @@ export default function Recruiting() {
                 flexWrap: "wrap",
               }}
             >
-              <h3 style={{ margin: 0 }}>Cartina agenti attivi</h3>
+              <h3 style={{ margin: 0 }}>
+                {mapView === "agents"
+                  ? "AGENTI ATTIVI"
+                  : "NOMINATIVI IN LAVORAZIONE"}
+              </h3>
 
               <button
                 type="button"
-                disabled={mapRefreshing || mapBoundariesLoading}
+                disabled={
+                  mapRefreshing ||
+                  mapBoundariesLoading ||
+                  mapCandidateGeocoding
+                }
                 onClick={() => void refreshRecruitingMap()}
                 style={{
                   ...buttonStyle,
                   background: "#0f172a",
                   color: "white",
                   opacity:
-                    mapRefreshing || mapBoundariesLoading ? 0.65 : 1,
+                    mapRefreshing ||
+                    mapBoundariesLoading ||
+                    mapCandidateGeocoding
+                      ? 0.65
+                      : 1,
                 }}
               >
                 {mapRefreshing || mapBoundariesLoading
@@ -5271,14 +5683,49 @@ export default function Recruiting() {
               </button>
             </div>
 
-            <div style={{ color: "#64748b", fontSize: 13, marginTop: 6, marginBottom: 12 }}>
-              I punti arancioni provengono da GESTIONE RECRUITING → ASSEGNAZIONE ZONE.
+            <div
+              style={{
+                color: "#64748b",
+                fontSize: 13,
+                marginTop: 6,
+                marginBottom: 12,
+              }}
+            >
+              {mapView === "agents"
+                ? "I punti arancioni provengono da GESTIONE RECRUITING → ASSEGNAZIONE ZONE."
+                : "I nominativi provengono dall'elenco CONTATTI e sono colorati in base allo stato."}
               {focusedCandidateMap && (
-                <span style={{ color: "#1d4ed8", fontWeight: 900 }}>
-                  {" "}Il punto blu evidenzia {focusedCandidateMap.fullName}.
+                <span
+                  style={{
+                    color: "#1d4ed8",
+                    fontWeight: 900,
+                  }}
+                >
+                  {" "}
+                  Il punto blu evidenzia {focusedCandidateMap.fullName}.
                 </span>
               )}
             </div>
+
+            {mapView === "candidates" &&
+              mapCandidateGeocoding && (
+                <div
+                  style={{
+                    marginBottom: 12,
+                    padding: "9px 11px",
+                    borderRadius: 9,
+                    background: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                    color: "#1e40af",
+                    fontWeight: 800,
+                    fontSize: 12,
+                  }}
+                >
+                  Posiziono i nominativi non ancora geolocalizzati:{" "}
+                  {mapCandidateGeocodingProgress.done} /{" "}
+                  {mapCandidateGeocodingProgress.total}
+                </div>
+              )}
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
               <div>
@@ -5319,6 +5766,170 @@ export default function Recruiting() {
                     ))}
                   </select>
                 </div>
+              )}
+
+              {mapView === "candidates" && (
+                <>
+                  <div
+                    style={{
+                      gridColumn: "1 / -1",
+                    }}
+                  >
+                    <label style={labelStyle}>
+                      Stato nominativi · MULTISELEZIONE
+                    </label>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 7,
+                        flexWrap: "wrap",
+                        padding: 9,
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 10,
+                        background: "white",
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "7px 9px",
+                          borderRadius: 8,
+                          background:
+                            mapCandidateStatusFilters.length === 0
+                              ? "#0f172a"
+                              : "#f8fafc",
+                          color:
+                            mapCandidateStatusFilters.length === 0
+                              ? "white"
+                              : "#0f172a",
+                          fontWeight: 900,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            mapCandidateStatusFilters.length === 0
+                          }
+                          onChange={() =>
+                            setMapCandidateStatusFilters([])
+                          }
+                        />
+                        TUTTI GLI STATI
+                      </label>
+
+                      {statusDefinitions.map((status) => (
+                        <label
+                          key={status.code}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "7px 9px",
+                            borderRadius: 8,
+                            background: status.background,
+                            color: status.color,
+                            border: `2px solid ${status.border}`,
+                            fontWeight: 900,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={mapCandidateStatusFilters.includes(
+                              status.code
+                            )}
+                            onChange={(event) => {
+                              setFocusedCandidateMap(null);
+                              setMapCandidateStatusFilters(
+                                (current) => {
+                                  if (event.target.checked) {
+                                    return current.includes(status.code)
+                                      ? current
+                                      : [...current, status.code];
+                                  }
+                                  return current.filter(
+                                    (code) => code !== status.code
+                                  );
+                                }
+                              );
+                            }}
+                          />
+                          {status.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "end",
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        minHeight: 40,
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={mapShowActiveAgents}
+                        onChange={(event) =>
+                          setMapShowActiveAgents(
+                            event.target.checked
+                          )
+                        }
+                        style={{
+                          width: 18,
+                          height: 18,
+                        }}
+                      />
+                      MOSTRA ANCHE AGENTI ATTIVI
+                    </label>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "end",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMapCandidateStatusFilters([]);
+                        setMapShowActiveAgents(false);
+                        setFocusedCandidateMap(null);
+                      }}
+                      style={{
+                        ...buttonStyle,
+                        width: "100%",
+                        minHeight: 40,
+                        background:
+                          mapCandidateStatusFilters.length ||
+                          mapShowActiveAgents
+                            ? "#fee2e2"
+                            : "#f1f5f9",
+                        color:
+                          mapCandidateStatusFilters.length ||
+                          mapShowActiveAgents
+                            ? "#b91c1c"
+                            : "#94a3b8",
+                        border: "1px solid #fecaca",
+                      }}
+                    >
+                      AZZERA FILTRI
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -5413,21 +6024,150 @@ export default function Recruiting() {
             )}
           </div>
 
-          <div style={cardStyle}>
-            <h3 style={{ marginTop: 0 }}>Agenti visualizzati ({visibleMapAgents.length})</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8 }}>
-              {visibleMapAgents.map((agent) => (
-                <div key={agent.id} style={{ border: "1px solid #fed7aa", background: "#fff7ed", borderRadius: 9, padding: 10 }}>
-                  <strong>{agent.firstName} {agent.lastName}</strong>
-                  <div style={{ marginTop: 4, fontSize: 13 }}>Cellulare: {agent.phone || "—"}</div>
-                  <div style={{ fontSize: 13 }}>Zona: {agent.zone || "—"}</div>
-                </div>
-              ))}
-              {!visibleMapAgents.length && (
-                <div style={{ color: "#64748b" }}>Nessun agente attivo posizionato nell'area selezionata.</div>
-              )}
+          {mapView === "agents" ? (
+            <div style={cardStyle}>
+              <h3 style={{ marginTop: 0 }}>
+                Agenti visualizzati ({visibleMapAgents.length})
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit,minmax(220px,1fr))",
+                  gap: 8,
+                }}
+              >
+                {visibleMapAgents.map((agent) => (
+                  <div
+                    key={agent.id}
+                    style={{
+                      border: "1px solid #fed7aa",
+                      background: "#fff7ed",
+                      borderRadius: 9,
+                      padding: 10,
+                    }}
+                  >
+                    <strong>
+                      {agent.firstName} {agent.lastName}
+                    </strong>
+                    <div style={{ marginTop: 4, fontSize: 13 }}>
+                      Cellulare: {agent.phone || "—"}
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      Zona: {agent.zone || "—"}
+                    </div>
+                  </div>
+                ))}
+                {!visibleMapAgents.length && (
+                  <div style={{ color: "#64748b" }}>
+                    Nessun agente attivo posizionato nell'area
+                    selezionata.
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div style={cardStyle}>
+                <h3 style={{ marginTop: 0 }}>
+                  Nominativi visualizzati (
+                  {visibleMapCandidates.length})
+                </h3>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit,minmax(240px,1fr))",
+                    gap: 8,
+                  }}
+                >
+                  {visibleMapCandidates.map((candidate) => {
+                    const statusStyle = getStatusDefinition(
+                      candidate.status
+                    );
+                    return (
+                      <div
+                        key={candidate.id}
+                        style={{
+                          border: `2px solid ${statusStyle.border}`,
+                          background: statusStyle.background,
+                          borderRadius: 9,
+                          padding: 10,
+                        }}
+                      >
+                        <strong>{candidate.fullName}</strong>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            color: statusStyle.color,
+                            fontSize: 12,
+                            fontWeight: 900,
+                          }}
+                        >
+                          {statusStyle.label}
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 13 }}>
+                          Cellulare: {candidate.phone || "—"}
+                        </div>
+                        <div style={{ fontSize: 13 }}>
+                          Zona:{" "}
+                          {candidate.operationalZone || "—"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!visibleMapCandidates.length &&
+                    !mapCandidateGeocoding && (
+                      <div style={{ color: "#64748b" }}>
+                        Nessun nominativo con i filtri selezionati
+                        è posizionato nell'area.
+                      </div>
+                    )}
+                </div>
+              </div>
+
+              {mapShowActiveAgents && (
+                <div style={cardStyle}>
+                  <h3 style={{ marginTop: 0 }}>
+                    Agenti attivi mostrati insieme (
+                    {visibleMapAgents.length})
+                  </h3>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit,minmax(220px,1fr))",
+                      gap: 8,
+                    }}
+                  >
+                    {visibleMapAgents.map((agent) => (
+                      <div
+                        key={agent.id}
+                        style={{
+                          border: "1px solid #fed7aa",
+                          background: "#fff7ed",
+                          borderRadius: 9,
+                          padding: 10,
+                        }}
+                      >
+                        <strong>
+                          {agent.firstName} {agent.lastName}
+                        </strong>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 13,
+                          }}
+                        >
+                          Zona: {agent.zone || "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </>
       )}
 
