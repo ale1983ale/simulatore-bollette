@@ -6,6 +6,7 @@ import Ateco from "./Ateco";
 import Archive from "./Archive";
 import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
 import Recruiting from "./Recruiting";
+import RecruitingManagement from "./RecruitingManagement";
 
 
 type MonthlyRow = {
@@ -5977,7 +5978,7 @@ useEffect(() => {
   localStorage.setItem("app_tab", tab);
 }, [tab]);
 
-  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin"];
+  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
   const adminTabs = ["reportAdmin", "archive", "recruiting", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
@@ -6191,7 +6192,7 @@ const renderAdminContent = () => {
               ...(tab === "archive" ? activeBtn : {}),
             }}
           >
-            DATI
+            DATI PRODUZIONE
           </button>
 
           <button
@@ -6299,6 +6300,17 @@ const renderAdminContent = () => {
               PUN / PSV Admin
             </button>
           )}
+
+          <button
+            onClick={() => setTab("recruitingManagement")}
+            style={{
+              ...baseBtn,
+              padding: "9px 14px",
+              ...(tab === "recruitingManagement" ? activeBtn : {}),
+            }}
+          >
+            GESTIONE RECRUITING
+          </button>
         </div>
       )}
 
@@ -6323,6 +6335,12 @@ const renderAdminContent = () => {
             <AdminUsersManager adminProfile={adminProfile} />
           )}
         </>
+      )}
+
+      {tab === "recruitingManagement" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <RecruitingManagement />
+        </div>
       )}
 
       {tab === "listini" && (

@@ -2,7 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
-import { ITALIAN_REGIONS, REGION_CENTERS, normalizeItalianRegion } from "./recruitingData";
+import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
+import RecruitingManagement from "./RecruitingManagement";
+
+const ITALY_REGIONS_GEOJSON_URL =
+  "https://raw.githubusercontent.com/guglielmo/geojson-italy/main/geojson/limits_IT_regions.geojson";
 
 type Candidate = {
   id: string;
@@ -210,7 +214,7 @@ function getMonthCells(monthKey: string) {
 
 export default function Recruiting() {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
-  const [section, setSection] = useState<"contacts" | "calendar" | "map">("contacts");
+  const [section, setSection] = useState<"contacts" | "calendar" | "map" | "management">("contacts");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -259,9 +263,13 @@ export default function Recruiting() {
   const [mapMode, setMapMode] = useState<"italy" | "region" | "macroarea">("italy");
   const [mapRegion, setMapRegion] = useState<string>("Umbria");
   const [mapMacroareaId, setMapMacroareaId] = useState("");
+  const [regionsGeoJson, setRegionsGeoJson] = useState<any>(null);
+  const [mapBoundariesLoading, setMapBoundariesLoading] = useState(false);
+  const [mapBoundariesError, setMapBoundariesError] = useState("");
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
+  const regionsLayerRef = useRef<L.GeoJSON | null>(null);
 
   const loadAll = async (context?: RecruitingContext) => {
     const active = context || ctx || (await getRecruitingContext());
@@ -695,26 +703,104 @@ export default function Recruiting() {
   }, [activeAgents, mapMode, visibleMapRegions]);
 
   useEffect(() => {
-    if (section !== "map" || !mapElementRef.current) return;
+    if (section !== "map" || regionsGeoJson || mapBoundariesLoading) return;
+
+    let cancelled = false;
+    setMapBoundariesLoading(true);
+    setMapBoundariesError("");
+
+    fetch(ITALY_REGIONS_GEOJSON_URL)
+      .then((response) => {
+        if (!response.ok) throw new Error("Confini regionali non disponibili");
+        return response.json();
+      })
+      .then((data) => {
+        if (!cancelled) setRegionsGeoJson(data);
+      })
+      .catch((error) => {
+        console.error("ITALY REGIONS MAP ERROR:", error);
+        if (!cancelled) {
+          setMapBoundariesError("Non riesco a caricare i confini regionali italiani.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setMapBoundariesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [section, regionsGeoJson, mapBoundariesLoading]);
+
+  useEffect(() => {
+    if (section !== "map") return;
+    void loadAll(ctx || undefined);
+  }, [section]);
+
+  useEffect(() => {
+    if (section !== "map" || !mapElementRef.current || !regionsGeoJson) return;
 
     if (!mapRef.current) {
       mapRef.current = L.map(mapElementRef.current, {
         center: [42.6, 12.5],
         zoom: 5,
+        minZoom: 4,
+        maxZoom: 10,
         zoomControl: true,
+        attributionControl: false,
+        maxBounds: [
+          [34.5, 5.2],
+          [48.5, 20.2],
+        ],
+        maxBoundsViscosity: 1,
       });
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 18,
-      }).addTo(mapRef.current);
-
+      mapRef.current.getContainer().style.background = "#f8fafc";
       markersRef.current = L.layerGroup().addTo(mapRef.current);
     }
 
     const map = mapRef.current;
-    const layer = markersRef.current;
-    layer?.clearLayers();
+    const markerLayer = markersRef.current;
+    markerLayer?.clearLayers();
+
+    if (regionsLayerRef.current) {
+      regionsLayerRef.current.removeFrom(map);
+      regionsLayerRef.current = null;
+    }
+
+    const selectedRegions =
+      mapMode === "italy"
+        ? [...ITALIAN_REGIONS]
+        : visibleMapRegions.map((region) => normalizeItalianRegion(region));
+
+    const filteredFeatures = (regionsGeoJson.features || []).filter((feature: any) => {
+      const regionName = normalizeItalianRegion(String(feature?.properties?.reg_name || ""));
+      return selectedRegions.includes(regionName as any);
+    });
+
+    const selectedGeoJson = {
+      ...regionsGeoJson,
+      features: filteredFeatures,
+    };
+
+    const regionLayer = L.geoJSON(selectedGeoJson, {
+      style: () => ({
+        color: "#475569",
+        weight: 2,
+        opacity: 1,
+        fillColor: "#e2e8f0",
+        fillOpacity: 0.92,
+      }),
+      onEachFeature: (feature: any, layer: any) => {
+        const regionName = normalizeItalianRegion(String(feature?.properties?.reg_name || ""));
+        layer.bindTooltip(regionName, {
+          permanent: true,
+          direction: "center",
+          opacity: 0.9,
+        });
+      },
+    }).addTo(map);
+
+    regionsLayerRef.current = regionLayer;
 
     visibleMapAgents.forEach((agent) => {
       if (agent.latitude === null || agent.longitude === null) return;
@@ -740,36 +826,28 @@ export default function Recruiting() {
           <div><strong>Zona:</strong> ${escapeHtml(agent.zone || "—")}</div>
         </div>`
       );
-      marker.addTo(layer!);
+      marker.addTo(markerLayer!);
     });
 
-    const coords: Array<[number, number]> = visibleMapAgents
-      .filter((agent) => agent.latitude !== null && agent.longitude !== null)
-      .map((agent) => [agent.latitude as number, agent.longitude as number]);
-
-    if (mapMode === "italy") {
-      if (coords.length >= 2) {
-        map.fitBounds(coords, { padding: [40, 40], maxZoom: 7 });
-      } else {
-        map.setView([42.6, 12.5], 5);
-      }
-    } else if (mapMode === "region") {
-      const center = REGION_CENTERS[mapRegion as keyof typeof REGION_CENTERS];
-      if (coords.length >= 2) map.fitBounds(coords, { padding: [50, 50], maxZoom: 9 });
-      else if (coords.length === 1) map.setView(coords[0], 9);
-      else if (center) map.setView(center, 7);
+    if (filteredFeatures.length && regionLayer.getBounds().isValid()) {
+      map.fitBounds(regionLayer.getBounds(), {
+        padding: mapMode === "region" ? [45, 45] : [30, 30],
+        maxZoom: mapMode === "region" ? 7 : 6,
+      });
     } else {
-      const regionCenters = visibleMapRegions
-        .map((region) => REGION_CENTERS[region as keyof typeof REGION_CENTERS])
-        .filter(Boolean) as Array<[number, number]>;
-      const bounds = coords.length ? coords : regionCenters;
-      if (bounds.length >= 2) map.fitBounds(bounds, { padding: [45, 45], maxZoom: 8 });
-      else if (bounds.length === 1) map.setView(bounds[0], 7);
-      else map.setView([42.6, 12.5], 5);
+      map.setView([42.6, 12.5], 5);
     }
 
     window.setTimeout(() => map.invalidateSize(), 50);
-  }, [section, mapMode, mapRegion, mapMacroareaId, visibleMapAgents, visibleMapRegions]);
+  }, [
+    section,
+    mapMode,
+    mapRegion,
+    mapMacroareaId,
+    visibleMapAgents,
+    visibleMapRegions,
+    regionsGeoJson,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -808,26 +886,42 @@ export default function Recruiting() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {[
-          ["contacts", "CONTATTI"],
-          ["calendar", "CALENDARIO"],
-          ["map", "MAPPA"],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setSection(key as "contacts" | "calendar" | "map")}
-            style={{
-              ...buttonStyle,
-              background: section === key ? "#0f172a" : "white",
-              color: section === key ? "white" : "#0f172a",
-              border: section === key ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            }}
-          >
-            {label}
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            ["contacts", "CONTATTI"],
+            ["calendar", "CALENDARIO"],
+            ["map", "MAPPA"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSection(key as "contacts" | "calendar" | "map")}
+              style={{
+                ...buttonStyle,
+                background: section === key ? "#0f172a" : "white",
+                color: section === key ? "white" : "#0f172a",
+                border: section === key ? "1px solid #0f172a" : "1px solid #cbd5e1",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setSection("management")}
+          style={{
+            ...buttonStyle,
+            marginLeft: "auto",
+            background: section === "management" ? "#0f172a" : "white",
+            color: section === "management" ? "white" : "#0f172a",
+            border: section === "management" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+          }}
+        >
+          GESTIONE RECRUITING
+        </button>
       </div>
 
       {message && (
@@ -1300,7 +1394,7 @@ export default function Recruiting() {
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0 }}>Cartina agenti attivi</h3>
             <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-              I punti arancioni provengono da DATI → GESTIONE RECRUITING → ASSEGNAZIONE ZONE.
+              I punti arancioni provengono da GESTIONE RECRUITING → ASSEGNAZIONE ZONE.
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
@@ -1339,6 +1433,16 @@ export default function Recruiting() {
           </div>
 
           <div style={{ ...cardStyle, padding: 10 }}>
+            {mapBoundariesLoading && (
+              <div style={{ padding: "12px 6px", fontWeight: 800, color: "#475569" }}>
+                Caricamento confini regionali italiani...
+              </div>
+            )}
+            {mapBoundariesError && (
+              <div style={{ padding: "12px 6px", fontWeight: 800, color: "#b91c1c" }}>
+                {mapBoundariesError}
+              </div>
+            )}
             <div
               ref={mapElementRef}
               style={{
@@ -1346,7 +1450,7 @@ export default function Recruiting() {
                 width: "100%",
                 borderRadius: 10,
                 overflow: "hidden",
-                background: "#e2e8f0",
+                background: "#f8fafc",
               }}
             />
           </div>
@@ -1368,6 +1472,8 @@ export default function Recruiting() {
           </div>
         </>
       )}
+
+      {section === "management" && <RecruitingManagement />}
     </div>
   );
 }
