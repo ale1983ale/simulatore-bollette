@@ -3773,8 +3773,37 @@ export default function Recruiting() {
                       <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
                         {selectedNotes.map((note) => (
                           <div key={note.id} style={{ border: "1px solid #e2e8f0", borderRadius: 9, padding: 11 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                              <strong>{formatDate(note.noteDate)}</strong>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  alignItems: "center",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <strong>{formatDate(note.noteDate)}</strong>
+                                {note.calledByMe && (
+                                  <span
+                                    style={{
+                                      color: "#6d28d9",
+                                      fontSize: 12,
+                                      fontWeight: 900,
+                                    }}
+                                  >
+                                    ALESSIO CEDRONI DICE:
+                                  </span>
+                                )}
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => void deleteNote(note)}
@@ -3783,22 +3812,6 @@ export default function Recruiting() {
                                 Elimina
                               </button>
                             </div>
-                            {note.calledByMe && (
-                              <div
-                                style={{
-                                  display: "inline-block",
-                                  marginTop: 7,
-                                  padding: "4px 7px",
-                                  borderRadius: 999,
-                                  background: "#ede9fe",
-                                  color: "#6d28d9",
-                                  fontSize: 11,
-                                  fontWeight: 900,
-                                }}
-                              >
-                                CHIAMATO DA ME
-                              </div>
-                            )}
                             <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
                               {note.noteText}
                             </div>
@@ -4689,22 +4702,27 @@ export default function Recruiting() {
                       padding: 10,
                     }}
                   >
-                    <strong>{formatDate(note.noteDate)}</strong>
-                    {note.calledByMe && (
-                      <span
-                        style={{
-                          marginLeft: 8,
-                          padding: "3px 6px",
-                          borderRadius: 999,
-                          background: "#ede9fe",
-                          color: "#6d28d9",
-                          fontSize: 10,
-                          fontWeight: 900,
-                        }}
-                      >
-                        CHIAMATO DA ME
-                      </span>
-                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <strong>{formatDate(note.noteDate)}</strong>
+                      {note.calledByMe && (
+                        <span
+                          style={{
+                            color: "#6d28d9",
+                            fontSize: 12,
+                            fontWeight: 900,
+                          }}
+                        >
+                          ALESSIO CEDRONI DICE:
+                        </span>
+                      )}
+                    </div>
                     <div
                       style={{
                         marginTop: 5,
