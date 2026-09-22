@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
-import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
+import { geocodeItalianZone, ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
 import RecruitingManagement from "./RecruitingManagement";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
@@ -65,6 +65,16 @@ type ActiveAgent = {
   region: string;
   latitude: number | null;
   longitude: number | null;
+};
+
+type CandidateMapPoint = {
+  candidateId: string;
+  fullName: string;
+  phone: string;
+  zone: string;
+  region: string;
+  latitude: number;
+  longitude: number;
 };
 
 const EVENT_LABELS: Record<EventType, string> = {
@@ -352,6 +362,10 @@ export default function Recruiting() {
   const [regionsGeoJson, setRegionsGeoJson] = useState<any>(null);
   const [mapBoundariesLoading, setMapBoundariesLoading] = useState(false);
   const [mapBoundariesError, setMapBoundariesError] = useState("");
+  const [focusedCandidateMap, setFocusedCandidateMap] =
+    useState<CandidateMapPoint | null>(null);
+  const [mapRefreshing, setMapRefreshing] = useState(false);
+  const [mapCandidateBusyId, setMapCandidateBusyId] = useState<string | null>(null);
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
@@ -882,6 +896,100 @@ export default function Recruiting() {
 
   const calendarCells = useMemo(() => getMonthCells(calendarMonth), [calendarMonth]);
 
+  const resetMapInstance = () => {
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+    markersRef.current = null;
+    regionsLayerRef.current = null;
+  };
+
+  const refreshRecruitingMap = async () => {
+    setMapRefreshing(true);
+    setMapBoundariesError("");
+
+    try {
+      resetMapInstance();
+      setRegionsGeoJson(null);
+      await loadAll(ctx || undefined);
+    } catch (error: any) {
+      console.error("REFRESH RECRUITING MAP ERROR:", error);
+      setMapBoundariesError(
+        "Errore durante l'aggiornamento della mappa: " +
+          (error?.message || error)
+      );
+    } finally {
+      setMapRefreshing(false);
+    }
+  };
+
+  const showCandidateOnMap = async (candidate: Candidate) => {
+    const zone =
+      candidate.id === selectedCandidateId
+        ? editZone.trim() || candidate.operationalZone.trim()
+        : candidate.operationalZone.trim();
+
+    if (!zone) {
+      setMessage(
+        "Per mostrare il nominativo sulla mappa devi prima indicare la zona operativa."
+      );
+      return;
+    }
+
+    setMapCandidateBusyId(candidate.id);
+    setMessage("Posiziono il nominativo sulla mappa...");
+
+    try {
+      const geo = await geocodeItalianZone(zone);
+
+      if (
+        geo.latitude === null ||
+        geo.longitude === null ||
+        !Number.isFinite(geo.latitude) ||
+        !Number.isFinite(geo.longitude)
+      ) {
+        throw new Error(
+          "Zona non riconosciuta. Prova a indicare una città o località più precisa."
+        );
+      }
+
+      const region = normalizeItalianRegion(geo.region || "");
+
+      setFocusedCandidateMap({
+        candidateId: candidate.id,
+        fullName: candidate.fullName,
+        phone: candidate.phone,
+        zone,
+        region,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+      });
+
+      setMapReturnView(null);
+
+      if (ITALIAN_REGIONS.includes(region as any)) {
+        setMapRegion(region);
+        setMapMode("region");
+      } else {
+        setMapMode("italy");
+      }
+
+      setSection("map");
+      setMessage(
+        `${candidate.fullName} è evidenziato in blu sulla mappa insieme agli agenti attivi.`
+      );
+    } catch (error: any) {
+      console.error("SHOW CANDIDATE MAP ERROR:", error);
+      setMessage(
+        "Non riesco a posizionare il nominativo sulla mappa: " +
+          (error?.message || error)
+      );
+    } finally {
+      setMapCandidateBusyId(null);
+    }
+  };
+
   const visibleMapRegions = useMemo(() => {
     if (mapMode === "region") return [mapRegion];
     if (mapMode === "macroarea") {
@@ -1055,7 +1163,70 @@ export default function Recruiting() {
       marker.addTo(markerLayer!);
     });
 
-    if (filteredFeatures.length && regionLayer.getBounds().isValid()) {
+    const focusedRegion = focusedCandidateMap
+      ? normalizeItalianRegion(focusedCandidateMap.region || focusedCandidateMap.zone)
+      : "";
+
+    const focusedCandidateVisible =
+      Boolean(focusedCandidateMap) &&
+      (mapMode === "italy" || selectedRegions.includes(focusedRegion as any));
+
+    if (focusedCandidateMap && focusedCandidateVisible) {
+      const candidateIcon = L.divIcon({
+        className: "",
+        html: `<div style="width:38px;height:38px;border-radius:999px;background:#2563eb;color:white;border:4px solid white;box-shadow:0 3px 10px rgba(37,99,235,.42);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;">★</div>`,
+        iconSize: [38, 38],
+        iconAnchor: [19, 19],
+      });
+
+      const candidateMarker = L.marker(
+        [focusedCandidateMap.latitude, focusedCandidateMap.longitude],
+        { icon: candidateIcon }
+      );
+
+      candidateMarker.bindTooltip(
+        escapeHtml(`CONTATTO: ${focusedCandidateMap.fullName}`),
+        {
+          permanent: true,
+          direction: "top",
+          offset: [0, -18],
+          opacity: 0.95,
+        }
+      );
+
+      candidateMarker.bindPopup(
+        `<div style="min-width:210px">
+          <div style="font-size:11px;font-weight:900;color:#2563eb;margin-bottom:4px">CONTATTO RECRUITING</div>
+          <div style="font-weight:900;font-size:15px;margin-bottom:7px">${escapeHtml(focusedCandidateMap.fullName)}</div>
+          <div><strong>Cellulare:</strong> ${escapeHtml(focusedCandidateMap.phone || "—")}</div>
+          <div><strong>Zona:</strong> ${escapeHtml(focusedCandidateMap.zone || "—")}</div>
+        </div>`
+      );
+
+      candidateMarker.addTo(markerLayer!);
+    }
+
+    const markerCoords: Array<[number, number]> = visibleMapAgents
+      .filter((agent) => agent.latitude !== null && agent.longitude !== null)
+      .map((agent) => [agent.latitude as number, agent.longitude as number]);
+
+    if (focusedCandidateMap && focusedCandidateVisible) {
+      markerCoords.push([
+        focusedCandidateMap.latitude,
+        focusedCandidateMap.longitude,
+      ]);
+    }
+
+    if (focusedCandidateMap && focusedCandidateVisible && markerCoords.length) {
+      if (markerCoords.length === 1) {
+        map.setView(markerCoords[0], 9);
+      } else {
+        map.fitBounds(L.latLngBounds(markerCoords), {
+          padding: [65, 65],
+          maxZoom: 9,
+        });
+      }
+    } else if (filteredFeatures.length && regionLayer.getBounds().isValid()) {
       map.fitBounds(regionLayer.getBounds(), {
         padding: mapMode === "region" ? [45, 45] : [30, 30],
         maxZoom: mapMode === "region" ? 7 : 6,
@@ -1072,15 +1243,13 @@ export default function Recruiting() {
     mapMacroareaId,
     visibleMapAgents,
     visibleMapRegions,
+    focusedCandidateMap,
     regionsGeoJson,
   ]);
 
   useEffect(() => {
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      resetMapInstance();
     };
   }, []);
 
@@ -1621,13 +1790,35 @@ export default function Recruiting() {
                   <div style={cardStyle}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                       <h3 style={{ margin: 0 }}>Scheda contatto</h3>
-                      <button
-                        type="button"
-                        onClick={() => void deleteCandidate()}
-                        style={{ ...buttonStyle, padding: "7px 10px", background: "#fee2e2", color: "#991b1b" }}
-                      >
-                        Elimina contatto
-                      </button>
+
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          disabled={mapCandidateBusyId === selectedCandidate.id}
+                          onClick={() => void showCandidateOnMap(selectedCandidate)}
+                          style={{
+                            ...buttonStyle,
+                            padding: "7px 10px",
+                            background: "#dbeafe",
+                            color: "#1d4ed8",
+                            border: "1px solid #93c5fd",
+                            opacity:
+                              mapCandidateBusyId === selectedCandidate.id ? 0.65 : 1,
+                          }}
+                        >
+                          {mapCandidateBusyId === selectedCandidate.id
+                            ? "Posiziono..."
+                            : "📍 MOSTRA IN MAPPA"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void deleteCandidate()}
+                          style={{ ...buttonStyle, padding: "7px 10px", background: "#fee2e2", color: "#991b1b" }}
+                        >
+                          Elimina contatto
+                        </button>
+                      </div>
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 10, marginTop: 14 }}>
@@ -1974,9 +2165,42 @@ export default function Recruiting() {
       {section === "map" && (
         <>
           <div style={cardStyle}>
-            <h3 style={{ marginTop: 0 }}>Cartina agenti attivi</h3>
-            <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>Cartina agenti attivi</h3>
+
+              <button
+                type="button"
+                disabled={mapRefreshing || mapBoundariesLoading}
+                onClick={() => void refreshRecruitingMap()}
+                style={{
+                  ...buttonStyle,
+                  background: "#0f172a",
+                  color: "white",
+                  opacity:
+                    mapRefreshing || mapBoundariesLoading ? 0.65 : 1,
+                }}
+              >
+                {mapRefreshing || mapBoundariesLoading
+                  ? "↻ AGGIORNAMENTO..."
+                  : "↻ AGGIORNA MAPPA"}
+              </button>
+            </div>
+
+            <div style={{ color: "#64748b", fontSize: 13, marginTop: 6, marginBottom: 12 }}>
               I punti arancioni provengono da GESTIONE RECRUITING → ASSEGNAZIONE ZONE.
+              {focusedCandidateMap && (
+                <span style={{ color: "#1d4ed8", fontWeight: 900 }}>
+                  {" "}Il punto blu evidenzia {focusedCandidateMap.fullName}.
+                </span>
+              )}
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 10 }}>
@@ -1986,6 +2210,7 @@ export default function Recruiting() {
                   value={mapMode}
                   onChange={(e) => {
                     setMapReturnView(null);
+                    setFocusedCandidateMap(null);
                     setMapMode(e.target.value as "italy" | "region" | "macroarea");
                   }}
                   style={inputStyle}
