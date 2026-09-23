@@ -123,8 +123,8 @@ type CandidateMapPoint = {
 
 const EVENT_LABELS: Record<EventType, string> = {
   CHIAMARE: "CHIAMARE",
-  APPUNTAMENTO_ZONA: "APPUNTAMENTO IN ZONA",
-  APPUNTAMENTO_SEDE: "APPUNTAMENTO IN SEDE",
+  APPUNTAMENTO_ZONA: "APP. IN ZONA",
+  APPUNTAMENTO_SEDE: "APP. IN SEDE",
   VIDEOCALL: "VIDEOCALL",
   ALTRO: "ALTRO",
 };
@@ -1064,6 +1064,9 @@ export default function Recruiting({
   const [calendarSearchFilter, setCalendarSearchFilter] = useState("");
   const [calendarCandidateFilter, setCalendarCandidateFilter] = useState("");
   const [calendarTypeFilter, setCalendarTypeFilter] = useState<"" | EventType>("");
+  const [calendarOriginFilter, setCalendarOriginFilter] = useState<
+    "" | "APP" | "CRM" | "EXTERNAL"
+  >("");
   const [calendarCandidateId, setCalendarCandidateId] = useState("");
   const [calendarType, setCalendarType] = useState<EventType>("CHIAMARE");
   const [calendarCustom, setCalendarCustom] = useState("");
@@ -1863,6 +1866,7 @@ export default function Recruiting({
     setCalendarSearchFilter("");
     setCalendarCandidateFilter("");
     setCalendarTypeFilter("");
+    setCalendarOriginFilter("");
   };
 
   const selectedNotes = useMemo(
@@ -2850,6 +2854,18 @@ export default function Recruiting({
   const candidateName = (candidateId: string | null) =>
     allCandidates.find((candidate) => candidate.id === candidateId)?.fullName ||
     "Senza contatto";
+
+  const recruitingEventOrigin = (
+    event: RecruitingEvent
+  ): "APP" | "EXTERNAL" => {
+    if (!event.candidateId) return "APP";
+    const candidate = allCandidates.find(
+      (item) => item.id === event.candidateId
+    );
+    return candidate?.contactScope === "external"
+      ? "EXTERNAL"
+      : "APP";
+  };
 
   const eventModalEvent =
     events.find((event) => event.id === eventModalId) || null;
@@ -6356,6 +6372,30 @@ export default function Recruiting({
                 </select>
               </div>
 
+              <div>
+                <label style={labelStyle}>Origine appuntamenti</label>
+                <select
+                  value={calendarOriginFilter}
+                  onChange={(e) =>
+                    setCalendarOriginFilter(
+                      e.target.value as
+                        | ""
+                        | "APP"
+                        | "CRM"
+                        | "EXTERNAL"
+                    )
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">TUTTE LE ORIGINI</option>
+                  <option value="APP">APP</option>
+                  <option value="CRM">CRM</option>
+                  <option value="EXTERNAL">
+                    CONTATTI ESTERNI
+                  </option>
+                </select>
+              </div>
+
               <div
                 style={{
                   display: "flex",
@@ -6368,7 +6408,8 @@ export default function Recruiting({
                   disabled={
                     !calendarSearchFilter.trim() &&
                     !calendarCandidateFilter &&
-                    !calendarTypeFilter
+                    !calendarTypeFilter &&
+                    !calendarOriginFilter
                   }
                   style={{
                     ...buttonStyle,
@@ -6377,25 +6418,29 @@ export default function Recruiting({
                     background:
                       calendarSearchFilter.trim() ||
                       calendarCandidateFilter ||
-                      calendarTypeFilter
+                      calendarTypeFilter ||
+                      calendarOriginFilter
                         ? "#fee2e2"
                         : "#f1f5f9",
                     color:
                       calendarSearchFilter.trim() ||
                       calendarCandidateFilter ||
-                      calendarTypeFilter
+                      calendarTypeFilter ||
+                      calendarOriginFilter
                         ? "#b91c1c"
                         : "#94a3b8",
                     border:
                       calendarSearchFilter.trim() ||
                       calendarCandidateFilter ||
-                      calendarTypeFilter
+                      calendarTypeFilter ||
+                      calendarOriginFilter
                         ? "1px solid #fecaca"
                         : "1px solid #e2e8f0",
                     cursor:
                       calendarSearchFilter.trim() ||
                       calendarCandidateFilter ||
-                      calendarTypeFilter
+                      calendarTypeFilter ||
+                      calendarOriginFilter
                         ? "pointer"
                         : "default",
                   }}
@@ -6428,6 +6473,25 @@ export default function Recruiting({
                 const dayEvents = events
                   .filter((event) => {
                     if (event.eventDate !== cell.dateKey) return false;
+
+                    const eventOrigin =
+                      recruitingEventOrigin(event);
+
+                    if (calendarOriginFilter === "CRM") {
+                      return false;
+                    }
+                    if (
+                      calendarOriginFilter === "APP" &&
+                      eventOrigin !== "APP"
+                    ) {
+                      return false;
+                    }
+                    if (
+                      calendarOriginFilter === "EXTERNAL" &&
+                      eventOrigin !== "EXTERNAL"
+                    ) {
+                      return false;
+                    }
 
                     if (
                       calendarCandidateFilter &&
@@ -6473,7 +6537,8 @@ export default function Recruiting({
                 const dayGoogleEvents =
                   showFullGoogleCalendar &&
                   !calendarCandidateFilter &&
-                  !calendarTypeFilter
+                  !calendarTypeFilter &&
+                  !calendarOriginFilter
                     ? googleExternalEvents
                         .filter((event) => {
                           if (
@@ -6515,7 +6580,9 @@ export default function Recruiting({
 
                 const dayCrmEvents =
                   !calendarCandidateFilter &&
-                  !calendarTypeFilter
+                  !calendarTypeFilter &&
+                  (calendarOriginFilter === "" ||
+                    calendarOriginFilter === "CRM")
                     ? crmCalendarEvents.filter((event) => {
                         if (event.startDate !== cell.dateKey) {
                           return false;
@@ -6640,6 +6707,17 @@ export default function Recruiting({
                                 {eventDisplayLabel(event)}
                               </div>
                               <div>
+                                {recruitingEventOrigin(event) ===
+                                  "EXTERNAL" && (
+                                  <strong
+                                    style={{
+                                      marginRight: 4,
+                                      fontSize: 9,
+                                    }}
+                                  >
+                                    [ESTERNO]
+                                  </strong>
+                                )}
                                 {candidateName(event.candidateId)}
                               </div>
                               {event.notes && (
