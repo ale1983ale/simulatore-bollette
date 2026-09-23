@@ -6215,6 +6215,86 @@ export default function Recruiting({
                     : "MOSTRA CALENDARIO COMPLETO"}
                 </button>
 
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  {[
+                    {
+                      key: "APP" as const,
+                      label: "APP",
+                      activeBackground: "#2563eb",
+                      activeColor: "#ffffff",
+                      border: "#93c5fd",
+                      inactiveColor: "#1d4ed8",
+                    },
+                    {
+                      key: "CRM" as const,
+                      label: "CRM",
+                      activeBackground: "#ea580c",
+                      activeColor: "#ffffff",
+                      border: "#fdba74",
+                      inactiveColor: "#c2410c",
+                    },
+                    {
+                      key: "EXTERNAL" as const,
+                      label: "CONTATTI ESTERNI",
+                      activeBackground: "#7c3aed",
+                      activeColor: "#ffffff",
+                      border: "#c4b5fd",
+                      inactiveColor: "#6d28d9",
+                    },
+                    {
+                      key: "GOOGLE" as const,
+                      label: "CALENDARIO GOOGLE",
+                      activeBackground: "#0f766e",
+                      activeColor: "#ffffff",
+                      border: "#5eead4",
+                      inactiveColor: "#0f766e",
+                    },
+                  ].map((origin) => {
+                    const active =
+                      calendarOriginFilter === origin.key;
+
+                    return (
+                      <button
+                        key={origin.key}
+                        type="button"
+                        disabled={googleCalendarBusy}
+                        onClick={() => {
+                          const next =
+                            calendarOriginFilter === origin.key
+                              ? ""
+                              : origin.key;
+                          setCalendarOriginFilter(next);
+                          if (next === "GOOGLE") {
+                            setShowFullGoogleCalendar(true);
+                          }
+                        }}
+                        style={{
+                          ...buttonStyle,
+                          background: active
+                            ? origin.activeBackground
+                            : "white",
+                          color: active
+                            ? origin.activeColor
+                            : origin.inactiveColor,
+                          border: `1px solid ${origin.border}`,
+                          boxShadow: active
+                            ? "0 1px 3px rgba(15,23,42,.15)"
+                            : "none",
+                        }}
+                      >
+                        {origin.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <button
                   type="button"
                   disabled={googleCalendarBusy}
@@ -6373,36 +6453,6 @@ export default function Recruiting({
                       </option>
                     )
                   )}
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Origine appuntamenti</label>
-                <select
-                  value={calendarOriginFilter}
-                  onChange={(e) => {
-                    const value = e.target.value as
-                      | ""
-                      | "APP"
-                      | "CRM"
-                      | "EXTERNAL"
-                      | "GOOGLE";
-                    setCalendarOriginFilter(value);
-                    if (value === "GOOGLE") {
-                      setShowFullGoogleCalendar(true);
-                    }
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">TUTTE LE ORIGINI</option>
-                  <option value="APP">APP</option>
-                  <option value="CRM">CRM</option>
-                  <option value="EXTERNAL">
-                    CONTATTI ESTERNI
-                  </option>
-                  <option value="GOOGLE">
-                    CALENDARIO GOOGLE
-                  </option>
                 </select>
               </div>
 
