@@ -16,7 +16,7 @@ const hasAdminSession = Boolean(localStorage.getItem("admin_session"));
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
-    {hasAdminSession && <OutlookEmail />}
+    <OutlookEmail />
     {hasAdminSession && <OutlookEmailPreview />}
     {hasAdminSession && <OutlookEmailKeywords />}
     {hasAdminSession && <OutlookEmailPreviewRefresh />}

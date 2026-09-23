@@ -8,6 +8,7 @@ import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogo
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
+import "./dashboard.css";
 
 
 type MonthlyRow = {
@@ -4068,10 +4069,12 @@ function LoginView({
   setSession,
   setAdminProfile,
   setAgentSession,
+  onLoginSuccess,
 }: {
   setSession: React.Dispatch<React.SetStateAction<any>>;
   setAdminProfile: React.Dispatch<React.SetStateAction<AdminProfile | null>>;
   setAgentSession: React.Dispatch<React.SetStateAction<any>>;
+  onLoginSuccess: () => void;
 }) {
   const [mode, setMode] = useState<"agent" | "admin">("agent");
   const [username, setUsername] = useState("");
@@ -4105,6 +4108,7 @@ function LoginView({
         setSession(data);
         setAdminProfile(data);
         setAgentSession(null);
+        onLoginSuccess();
       } else {
         const { data, error } = await supabase
           .from("agents")
@@ -4124,6 +4128,7 @@ function LoginView({
         setSession(null);
         setAdminProfile(null);
         localStorage.setItem("agent_session", JSON.stringify(data));
+        onLoginSuccess();
       }
     } catch (err) {
       setErrorMsg("Errore durante il login");
@@ -5541,6 +5546,275 @@ function AdminUsersManager({
 }
 
 
+
+type DashboardNavigate = (tab: string) => void;
+
+function useDashboardClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return now;
+}
+
+function DashboardCard({
+  title,
+  description,
+  icon,
+  className,
+  onClick,
+  compact = false,
+  spanMobile = false,
+}: {
+  title: string;
+  description: string;
+  icon: string;
+  className: string;
+  onClick: () => void;
+  compact?: boolean;
+  spanMobile?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        "ge-dashboard-card",
+        compact ? "ge-dashboard-card--compact" : "",
+        spanMobile ? "ge-dashboard-card--span-mobile" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      onClick={onClick}
+    >
+      <div className="ge-dashboard-card__icon">{icon}</div>
+      <div className="ge-dashboard-card__body">
+        <div className="ge-dashboard-card__title">{title}</div>
+        <div className="ge-dashboard-card__description">
+          {description}
+        </div>
+        <div className="ge-dashboard-card__link">
+          Vai alla sezione <span>→</span>
+        </div>
+      </div>
+      <div className="ge-dashboard-card__arrow">›</div>
+    </button>
+  );
+}
+
+function DashboardWelcome({
+  name,
+  areaLabel,
+  subtitle,
+}: {
+  name: string;
+  areaLabel: string;
+  subtitle: string;
+}) {
+  const now = useDashboardClock();
+  const dateLabel = new Intl.DateTimeFormat("it-IT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(now);
+  const timeLabel = new Intl.DateTimeFormat("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(now);
+
+  return (
+    <div className="ge-dashboard-welcome">
+      <div className="ge-dashboard-welcome__main">
+        <div className="ge-dashboard-eyebrow">{areaLabel}</div>
+        <div className="ge-dashboard-welcome__title">
+          Bentornato, <span>{name}</span>
+        </div>
+        <div className="ge-dashboard-welcome__subtitle">{subtitle}</div>
+      </div>
+      <div className="ge-dashboard-date">
+        <div className="ge-dashboard-date__icon">▣</div>
+        <div>
+          <div className="ge-dashboard-date__date">{dateLabel}</div>
+          <div className="ge-dashboard-date__time">{timeLabel}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminDashboard({
+  name,
+  navigate,
+  openEmail,
+}: {
+  name: string;
+  navigate: DashboardNavigate;
+  openEmail: () => void;
+}) {
+  return (
+    <div className="ge-dashboard">
+      <DashboardWelcome
+        name={name}
+        areaLabel="AREA ADMIN"
+        subtitle="Da qui puoi accedere rapidamente a tutte le funzioni di gestione."
+      />
+
+      <div className="ge-dashboard-primary ge-dashboard-primary--admin">
+        <DashboardCard
+          title="ENERGIA"
+          description="Simula una fattura di energia elettrica."
+          icon="⚡"
+          className="ge-card-energy"
+          spanMobile
+          onClick={() => navigate("energia")}
+        />
+        <DashboardCard
+          title="GAS"
+          description="Simula una fattura di gas metano."
+          icon="◆"
+          className="ge-card-gas"
+          spanMobile
+          onClick={() => navigate("gas")}
+        />
+        <DashboardCard
+          title="PUN"
+          description="Analizza e monitora i dati PUN."
+          icon="▥"
+          className="ge-card-pun"
+          onClick={() => navigate("punpsvPublic")}
+        />
+        <DashboardCard
+          title="ATECO"
+          description="Analizza i dati ATECO."
+          icon="▦"
+          className="ge-card-ateco"
+          onClick={() => navigate("ateco")}
+        />
+      </div>
+
+      <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
+        <DashboardCard
+          title="CALENDARIO"
+          description="Gestisci il tuo calendario e le attività."
+          icon="▣"
+          className="ge-card-calendar"
+          compact
+          onClick={() => navigate("calendarAdmin")}
+        />
+        <DashboardCard
+          title="RECRUITING"
+          description="Gestisci candidati e nuove risorse."
+          icon="●●"
+          className="ge-card-recruiting"
+          compact
+          onClick={() => navigate("recruiting")}
+        />
+        <DashboardCard
+          title="APPUNTAMENTI"
+          description="Organizza e monitora gli appuntamenti."
+          icon="✓"
+          className="ge-card-appointments"
+          compact
+          onClick={() => navigate("appointments")}
+        />
+        <DashboardCard
+          title="DATI PRODUZIONE"
+          description="Monitora i dati di produzione."
+          icon="▥"
+          className="ge-card-production"
+          compact
+          onClick={() => navigate("archive")}
+        />
+        <DashboardCard
+          title="INVIO EMAIL"
+          description="Invia comunicazioni e allegati."
+          icon="✉"
+          className="ge-card-email"
+          compact
+          onClick={openEmail}
+        />
+        <DashboardCard
+          title="REPORT AGENTI"
+          description="Consulta i report degli agenti."
+          icon="▤"
+          className="ge-card-agent-report"
+          compact
+          onClick={() => navigate("reportAdmin")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AgentDashboard({
+  name,
+  navigate,
+}: {
+  name: string;
+  navigate: DashboardNavigate;
+}) {
+  return (
+    <div className="ge-dashboard ge-dashboard--agent">
+      <DashboardWelcome
+        name={name}
+        areaLabel="AREA AGENTE"
+        subtitle="La tua area di lavoro per simulazioni, dati di mercato e report."
+      />
+
+      <div className="ge-dashboard-primary ge-dashboard-primary--agent">
+        <DashboardCard
+          title="ENERGIA"
+          description="Simula una fattura di energia elettrica."
+          icon="⚡"
+          className="ge-card-energy"
+          spanMobile
+          onClick={() => navigate("energia")}
+        />
+        <DashboardCard
+          title="GAS"
+          description="Simula una fattura di gas metano."
+          icon="◆"
+          className="ge-card-gas"
+          spanMobile
+          onClick={() => navigate("gas")}
+        />
+      </div>
+
+      <div className="ge-dashboard-secondary ge-dashboard-secondary--agent">
+        <DashboardCard
+          title="PUN"
+          description="Analizza i dati del mercato PUN."
+          icon="▥"
+          className="ge-card-pun"
+          compact
+          onClick={() => navigate("punpsvPublic")}
+        />
+        <DashboardCard
+          title="ATECO"
+          description="Analizza i dati ATECO."
+          icon="▦"
+          className="ge-card-ateco"
+          compact
+          onClick={() => navigate("ateco")}
+        />
+        <DashboardCard
+          title="REPORT"
+          description="Accedi ai tuoi report personali e alle tue attività."
+          icon="▤"
+          className="ge-card-agent-dashboard-report"
+          compact
+          spanMobile
+          onClick={() => navigate("report")}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const baseBtn = {
     padding: "10px 14px",
@@ -5585,8 +5859,31 @@ export default function App() {
   };
   
   const [tab, setTab] = useState(() => {
-    return localStorage.getItem("app_tab") || "energia";
+    return localStorage.getItem("app_tab") || "dashboard";
   });
+
+  const navigateTo = (nextTab: string) => {
+    setTab(nextTab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openOutlookEmail = () => {
+    const button = document.querySelector(
+      '[data-outlook-email-admin-slot="true"] button'
+    ) as HTMLButtonElement | null;
+
+    if (button) {
+      button.click();
+      return;
+    }
+
+    window.setTimeout(() => {
+      const retry = document.querySelector(
+        '[data-outlook-email-admin-slot="true"] button'
+      ) as HTMLButtonElement | null;
+      retry?.click();
+    }, 300);
+  };
   useEffect(() => {
     void (async () => {
       const admin = await ensureAdminSession();
@@ -5980,7 +6277,7 @@ useEffect(() => {
 }, [tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
-  const adminTabs = ["calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6156,6 +6453,10 @@ const renderAdminContent = () => {
         setSession={setAdminSession}
         setAdminProfile={setAdminProfile}
         setAgentSession={setAgentSession}
+        onLoginSuccess={() => {
+          setTab("dashboard");
+          localStorage.setItem("app_tab", "dashboard");
+        }}
       />
     );
   }
@@ -6333,6 +6634,18 @@ const renderAdminContent = () => {
             GESTIONE RECRUITING
           </button>
         </div>
+      )}
+
+      {tab === "dashboard" && (
+        <AdminDashboard
+          name={
+            adminProfile?.nome?.trim() ||
+            adminProfile?.username ||
+            "Admin"
+          }
+          navigate={navigateTo}
+          openEmail={openOutlookEmail}
+        />
       )}
 
       {tab === "calendarAdmin" && (
@@ -6520,12 +6833,29 @@ if (!agentSession && !adminSession) {
       setSession={setAdminSession}
       setAdminProfile={setAdminProfile}
       setAgentSession={setAgentSession}
-    />
+        onLoginSuccess={() => {
+          setTab("dashboard");
+          localStorage.setItem("app_tab", "dashboard");
+        }}
+      />
   );
 }
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20 }}>
-      <h1>Simulatore Bollette</h1>
+      <button
+        type="button"
+        className="ge-brand"
+        onClick={() => navigateTo("dashboard")}
+        aria-label="Torna alla dashboard"
+      >
+        <span className="ge-brand__bolt">⚡</span>
+        <span>
+          <span className="ge-brand__title">GESTIONE ENERGIA</span>
+          <span className="ge-brand__subtitle">
+            PIÙ ENERGIA AL TUO LAVORO
+          </span>
+        </span>
+      </button>
   
       <div
   style={{
@@ -6587,10 +6917,10 @@ if (!agentSession && !adminSession) {
 
   {adminProfile?.role === "super_admin" && (
     <button
-      onClick={() => setTab("reportAdmin")}
+      onClick={() => navigateTo("dashboard")}
       style={{
         ...baseBtn,
-        ...(tab === "reportAdmin" ? activeBtn : {}),
+        ...(isAdminTab ? activeBtn : {}),
       }}
     >
       Area Admin
@@ -6620,7 +6950,23 @@ if (!agentSession && !adminSession) {
   )}
 </div>
   
-{tab === "energia" ? (
+{tab === "dashboard" ? (
+  adminSession ? (
+    renderAdminContent()
+  ) : (
+    <AgentDashboard
+      name={
+        [agentSession?.nome, agentSession?.cognome]
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        agentSession?.username ||
+        "Agente"
+      }
+      navigate={navigateTo}
+    />
+  )
+) : tab === "energia" ? (
   <Energia
     punPsvRows={punPsvRows}
     energyOffers={energyOffers}

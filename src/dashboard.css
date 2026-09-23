@@ -1,0 +1,440 @@
+
+:root {
+  --ge-text: #0f2d69;
+  --ge-muted: #61708e;
+  --ge-border: #dbe5f2;
+}
+
+.ge-brand {
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  padding: 20px 28px;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  cursor: pointer;
+  color: white;
+  background: linear-gradient(105deg, #0347c9 0%, #1678ee 38%, #6fa9ef 58%, #ff9c3c 82%, #ff7a18 100%);
+  box-shadow: 0 12px 30px rgba(14, 82, 184, 0.2);
+}
+
+.ge-brand__bolt {
+  font-size: 34px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.16));
+}
+
+.ge-brand__title {
+  display: block;
+  font-size: clamp(25px, 3vw, 38px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: .01em;
+}
+
+.ge-brand__subtitle {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .32em;
+  opacity: .92;
+}
+
+.ge-dashboard {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ge-dashboard-welcome {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: center;
+  background: linear-gradient(135deg, #ffffff 0%, #ffffff 70%, #f6f9fd 100%);
+  border: 1px solid var(--ge-border);
+  border-radius: 20px;
+  padding: 26px 34px;
+  box-shadow: 0 8px 26px rgba(31, 74, 128, .07);
+}
+
+.ge-dashboard-eyebrow {
+  color: #4a79c9;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .28em;
+  margin-bottom: 8px;
+}
+
+.ge-dashboard-welcome__title {
+  color: #0b255b;
+  font-size: clamp(30px, 4vw, 52px);
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.ge-dashboard-welcome__title span {
+  color: #1475ee;
+}
+
+.ge-dashboard-welcome__subtitle {
+  margin-top: 10px;
+  color: #4f6489;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.ge-dashboard-date {
+  min-width: 250px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #dce8f6;
+  border-radius: 16px;
+  padding: 18px 22px;
+  background: #f8fbff;
+  color: #173d7b;
+}
+
+.ge-dashboard-date__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #e8f2ff;
+  color: #1475ee;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.ge-dashboard-date__date {
+  text-transform: capitalize;
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.ge-dashboard-date__time {
+  margin-top: 4px;
+  font-weight: 800;
+  color: #57749e;
+}
+
+.ge-dashboard-primary,
+.ge-dashboard-secondary {
+  display: grid;
+  gap: 14px;
+}
+
+.ge-dashboard-primary--admin {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ge-dashboard-primary--agent {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ge-dashboard-secondary--admin {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.ge-dashboard-secondary--agent {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ge-dashboard-card {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 172px;
+  border: 0;
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(22, 60, 105, .11);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.ge-dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 13px 28px rgba(22, 60, 105, .16);
+}
+
+.ge-dashboard-card--compact {
+  min-height: 160px;
+  padding: 17px 14px;
+  align-items: flex-start;
+}
+
+.ge-dashboard-card__icon {
+  flex: 0 0 auto;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 8px 18px rgba(0,0,0,.12);
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.ge-dashboard-card--compact .ge-dashboard-card__icon {
+  width: 52px;
+  height: 52px;
+  font-size: 22px;
+}
+
+.ge-dashboard-card__body {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.ge-dashboard-card__title {
+  font-size: clamp(20px, 2vw, 29px);
+  line-height: 1.05;
+  font-weight: 950;
+  letter-spacing: -.01em;
+}
+
+.ge-dashboard-card--compact .ge-dashboard-card__title {
+  font-size: 16px;
+}
+
+.ge-dashboard-card__description {
+  margin-top: 8px;
+  line-height: 1.35;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.ge-dashboard-card--compact .ge-dashboard-card__description {
+  font-size: 12px;
+}
+
+.ge-dashboard-card__link {
+  margin-top: 15px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ge-dashboard-card__link span {
+  margin-left: 8px;
+  font-size: 18px;
+}
+
+.ge-dashboard-card__arrow {
+  margin-left: auto;
+  position: relative;
+  z-index: 1;
+  font-size: 42px;
+  opacity: .72;
+}
+
+.ge-card-energy {
+  color: white;
+  background: linear-gradient(135deg, #ffb619 0%, #ff7a0a 62%, #f75c00 100%);
+}
+
+.ge-card-gas {
+  color: white;
+  background: linear-gradient(135deg, #1dc4f1 0%, #1689ee 50%, #075fe4 100%);
+}
+
+.ge-card-pun {
+  color: white;
+  background: linear-gradient(135deg, #ff637b 0%, #ed315d 52%, #c9124b 100%);
+}
+
+.ge-card-ateco {
+  color: white;
+  background: linear-gradient(135deg, #32d3a0 0%, #14b878 56%, #07935d 100%);
+}
+
+.ge-card-calendar {
+  color: #0767d7;
+  background: linear-gradient(135deg, #e9f7ff 0%, #d3ebff 100%);
+}
+
+.ge-card-recruiting {
+  color: #d35a00;
+  background: linear-gradient(135deg, #fff8e8 0%, #ffe7ba 100%);
+}
+
+.ge-card-appointments {
+  color: #6331df;
+  background: linear-gradient(135deg, #f4ecff 0%, #e5d8ff 100%);
+}
+
+.ge-card-production {
+  color: #087d67;
+  background: linear-gradient(135deg, #e6fff3 0%, #ccf6e3 100%);
+}
+
+.ge-card-email {
+  color: #d91f4b;
+  background: linear-gradient(135deg, #fff0f3 0%, #ffd7df 100%);
+}
+
+.ge-card-agent-report {
+  color: #a85a00;
+  background: linear-gradient(135deg, #fff8dc 0%, #ffe69a 100%);
+}
+
+.ge-card-agent-dashboard-report {
+  color: #5730cb;
+  background: linear-gradient(135deg, #f1eaff 0%, #d9c8ff 100%);
+}
+
+.ge-card-calendar .ge-dashboard-card__icon,
+.ge-card-recruiting .ge-dashboard-card__icon,
+.ge-card-appointments .ge-dashboard-card__icon,
+.ge-card-production .ge-dashboard-card__icon,
+.ge-card-email .ge-dashboard-card__icon,
+.ge-card-agent-report .ge-dashboard-card__icon,
+.ge-card-agent-dashboard-report .ge-dashboard-card__icon {
+  background: rgba(255,255,255,.78);
+}
+
+@media (max-width: 1150px) {
+  .ge-dashboard-primary--admin {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ge-dashboard-secondary--admin {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .ge-brand {
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+  }
+
+  .ge-brand__bolt {
+    font-size: 28px;
+  }
+
+  .ge-brand__title {
+    font-size: 25px;
+  }
+
+  .ge-brand__subtitle {
+    margin-top: 5px;
+    font-size: 8px;
+    letter-spacing: .22em;
+  }
+
+  .ge-dashboard {
+    gap: 12px;
+  }
+
+  .ge-dashboard-welcome {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 20px;
+    border-radius: 16px;
+  }
+
+  .ge-dashboard-welcome__title {
+    font-size: 34px;
+  }
+
+  .ge-dashboard-welcome__subtitle {
+    font-size: 14px;
+  }
+
+  .ge-dashboard-date {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+  }
+
+  .ge-dashboard-primary--admin,
+  .ge-dashboard-primary--agent,
+  .ge-dashboard-secondary--admin,
+  .ge-dashboard-secondary--agent {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .ge-dashboard-card {
+    min-height: 145px;
+    padding: 15px;
+    border-radius: 15px;
+    gap: 12px;
+  }
+
+  .ge-dashboard-card--span-mobile,
+  .ge-dashboard-primary--agent .ge-card-energy,
+  .ge-dashboard-primary--agent .ge-card-gas,
+  .ge-dashboard-secondary--agent .ge-card-agent-dashboard-report {
+    grid-column: 1 / -1;
+  }
+
+  .ge-dashboard-card__icon {
+    width: 60px;
+    height: 60px;
+    font-size: 27px;
+  }
+
+  .ge-dashboard-card--compact {
+    min-height: 145px;
+    padding: 14px 12px;
+    display: block;
+  }
+
+  .ge-dashboard-card--compact .ge-dashboard-card__icon {
+    width: 45px;
+    height: 45px;
+    margin-bottom: 10px;
+  }
+
+  .ge-dashboard-card__title {
+    font-size: 22px;
+  }
+
+  .ge-dashboard-card--compact .ge-dashboard-card__title {
+    font-size: 15px;
+  }
+
+  .ge-dashboard-card__description {
+    font-size: 13px;
+  }
+
+  .ge-dashboard-card--compact .ge-dashboard-card__description {
+    font-size: 11px;
+  }
+
+  .ge-dashboard-card__link {
+    margin-top: 10px;
+    font-size: 11px;
+  }
+
+  .ge-dashboard-card__arrow {
+    display: none;
+  }
+}
+
+@media (max-width: 460px) {
+  .ge-dashboard-welcome__title {
+    font-size: 30px;
+  }
+
+  .ge-dashboard-card--compact .ge-dashboard-card__description {
+    min-height: 30px;
+  }
+}
