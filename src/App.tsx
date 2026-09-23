@@ -600,6 +600,62 @@ async function saveSimulationArchive(
   }
 }
 
+async function deleteSavedSimulation(
+  type: SavedSimulationType,
+  id: string
+) {
+  const ownerKey = await getSimulationOwnerKey();
+  const params = new URLSearchParams({
+    owner_key: `eq.${ownerKey}`,
+    simulation_type: `eq.${type}`,
+    id: `eq.${id}`,
+  });
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/saved_simulations?${params.toString()}`,
+    {
+      method: "DELETE",
+      headers: {
+        ...simulationArchiveHeaders(ownerKey),
+        Prefer: "return=minimal",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Impossibile eliminare la simulazione."
+    );
+  }
+}
+
+async function deleteAllSavedSimulations(
+  type: SavedSimulationType
+) {
+  const ownerKey = await getSimulationOwnerKey();
+  const params = new URLSearchParams({
+    owner_key: `eq.${ownerKey}`,
+    simulation_type: `eq.${type}`,
+  });
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/saved_simulations?${params.toString()}`,
+    {
+      method: "DELETE",
+      headers: {
+        ...simulationArchiveHeaders(ownerKey),
+        Prefer: "return=minimal",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Impossibile eliminare le simulazioni."
+    );
+  }
+}
+
 function SavedSimulationsModal({
   open,
   type,
@@ -616,36 +672,102 @@ function SavedSimulationsModal({
   const [items, setItems] = useState<SavedSimulation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(
+    null
+  );
+  const [deletingAll, setDeletingAll] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
+  const reloadSavedSimulations = async () => {
     setLoading(true);
     setError("");
 
-    void listSavedSimulations(type)
-      .then((rows) => {
-        if (!cancelled) setItems(rows);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setItems([]);
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Errore caricamento simulazioni."
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    try {
+      const rows = await listSavedSimulations(type);
+      setItems(rows);
+    } catch (err) {
+      setItems([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Errore caricamento simulazioni."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => {
-      cancelled = true;
-    };
+  useEffect(() => {
+    if (!open) return;
+    void reloadSavedSimulations();
   }, [open, type]);
+
+  const handleDeleteOne = async (
+    simulation: SavedSimulation
+  ) => {
+    if (
+      !window.confirm(
+        `Vuoi eliminare la simulazione "${simulation.name}"?`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingId(simulation.id);
+    setError("");
+
+    try {
+      await deleteSavedSimulation(type, simulation.id);
+      setItems((current) =>
+        current.filter(
+          (item) => item.id !== simulation.id
+        )
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Errore durante l'eliminazione."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (items.length === 0) return;
+
+    if (
+      !window.confirm(
+        `Vuoi eliminare tutte le simulazioni ${type === "energy" ? "Energia" : "Gas"} salvate?`
+      )
+    ) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Conferma definitiva: questa operazione non può essere annullata."
+      )
+    ) {
+      return;
+    }
+
+    setDeletingAll(true);
+    setError("");
+
+    try {
+      await deleteAllSavedSimulations(type);
+      setItems([]);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Errore durante l'eliminazione."
+      );
+    } finally {
+      setDeletingAll(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -697,20 +819,54 @@ function SavedSimulationsModal({
               Ultime 100 simulazioni salvate
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
+          <div
             style={{
-              border: "1px solid #cbd5e1",
-              background: "white",
-              borderRadius: 9,
-              padding: "8px 11px",
-              fontWeight: 800,
-              cursor: "pointer",
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
             }}
           >
-            CHIUDI
-          </button>
+            <button
+              type="button"
+              disabled={
+                deletingAll || loading || items.length === 0
+              }
+              onClick={() => void handleDeleteAll()}
+              style={{
+                border: "1px solid #dc2626",
+                background: "#dc2626",
+                color: "white",
+                borderRadius: 9,
+                padding: "8px 11px",
+                fontWeight: 900,
+                cursor:
+                  deletingAll || loading || items.length === 0
+                    ? "default"
+                    : "pointer",
+                opacity:
+                  deletingAll || loading || items.length === 0
+                    ? 0.55
+                    : 1,
+              }}
+            >
+              {deletingAll ? "ELIMINAZIONE..." : "ELIMINA TUTTO"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                border: "1px solid #cbd5e1",
+                background: "white",
+                borderRadius: 9,
+                padding: "8px 11px",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              CHIUDI
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -741,7 +897,7 @@ function SavedSimulationsModal({
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "minmax(0,1fr) auto auto",
+                    "minmax(0,1fr) auto",
                   gap: 12,
                   alignItems: "center",
                   border: "1px solid #e2e8f0",
@@ -777,29 +933,53 @@ function SavedSimulationsModal({
 
                 <div
                   style={{
-                    fontSize: 11,
-                    color: "#64748b",
-                    fontWeight: 800,
+                    display: "flex",
+                    gap: 7,
+                    flexWrap: "nowrap",
+                    alignItems: "center",
                   }}
                 >
-                  {type === "energy" ? "ENERGIA" : "GAS"}
+                  <button
+                    type="button"
+                    onClick={() => onOpenSimulation(item)}
+                    style={{
+                      border: 0,
+                      background: "#0f172a",
+                      color: "white",
+                      borderRadius: 9,
+                      padding: "8px 12px",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    APRI
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deletingId === item.id}
+                    onClick={() =>
+                      void handleDeleteOne(item)
+                    }
+                    style={{
+                      border: "1px solid #dc2626",
+                      background: "#fff",
+                      color: "#b91c1c",
+                      borderRadius: 9,
+                      padding: "8px 10px",
+                      fontWeight: 900,
+                      cursor:
+                        deletingId === item.id
+                          ? "wait"
+                          : "pointer",
+                      opacity:
+                        deletingId === item.id ? 0.6 : 1,
+                    }}
+                  >
+                    {deletingId === item.id
+                      ? "..."
+                      : "ELIMINA"}
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => onOpenSimulation(item)}
-                  style={{
-                    border: 0,
-                    background: "#0f172a",
-                    color: "white",
-                    borderRadius: 9,
-                    padding: "8px 13px",
-                    fontWeight: 900,
-                    cursor: "pointer",
-                  }}
-                >
-                  APRI
-                </button>
               </div>
             ))}
           </div>
@@ -2243,9 +2423,10 @@ return (
       <div
         style={{
           display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
+          gap: isMobile ? 5 : 8,
+          flexWrap: "nowrap",
           justifyContent: "flex-end",
+          width: isMobile ? "100%" : "auto",
         }}
       >
         <button
@@ -2256,8 +2437,12 @@ return (
             background: "#fff",
             color: "#b91c1c",
             borderRadius: 10,
-            padding: "9px 13px",
+            padding: isMobile ? "9px 5px" : "9px 13px",
             fontWeight: 900,
+            fontSize: isMobile ? 10 : 13,
+            whiteSpace: "nowrap",
+            minWidth: 0,
+            flex: isMobile ? "1 1 0" : "0 0 auto",
             cursor: "pointer",
           }}
         >
@@ -2272,8 +2457,12 @@ return (
             background: "#16a34a",
             color: "white",
             borderRadius: 10,
-            padding: "9px 13px",
+            padding: isMobile ? "9px 5px" : "9px 13px",
             fontWeight: 900,
+            fontSize: isMobile ? 10 : 13,
+            whiteSpace: "nowrap",
+            minWidth: 0,
+            flex: isMobile ? "1 1 0" : "0 0 auto",
             cursor: energySaving ? "wait" : "pointer",
             opacity: energySaving ? 0.7 : 1,
           }}
@@ -3468,9 +3657,10 @@ function Gas({
         <div
           style={{
             display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
+            gap: isMobile ? 5 : 8,
+            flexWrap: "nowrap",
             justifyContent: "flex-end",
+            width: isMobile ? "100%" : "auto",
           }}
         >
           <button
@@ -3481,8 +3671,12 @@ function Gas({
               background: "#fff",
               color: "#b91c1c",
               borderRadius: 10,
-              padding: "9px 13px",
+              padding: isMobile ? "9px 5px" : "9px 13px",
               fontWeight: 900,
+              fontSize: isMobile ? 10 : 13,
+              whiteSpace: "nowrap",
+              minWidth: 0,
+              flex: isMobile ? "1 1 0" : "0 0 auto",
               cursor: "pointer",
             }}
           >
@@ -3497,8 +3691,12 @@ function Gas({
               background: "#16a34a",
               color: "white",
               borderRadius: 10,
-              padding: "9px 13px",
+              padding: isMobile ? "9px 5px" : "9px 13px",
               fontWeight: 900,
+              fontSize: isMobile ? 10 : 13,
+              whiteSpace: "nowrap",
+              minWidth: 0,
+              flex: isMobile ? "1 1 0" : "0 0 auto",
               cursor: gasSaving ? "wait" : "pointer",
               opacity: gasSaving ? 0.7 : 1,
             }}
@@ -3515,8 +3713,12 @@ function Gas({
               background: "#fff",
               color: "#1d4ed8",
               borderRadius: 10,
-              padding: "9px 13px",
+              padding: isMobile ? "9px 5px" : "9px 13px",
               fontWeight: 900,
+              fontSize: isMobile ? 10 : 13,
+              whiteSpace: "nowrap",
+              minWidth: 0,
+              flex: isMobile ? "1 1 0" : "0 0 auto",
               cursor: "pointer",
             }}
           >
