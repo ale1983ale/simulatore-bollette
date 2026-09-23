@@ -6195,7 +6195,7 @@ useEffect(() => {
 }, [tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
-  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "adminMenu", "calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6832,10 +6832,10 @@ if (!agentSession && !adminSession) {
 
   {adminProfile?.role === "super_admin" && (
     <button
-      onClick={() => navigateTo("dashboard")}
+      onClick={() => navigateTo("adminMenu")}
       style={{
         ...baseBtn,
-        ...(isAdminTab ? activeBtn : {}),
+        ...(isAdminTab && tab !== "dashboard" ? activeBtn : {}),
       }}
     >
       Area Admin
