@@ -358,6 +358,13 @@ export default function OutlookEmail() {
   const [removedRows, setRemovedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
+    const onOpenEmail = () => setOpen(true);
+    window.addEventListener("open-outlook-email", onOpenEmail);
+    return () =>
+      window.removeEventListener("open-outlook-email", onOpenEmail);
+  }, []);
+
+  useEffect(() => {
     const onToggleRemoved = (event: Event) => {
       const detail = (event as CustomEvent<{ index?: number; removed?: boolean }>).detail;
       const rowIndex = Number(detail?.index);

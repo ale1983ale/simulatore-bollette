@@ -9,8 +9,8 @@
   width: 100%;
   border: 0;
   border-radius: 18px;
-  padding: 20px 28px;
-  margin: 0 0 14px;
+  padding: 18px 26px;
+  margin: 0 0 12px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -18,18 +18,18 @@
   cursor: pointer;
   color: white;
   background: linear-gradient(105deg, #0347c9 0%, #1678ee 38%, #6fa9ef 58%, #ff9c3c 82%, #ff7a18 100%);
-  box-shadow: 0 12px 30px rgba(14, 82, 184, 0.2);
+  box-shadow: 0 10px 25px rgba(14, 82, 184, 0.18);
 }
 
 .ge-brand__bolt {
-  font-size: 34px;
+  font-size: 32px;
   line-height: 1;
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.16));
 }
 
 .ge-brand__title {
   display: block;
-  font-size: clamp(25px, 3vw, 38px);
+  font-size: clamp(25px, 3vw, 37px);
   line-height: 1;
   font-weight: 900;
   letter-spacing: .01em;
@@ -37,98 +37,24 @@
 
 .ge-brand__subtitle {
   display: block;
-  margin-top: 7px;
-  font-size: 11px;
+  margin-top: 6px;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: .32em;
+  letter-spacing: .3em;
   opacity: .92;
 }
 
 .ge-dashboard {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   min-width: 0;
-}
-
-.ge-dashboard-welcome {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 22px;
-  align-items: center;
-  background: linear-gradient(135deg, #ffffff 0%, #ffffff 70%, #f6f9fd 100%);
-  border: 1px solid var(--ge-border);
-  border-radius: 20px;
-  padding: 26px 34px;
-  box-shadow: 0 8px 26px rgba(31, 74, 128, .07);
-}
-
-.ge-dashboard-eyebrow {
-  color: #4a79c9;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: .28em;
-  margin-bottom: 8px;
-}
-
-.ge-dashboard-welcome__title {
-  color: #0b255b;
-  font-size: clamp(30px, 4vw, 52px);
-  font-weight: 900;
-  line-height: 1.05;
-}
-
-.ge-dashboard-welcome__title span {
-  color: #1475ee;
-}
-
-.ge-dashboard-welcome__subtitle {
-  margin-top: 10px;
-  color: #4f6489;
-  font-size: 16px;
-  line-height: 1.45;
-}
-
-.ge-dashboard-date {
-  min-width: 250px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid #dce8f6;
-  border-radius: 16px;
-  padding: 18px 22px;
-  background: #f8fbff;
-  color: #173d7b;
-}
-
-.ge-dashboard-date__icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: #e8f2ff;
-  color: #1475ee;
-  font-size: 24px;
-  font-weight: 900;
-}
-
-.ge-dashboard-date__date {
-  text-transform: capitalize;
-  font-weight: 900;
-  font-size: 16px;
-}
-
-.ge-dashboard-date__time {
-  margin-top: 4px;
-  font-weight: 800;
-  color: #57749e;
 }
 
 .ge-dashboard-primary,
 .ge-dashboard-secondary {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .ge-dashboard-primary--admin {
@@ -151,47 +77,47 @@
   position: relative;
   overflow: hidden;
   min-width: 0;
-  min-height: 172px;
+  min-height: 136px;
   border: 0;
-  border-radius: 18px;
-  padding: 20px;
+  border-radius: 17px;
+  padding: 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 8px 22px rgba(22, 60, 105, .11);
+  box-shadow: 0 7px 18px rgba(22, 60, 105, .10);
   transition: transform .16s ease, box-shadow .16s ease;
 }
 
 .ge-dashboard-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 13px 28px rgba(22, 60, 105, .16);
+  box-shadow: 0 11px 24px rgba(22, 60, 105, .15);
 }
 
 .ge-dashboard-card--compact {
-  min-height: 160px;
-  padding: 17px 14px;
+  min-height: 118px;
+  padding: 14px 12px;
   align-items: flex-start;
 }
 
 .ge-dashboard-card__icon {
   flex: 0 0 auto;
-  width: 78px;
-  height: 78px;
+  width: 62px;
+  height: 62px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   background: rgba(255,255,255,.9);
-  box-shadow: 0 8px 18px rgba(0,0,0,.12);
-  font-size: 34px;
+  box-shadow: 0 7px 16px rgba(0,0,0,.11);
+  font-size: 28px;
   font-weight: 900;
 }
 
 .ge-dashboard-card--compact .ge-dashboard-card__icon {
-  width: 52px;
-  height: 52px;
-  font-size: 22px;
+  width: 44px;
+  height: 44px;
+  font-size: 19px;
 }
 
 .ge-dashboard-card__body {
@@ -201,43 +127,43 @@
 }
 
 .ge-dashboard-card__title {
-  font-size: clamp(20px, 2vw, 29px);
+  font-size: clamp(18px, 1.8vw, 25px);
   line-height: 1.05;
   font-weight: 950;
   letter-spacing: -.01em;
 }
 
 .ge-dashboard-card--compact .ge-dashboard-card__title {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .ge-dashboard-card__description {
-  margin-top: 8px;
-  line-height: 1.35;
-  font-size: 15px;
+  margin-top: 6px;
+  line-height: 1.25;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .ge-dashboard-card--compact .ge-dashboard-card__description {
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .ge-dashboard-card__link {
-  margin-top: 15px;
-  font-size: 13px;
+  margin-top: 9px;
+  font-size: 11px;
   font-weight: 900;
 }
 
 .ge-dashboard-card__link span {
-  margin-left: 8px;
-  font-size: 18px;
+  margin-left: 5px;
+  font-size: 15px;
 }
 
 .ge-dashboard-card__arrow {
   margin-left: auto;
   position: relative;
   z-index: 1;
-  font-size: 42px;
+  font-size: 34px;
   opacity: .72;
 }
 
@@ -319,48 +245,26 @@
 @media (max-width: 720px) {
   .ge-brand {
     border-radius: 14px;
-    padding: 16px 18px;
-    margin-bottom: 10px;
+    padding: 13px 17px;
+    margin-bottom: 9px;
   }
 
   .ge-brand__bolt {
-    font-size: 28px;
-  }
-
-  .ge-brand__title {
     font-size: 25px;
   }
 
+  .ge-brand__title {
+    font-size: 24px;
+  }
+
   .ge-brand__subtitle {
-    margin-top: 5px;
-    font-size: 8px;
-    letter-spacing: .22em;
+    margin-top: 4px;
+    font-size: 7px;
+    letter-spacing: .2em;
   }
 
   .ge-dashboard {
-    gap: 12px;
-  }
-
-  .ge-dashboard-welcome {
-    grid-template-columns: 1fr;
-    gap: 14px;
-    padding: 20px;
-    border-radius: 16px;
-  }
-
-  .ge-dashboard-welcome__title {
-    font-size: 34px;
-  }
-
-  .ge-dashboard-welcome__subtitle {
-    font-size: 14px;
-  }
-
-  .ge-dashboard-date {
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 12px 14px;
+    gap: 8px;
   }
 
   .ge-dashboard-primary--admin,
@@ -368,14 +272,14 @@
   .ge-dashboard-secondary--admin,
   .ge-dashboard-secondary--agent {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: 8px;
   }
 
   .ge-dashboard-card {
-    min-height: 145px;
-    padding: 15px;
-    border-radius: 15px;
-    gap: 12px;
+    min-height: 102px;
+    padding: 11px;
+    border-radius: 14px;
+    gap: 9px;
   }
 
   .ge-dashboard-card--span-mobile,
@@ -385,43 +289,55 @@
     grid-column: 1 / -1;
   }
 
+  .ge-dashboard-primary--admin .ge-card-energy,
+  .ge-dashboard-primary--admin .ge-card-gas {
+    grid-column: auto;
+  }
+
   .ge-dashboard-card__icon {
-    width: 60px;
-    height: 60px;
-    font-size: 27px;
+    width: 46px;
+    height: 46px;
+    font-size: 21px;
   }
 
   .ge-dashboard-card--compact {
-    min-height: 145px;
-    padding: 14px 12px;
-    display: block;
+    min-height: 78px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
   }
 
   .ge-dashboard-card--compact .ge-dashboard-card__icon {
-    width: 45px;
-    height: 45px;
-    margin-bottom: 10px;
-  }
-
-  .ge-dashboard-card__title {
-    font-size: 22px;
-  }
-
-  .ge-dashboard-card--compact .ge-dashboard-card__title {
+    width: 34px;
+    height: 34px;
+    margin: 0;
     font-size: 15px;
   }
 
+  .ge-dashboard-card__title {
+    font-size: 17px;
+  }
+
+  .ge-dashboard-card--compact .ge-dashboard-card__title {
+    font-size: 12px;
+  }
+
   .ge-dashboard-card__description {
-    font-size: 13px;
+    font-size: 10px;
   }
 
   .ge-dashboard-card--compact .ge-dashboard-card__description {
-    font-size: 11px;
+    display: none;
   }
 
   .ge-dashboard-card__link {
-    margin-top: 10px;
-    font-size: 11px;
+    margin-top: 6px;
+    font-size: 9px;
+  }
+
+  .ge-dashboard-card--compact .ge-dashboard-card__link {
+    margin-top: 3px;
+    font-size: 8px;
   }
 
   .ge-dashboard-card__arrow {
@@ -430,11 +346,15 @@
 }
 
 @media (max-width: 460px) {
-  .ge-dashboard-welcome__title {
-    font-size: 30px;
+  .ge-brand__title {
+    font-size: 21px;
   }
 
-  .ge-dashboard-card--compact .ge-dashboard-card__description {
-    min-height: 30px;
+  .ge-dashboard-card {
+    min-height: 94px;
+  }
+
+  .ge-dashboard-card--compact {
+    min-height: 70px;
   }
 }

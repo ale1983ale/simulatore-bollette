@@ -5549,120 +5549,15 @@ function AdminUsersManager({
 
 type DashboardNavigate = (tab: string) => void;
 
-function useDashboardClock() {
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  return now;
-}
-
-function DashboardCard({
-  title,
-  description,
-  icon,
-  className,
-  onClick,
-  compact = false,
-  spanMobile = false,
-}: {
-  title: string;
-  description: string;
-  icon: string;
-  className: string;
-  onClick: () => void;
-  compact?: boolean;
-  spanMobile?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className={[
-        "ge-dashboard-card",
-        compact ? "ge-dashboard-card--compact" : "",
-        spanMobile ? "ge-dashboard-card--span-mobile" : "",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      onClick={onClick}
-    >
-      <div className="ge-dashboard-card__icon">{icon}</div>
-      <div className="ge-dashboard-card__body">
-        <div className="ge-dashboard-card__title">{title}</div>
-        <div className="ge-dashboard-card__description">
-          {description}
-        </div>
-        <div className="ge-dashboard-card__link">
-          Vai alla sezione <span>→</span>
-        </div>
-      </div>
-      <div className="ge-dashboard-card__arrow">›</div>
-    </button>
-  );
-}
-
-function DashboardWelcome({
-  name,
-  areaLabel,
-  subtitle,
-}: {
-  name: string;
-  areaLabel: string;
-  subtitle: string;
-}) {
-  const now = useDashboardClock();
-  const dateLabel = new Intl.DateTimeFormat("it-IT", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(now);
-  const timeLabel = new Intl.DateTimeFormat("it-IT", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(now);
-
-  return (
-    <div className="ge-dashboard-welcome">
-      <div className="ge-dashboard-welcome__main">
-        <div className="ge-dashboard-eyebrow">{areaLabel}</div>
-        <div className="ge-dashboard-welcome__title">
-          Bentornato, <span>{name}</span>
-        </div>
-        <div className="ge-dashboard-welcome__subtitle">{subtitle}</div>
-      </div>
-      <div className="ge-dashboard-date">
-        <div className="ge-dashboard-date__icon">▣</div>
-        <div>
-          <div className="ge-dashboard-date__date">{dateLabel}</div>
-          <div className="ge-dashboard-date__time">{timeLabel}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AdminDashboard({
-  name,
   navigate,
   openEmail,
 }: {
-  name: string;
   navigate: DashboardNavigate;
   openEmail: () => void;
 }) {
   return (
     <div className="ge-dashboard">
-      <DashboardWelcome
-        name={name}
-        areaLabel="AREA ADMIN"
-        subtitle="Da qui puoi accedere rapidamente a tutte le funzioni di gestione."
-      />
-
       <div className="ge-dashboard-primary ge-dashboard-primary--admin">
         <DashboardCard
           title="ENERGIA"
@@ -5751,20 +5646,12 @@ function AdminDashboard({
 }
 
 function AgentDashboard({
-  name,
   navigate,
 }: {
-  name: string;
   navigate: DashboardNavigate;
 }) {
   return (
     <div className="ge-dashboard ge-dashboard--agent">
-      <DashboardWelcome
-        name={name}
-        areaLabel="AREA AGENTE"
-        subtitle="La tua area di lavoro per simulazioni, dati di mercato e report."
-      />
-
       <div className="ge-dashboard-primary ge-dashboard-primary--agent">
         <DashboardCard
           title="ENERGIA"
@@ -5868,21 +5755,7 @@ export default function App() {
   };
 
   const openOutlookEmail = () => {
-    const button = document.querySelector(
-      '[data-outlook-email-admin-slot="true"] button'
-    ) as HTMLButtonElement | null;
-
-    if (button) {
-      button.click();
-      return;
-    }
-
-    window.setTimeout(() => {
-      const retry = document.querySelector(
-        '[data-outlook-email-admin-slot="true"] button'
-      ) as HTMLButtonElement | null;
-      retry?.click();
-    }, 300);
+    window.dispatchEvent(new CustomEvent("open-outlook-email"));
   };
   useEffect(() => {
     void (async () => {
@@ -6471,6 +6344,7 @@ const renderAdminContent = () => {
         minWidth: 0,
       }}
     >
+      {tab !== "dashboard" && (
       <div
         style={{
           display: "flex",
@@ -6572,6 +6446,7 @@ const renderAdminContent = () => {
 )}
       </div>
       </div>
+      )}
 
       {databaseAdminTabs.includes(tab) && (
         <div
@@ -6638,11 +6513,6 @@ const renderAdminContent = () => {
 
       {tab === "dashboard" && (
         <AdminDashboard
-          name={
-            adminProfile?.nome?.trim() ||
-            adminProfile?.username ||
-            "Admin"
-          }
           navigate={navigateTo}
           openEmail={openOutlookEmail}
         />
@@ -6954,17 +6824,7 @@ if (!agentSession && !adminSession) {
   adminSession ? (
     renderAdminContent()
   ) : (
-    <AgentDashboard
-      name={
-        [agentSession?.nome, agentSession?.cognome]
-          .filter(Boolean)
-          .join(" ")
-          .trim() ||
-        agentSession?.username ||
-        "Agente"
-      }
-      navigate={navigateTo}
-    />
+    <AgentDashboard navigate={navigateTo} />
   )
 ) : tab === "energia" ? (
   <Energia
