@@ -105,6 +105,37 @@ const EVENT_LABELS: Record<EventType, string> = {
   ALTRO: "ALTRO",
 };
 
+const EVENT_COLORS: Record<
+  EventType,
+  { background: string; color: string; border: string }
+> = {
+  CHIAMARE: {
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    border: "#60a5fa",
+  },
+  APPUNTAMENTO_ZONA: {
+    background: "#ffedd5",
+    color: "#c2410c",
+    border: "#fb923c",
+  },
+  APPUNTAMENTO_SEDE: {
+    background: "#f3e8ff",
+    color: "#7e22ce",
+    border: "#c084fc",
+  },
+  VIDEOCALL: {
+    background: "#dcfce7",
+    color: "#15803d",
+    border: "#4ade80",
+  },
+  ALTRO: {
+    background: "#e2e8f0",
+    color: "#334155",
+    border: "#94a3b8",
+  },
+};
+
 const CANDIDATE_STATUS: Record<
   string,
   { label: string; background: string; color: string; border: string }
@@ -5622,14 +5653,18 @@ export default function Recruiting() {
                 {!googleCalendarConnected ? (
                   <button
                     type="button"
-                    disabled={googleCalendarBusy || !googleCalendarConfigured}
+                    disabled={
+                      googleCalendarBusy ||
+                      !googleCalendarConfigured
+                    }
                     onClick={() => void connectGoogleCalendar()}
                     style={{
                       ...buttonStyle,
                       background: "#2563eb",
                       color: "white",
                       opacity:
-                        googleCalendarBusy || !googleCalendarConfigured
+                        googleCalendarBusy ||
+                        !googleCalendarConfigured
                           ? 0.6
                           : 1,
                     }}
@@ -5641,65 +5676,80 @@ export default function Recruiting() {
                       : "COLLEGA GOOGLE CALENDAR"}
                   </button>
                 ) : (
-                  <>
-                    <button
-                      type="button"
-                      disabled={googleCalendarBusy}
-                      onClick={() => {
-                        setGoogleExternalError("");
-                        setShowFullGoogleCalendar((current) => !current);
-                      }}
-                      style={{
-                        ...buttonStyle,
-                        background: showFullGoogleCalendar
-                          ? "#2563eb"
-                          : "white",
-                        color: showFullGoogleCalendar
-                          ? "white"
-                          : "#1d4ed8",
-                        border: "1px solid #93c5fd",
-                      }}
-                    >
-                      {googleExternalLoading && showFullGoogleCalendar
-                        ? "CARICO CALENDARIO..."
-                        : showFullGoogleCalendar
-                        ? "NASCONDI CALENDARIO COMPLETO"
-                        : "MOSTRA CALENDARIO COMPLETO"}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={googleCalendarBusy}
-                      onClick={() => void syncAllGoogle()}
-                      style={{
-                        ...buttonStyle,
-                        background: "#16a34a",
-                        color: "white",
-                        opacity: googleCalendarBusy ? 0.6 : 1,
-                      }}
-                    >
-                      {googleCalendarBusy
-                        ? "SINCRONIZZAZIONE..."
-                        : "↻ SINCRONIZZA ORA"}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={googleCalendarBusy}
-                      onClick={() => void disconnectGoogle()}
-                      style={{
-                        ...buttonStyle,
-                        background: "white",
-                        color: "#b91c1c",
-                        border: "1px solid #fecaca",
-                      }}
-                    >
-                      DISCONNETTI
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    disabled={googleCalendarBusy}
+                    onClick={() => void disconnectGoogle()}
+                    style={{
+                      ...buttonStyle,
+                      background: "white",
+                      color: "#b91c1c",
+                      border: "1px solid #fecaca",
+                    }}
+                  >
+                    DISCONNETTI
+                  </button>
                 )}
               </div>
             </div>
+
+            {googleCalendarConnected && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  marginTop: 14,
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={googleCalendarBusy}
+                  onClick={() => {
+                    setGoogleExternalError("");
+                    setShowFullGoogleCalendar(
+                      (current) => !current
+                    );
+                  }}
+                  style={{
+                    ...buttonStyle,
+                    background: showFullGoogleCalendar
+                      ? "#2563eb"
+                      : "white",
+                    color: showFullGoogleCalendar
+                      ? "white"
+                      : "#1d4ed8",
+                    border: "1px solid #93c5fd",
+                  }}
+                >
+                  {googleExternalLoading &&
+                  showFullGoogleCalendar
+                    ? "CARICO CALENDARIO..."
+                    : showFullGoogleCalendar
+                    ? "NASCONDI CALENDARIO COMPLETO"
+                    : "MOSTRA CALENDARIO COMPLETO"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={googleCalendarBusy}
+                  onClick={() => void syncAllGoogle()}
+                  style={{
+                    ...buttonStyle,
+                    marginLeft: "auto",
+                    background: "#16a34a",
+                    color: "white",
+                    opacity: googleCalendarBusy ? 0.6 : 1,
+                  }}
+                >
+                  {googleCalendarBusy
+                    ? "SINCRONIZZAZIONE..."
+                    : "↻ SINCRONIZZA ORA"}
+                </button>
+              </div>
+            )}
 
             {showFullGoogleCalendar && (
               <div
@@ -5998,6 +6048,31 @@ export default function Recruiting() {
                         )
                     : [];
 
+                const dayCalendarItems = [
+                  ...dayEvents.map((event) => ({
+                    kind: "internal" as const,
+                    event,
+                    sortTime: event.eventTime || "",
+                  })),
+                  ...dayGoogleEvents.map((event) => ({
+                    kind: "google" as const,
+                    event,
+                    sortTime:
+                      event.all_day || !event.start_time
+                        ? ""
+                        : event.start_time,
+                  })),
+                ].sort((a, b) => {
+                  const aNoTime = !a.sortTime;
+                  const bNoTime = !b.sortTime;
+
+                  if (aNoTime !== bNoTime) {
+                    return aNoTime ? -1 : 1;
+                  }
+
+                  return a.sortTime.localeCompare(b.sortTime);
+                });
+
                 return (
                   <div
                     key={cell.dateKey}
@@ -6010,134 +6085,196 @@ export default function Recruiting() {
                   >
                     <div style={{ fontWeight: 900, marginBottom: 5 }}>{cell.day}</div>
                     <div style={{ display: "grid", gap: 5 }}>
-                      {dayEvents.map((event) => (
-                        <div
-                          key={event.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => openEventModal(event, "view")}
-                          onKeyDown={(keyEvent) => {
-                            if (
-                              keyEvent.key === "Enter" ||
-                              keyEvent.key === " "
-                            ) {
-                              openEventModal(event, "view");
-                            }
-                          }}
-                          style={{
-                            borderRadius: 7,
-                            padding: 6,
-                            background: event.completed ? "#e2e8f0" : "#fff7ed",
-                            border: event.completed ? "1px solid #cbd5e1" : "1px solid #fed7aa",
-                            fontSize: 11,
-                            textDecoration: event.completed ? "line-through" : "none",
-                          }}
-                        >
-                          <div style={{ fontWeight: 900 }}>
-                            {event.eventTime ? `${formatTime(event.eventTime)} · ` : ""}
-                            {eventDisplayLabel(event)}
-                          </div>
-                          <div>{candidateName(event.candidateId)}</div>
-                          {event.notes && <div style={{ marginTop: 2, color: "#475569" }}>{event.notes}</div>}
-                          <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
-                            <button
-                              type="button"
-                              onClick={(clickEvent) => {
-                                clickEvent.stopPropagation();
-                                void toggleEventCompleted(event);
-                              }}
-                              style={{ border: 0, borderRadius: 5, padding: "3px 5px", fontSize: 10, fontWeight: 800, cursor: "pointer" }}
-                            >
-                              {event.completed ? "Riapri" : "Fatto"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(clickEvent) => {
-                                clickEvent.stopPropagation();
-                                void deleteEvent(event);
-                              }}
-                              style={{ border: 0, background: "#fee2e2", color: "#991b1b", borderRadius: 5, padding: "3px 5px", fontSize: 10, fontWeight: 800, cursor: "pointer" }}
-                            >
-                              Elimina
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                      {dayCalendarItems.map((item) => {
+                        if (item.kind === "internal") {
+                          const event = item.event;
+                          const eventStyle = EVENT_COLORS[event.eventType];
 
-                      {dayGoogleEvents.map((event) => (
-                        <div
-                          key={`google-${event.calendar_id}-${event.id}`}
-                          role={event.html_link ? "button" : undefined}
-                          tabIndex={event.html_link ? 0 : undefined}
-                          onClick={() => {
-                            if (event.html_link) {
-                              window.open(
-                                event.html_link,
-                                "_blank",
-                                "noopener,noreferrer"
-                              );
-                            }
-                          }}
-                          onKeyDown={(keyEvent) => {
-                            if (
-                              event.html_link &&
-                              (keyEvent.key === "Enter" ||
-                                keyEvent.key === " ")
-                            ) {
-                              window.open(
-                                event.html_link,
-                                "_blank",
-                                "noopener,noreferrer"
-                              );
-                            }
-                          }}
-                          title={
-                            event.html_link
-                              ? "Apri in Google Calendar"
-                              : undefined
-                          }
-                          style={{
-                            borderRadius: 7,
-                            padding: 6,
-                            background: "#f8fafc",
-                            border: `1px solid ${event.background_color}`,
-                            borderLeft: `5px solid ${event.background_color}`,
-                            fontSize: 11,
-                            cursor: event.html_link
-                              ? "pointer"
-                              : "default",
-                          }}
-                        >
-                          <div style={{ fontWeight: 900 }}>
-                            {!event.all_day && event.start_time
-                              ? `${event.start_time} · `
-                              : ""}
-                            {event.summary}
-                          </div>
+                          return (
+                            <div
+                              key={event.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() =>
+                                openEventModal(event, "view")
+                              }
+                              onKeyDown={(keyEvent) => {
+                                if (
+                                  keyEvent.key === "Enter" ||
+                                  keyEvent.key === " "
+                                ) {
+                                  openEventModal(event, "view");
+                                }
+                              }}
+                              style={{
+                                borderRadius: 7,
+                                padding: 6,
+                                background: event.completed
+                                  ? "#f1f5f9"
+                                  : eventStyle.background,
+                                color: event.completed
+                                  ? "#64748b"
+                                  : eventStyle.color,
+                                border: event.completed
+                                  ? "1px solid #cbd5e1"
+                                  : `1px solid ${eventStyle.border}`,
+                                borderLeft: event.completed
+                                  ? "5px solid #94a3b8"
+                                  : `5px solid ${eventStyle.border}`,
+                                fontSize: 11,
+                                textDecoration: event.completed
+                                  ? "line-through"
+                                  : "none",
+                              }}
+                            >
+                              <div style={{ fontWeight: 900 }}>
+                                {event.eventTime
+                                  ? `${formatTime(event.eventTime)} · `
+                                  : ""}
+                                {eventDisplayLabel(event)}
+                              </div>
+                              <div>
+                                {candidateName(event.candidateId)}
+                              </div>
+                              {event.notes && (
+                                <div
+                                  style={{
+                                    marginTop: 2,
+                                    color: event.completed
+                                      ? "#64748b"
+                                      : "#475569",
+                                  }}
+                                >
+                                  {event.notes}
+                                </div>
+                              )}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 5,
+                                  marginTop: 5,
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={(clickEvent) => {
+                                    clickEvent.stopPropagation();
+                                    void toggleEventCompleted(event);
+                                  }}
+                                  style={{
+                                    border: 0,
+                                    borderRadius: 5,
+                                    padding: "3px 5px",
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {event.completed
+                                    ? "Riapri"
+                                    : "Fatto"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(clickEvent) => {
+                                    clickEvent.stopPropagation();
+                                    void deleteEvent(event);
+                                  }}
+                                  style={{
+                                    border: 0,
+                                    background: "#fee2e2",
+                                    color: "#991b1b",
+                                    borderRadius: 5,
+                                    padding: "3px 5px",
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Elimina
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
 
+                        const event = item.event;
+
+                        return (
                           <div
+                            key={`google-${event.calendar_id}-${event.id}`}
+                            role={event.html_link ? "button" : undefined}
+                            tabIndex={event.html_link ? 0 : undefined}
+                            onClick={() => {
+                              if (event.html_link) {
+                                window.open(
+                                  event.html_link,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                );
+                              }
+                            }}
+                            onKeyDown={(keyEvent) => {
+                              if (
+                                event.html_link &&
+                                (keyEvent.key === "Enter" ||
+                                  keyEvent.key === " ")
+                              ) {
+                                window.open(
+                                  event.html_link,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                );
+                              }
+                            }}
+                            title={
+                              event.html_link
+                                ? "Apri in Google Calendar"
+                                : undefined
+                            }
                             style={{
-                              marginTop: 2,
-                              color: event.background_color,
-                              fontSize: 10,
-                              fontWeight: 900,
+                              borderRadius: 7,
+                              padding: 6,
+                              background: "#f8fafc",
+                              border: `1px solid ${event.background_color}`,
+                              borderLeft: `5px solid ${event.background_color}`,
+                              fontSize: 11,
+                              cursor: event.html_link
+                                ? "pointer"
+                                : "default",
                             }}
                           >
-                            GOOGLE · {event.calendar_name}
-                          </div>
+                            <div style={{ fontWeight: 900 }}>
+                              {!event.all_day && event.start_time
+                                ? `${event.start_time} · `
+                                : ""}
+                              {event.summary}
+                            </div>
 
-                          {event.location && (
                             <div
                               style={{
                                 marginTop: 2,
-                                color: "#475569",
+                                color: event.background_color,
+                                fontSize: 10,
+                                fontWeight: 900,
                               }}
                             >
-                              {event.location}
+                              GOOGLE · {event.calendar_name}
                             </div>
-                          )}
-                        </div>
-                      ))}
+
+                            {event.location && (
+                              <div
+                                style={{
+                                  marginTop: 2,
+                                  color: "#475569",
+                                }}
+                              >
+                                {event.location}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
