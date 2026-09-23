@@ -2428,8 +2428,11 @@ return (
       </div>
       <div
         style={{
-          display: "flex",
-          gap: isMobile ? 5 : 8,
+          display: isMobile ? "grid" : "flex",
+          gridTemplateColumns: isMobile
+            ? "repeat(3,minmax(0,1fr))"
+            : undefined,
+          gap: isMobile ? 6 : 8,
           flexWrap: "nowrap",
           justifyContent: "flex-end",
           width: isMobile ? "100%" : "auto",
@@ -2443,16 +2446,30 @@ return (
             background: "#fff",
             color: "#b91c1c",
             borderRadius: 10,
-            padding: isMobile ? "9px 5px" : "9px 13px",
+            padding: isMobile ? "8px 4px" : "9px 13px",
             fontWeight: 900,
-            fontSize: isMobile ? 10 : 13,
-            whiteSpace: "nowrap",
+            fontSize: isMobile ? 11 : 13,
+            lineHeight: isMobile ? 1.08 : 1.2,
+            whiteSpace: isMobile ? "normal" : "nowrap",
             minWidth: 0,
-            flex: isMobile ? "1 1 0" : "0 0 auto",
+            minHeight: isMobile ? 58 : undefined,
+            width: isMobile ? "100%" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
             cursor: "pointer",
           }}
         >
-          NUOVA SIMULAZIONE
+          {isMobile ? (
+            <>
+              NUOVA
+              <br />
+              SIMULAZIONE
+            </>
+          ) : (
+            "NUOVA SIMULAZIONE"
+          )}
         </button>
         <button
           type="button"
@@ -2463,19 +2480,33 @@ return (
             background: "#16a34a",
             color: "white",
             borderRadius: 10,
-            padding: isMobile ? "9px 5px" : "9px 13px",
+            padding: isMobile ? "8px 4px" : "9px 13px",
             fontWeight: 900,
-            fontSize: isMobile ? 10 : 13,
-            whiteSpace: "nowrap",
+            fontSize: isMobile ? 11 : 13,
+            lineHeight: isMobile ? 1.08 : 1.2,
+            whiteSpace: isMobile ? "normal" : "nowrap",
             minWidth: 0,
-            flex: isMobile ? "1 1 0" : "0 0 auto",
+            minHeight: isMobile ? 58 : undefined,
+            width: isMobile ? "100%" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
             cursor: energySaving ? "wait" : "pointer",
             opacity: energySaving ? 0.7 : 1,
           }}
         >
-          {energySaving
-            ? "SALVATAGGIO..."
-            : "SALVA SIMULAZIONE"}
+          {energySaving ? (
+            "SALVATAGGIO..."
+          ) : isMobile ? (
+            <>
+              SALVA
+              <br />
+              SIMULAZIONE
+            </>
+          ) : (
+            "SALVA SIMULAZIONE"
+          )}
         </button>
         <button
           type="button"
@@ -2485,12 +2516,30 @@ return (
             background: "#fff",
             color: "#1d4ed8",
             borderRadius: 10,
-            padding: "9px 13px",
+            padding: isMobile ? "8px 4px" : "9px 13px",
             fontWeight: 900,
+            fontSize: isMobile ? 11 : 13,
+            lineHeight: isMobile ? 1.08 : 1.2,
+            whiteSpace: isMobile ? "normal" : "nowrap",
+            minWidth: 0,
+            minHeight: isMobile ? 58 : undefined,
+            width: isMobile ? "100%" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
             cursor: "pointer",
           }}
         >
-          APRI SIMULAZIONE
+          {isMobile ? (
+            <>
+              APRI
+              <br />
+              SIMULAZIONE
+            </>
+          ) : (
+            "APRI SIMULAZIONE"
+          )}
         </button>
       </div>
     </div>
@@ -3658,79 +3707,124 @@ function Gas({
         }}
       >
         <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
-          Salvataggio temporaneo attivo · reset automatico dopo 15 minuti di inattività
-        </div>
-        <div
+        Salvataggio temporaneo attivo · reset automatico dopo 15 minuti di inattività
+      </div>
+      <div
+        style={{
+          display: isMobile ? "grid" : "flex",
+          gridTemplateColumns: isMobile
+            ? "repeat(3,minmax(0,1fr))"
+            : undefined,
+          gap: isMobile ? 6 : 8,
+          flexWrap: "nowrap",
+          justifyContent: "flex-end",
+          width: isMobile ? "100%" : "auto",
+        }}
+      >
+        <button
+          type="button"
+          onClick={resetGasSimulation}
           style={{
-            display: "flex",
-            gap: isMobile ? 5 : 8,
-            flexWrap: "nowrap",
-            justifyContent: "flex-end",
+            border: "1px solid #ef4444",
+            background: "#fff",
+            color: "#b91c1c",
+            borderRadius: 10,
+            padding: isMobile ? "8px 4px" : "9px 13px",
+            fontWeight: 900,
+            fontSize: isMobile ? 11 : 13,
+            lineHeight: isMobile ? 1.08 : 1.2,
+            whiteSpace: isMobile ? "normal" : "nowrap",
+            minWidth: 0,
+            minHeight: isMobile ? 58 : undefined,
             width: isMobile ? "100%" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            cursor: "pointer",
           }}
         >
-          <button
-            type="button"
-            onClick={resetGasSimulation}
-            style={{
-              border: "1px solid #ef4444",
-              background: "#fff",
-              color: "#b91c1c",
-              borderRadius: 10,
-              padding: isMobile ? "9px 5px" : "9px 13px",
-              fontWeight: 900,
-              fontSize: isMobile ? 10 : 13,
-              whiteSpace: "nowrap",
-              minWidth: 0,
-              flex: isMobile ? "1 1 0" : "0 0 auto",
-              cursor: "pointer",
-            }}
-          >
-            NUOVA SIMULAZIONE
-          </button>
-          <button
-            type="button"
-            disabled={gasSaving}
-            onClick={() => void saveGasSimulation()}
-            style={{
-              border: "1px solid #16a34a",
-              background: "#16a34a",
-              color: "white",
-              borderRadius: 10,
-              padding: isMobile ? "9px 5px" : "9px 13px",
-              fontWeight: 900,
-              fontSize: isMobile ? 10 : 13,
-              whiteSpace: "nowrap",
-              minWidth: 0,
-              flex: isMobile ? "1 1 0" : "0 0 auto",
-              cursor: gasSaving ? "wait" : "pointer",
-              opacity: gasSaving ? 0.7 : 1,
-            }}
-          >
-            {gasSaving
-              ? "SALVATAGGIO..."
-              : "SALVA SIMULAZIONE"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setGasSavedOpen(true)}
-            style={{
-              border: "1px solid #2563eb",
-              background: "#fff",
-              color: "#1d4ed8",
-              borderRadius: 10,
-              padding: isMobile ? "9px 5px" : "9px 13px",
-              fontWeight: 900,
-              fontSize: isMobile ? 10 : 13,
-              whiteSpace: "nowrap",
-              minWidth: 0,
-              flex: isMobile ? "1 1 0" : "0 0 auto",
-              cursor: "pointer",
-            }}
-          >
-            APRI SIMULAZIONE
-          </button>
-        </div>
+          {isMobile ? (
+            <>
+              NUOVA
+              <br />
+              SIMULAZIONE
+            </>
+          ) : (
+            "NUOVA SIMULAZIONE"
+          )}
+        </button>
+        <button
+          type="button"
+          disabled={gasSaving}
+          onClick={() => void saveGasSimulation()}
+          style={{
+            border: "1px solid #16a34a",
+            background: "#16a34a",
+            color: "white",
+            borderRadius: 10,
+            padding: isMobile ? "8px 4px" : "9px 13px",
+            fontWeight: 900,
+            fontSize: isMobile ? 11 : 13,
+            lineHeight: isMobile ? 1.08 : 1.2,
+            whiteSpace: isMobile ? "normal" : "nowrap",
+            minWidth: 0,
+            minHeight: isMobile ? 58 : undefined,
+            width: isMobile ? "100%" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            cursor: gasSaving ? "wait" : "pointer",
+            opacity: gasSaving ? 0.7 : 1,
+          }}
+        >
+          {gasSaving ? (
+            "SALVATAGGIO..."
+          ) : isMobile ? (
+            <>
+              SALVA
+              <br />
+              SIMULAZIONE
+            </>
+          ) : (
+            "SALVA SIMULAZIONE"
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setGasSavedOpen(true)}
+          style={{
+            border: "1px solid #2563eb",
+            background: "#fff",
+            color: "#1d4ed8",
+            borderRadius: 10,
+            padding: isMobile ? "8px 4px" : "9px 13px",
+            fontWeight: 900,
+            fontSize: isMobile ? 11 : 13,
+            lineHeight: isMobile ? 1.08 : 1.2,
+            whiteSpace: isMobile ? "normal" : "nowrap",
+            minWidth: 0,
+            minHeight: isMobile ? 58 : undefined,
+            width: isMobile ? "100%" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            cursor: "pointer",
+          }}
+        >
+          {isMobile ? (
+            <>
+              APRI
+              <br />
+              SIMULAZIONE
+            </>
+          ) : (
+            "APRI SIMULAZIONE"
+          )}
+        </button>
+      </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
