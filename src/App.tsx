@@ -1033,6 +1033,8 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             box-sizing: border-box;
+            text-rendering: geometricPrecision;
+            -webkit-font-smoothing: antialiased;
           }
           body {
             font-family: Arial, sans-serif;
@@ -1200,60 +1202,152 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
         return;
       }
 
-      const html2canvasModule = await import("html2canvas");
-      const html2canvas = html2canvasModule.default;
+      // Aspetta che il browser abbia finito di comporre font e layout:
+      // evita testi "morbidi" o catturati prima del rendering definitivo.
+      if (doc.fonts?.ready) {
+        await doc.fonts.ready;
+      }
 
-      const canvas = await html2canvas(page, {
-        scale: 1.2,
+      const sourceCanvas = await html2canvas(page, {
+        // 2.2x aumenta nettamente la definizione del testo rispetto al vecchio 1.2x.
+        // La dimensione finale viene poi tenuta sotto 2 MB con compressione adattiva.
+        scale: 2.2,
         useCORS: true,
         backgroundColor: "#ffffff",
+        logging: false,
+        imageTimeout: 8000,
+        windowWidth: Math.max(page.scrollWidth, 650),
       });
-      
-      const imgData = canvas.toDataURL("image/jpeg", 0.75);
-      
-      const pdf = new jsPDF({
-        orientation: "p",
-        unit: "mm",
-        format: "a4",
-        compress: true,
-      });
-      
+
       const pdfWidth = 210;
       const pdfHeight = 297;
       const marginTop = 8;
-const marginBottom = 22;
-const margin = 8;
+      const marginBottom = 18;
+      const margin = 8;
       const usableWidth = pdfWidth - margin * 2;
       const usableHeight = pdfHeight - marginTop - marginBottom;
-      
-      const imgWidth = usableWidth * 0.90;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      let renderedHeight = 0;
+      const maxPdfBytes = 2 * 1024 * 1024;
+      const targetPdfBytes = 1.9 * 1024 * 1024;
 
-while (renderedHeight < imgHeight) {
-  if (renderedHeight > 0) {
-    pdf.addPage();
-  }
+      const resizeCanvas = (
+        input: HTMLCanvasElement,
+        factor: number
+      ) => {
+        const output = document.createElement("canvas");
+        output.width = Math.max(1, Math.round(input.width * factor));
+        output.height = Math.max(1, Math.round(input.height * factor));
 
-  pdf.addImage(
-    imgData,
-    "JPEG",
-    margin,
-    margin - renderedHeight,
-    imgWidth,
-    imgHeight
-  );
+        const context = output.getContext("2d");
+        if (!context) return input;
 
-  renderedHeight += usableHeight - 10;
-}
-      
-      pdf.save(`${finalFileName}.pdf`);
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, output.width, output.height);
+        context.drawImage(
+          input,
+          0,
+          0,
+          input.width,
+          input.height,
+          0,
+          0,
+          output.width,
+          output.height
+        );
+
+        return output;
+      };
+
+      const buildPdf = (
+        canvas: HTMLCanvasElement,
+        jpegQuality: number
+      ) => {
+        const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
+
+        const pdf = new jsPDF({
+          orientation: "p",
+          unit: "mm",
+          format: "a4",
+          compress: true,
+          putOnlyUsedFonts: true,
+        });
+
+        // Usa tutta la larghezza utile A4: il testo risulta anche fisicamente
+        // più grande rispetto al precedente 90% della pagina.
+        const imgWidth = usableWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        let renderedHeight = 0;
+        let pageIndex = 0;
+
+        while (renderedHeight < imgHeight) {
+          if (pageIndex > 0) {
+            pdf.addPage();
+          }
+
+          pdf.addImage(
+            imgData,
+            "JPEG",
+            margin,
+            marginTop - renderedHeight,
+            imgWidth,
+            imgHeight,
+            "preventivo-page",
+            "FAST"
+          );
+
+          renderedHeight += usableHeight;
+          pageIndex += 1;
+        }
+
+        return pdf;
+      };
+
+      let workingCanvas = sourceCanvas;
+      let quality = 0.9;
+      let pdf = buildPdf(workingCanvas, quality);
+      let blob = pdf.output("blob");
+
+      // Mantiene il file entro il limite richiesto senza sacrificare
+      // inutilmente la nitidezza quando il documento è già leggero.
+      let attempts = 0;
+      while (blob.size > targetPdfBytes && attempts < 10) {
+        attempts += 1;
+
+        if (quality > 0.58) {
+          quality = Math.max(0.58, quality - 0.06);
+        } else {
+          workingCanvas = resizeCanvas(workingCanvas, 0.88);
+        }
+
+        pdf = buildPdf(workingCanvas, quality);
+        blob = pdf.output("blob");
+      }
+
+      // Ultima rete di sicurezza: il PDF scaricato non deve superare 2 MB.
+      while (blob.size > maxPdfBytes && workingCanvas.width > 900) {
+        workingCanvas = resizeCanvas(workingCanvas, 0.82);
+        quality = Math.min(quality, 0.56);
+        pdf = buildPdf(workingCanvas, quality);
+        blob = pdf.output("blob");
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${finalFileName}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+
       win.close();
-    } catch {
+    } catch (error) {
+      console.error("PDF GENERATION ERROR:", error);
       win.print();
     }
-  }, 400);
+  }, 450);
 }
 
 function field(label: string, value: string, setValue: (v: string) => void, type = "text") {
