@@ -1065,7 +1065,7 @@ export default function Recruiting({
   const [calendarCandidateFilter, setCalendarCandidateFilter] = useState("");
   const [calendarTypeFilter, setCalendarTypeFilter] = useState<"" | EventType>("");
   const [calendarOriginFilter, setCalendarOriginFilter] = useState<
-    "" | "APP" | "CRM" | "EXTERNAL"
+    "" | "APP" | "CRM" | "EXTERNAL" | "GOOGLE"
   >("");
   const [calendarCandidateId, setCalendarCandidateId] = useState("");
   const [calendarType, setCalendarType] = useState<EventType>("CHIAMARE");
@@ -2987,7 +2987,8 @@ export default function Recruiting({
   useEffect(() => {
     if (
       section !== "calendar" ||
-      !showFullGoogleCalendar ||
+      (!showFullGoogleCalendar &&
+        calendarOriginFilter !== "GOOGLE") ||
       !googleCalendarConnected
     ) {
       return;
@@ -2997,6 +2998,7 @@ export default function Recruiting({
   }, [
     section,
     showFullGoogleCalendar,
+    calendarOriginFilter,
     googleCalendarConnected,
     calendarMonth,
   ]);
@@ -6252,6 +6254,8 @@ export default function Recruiting({
                   ? `Errore calendario completo: ${googleExternalError}`
                   : googleExternalLoading
                   ? "Caricamento degli eventi Google..."
+                  : calendarOriginFilter === "GOOGLE"
+                  ? `Filtro CALENDARIO GOOGLE attivo · ${googleExternalEvents.length} impegni Google extra disponibili.`
                   : `Calendario completo attivo · ${googleExternalEvents.length} eventi Google esterni visualizzati.`}
               </div>
             )}
@@ -6376,15 +6380,18 @@ export default function Recruiting({
                 <label style={labelStyle}>Origine appuntamenti</label>
                 <select
                   value={calendarOriginFilter}
-                  onChange={(e) =>
-                    setCalendarOriginFilter(
-                      e.target.value as
-                        | ""
-                        | "APP"
-                        | "CRM"
-                        | "EXTERNAL"
-                    )
-                  }
+                  onChange={(e) => {
+                    const value = e.target.value as
+                      | ""
+                      | "APP"
+                      | "CRM"
+                      | "EXTERNAL"
+                      | "GOOGLE";
+                    setCalendarOriginFilter(value);
+                    if (value === "GOOGLE") {
+                      setShowFullGoogleCalendar(true);
+                    }
+                  }}
                   style={inputStyle}
                 >
                   <option value="">TUTTE LE ORIGINI</option>
@@ -6392,6 +6399,9 @@ export default function Recruiting({
                   <option value="CRM">CRM</option>
                   <option value="EXTERNAL">
                     CONTATTI ESTERNI
+                  </option>
+                  <option value="GOOGLE">
+                    CALENDARIO GOOGLE
                   </option>
                 </select>
               </div>
@@ -6477,7 +6487,10 @@ export default function Recruiting({
                     const eventOrigin =
                       recruitingEventOrigin(event);
 
-                    if (calendarOriginFilter === "CRM") {
+                    if (
+                      calendarOriginFilter === "CRM" ||
+                      calendarOriginFilter === "GOOGLE"
+                    ) {
                       return false;
                     }
                     if (
@@ -6535,10 +6548,11 @@ export default function Recruiting({
                   );
 
                 const dayGoogleEvents =
-                  showFullGoogleCalendar &&
+                  (calendarOriginFilter === "GOOGLE" ||
+                    (showFullGoogleCalendar &&
+                      calendarOriginFilter === "")) &&
                   !calendarCandidateFilter &&
-                  !calendarTypeFilter &&
-                  !calendarOriginFilter
+                  !calendarTypeFilter
                     ? googleExternalEvents
                         .filter((event) => {
                           if (
