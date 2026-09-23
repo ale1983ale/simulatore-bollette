@@ -14,6 +14,13 @@ import {
   syncGoogleCalendarEvent,
   type GoogleCalendarExternalEvent,
 } from "./googleCalendar";
+import {
+  getRecruitingCrmStatus,
+  saveRecruitingCrmCredentials,
+  syncRecruitingCrmNow,
+  testRecruitingCrmConnection,
+  type RecruitingCrmStatus,
+} from "./crmIntegration";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
 
@@ -66,6 +73,22 @@ type RecruitingEvent = {
   customType: string;
   notes: string;
   completed: boolean;
+};
+
+type CrmCalendarEvent = {
+  id: string;
+  crmEventId: string;
+  title: string;
+  notes: string;
+  clientName: string;
+  assignedTo: string;
+  crmColor: string;
+  causeCode: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  active: boolean;
 };
 
 type Macroarea = {
@@ -680,6 +703,24 @@ function eventFromRow(row: any): RecruitingEvent {
   };
 }
 
+function crmEventFromRow(row: any): CrmCalendarEvent {
+  return {
+    id: String(row.id),
+    crmEventId: String(row.crm_event_id || ""),
+    title: String(row.title || ""),
+    notes: String(row.notes || ""),
+    clientName: String(row.client_name || ""),
+    assignedTo: String(row.assigned_to || ""),
+    crmColor: String(row.crm_color || ""),
+    causeCode: String(row.cause_code || ""),
+    startDate: String(row.start_date || ""),
+    startTime: String(row.start_time || "").slice(0, 5),
+    endDate: String(row.end_date || ""),
+    endTime: String(row.end_time || "").slice(0, 5),
+    active: Boolean(row.active),
+  };
+}
+
 function activeAgentFromRow(row: any): ActiveAgent {
   return {
     id: String(row.id),
@@ -758,7 +799,12 @@ function googleCalendarMonthRange(monthKey: string) {
 export default function Recruiting() {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [section, setSection] = useState<
-    "contacts" | "calendar" | "map" | "hr_notes" | "management"
+    | "contacts"
+    | "calendar"
+    | "map"
+    | "hr_notes"
+    | "management"
+    | "crm_management"
   >("contacts");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -783,6 +829,16 @@ export default function Recruiting() {
     HrStatusSyncItem[]
   >([]);
   const [events, setEvents] = useState<RecruitingEvent[]>([]);
+  const [crmCalendarEvents, setCrmCalendarEvents] = useState<
+    CrmCalendarEvent[]
+  >([]);
+  const [crmStatus, setCrmStatus] =
+    useState<RecruitingCrmStatus | null>(null);
+  const [crmUsername, setCrmUsername] = useState("");
+  const [crmPassword, setCrmPassword] = useState("");
+  const [crmShowPassword, setCrmShowPassword] = useState(false);
+  const [crmBusy, setCrmBusy] = useState(false);
+  const [crmMessage, setCrmMessage] = useState("");
   const [macroareas, setMacroareas] = useState<Macroarea[]>([]);
   const [activeAgents, setActiveAgents] = useState<ActiveAgent[]>([]);
   const [statusRows, setStatusRows] = useState<RecruitingStatusRow[]>([]);
@@ -906,6 +962,7 @@ export default function Recruiting() {
       notesResult,
       hrStatusSyncResult,
       eventsResult,
+      crmEventsResult,
       macroResult,
       macroRegionsResult,
       activeAgentsResult,
@@ -930,6 +987,12 @@ export default function Recruiting() {
         .order("event_date", { ascending: true })
         .order("event_time", { ascending: true }),
       active.client
+        .from("recruiting_crm_events")
+        .select("id,crm_event_id,title,notes,client_name,assigned_to,crm_color,cause_code,start_date,start_time,end_date,end_time,active")
+        .eq("active", true)
+        .order("start_date", { ascending: true })
+        .order("start_time", { ascending: true }),
+      active.client
         .from("recruiting_macroareas")
         .select("id,name")
         .order("name", { ascending: true }),
@@ -952,6 +1015,7 @@ export default function Recruiting() {
       notesResult,
       hrStatusSyncResult,
       eventsResult,
+      crmEventsResult,
       macroResult,
       macroRegionsResult,
       activeAgentsResult,
@@ -973,6 +1037,9 @@ export default function Recruiting() {
       }))
     );
     setEvents((eventsResult.data || []).map(eventFromRow));
+    setCrmCalendarEvents(
+      (crmEventsResult.data || []).map(crmEventFromRow)
+    );
     setActiveAgents((activeAgentsResult.data || []).map(activeAgentFromRow));
     setStatusRows(
       (statusesResult.data || []).map((row: any) => ({
@@ -1005,6 +1072,102 @@ export default function Recruiting() {
       setMapMacroareaId(nextMacroareas[0].id);
     }
   };
+
+  const refreshCrmStatus = async () => {
+    try {
+      const status = await getRecruitingCrmStatus();
+      setCrmStatus(status);
+      return status;
+    } catch (error: any) {
+      setCrmMessage(error?.message || String(error));
+      return null;
+    }
+  };
+
+  const saveCrmCredentials = async () => {
+    setCrmBusy(true);
+    setCrmMessage("");
+    try {
+      await saveRecruitingCrmCredentials({
+        username: crmUsername.trim() || undefined,
+        password: crmPassword || undefined,
+        ccodsog: "17",
+      });
+      setCrmUsername("");
+      setCrmPassword("");
+      await refreshCrmStatus();
+      setCrmMessage(
+        "Credenziali CRM salvate. Premi TEST CONNESSIONE per verificarle."
+      );
+    } catch (error: any) {
+      setCrmMessage(
+        "Errore nel salvataggio credenziali: " +
+          (error?.message || error)
+      );
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
+  const testCrmConnection = async () => {
+    setCrmBusy(true);
+    setCrmMessage("");
+    try {
+      const result = await testRecruitingCrmConnection();
+      await refreshCrmStatus();
+      setCrmMessage(
+        `Connessione CRM riuscita: ${Number(
+          result?.event_count || 0
+        )} appuntamenti letti.`
+      );
+    } catch (error: any) {
+      await refreshCrmStatus();
+      setCrmMessage(
+        "Test CRM non riuscito: " + (error?.message || error)
+      );
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
+  const syncCrmNow = async () => {
+    setCrmBusy(true);
+    setCrmMessage("");
+    try {
+      const result = await syncRecruitingCrmNow();
+      await loadAll(ctx || undefined);
+      await refreshCrmStatus();
+      setCrmMessage(
+        `Sincronizzazione CRM completata: ${Number(
+          result?.event_count || 0
+        )} appuntamenti letti.`
+      );
+    } catch (error: any) {
+      await refreshCrmStatus();
+      setCrmMessage(
+        "Sincronizzazione CRM non riuscita: " +
+          (error?.message || error)
+      );
+    } finally {
+      setCrmBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (section === "crm_management") {
+      void refreshCrmStatus();
+    }
+  }, [section]);
+
+  useEffect(() => {
+    if (!ctx) return;
+    const timer = window.setInterval(() => {
+      void loadAll(ctx).catch((error) =>
+        console.error("CRM CALENDAR REFRESH ERROR:", error)
+      );
+    }, 120000);
+    return () => window.clearInterval(timer);
+  }, [ctx]);
 
   const refreshGoogleCalendarConnectionStatus = async () => {
     try {
@@ -3424,6 +3587,21 @@ export default function Recruiting() {
             }}
           >
             GESTIONE RECRUITING
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSection("crm_management")}
+            style={{
+              ...buttonStyle,
+              background:
+                section === "crm_management" ? "#0f766e" : "white",
+              color:
+                section === "crm_management" ? "white" : "#0f766e",
+              border: "1px solid #5eead4",
+            }}
+          >
+            GESTIONE CRM
           </button>
         </div>
       </div>
@@ -6048,6 +6226,42 @@ export default function Recruiting() {
                         )
                     : [];
 
+                const dayCrmEvents =
+                  !calendarCandidateFilter &&
+                  !calendarTypeFilter
+                    ? crmCalendarEvents.filter((event) => {
+                        if (event.startDate !== cell.dateKey) {
+                          return false;
+                        }
+
+                        if (calendarSearchNeedle) {
+                          const searchableText =
+                            normalizeFilterValue(
+                              [
+                                event.clientName,
+                                event.title,
+                                event.notes,
+                                event.assignedTo,
+                                event.causeCode,
+                                "CRM +ENERGIA",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")
+                            );
+
+                          if (
+                            !searchableText.includes(
+                              calendarSearchNeedle
+                            )
+                          ) {
+                            return false;
+                          }
+                        }
+
+                        return true;
+                      })
+                    : [];
+
                 const dayCalendarItems = [
                   ...dayEvents.map((event) => ({
                     kind: "internal" as const,
@@ -6061,6 +6275,11 @@ export default function Recruiting() {
                       event.all_day || !event.start_time
                         ? ""
                         : event.start_time,
+                  })),
+                  ...dayCrmEvents.map((event) => ({
+                    kind: "crm" as const,
+                    event,
+                    sortTime: event.startTime || "",
                   })),
                 ].sort((a, b) => {
                   const aNoTime = !a.sortTime;
@@ -6194,6 +6413,77 @@ export default function Recruiting() {
                                   Elimina
                                 </button>
                               </div>
+                            </div>
+                          );
+                        }
+
+                        if (item.kind === "crm") {
+                          const event = item.event;
+                          const crmColor = /^#[0-9a-f]{6}$/i.test(
+                            event.crmColor
+                          )
+                            ? event.crmColor
+                            : "#0f766e";
+
+                          return (
+                            <div
+                              key={`crm-${event.crmEventId}`}
+                              title={
+                                event.notes ||
+                                event.title ||
+                                "Appuntamento CRM +Energia"
+                              }
+                              style={{
+                                borderRadius: 7,
+                                padding: 6,
+                                background: "#f0fdfa",
+                                border: `1px solid ${crmColor}`,
+                                borderLeft: `5px solid ${crmColor}`,
+                                fontSize: 11,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: 900,
+                                  color: "#0f766e",
+                                }}
+                              >
+                                {event.startTime
+                                  ? `${event.startTime} · `
+                                  : ""}
+                                CRM +ENERGIA
+                              </div>
+                              <div style={{ fontWeight: 900 }}>
+                                {event.clientName ||
+                                  event.title ||
+                                  "APPUNTAMENTO CRM"}
+                              </div>
+                              {event.title &&
+                                event.title !== event.clientName && (
+                                  <div>{event.title}</div>
+                                )}
+                              {event.assignedTo && (
+                                <div
+                                  style={{
+                                    marginTop: 2,
+                                    color: "#475569",
+                                  }}
+                                >
+                                  In carico a: {event.assignedTo}
+                                </div>
+                              )}
+                              {event.notes && (
+                                <div
+                                  style={{
+                                    marginTop: 2,
+                                    color: "#475569",
+                                  }}
+                                >
+                                  {event.notes.length > 120
+                                    ? `${event.notes.slice(0, 120)}…`
+                                    : event.notes}
+                                </div>
+                              )}
                             </div>
                           );
                         }
@@ -7626,6 +7916,275 @@ export default function Recruiting() {
                 Nessuna nota o stato da sincronizzare su HR Specialist.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {section === "crm_management" && (
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={cardStyle}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0 }}>GESTIONE CRM +ENERGIA</h3>
+                <div
+                  style={{
+                    marginTop: 5,
+                    color: "#64748b",
+                    fontSize: 13,
+                  }}
+                >
+                  Agenda CRM 17 · sincronizzazione automatica ogni{" "}
+                  {crmStatus?.automatic_sync_minutes || 15} minuti
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "7px 10px",
+                  borderRadius: 999,
+                  background:
+                    crmStatus?.status === "connected"
+                      ? "#dcfce7"
+                      : crmStatus?.status === "error"
+                      ? "#fee2e2"
+                      : "#f1f5f9",
+                  color:
+                    crmStatus?.status === "connected"
+                      ? "#166534"
+                      : crmStatus?.status === "error"
+                      ? "#b91c1c"
+                      : "#475569",
+                  fontWeight: 900,
+                  fontSize: 12,
+                }}
+              >
+                {crmStatus?.status === "connected"
+                  ? "● CRM COLLEGATO"
+                  : crmStatus?.status === "error"
+                  ? "● ERRORE CONNESSIONE"
+                  : crmStatus?.configured
+                  ? "○ CRM CONFIGURATO"
+                  : "○ CRM NON CONFIGURATO"}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(210px,1fr))",
+                gap: 10,
+                marginTop: 16,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>Username / email CRM</label>
+                <input
+                  value={crmUsername}
+                  onChange={(e) => setCrmUsername(e.target.value)}
+                  placeholder={
+                    crmStatus?.username_hint
+                      ? `Attuale: ${crmStatus.username_hint} · lascia vuoto per mantenerlo`
+                      : "Inserisci username/email CRM"
+                  }
+                  autoComplete="off"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Password CRM</label>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                  }}
+                >
+                  <input
+                    type={crmShowPassword ? "text" : "password"}
+                    value={crmPassword}
+                    onChange={(e) => setCrmPassword(e.target.value)}
+                    placeholder={
+                      crmStatus?.configured
+                        ? "Nuova password · lascia vuoto per mantenerla"
+                        : "Inserisci password CRM"
+                    }
+                    autoComplete="new-password"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCrmShowPassword((value) => !value)
+                    }
+                    style={{
+                      ...buttonStyle,
+                      background: "#f1f5f9",
+                    }}
+                  >
+                    {crmShowPassword ? "NASCONDI" : "MOSTRA"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                marginTop: 12,
+              }}
+            >
+              <button
+                type="button"
+                disabled={crmBusy}
+                onClick={() => void saveCrmCredentials()}
+                style={{
+                  ...buttonStyle,
+                  background: "#2563eb",
+                  color: "white",
+                  opacity: crmBusy ? 0.6 : 1,
+                }}
+              >
+                SALVA / AGGIORNA CREDENZIALI
+              </button>
+
+              <button
+                type="button"
+                disabled={crmBusy || !crmStatus?.configured}
+                onClick={() => void testCrmConnection()}
+                style={{
+                  ...buttonStyle,
+                  background: "#0f766e",
+                  color: "white",
+                  opacity:
+                    crmBusy || !crmStatus?.configured ? 0.6 : 1,
+                }}
+              >
+                TEST CONNESSIONE CRM
+              </button>
+
+              <button
+                type="button"
+                disabled={crmBusy || !crmStatus?.configured}
+                onClick={() => void syncCrmNow()}
+                style={{
+                  ...buttonStyle,
+                  marginLeft: "auto",
+                  background: "#16a34a",
+                  color: "white",
+                  opacity:
+                    crmBusy || !crmStatus?.configured ? 0.6 : 1,
+                }}
+              >
+                {crmBusy ? "ATTENDI..." : "↻ SINCRONIZZA ORA"}
+              </button>
+            </div>
+
+            {crmMessage && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "9px 11px",
+                  borderRadius: 8,
+                  background: "#eff6ff",
+                  color: "#1e40af",
+                  fontWeight: 800,
+                  fontSize: 12,
+                }}
+              >
+                {crmMessage}
+              </div>
+            )}
+          </div>
+
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0 }}>Stato sincronizzazione</h3>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(190px,1fr))",
+                gap: 10,
+              }}
+            >
+              <div>
+                <div style={labelStyle}>Ultimo test</div>
+                <strong>
+                  {crmStatus?.last_test_at
+                    ? new Date(
+                        crmStatus.last_test_at
+                      ).toLocaleString("it-IT")
+                    : "—"}
+                </strong>
+              </div>
+
+              <div>
+                <div style={labelStyle}>Ultima sincronizzazione</div>
+                <strong>
+                  {crmStatus?.last_sync_at
+                    ? new Date(
+                        crmStatus.last_sync_at
+                      ).toLocaleString("it-IT")
+                    : "—"}
+                </strong>
+              </div>
+
+              <div>
+                <div style={labelStyle}>
+                  Appuntamenti letti nell'ultimo controllo
+                </div>
+                <strong>
+                  {crmStatus?.last_event_count ?? "—"}
+                </strong>
+              </div>
+
+              <div>
+                <div style={labelStyle}>Agenda CRM</div>
+                <strong>{crmStatus?.ccodsog || "17"}</strong>
+              </div>
+            </div>
+
+            {crmStatus?.last_sync_error && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 10,
+                  borderRadius: 8,
+                  background: "#fef2f2",
+                  color: "#b91c1c",
+                  border: "1px solid #fecaca",
+                  fontWeight: 800,
+                  fontSize: 12,
+                }}
+              >
+                {crmStatus.last_sync_error}
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: 14,
+                color: "#64748b",
+                fontSize: 12,
+                lineHeight: 1.5,
+              }}
+            >
+              La sincronizzazione è solo in lettura: la web app legge
+              l'Agenda del CRM e non modifica, cancella o cambia lo stato
+              degli appuntamenti nel CRM aziendale. Le credenziali non
+              vengono salvate nel browser o nel repository GitHub.
+            </div>
           </div>
         </div>
       )}
