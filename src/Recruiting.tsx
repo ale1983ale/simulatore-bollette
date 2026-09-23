@@ -28,6 +28,7 @@ type CandidateStatus = string;
 
 type Candidate = {
   id: string;
+  contactScope: "internal" | "external";
   fullName: string;
   operationalZone: string;
   sectorEnergy: boolean;
@@ -655,6 +656,10 @@ function formatTime(value: string) {
 function candidateFromRow(row: any): Candidate {
   return {
     id: String(row.id),
+    contactScope:
+      String(row.contact_scope || "internal") === "external"
+        ? "external"
+        : "internal",
     fullName: String(row.full_name || "").toLocaleUpperCase("it"),
     operationalZone: String(row.operational_zone || ""),
     sectorEnergy: row.sector_energy !== false,
@@ -938,16 +943,23 @@ function googleCalendarMonthRange(monthKey: string) {
 
 type RecruitingSection =
   | "contacts"
+  | "external_contacts"
   | "calendar"
   | "map"
   | "hr_notes"
   | "management"
   | "crm_management";
 
+type RecruitingContactScope = "internal" | "external";
+
 export default function Recruiting({
   initialSection = "contacts",
+  contactScope = "internal",
+  contactsOnly = false,
 }: {
   initialSection?: RecruitingSection;
+  contactScope?: RecruitingContactScope;
+  contactsOnly?: boolean;
 }) {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [section, setSection] = useState<RecruitingSection>(
@@ -971,6 +983,7 @@ export default function Recruiting({
   const [googleExternalError, setGoogleExternalError] = useState("");
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [hrStatusSyncItems, setHrStatusSyncItems] = useState<
     HrStatusSyncItem[]
@@ -1126,7 +1139,7 @@ export default function Recruiting({
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,contact_status,forwarded_to,province_code,region,latitude,longitude")
+        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,contact_status,forwarded_to,province_code,region,latitude,longitude")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -1180,7 +1193,11 @@ export default function Recruiting({
       if (result.error) throw result.error;
     }
 
-    const nextCandidates = (candidatesResult.data || []).map(candidateFromRow);
+    const nextAllCandidates = (candidatesResult.data || []).map(candidateFromRow);
+    const nextCandidates = nextAllCandidates.filter(
+      (candidate) => candidate.contactScope === contactScope
+    );
+    setAllCandidates(nextAllCandidates);
     setCandidates(nextCandidates);
     setNotes((notesResult.data || []).map(noteFromRow));
     setHrStatusSyncItems(
@@ -2030,6 +2047,7 @@ export default function Recruiting({
             updated_at: new Date().toISOString(),
           })
           .eq("owner_key", ctx.ownerKey)
+          .eq("contact_scope", contactScope)
           .eq("contact_status", status.code);
 
         if (candidatesError) throw candidatesError;
@@ -2348,6 +2366,7 @@ export default function Recruiting({
         .from("recruiting_candidates")
         .insert({
           owner_key: ctx.ownerKey,
+          contact_scope: contactScope,
           full_name: newName.trim().toLocaleUpperCase("it"),
           operational_zone: newZone.trim().toLocaleUpperCase("it"),
           sector_energy: newSectorEnergy,
@@ -2380,7 +2399,11 @@ export default function Recruiting({
       setShowNewContact(false);
       await loadAll(ctx);
       setSelectedCandidateId(String(data.id));
-      setMessage("Nuovo contatto inserito.");
+      setMessage(
+        contactScope === "external"
+          ? "Nuovo contatto esterno inserito."
+          : "Nuovo contatto inserito."
+      );
     } catch (error: any) {
       setMessage("Errore nell'inserimento del contatto: " + (error?.message || error));
     } finally {
@@ -2825,7 +2848,8 @@ export default function Recruiting({
   };
 
   const candidateName = (candidateId: string | null) =>
-    candidates.find((candidate) => candidate.id === candidateId)?.fullName || "Senza contatto";
+    allCandidates.find((candidate) => candidate.id === candidateId)?.fullName ||
+    "Senza contatto";
 
   const eventModalEvent =
     events.find((event) => event.id === eventModalId) || null;
@@ -2836,7 +2860,7 @@ export default function Recruiting({
     ) || null;
 
   const calendarContactPreview =
-    candidates.find(
+    allCandidates.find(
       (candidate) => candidate.id === calendarContactPreviewId
     ) || null;
 
@@ -2861,10 +2885,10 @@ export default function Recruiting({
         .filter((value): value is string => Boolean(value))
     );
 
-    return candidates
+    return allCandidates
       .filter((candidate) => ids.has(candidate.id))
       .sort((a, b) => a.fullName.localeCompare(b.fullName, "it"));
-  }, [events, candidates]);
+  }, [events, allCandidates]);
 
   const calendarCells = useMemo(
     () => getMonthCells(calendarMonth),
@@ -3729,6 +3753,8 @@ export default function Recruiting({
           padding: 18px;
         }
       `}</style>
+      {!contactsOnly && (
+        <>
       <div style={cardStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div>
@@ -3751,13 +3777,14 @@ export default function Recruiting({
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {[
             ["contacts", "CONTATTI"],
+            ["external_contacts", "CONTATTI ESTERNI"],
             ["calendar", "CALENDARIO"],
             ["map", "MAPPA"],
           ].map(([key, label]) => (
             <button
               key={key}
               type="button"
-              onClick={() => setSection(key as "contacts" | "calendar" | "map")}
+              onClick={() => setSection(key as RecruitingSection)}
               style={{
                 ...buttonStyle,
                 background: section === key ? "#0f172a" : "white",
@@ -3850,6 +3877,9 @@ export default function Recruiting({
         </div>
       </div>
 
+        </>
+      )}
+
       {message && (
         <div
           style={{
@@ -3865,12 +3895,24 @@ export default function Recruiting({
         </div>
       )}
 
-      {section === "contacts" && (
+      {section === "external_contacts" && !contactsOnly && (
+        <Recruiting
+          initialSection="contacts"
+          contactScope="external"
+          contactsOnly
+        />
+      )}
+
+      {(section === "contacts" || contactsOnly) && (
         <>
           <div style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <div>
-                <h3 style={{ margin: 0 }}>Database contatti</h3>
+                <h3 style={{ margin: 0 }}>
+                  {contactScope === "external"
+                    ? "Database contatti esterni"
+                    : "Database contatti"}
+                </h3>
                 <div style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
                   {candidates.length} nominativi presenti
                 </div>
@@ -8139,7 +8181,7 @@ export default function Recruiting({
             )}
 
             {hrStatusSyncItems.map((item) => {
-              const candidate = candidates.find(
+              const candidate = allCandidates.find(
                 (candidate) => candidate.id === item.candidateId
               );
               const previousStyle = getStatusDefinition(
@@ -8301,7 +8343,7 @@ export default function Recruiting({
             )}
 
             {hrSyncNotes.map((note) => {
-              const candidate = candidates.find(
+              const candidate = allCandidates.find(
                 (item) => item.id === note.candidateId
               );
               const statusStyle = candidate
@@ -8448,7 +8490,7 @@ export default function Recruiting({
                       onClick={async (event) => {
                         event.stopPropagation();
                         const copied = await copyPlainText(
-                          note.noteText
+                          `${formatDate(note.noteDate)} - ALESSIO CEDRONI: - ${note.noteText}`
                         );
                         setMessage(
                           copied
