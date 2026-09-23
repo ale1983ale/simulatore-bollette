@@ -47,6 +47,14 @@ type ContactNote = {
   createdAt: string;
 };
 
+type HrStatusSyncItem = {
+  id: string;
+  candidateId: string;
+  previousStatus: CandidateStatus;
+  newStatus: CandidateStatus;
+  createdAt: string;
+};
+
 type EventType = "CHIAMARE" | "APPUNTAMENTO_ZONA" | "APPUNTAMENTO_SEDE" | "VIDEOCALL" | "ALTRO";
 
 type RecruitingEvent = {
@@ -740,6 +748,9 @@ export default function Recruiting() {
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
+  const [hrStatusSyncItems, setHrStatusSyncItems] = useState<
+    HrStatusSyncItem[]
+  >([]);
   const [events, setEvents] = useState<RecruitingEvent[]>([]);
   const [macroareas, setMacroareas] = useState<Macroarea[]>([]);
   const [activeAgents, setActiveAgents] = useState<ActiveAgent[]>([]);
@@ -862,6 +873,7 @@ export default function Recruiting() {
     const [
       candidatesResult,
       notesResult,
+      hrStatusSyncResult,
       eventsResult,
       macroResult,
       macroRegionsResult,
@@ -876,6 +888,10 @@ export default function Recruiting() {
         .from("recruiting_notes")
         .select("id,candidate_id,note_date,note_text,called_by_me,hr_sync_pending,created_at")
         .order("note_date", { ascending: false })
+        .order("created_at", { ascending: false }),
+      active.client
+        .from("recruiting_hr_status_sync_queue")
+        .select("id,candidate_id,previous_status,new_status,created_at")
         .order("created_at", { ascending: false }),
       active.client
         .from("recruiting_events")
@@ -903,6 +919,7 @@ export default function Recruiting() {
     for (const result of [
       candidatesResult,
       notesResult,
+      hrStatusSyncResult,
       eventsResult,
       macroResult,
       macroRegionsResult,
@@ -915,6 +932,15 @@ export default function Recruiting() {
     const nextCandidates = (candidatesResult.data || []).map(candidateFromRow);
     setCandidates(nextCandidates);
     setNotes((notesResult.data || []).map(noteFromRow));
+    setHrStatusSyncItems(
+      (hrStatusSyncResult.data || []).map((row: any) => ({
+        id: String(row.id),
+        candidateId: String(row.candidate_id),
+        previousStatus: String(row.previous_status || ""),
+        newStatus: String(row.new_status || ""),
+        createdAt: String(row.created_at || ""),
+      }))
+    );
     setEvents((eventsResult.data || []).map(eventFromRow));
     setActiveAgents((activeAgentsResult.data || []).map(activeAgentFromRow));
     setStatusRows(
@@ -1484,6 +1510,9 @@ export default function Recruiting() {
     [notes]
   );
 
+  const hrSyncPendingCount =
+    hrSyncNotes.length + hrStatusSyncItems.length;
+
   const selectedFutureEvents = useMemo(
     () =>
       events
@@ -1693,7 +1722,8 @@ export default function Recruiting() {
     candidate: Candidate,
     status: CandidateStatus
   ) => {
-    if (!ctx || candidate.status === status) return;
+    if (!ctx) return false;
+    if (candidate.status === status) return true;
 
     const previousStatus = candidate.status;
     setCandidates((current) =>
@@ -1712,6 +1742,7 @@ export default function Recruiting() {
         .eq("id", candidate.id);
 
       if (error) throw error;
+      return true;
     } catch (error: any) {
       setCandidates((current) =>
         current.map((item) =>
@@ -1721,17 +1752,83 @@ export default function Recruiting() {
       setMessage(
         "Errore nell'aggiornamento dello stato: " + (error?.message || error)
       );
+      return false;
     }
   };
 
-  const confirmNoteStatus = async () => {
-    if (!selectedCandidate) return;
+  const confirmNoteStatus = async (sendToHr = false) => {
+    if (!selectedCandidate || !ctx || !noteStatusDraft) return;
 
-    if (noteStatusDraft) {
-      await updateCandidateStatus(selectedCandidate, noteStatusDraft);
+    const previousStatus = selectedCandidate.status;
+    const nextStatus = noteStatusDraft;
+
+    if (previousStatus === nextStatus) {
+      if (sendToHr) {
+        setMessage(
+          "Lo stato selezionato è già attivo: nessuno stato è stato aggiunto alla sincronizzazione HR."
+        );
+      }
+      setNoteStatusDraft("DA_CHIAMARE");
+      return;
+    }
+
+    let queueId = "";
+
+    if (sendToHr) {
+      setBusy(true);
+      try {
+        const { data, error } = await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .insert({
+            owner_key: ctx.ownerKey,
+            candidate_id: selectedCandidate.id,
+            previous_status: previousStatus,
+            new_status: nextStatus,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw error;
+        queueId = String(data.id);
+      } catch (error: any) {
+        setMessage(
+          "Errore nell'aggiunta dello stato alla sincronizzazione HR: " +
+            (error?.message || error)
+        );
+        setBusy(false);
+        return;
+      }
+    }
+
+    const updated = await updateCandidateStatus(
+      selectedCandidate,
+      nextStatus
+    );
+
+    if (!updated) {
+      if (queueId) {
+        await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .delete()
+          .eq("id", queueId);
+      }
+      setBusy(false);
+      return;
     }
 
     setNoteStatusDraft("DA_CHIAMARE");
+
+    if (sendToHr) {
+      try {
+        await loadAll(ctx);
+      } catch (error) {
+        console.error("HR STATUS QUEUE REFRESH ERROR:", error);
+      }
+      setMessage(
+        "Stato aggiornato e aggiunto agli STATI DA SINCRONIZZARE SU HR SPECIALIST."
+      );
+      setBusy(false);
+    }
   };
 
   const updateCandidateForwardedTo = async (
@@ -3256,7 +3353,7 @@ export default function Recruiting() {
             }}
           >
             NOTE DA SINCRONIZZARE SU HR SPECIALIST
-            {hrSyncNotes.length > 0 && (
+            {hrSyncPendingCount > 0 && (
               <span
                 style={{
                   marginLeft: 7,
@@ -3275,7 +3372,7 @@ export default function Recruiting() {
                   fontWeight: 900,
                 }}
               >
-                {hrSyncNotes.length}
+                {hrSyncPendingCount}
               </span>
             )}
           </button>
@@ -5012,7 +5109,7 @@ export default function Recruiting() {
                             <button
                               type="button"
                               disabled={busy || !noteStatusDraft}
-                              onClick={() => void confirmNoteStatus()}
+                              onClick={() => void confirmNoteStatus(false)}
                               style={{
                                 ...buttonStyle,
                                 minHeight: 40,
@@ -5023,6 +5120,22 @@ export default function Recruiting() {
                               }}
                             >
                               OK
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={busy || !noteStatusDraft}
+                              onClick={() => void confirmNoteStatus(true)}
+                              style={{
+                                ...buttonStyle,
+                                minHeight: 40,
+                                background: "#2563eb",
+                                color: "white",
+                                opacity:
+                                  busy || !noteStatusDraft ? 0.6 : 1,
+                              }}
+                            >
+                              OK E SINCRO HR
                             </button>
                           </div>
                         </div>
@@ -7001,7 +7114,8 @@ export default function Recruiting() {
                   fontSize: 13,
                 }}
               >
-                {hrSyncNotes.length} note in attesa
+                {hrSyncPendingCount} elementi in attesa · {hrSyncNotes.length} note ·{" "}
+                {hrStatusSyncItems.length} stati
               </div>
             </div>
           </div>
@@ -7013,6 +7127,184 @@ export default function Recruiting() {
               marginTop: 14,
             }}
           >
+            {hrStatusSyncItems.length > 0 && (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 9,
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  color: "#1d4ed8",
+                  fontSize: 12,
+                  fontWeight: 900,
+                }}
+              >
+                STATI DA SINCRONIZZARE ({hrStatusSyncItems.length})
+              </div>
+            )}
+
+            {hrStatusSyncItems.map((item) => {
+              const candidate = candidates.find(
+                (candidate) => candidate.id === item.candidateId
+              );
+              const previousStyle = getStatusDefinition(
+                item.previousStatus
+              );
+              const nextStyle = getStatusDefinition(item.newStatus);
+
+              return (
+                <div
+                  key={`status-${item.id}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    setContactEditMode(false);
+                    setSelectedCandidateId(item.candidateId);
+                    setSection("contacts");
+                    window.setTimeout(() => {
+                      document
+                        .getElementById(
+                          `recruiting-candidate-${item.candidateId}`
+                        )
+                        ?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                    }, 80);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" ||
+                      event.key === " "
+                    ) {
+                      setContactEditMode(false);
+                      setSelectedCandidateId(item.candidateId);
+                      setSection("contacts");
+                    }
+                  }}
+                  style={{
+                    border: `3px solid ${nextStyle.border}`,
+                    borderRadius: 11,
+                    padding: 13,
+                    background: "white",
+                    cursor: "pointer",
+                    boxShadow:
+                      "0 2px 8px rgba(15,23,42,.06)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          color: "#2563eb",
+                          fontSize: 11,
+                          fontWeight: 900,
+                          marginBottom: 4,
+                        }}
+                      >
+                        STATO DA SINCRONIZZARE
+                      </div>
+                      <strong style={{ fontSize: 15 }}>
+                        {candidate?.fullName ||
+                          "NOMINATIVO NON DISPONIBILE"}
+                      </strong>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {new Date(item.createdAt).toLocaleString("it-IT", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                        {candidate?.operationalZone
+                          ? ` · ${candidate.operationalZone.toLocaleUpperCase(
+                              "it"
+                            )}`
+                          : ""}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 7,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          padding: "6px 9px",
+                          borderRadius: 8,
+                          background: previousStyle.background,
+                          color: previousStyle.color,
+                          border: `2px solid ${previousStyle.border}`,
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {previousStyle.label}
+                      </span>
+                      <strong>→</strong>
+                      <span
+                        style={{
+                          padding: "6px 9px",
+                          borderRadius: 8,
+                          background: nextStyle.background,
+                          color: nextStyle.color,
+                          border: `2px solid ${nextStyle.border}`,
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {nextStyle.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 10,
+                      color: "#2563eb",
+                      fontSize: 11,
+                      fontWeight: 900,
+                    }}
+                  >
+                    CLICCA PER APRIRE LA SCHEDA COMPLETA
+                  </div>
+                </div>
+              );
+            })}
+
+            {hrSyncNotes.length > 0 && (
+              <div
+                style={{
+                  marginTop: hrStatusSyncItems.length ? 6 : 0,
+                  padding: "10px 12px",
+                  borderRadius: 9,
+                  background: "#f5f3ff",
+                  border: "1px solid #ddd6fe",
+                  color: "#6d28d9",
+                  fontSize: 12,
+                  fontWeight: 900,
+                }}
+              >
+                NOTE DA SINCRONIZZARE ({hrSyncNotes.length})
+              </div>
+            )}
+
             {hrSyncNotes.map((note) => {
               const candidate = candidates.find(
                 (item) => item.id === note.candidateId
@@ -7183,7 +7475,7 @@ export default function Recruiting() {
               );
             })}
 
-            {!hrSyncNotes.length && (
+            {!hrSyncNotes.length && !hrStatusSyncItems.length && (
               <div
                 style={{
                   padding: 18,
@@ -7194,7 +7486,7 @@ export default function Recruiting() {
                   fontWeight: 800,
                 }}
               >
-                Nessuna nota da sincronizzare su HR Specialist.
+                Nessuna nota o stato da sincronizzare su HR Specialist.
               </div>
             )}
           </div>
