@@ -355,6 +355,12 @@ const numFormat = (v: number, decimals: number) =>
     maximumFractionDigits: decimals,
   });
 
+function formatReportDate(value: any) {
+  const raw = String(value || "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : raw || "-";
+}
+
 const referencePriceFormat = (v: number) =>
   Number(v || 0).toLocaleString("it-IT", {
     minimumFractionDigits: 3,
@@ -4957,8 +4963,8 @@ function AgentsAdmin({
         {loading ? (
           <div>Caricamento...</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="ge-table-shell">
+            <table className="ge-list-table">
               <thead>
                 <tr>
                   {[
@@ -5681,8 +5687,8 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
         ) : reports.length === 0 ? (
           <div>Nessun report</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="ge-table-shell">
+            <table className="ge-list-table ge-report-table">
               <thead>
                 <tr>
                   {[
@@ -5710,26 +5716,32 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
               <tbody>
                 {reports.map((r, i) => (
                   <tr key={r.id || i}>
-                    <td style={{ padding: 8 }}>{r.report_date}</td>
-                    <td style={{ padding: 8 }}>{r.contracts_energia}</td>
-                    <td style={{ padding: 8 }}>{r.consumi_energia}</td>
-                    <td style={{ padding: 8 }}>{r.contracts_gas}</td>
-                    <td style={{ padding: 8 }}>{r.consumi_gas}</td>
-                    <td style={{ padding: 8 }}>{r.notes}</td>
-                    <td style={{ padding: 8 }}>
+                    <td data-label="Data" className="ge-date-cell">
+                      {formatReportDate(r.report_date)}
+                    </td>
+                    <td data-label="Contratti energia" className="ge-number-cell">
+                      {r.contracts_energia}
+                    </td>
+                    <td data-label="Consumi energia" className="ge-number-cell">
+                      {numFormat(r.consumi_energia, 2)}
+                    </td>
+                    <td data-label="Contratti gas" className="ge-number-cell">
+                      {r.contracts_gas}
+                    </td>
+                    <td data-label="Consumi gas" className="ge-number-cell">
+                      {numFormat(r.consumi_gas, 2)}
+                    </td>
+                    <td data-label="Note" className="ge-note-cell">
+                      {r.notes || "-"}
+                    </td>
+                    <td data-label="Azioni" className="ge-action-cell">
                       <button
                         onClick={() => deleteReport(r.id)}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 8,
-                          border: "1px solid #dc2626",
-                          background: "white",
-                          color: "#dc2626",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                        }}
+                        className="ge-icon-danger"
+                        title="Cancella report"
+                        aria-label="Cancella report"
                       >
-                        🗑
+                        🗑️
                       </button>
                     </td>
                   </tr>
@@ -6077,8 +6089,8 @@ function ReportAdmin({
         ) : reports.length === 0 ? (
           <div>Nessun report</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="ge-table-shell">
+            <table className="ge-list-table ge-report-table">
               <thead>
                 <tr>
                   {[
@@ -6107,43 +6119,36 @@ function ReportAdmin({
               <tbody>
                 {filteredReports.map((r, i) => (
                   <tr key={r.id || i}>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    <td data-label="Agente" className="ge-agent-cell">
                       {getAgentName(r.agent_id)?.toUpperCase()}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                      {r.report_date}
+                    <td data-label="Data" className="ge-date-cell">
+                      {formatReportDate(r.report_date)}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    <td data-label="Contratti energia" className="ge-number-cell">
                       {r.contracts_energia}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    <td data-label="Consumi energia" className="ge-number-cell">
                       {numFormat(r.consumi_energia, 2)}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    <td data-label="Contratti gas" className="ge-number-cell">
                       {r.contracts_gas}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    <td data-label="Consumi gas" className="ge-number-cell">
                       {numFormat(r.consumi_gas, 2)}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                      {r.notes}
+                    <td data-label="Note" className="ge-note-cell">
+                      {r.notes || "-"}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                    <td data-label="Azioni" className="ge-action-cell">
                       <button
                         type="button"
                         onClick={() => deleteReportAdmin(r.id)}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 8,
-                          border: "1px solid #dc2626",
-                          background: "white",
-                          color: "#dc2626",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                        }}
+                        className="ge-icon-danger"
                         title="Cancella report"
+                        aria-label="Cancella report"
                       >
-                        🗑
+                        🗑️
                       </button>
                     </td>
                   </tr>
@@ -6402,8 +6407,8 @@ function AdminUsersManager({
         ) : admins.length === 0 ? (
           <div>Nessun admin trovato</div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className="ge-table-shell">
+            <table className="ge-list-table">
               <thead>
                 <tr>
                   {["Nome", "Cognome", "Username", "Password", "Ruolo", "Azioni"].map(
