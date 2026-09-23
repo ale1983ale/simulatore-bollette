@@ -936,16 +936,23 @@ function googleCalendarMonthRange(monthKey: string) {
   };
 }
 
-export default function Recruiting() {
+type RecruitingSection =
+  | "contacts"
+  | "calendar"
+  | "map"
+  | "hr_notes"
+  | "management"
+  | "crm_management";
+
+export default function Recruiting({
+  initialSection = "contacts",
+}: {
+  initialSection?: RecruitingSection;
+}) {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
-  const [section, setSection] = useState<
-    | "contacts"
-    | "calendar"
-    | "map"
-    | "hr_notes"
-    | "management"
-    | "crm_management"
-  >("contacts");
+  const [section, setSection] = useState<RecruitingSection>(
+    initialSection
+  );
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");

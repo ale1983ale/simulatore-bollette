@@ -5980,7 +5980,7 @@ useEffect(() => {
 }, [tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
-  const adminTabs = ["reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6187,6 +6187,16 @@ const renderAdminContent = () => {
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
+            onClick={() => setTab("calendarAdmin")}
+            style={{
+              ...baseBtn,
+              ...(tab === "calendarAdmin" ? activeBtn : {}),
+            }}
+          >
+            CALENDARIO
+          </button>
+
+          <button
             onClick={() => setTab("archive")}
             style={{
               ...baseBtn,
@@ -6322,6 +6332,12 @@ const renderAdminContent = () => {
           >
             GESTIONE RECRUITING
           </button>
+        </div>
+      )}
+
+      {tab === "calendarAdmin" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Recruiting initialSection="calendar" />
         </div>
       )}
 

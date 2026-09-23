@@ -382,24 +382,47 @@ export default function OutlookEmail() {
   useEffect(() => {
     let host: HTMLElement | null = null;
     const placeInAdminToolbar = () => {
-      const dataButton = Array.from(document.querySelectorAll("button")).find(
-        (node) => node.textContent?.trim() === "DATI PRODUZIONE" && (node as HTMLElement).offsetParent !== null
+      const databaseButton = Array.from(
+        document.querySelectorAll("button")
+      ).find(
+        (node) =>
+          node.textContent?.trim() === "DATABASE" &&
+          (node as HTMLElement).offsetParent !== null
       ) as HTMLElement | undefined;
-      if (!dataButton?.parentElement) {
+
+      const toolbar = databaseButton?.parentElement || null;
+      const exitButton = toolbar
+        ? (Array.from(toolbar.children).find(
+            (node) =>
+              node instanceof HTMLButtonElement &&
+              node.textContent?.trim() === "ESCI"
+          ) as HTMLElement | undefined)
+        : undefined;
+
+      if (!toolbar || !exitButton) {
         if (host?.isConnected) host.remove();
         host = null;
         setPortalHost(null);
         setOpen(false);
         return;
       }
+
       if (!host || !host.isConnected) {
         host = document.createElement("span");
-        host.setAttribute("data-outlook-email-admin-slot", "true");
+        host.setAttribute(
+          "data-outlook-email-admin-slot",
+          "true"
+        );
         host.style.display = "contents";
       }
-      if (host.parentElement !== dataButton.parentElement || host.nextSibling !== dataButton) {
-        dataButton.parentElement.insertBefore(host, dataButton);
+
+      if (
+        host.parentElement !== toolbar ||
+        host.nextSibling !== exitButton
+      ) {
+        toolbar.insertBefore(host, exitButton);
       }
+
       setPortalHost(host);
     };
     placeInAdminToolbar();
