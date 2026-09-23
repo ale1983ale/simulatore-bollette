@@ -1064,9 +1064,10 @@ export default function Recruiting({
   const [calendarSearchFilter, setCalendarSearchFilter] = useState("");
   const [calendarCandidateFilter, setCalendarCandidateFilter] = useState("");
   const [calendarTypeFilter, setCalendarTypeFilter] = useState<"" | EventType>("");
-  const [calendarOriginFilter, setCalendarOriginFilter] = useState<
-    "" | "APP" | "CRM" | "EXTERNAL" | "GOOGLE"
-  >("");
+  type CalendarOrigin = "APP" | "CRM" | "EXTERNAL" | "GOOGLE";
+  const [calendarOriginFilters, setCalendarOriginFilters] = useState<
+    CalendarOrigin[]
+  >([]);
   const [calendarCandidateId, setCalendarCandidateId] = useState("");
   const [calendarType, setCalendarType] = useState<EventType>("CHIAMARE");
   const [calendarCustom, setCalendarCustom] = useState("");
@@ -1866,7 +1867,7 @@ export default function Recruiting({
     setCalendarSearchFilter("");
     setCalendarCandidateFilter("");
     setCalendarTypeFilter("");
-    setCalendarOriginFilter("");
+    setCalendarOriginFilters([]);
   };
 
   const selectedNotes = useMemo(
@@ -2985,10 +2986,12 @@ export default function Recruiting({
   ]);
 
   useEffect(() => {
+    const googleOriginSelected =
+      calendarOriginFilters.includes("GOOGLE");
+
     if (
       section !== "calendar" ||
-      (!showFullGoogleCalendar &&
-        calendarOriginFilter !== "GOOGLE") ||
+      (!showFullGoogleCalendar && !googleOriginSelected) ||
       !googleCalendarConnected
     ) {
       return;
@@ -2998,7 +3001,7 @@ export default function Recruiting({
   }, [
     section,
     showFullGoogleCalendar,
-    calendarOriginFilter,
+    calendarOriginFilters,
     googleCalendarConnected,
     calendarMonth,
   ]);
@@ -6226,7 +6229,7 @@ export default function Recruiting({
                   {[
                     {
                       key: "APP" as const,
-                      label: "APP",
+                      label: "APP HR",
                       activeBackground: "#2563eb",
                       activeColor: "#ffffff",
                       border: "#93c5fd",
@@ -6258,7 +6261,7 @@ export default function Recruiting({
                     },
                   ].map((origin) => {
                     const active =
-                      calendarOriginFilter === origin.key;
+                      calendarOriginFilters.includes(origin.key);
 
                     return (
                       <button
@@ -6266,12 +6269,17 @@ export default function Recruiting({
                         type="button"
                         disabled={googleCalendarBusy}
                         onClick={() => {
-                          const next =
-                            calendarOriginFilter === origin.key
-                              ? ""
-                              : origin.key;
-                          setCalendarOriginFilter(next);
-                          if (next === "GOOGLE") {
+                          setCalendarOriginFilters((current) => {
+                            if (current.includes(origin.key)) {
+                              return current.filter(
+                                (item) => item !== origin.key
+                              );
+                            }
+
+                            return [...current, origin.key];
+                          });
+
+                          if (origin.key === "GOOGLE") {
                             setShowFullGoogleCalendar(true);
                           }
                         }}
@@ -6311,6 +6319,20 @@ export default function Recruiting({
                     ? "SINCRONIZZAZIONE..."
                     : "↻ SINCRONIZZA ORA"}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={resetCalendarFilters}
+                  style={{
+                    ...buttonStyle,
+                    background: "#dc2626",
+                    color: "#ffffff",
+                    border: "1px solid #b91c1c",
+                    fontWeight: 900,
+                  }}
+                >
+                  AZZERA FILTRI
+                </button>
               </div>
             )}
 
@@ -6334,9 +6356,10 @@ export default function Recruiting({
                   ? `Errore calendario completo: ${googleExternalError}`
                   : googleExternalLoading
                   ? "Caricamento degli eventi Google..."
-                  : calendarOriginFilter === "GOOGLE"
+                  : calendarOriginFilters.length === 1 &&
+                    calendarOriginFilters.includes("GOOGLE")
                   ? `Filtro CALENDARIO GOOGLE attivo · ${googleExternalEvents.length} impegni Google extra disponibili.`
-                  : `Calendario completo attivo · ${googleExternalEvents.length} eventi Google esterni visualizzati.`}
+                  : `Calendario completo attivo · ${googleExternalEvents.length} eventi Google esterni disponibili.`}
               </div>
             )}
           </div>
@@ -6456,58 +6479,6 @@ export default function Recruiting({
                 </select>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "end",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={resetCalendarFilters}
-                  disabled={
-                    !calendarSearchFilter.trim() &&
-                    !calendarCandidateFilter &&
-                    !calendarTypeFilter &&
-                    !calendarOriginFilter
-                  }
-                  style={{
-                    ...buttonStyle,
-                    width: "100%",
-                    minHeight: 40,
-                    background:
-                      calendarSearchFilter.trim() ||
-                      calendarCandidateFilter ||
-                      calendarTypeFilter ||
-                      calendarOriginFilter
-                        ? "#fee2e2"
-                        : "#f1f5f9",
-                    color:
-                      calendarSearchFilter.trim() ||
-                      calendarCandidateFilter ||
-                      calendarTypeFilter ||
-                      calendarOriginFilter
-                        ? "#b91c1c"
-                        : "#94a3b8",
-                    border:
-                      calendarSearchFilter.trim() ||
-                      calendarCandidateFilter ||
-                      calendarTypeFilter ||
-                      calendarOriginFilter
-                        ? "1px solid #fecaca"
-                        : "1px solid #e2e8f0",
-                    cursor:
-                      calendarSearchFilter.trim() ||
-                      calendarCandidateFilter ||
-                      calendarTypeFilter ||
-                      calendarOriginFilter
-                        ? "pointer"
-                        : "default",
-                  }}
-                >
-                  AZZERA FILTRI
-                </button>
-              </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
@@ -6538,20 +6509,8 @@ export default function Recruiting({
                       recruitingEventOrigin(event);
 
                     if (
-                      calendarOriginFilter === "CRM" ||
-                      calendarOriginFilter === "GOOGLE"
-                    ) {
-                      return false;
-                    }
-                    if (
-                      calendarOriginFilter === "APP" &&
-                      eventOrigin !== "APP"
-                    ) {
-                      return false;
-                    }
-                    if (
-                      calendarOriginFilter === "EXTERNAL" &&
-                      eventOrigin !== "EXTERNAL"
+                      calendarOriginFilters.length > 0 &&
+                      !calendarOriginFilters.includes(eventOrigin)
                     ) {
                       return false;
                     }
@@ -6598,9 +6557,10 @@ export default function Recruiting({
                   );
 
                 const dayGoogleEvents =
-                  (calendarOriginFilter === "GOOGLE" ||
-                    (showFullGoogleCalendar &&
-                      calendarOriginFilter === "")) &&
+                  ((calendarOriginFilters.length > 0 &&
+                    calendarOriginFilters.includes("GOOGLE")) ||
+                    (calendarOriginFilters.length === 0 &&
+                      showFullGoogleCalendar)) &&
                   !calendarCandidateFilter &&
                   !calendarTypeFilter
                     ? googleExternalEvents
@@ -6645,8 +6605,8 @@ export default function Recruiting({
                 const dayCrmEvents =
                   !calendarCandidateFilter &&
                   !calendarTypeFilter &&
-                  (calendarOriginFilter === "" ||
-                    calendarOriginFilter === "CRM")
+                  (calendarOriginFilters.length === 0 ||
+                    calendarOriginFilters.includes("CRM"))
                     ? crmCalendarEvents.filter((event) => {
                         if (event.startDate !== cell.dateKey) {
                           return false;
