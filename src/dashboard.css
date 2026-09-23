@@ -433,3 +433,36 @@
     font-size: 10px;
   }
 }
+
+
+/* Unified section identity across the whole application */
+.ge-section-hero--energy {
+  background: linear-gradient(105deg, #f59e0b 0%, #ff7a0a 55%, #ef5b0c 100%);
+}
+.ge-section-hero--gas {
+  background: linear-gradient(105deg, #06b6d4 0%, #1689ee 52%, #075fe4 100%);
+}
+.ge-section-hero--report {
+  background: linear-gradient(105deg, #243b73 0%, #465fc7 55%, #7c3aed 100%);
+}
+.ge-section-hero--calendar {
+  background: linear-gradient(105deg, #0ea5e9 0%, #2563eb 55%, #3156c8 100%);
+}
+.ge-section-hero--production {
+  background: linear-gradient(105deg, #059669 0%, #14b8a6 52%, #0ea5a4 100%);
+}
+.ge-section-hero--recruiting {
+  background: linear-gradient(105deg, #d97706 0%, #f59e0b 55%, #fb923c 100%);
+}
+.ge-section-hero--appointments {
+  background: linear-gradient(105deg, #7c3aed 0%, #9333ea 52%, #c026d3 100%);
+}
+.ge-section-hero--agent-report {
+  background: linear-gradient(105deg, #9a6700 0%, #d69e1e 55%, #f59e0b 100%);
+}
+.ge-section-hero--database {
+  background: linear-gradient(105deg, #334155 0%, #475569 50%, #0f766e 100%);
+}
+.ge-section-hero--email {
+  background: linear-gradient(105deg, #db2777 0%, #e11d48 52%, #f43f5e 100%);
+}

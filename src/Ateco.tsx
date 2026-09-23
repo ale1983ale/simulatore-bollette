@@ -305,16 +305,6 @@ export default function Ateco() {
         boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
       }}
     >
-      <div className="ge-section-hero ge-section-hero--ateco">
-        <div className="ge-section-hero__icon">▦</div>
-        <div>
-          <div className="ge-section-hero__title">ATECO</div>
-          <div className="ge-section-hero__subtitle">
-            Ricerca codici e verifica le principali agevolazioni fiscali
-          </div>
-        </div>
-      </div>
-
       <div style={{ color: "#64748b", marginBottom: 20 }}>
         Inserisci un codice ATECO 2025 oppure un codice ATECO 2022 precedente.
       </div>

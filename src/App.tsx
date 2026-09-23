@@ -5594,6 +5594,32 @@ function DashboardCard({
   );
 }
 
+function SectionHero({
+  title,
+  subtitle,
+  icon,
+  variant,
+}: {
+  title: string;
+  subtitle: string;
+  icon: string;
+  variant: string;
+}) {
+  return (
+    <div
+      className={`ge-section-hero ge-section-hero--${variant}`}
+    >
+      <div className="ge-section-hero__icon">{icon}</div>
+      <div>
+        <div className="ge-section-hero__title">{title}</div>
+        <div className="ge-section-hero__subtitle">
+          {subtitle}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard({
   navigate,
   openEmail,
@@ -6218,6 +6244,74 @@ useEffect(() => {
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
   const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
+
+  const adminSectionMeta: Record<
+    string,
+    { title: string; subtitle: string; icon: string; variant: string }
+  > = {
+    calendarAdmin: {
+      title: "CALENDARIO",
+      subtitle: "Gestisci attività, appuntamenti e sincronizzazioni.",
+      icon: "▣",
+      variant: "calendar",
+    },
+    archive: {
+      title: "DATI PRODUZIONE",
+      subtitle: "Consulta produzione, recessi e copertura territoriale.",
+      icon: "▥",
+      variant: "production",
+    },
+    recruiting: {
+      title: "RECRUITING",
+      subtitle: "Gestisci contatti, candidati e attività di recruiting.",
+      icon: "●●",
+      variant: "recruiting",
+    },
+    appointments: {
+      title: "APPUNTAMENTI",
+      subtitle: "Consulta e riprogramma gli appuntamenti in ordine cronologico.",
+      icon: "✓",
+      variant: "appointments",
+    },
+    reportAdmin: {
+      title: "REPORT AGENTI",
+      subtitle: "Analizza risultati, attività e performance della rete.",
+      icon: "▤",
+      variant: "agent-report",
+    },
+    agents: {
+      title: "DATABASE",
+      subtitle: "Gestisci agenti, utenti e configurazioni amministrative.",
+      icon: "◫",
+      variant: "database",
+    },
+    listini: {
+      title: "DATABASE · LISTINI",
+      subtitle: "Gestisci listini, offerte e parametri commerciali.",
+      icon: "▦",
+      variant: "database",
+    },
+    punpsvAdmin: {
+      title: "DATABASE · PUN / PSV",
+      subtitle: "Aggiorna i valori PUN, PSV e i riferimenti di mercato.",
+      icon: "▥",
+      variant: "database",
+    },
+    recruitingManagement: {
+      title: "GESTIONE RECRUITING",
+      subtitle: "Configura stati, colori e impostazioni del recruiting.",
+      icon: "⚙",
+      variant: "database",
+    },
+    adminUsers: {
+      title: "DATABASE · ADMIN",
+      subtitle: "Gestisci gli amministratori della web app.",
+      icon: "●",
+      variant: "database",
+    },
+  };
+
+  const currentAdminSection = adminSectionMeta[tab];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6602,6 +6696,15 @@ const renderAdminContent = () => {
         </div>
       )}
 
+      {tab !== "dashboard" && currentAdminSection && (
+        <SectionHero
+          title={currentAdminSection.title}
+          subtitle={currentAdminSection.subtitle}
+          icon={currentAdminSection.icon}
+          variant={currentAdminSection.variant}
+        />
+      )}
+
       {tab === "dashboard" && (
         <AdminDashboard
           navigate={navigateTo}
@@ -6923,21 +7026,53 @@ if (!agentSession && !adminSession) {
     <AgentDashboard navigate={navigateTo} />
   )
 ) : tab === "energia" ? (
-  <Energia
-    punPsvRows={punPsvRows}
-    energyOffers={energyOffers}
-    dispCpRows={dispCpRows}
-  />
+  <>
+    <SectionHero
+      title="ENERGIA"
+      subtitle="Simula una fattura di energia elettrica."
+      icon="⚡"
+      variant="energy"
+    />
+    <Energia
+      punPsvRows={punPsvRows}
+      energyOffers={energyOffers}
+      dispCpRows={dispCpRows}
+    />
+  </>
 ) : tab === "gas" ? (
-  <Gas
-  punPsvRows={punPsvRows}
-  gasOffers={gasOffers}
-  gasAcciseSettings={gasAcciseSettings}
-/>
+  <>
+    <SectionHero
+      title="GAS"
+      subtitle="Simula una fattura di gas metano."
+      icon="◆"
+      variant="gas"
+    />
+    <Gas
+      punPsvRows={punPsvRows}
+      gasOffers={gasOffers}
+      gasAcciseSettings={gasAcciseSettings}
+    />
+  </>
 ) : tab === "report" ? (
-  <ReportAgent agentSession={agentSession} />
+  <>
+    <SectionHero
+      title="REPORT"
+      subtitle="Inserisci e consulta i tuoi report personali."
+      icon="▤"
+      variant="report"
+    />
+    <ReportAgent agentSession={agentSession} />
+  </>
         ) : tab === "ateco" ? (
-          <Ateco />
+          <>
+            <SectionHero
+              title="ATECO"
+              subtitle="Ricerca codici e verifica le principali agevolazioni fiscali."
+              icon="▦"
+              variant="ateco"
+            />
+            <Ateco />
+          </>
         ) : tab === "punpsvPublic" ? (
           <div
             style={{
@@ -6948,15 +7083,12 @@ if (!agentSession && !adminSession) {
               boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
             }}
           >
-            <div className="ge-section-hero ge-section-hero--pun">
-              <div className="ge-section-hero__icon">▥</div>
-              <div>
-                <div className="ge-section-hero__title">PUN / PSV</div>
-                <div className="ge-section-hero__subtitle">
-                  Andamento dei principali indici del mercato energetico
-                </div>
-              </div>
-            </div>
+            <SectionHero
+              title="PUN / PSV"
+              subtitle="Andamento dei principali indici del mercato energetico."
+              icon="▥"
+              variant="pun"
+            />
         
             <div
               style={{

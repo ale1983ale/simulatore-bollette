@@ -852,10 +852,18 @@ export default function OutlookEmail() {
       {open && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f8fafc", overflow: "auto", color: "#0f172a" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto", padding: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", marginBottom: 18 }}>
-              <div>
-                <h1 style={{ margin: 0, fontSize: 26 }}>Invio Email Outlook</h1>
-                <div style={{ color: "#64748b", marginTop: 4 }}>Carica un file unico, dividilo automaticamente per agenzia e controlla gli abbinamenti.</div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap" }}>
+              <div
+                className="ge-section-hero ge-section-hero--email"
+                style={{ flex: "1 1 620px", marginBottom: 0 }}
+              >
+                <div className="ge-section-hero__icon">✉</div>
+                <div>
+                  <div className="ge-section-hero__title">INVIO EMAIL</div>
+                  <div className="ge-section-hero__subtitle">
+                    Prepara comunicazioni, allegati e bozze Outlook.
+                  </div>
+                </div>
               </div>
               <button onClick={() => setOpen(false)} style={{ ...button, background: "#e2e8f0" }}>Chiudi</button>
             </div>
