@@ -1,10 +1,8 @@
-const CACHE_NAME = "simulatore-bollette-pwa-v1";
+const CACHE_NAME = "simulatore-bollette-pwa-v2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/icon-maskable-512.png",
+  "/icon.svg",
 ];
 
 self.addEventListener("install", (event) => {
