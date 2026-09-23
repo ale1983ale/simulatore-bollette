@@ -317,6 +317,109 @@ export default function RecruitingManagement() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const toggleAgentOnMap = async (
+    agent: ActiveAgent,
+    showOnMap: boolean
+  ) => {
+    if (!ctx) return;
+
+    setBusy(true);
+    try {
+      if (!showOnMap) {
+        const { error } = await ctx.client
+          .from("recruiting_active_agents")
+          .update({
+            latitude: null,
+            longitude: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", agent.id)
+          .eq("owner_key", ctx.ownerKey);
+
+        if (error) throw error;
+
+        setAgents((current) =>
+          current.map((item) =>
+            item.id === agent.id
+              ? { ...item, latitude: null, longitude: null }
+              : item
+          )
+        );
+        setMessage(
+          `${agent.firstName} ${agent.lastName} non viene più mostrato sulla mappa.`
+        );
+        return;
+      }
+
+      if (!agent.zone.trim()) {
+        setMessage(
+          "Per mostrare l'agente sulla mappa devi prima indicare una zona."
+        );
+        return;
+      }
+
+      setMessage("Geolocalizzo la zona dell'agente...");
+      const geo = await geocodeItalianZone(agent.zone.trim());
+
+      if (
+        geo.latitude === null ||
+        geo.longitude === null ||
+        !Number.isFinite(geo.latitude) ||
+        !Number.isFinite(geo.longitude)
+      ) {
+        setMessage(
+          "Non riesco a posizionare l'agente. Modifica la zona indicando una città o località più precisa."
+        );
+        return;
+      }
+
+      const region = normalizeItalianRegion(
+        geo.region || agent.zone.trim()
+      );
+
+      const { error } = await ctx.client
+        .from("recruiting_active_agents")
+        .update({
+          region: ITALIAN_REGIONS.includes(region as any)
+            ? region
+            : agent.region,
+          latitude: geo.latitude,
+          longitude: geo.longitude,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", agent.id)
+        .eq("owner_key", ctx.ownerKey);
+
+      if (error) throw error;
+
+      setAgents((current) =>
+        current.map((item) =>
+          item.id === agent.id
+            ? {
+                ...item,
+                region: ITALIAN_REGIONS.includes(region as any)
+                  ? region
+                  : item.region,
+                latitude: geo.latitude,
+                longitude: geo.longitude,
+              }
+            : item
+        )
+      );
+      setMessage(
+        `${agent.firstName} ${agent.lastName} è stato aggiunto alla mappa.`
+      );
+    } catch (error: any) {
+      console.error(error);
+      setMessage(
+        "Errore nell'aggiornamento della mappa agente: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteAgent = async (agent: ActiveAgent) => {
     if (!ctx || !window.confirm(`Eliminare ${agent.firstName} ${agent.lastName} dagli agenti attivi?`)) return;
     setBusy(true);
@@ -556,7 +659,41 @@ export default function RecruitingManagement() {
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.zone || "—"}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.region || "—"}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 800 }}>
-                    {agent.latitude !== null && agent.longitude !== null ? "✓ Posizionato" : "Da verificare"}
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: busy ? "not-allowed" : "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={
+                          agent.latitude !== null &&
+                          agent.longitude !== null
+                        }
+                        disabled={busy}
+                        onChange={(event) =>
+                          void toggleAgentOnMap(
+                            agent,
+                            event.target.checked
+                          )
+                        }
+                        style={{
+                          width: 18,
+                          height: 18,
+                          cursor: busy ? "not-allowed" : "pointer",
+                        }}
+                      />
+                      <span>
+                        {agent.latitude !== null &&
+                        agent.longitude !== null
+                          ? "Mostra"
+                          : "Non mostrare"}
+                      </span>
+                    </label>
                   </td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
                     <button type="button" onClick={() => editAgent(agent)} style={{ ...buttonStyle, padding: "6px 9px", marginRight: 6, background: "#e0f2fe" }}>
