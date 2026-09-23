@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import { supabase } from "./supabase";
+import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
 import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
@@ -468,6 +468,345 @@ function clearAllSimulationDrafts() {
     sessionStorage.removeItem(ENERGY_SIMULATION_DRAFT_KEY);
     sessionStorage.removeItem(GAS_SIMULATION_DRAFT_KEY);
   } catch {}
+}
+
+type SavedSimulation = {
+  id: string;
+  name: string;
+  state: Record<string, any>;
+  created_at: string;
+};
+
+type SavedSimulationType = "energy" | "gas";
+
+async function getSimulationOwnerKey() {
+  const adminRaw = localStorage.getItem("admin_session");
+  const agentRaw = localStorage.getItem("agent_session");
+
+  let seed = "";
+
+  try {
+    if (adminRaw) {
+      const admin = JSON.parse(adminRaw);
+      seed = [
+        "admin",
+        admin?.auth_id || admin?.id || "",
+        String(admin?.username || "").trim().toLowerCase(),
+      ].join("|");
+    } else if (agentRaw) {
+      const agent = JSON.parse(agentRaw);
+      seed = [
+        "agent",
+        agent?.id || "",
+        agent?.owner_auth_id || "",
+        String(agent?.username || "").trim().toLowerCase(),
+      ].join("|");
+    }
+  } catch {
+    seed = "";
+  }
+
+  if (!seed || seed.endsWith("||")) {
+    throw new Error(
+      "Sessione utente non disponibile. Esci e accedi di nuovo."
+    );
+  }
+
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(
+      seed + "|saved-simulations-v1"
+    )
+  );
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function simulationArchiveHeaders(
+  ownerKey: string,
+  includeJson = false
+) {
+  return {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${supabaseAnonKey}`,
+    "x-client-info": `simulation-save-sync-${ownerKey}`,
+    ...(includeJson
+      ? { "Content-Type": "application/json" }
+      : {}),
+  };
+}
+
+async function listSavedSimulations(
+  type: SavedSimulationType
+): Promise<SavedSimulation[]> {
+  const ownerKey = await getSimulationOwnerKey();
+  const params = new URLSearchParams({
+    owner_key: `eq.${ownerKey}`,
+    simulation_type: `eq.${type}`,
+    select: "id,name,state,created_at",
+    order: "created_at.desc",
+    limit: "100",
+  });
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/saved_simulations?${params.toString()}`,
+    {
+      headers: simulationArchiveHeaders(ownerKey),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Impossibile caricare le simulazioni salvate."
+    );
+  }
+
+  const data = await response.json();
+  return Array.isArray(data)
+    ? (data as SavedSimulation[])
+    : [];
+}
+
+async function saveSimulationArchive(
+  type: SavedSimulationType,
+  name: string,
+  state: Record<string, any>
+) {
+  const ownerKey = await getSimulationOwnerKey();
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/saved_simulations`,
+    {
+      method: "POST",
+      headers: {
+        ...simulationArchiveHeaders(ownerKey, true),
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        owner_key: ownerKey,
+        simulation_type: type,
+        name: name.trim(),
+        state,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Impossibile salvare la simulazione."
+    );
+  }
+}
+
+function SavedSimulationsModal({
+  open,
+  type,
+  title,
+  onClose,
+  onOpenSimulation,
+}: {
+  open: boolean;
+  type: SavedSimulationType;
+  title: string;
+  onClose: () => void;
+  onOpenSimulation: (simulation: SavedSimulation) => void;
+}) {
+  const [items, setItems] = useState<SavedSimulation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+
+    void listSavedSimulations(type)
+      .then((rows) => {
+        if (!cancelled) setItems(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setItems([]);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Errore caricamento simulazioni."
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, type]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100000,
+        background: "rgba(15,23,42,.55)",
+        display: "grid",
+        placeItems: "center",
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: "min(760px, 100%)",
+          maxHeight: "82vh",
+          overflow: "auto",
+          background: "white",
+          borderRadius: 18,
+          boxShadow: "0 24px 70px rgba(15,23,42,.28)",
+          padding: 18,
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 14,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 950, fontSize: 22 }}>
+              {title}
+            </div>
+            <div
+              style={{
+                color: "#64748b",
+                fontSize: 12,
+                marginTop: 3,
+              }}
+            >
+              Ultime 100 simulazioni salvate
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              border: "1px solid #cbd5e1",
+              background: "white",
+              borderRadius: 9,
+              padding: "8px 11px",
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            CHIUDI
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: 22, color: "#64748b" }}>
+            Caricamento...
+          </div>
+        ) : error ? (
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              background: "#fef2f2",
+              color: "#b91c1c",
+              fontWeight: 700,
+            }}
+          >
+            {error}
+          </div>
+        ) : items.length === 0 ? (
+          <div style={{ padding: 22, color: "#64748b" }}>
+            Nessuna simulazione salvata.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {items.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "minmax(0,1fr) auto auto",
+                  gap: 12,
+                  alignItems: "center",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  padding: "11px 12px",
+                  background: "#f8fafc",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 900,
+                      color: "#0f172a",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {item.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#64748b",
+                      marginTop: 3,
+                    }}
+                  >
+                    {new Date(item.created_at).toLocaleString(
+                      "it-IT"
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#64748b",
+                    fontWeight: 800,
+                  }}
+                >
+                  {type === "energy" ? "ENERGIA" : "GAS"}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenSimulation(item)}
+                  style={{
+                    border: 0,
+                    background: "#0f172a",
+                    color: "white",
+                    borderRadius: 9,
+                    padding: "8px 13px",
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  APRI
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const energyMonths = (f: string) =>
@@ -1237,6 +1576,67 @@ function Energia({
     setS(buildEnergyInitialState());
     setLastEnergyInputAt(Date.now());
   };
+
+  const [energySavedOpen, setEnergySavedOpen] =
+    useState(false);
+  const [energySaving, setEnergySaving] =
+    useState(false);
+
+  const saveEnergySimulation = async () => {
+    let customerName = String(s.nome || "").trim();
+
+    if (!customerName) {
+      const entered = window.prompt(
+        "Per salvare la simulazione devi inserire il nome del cliente."
+      );
+
+      customerName = String(entered || "").trim();
+      if (!customerName) {
+        alert("Il campo Nome è obbligatorio.");
+        return;
+      }
+    }
+
+    const stateToSave = {
+      ...s,
+      nome: customerName,
+    };
+
+    setS(stateToSave);
+    setLastEnergyInputAt(Date.now());
+    setEnergySaving(true);
+
+    try {
+      await saveSimulationArchive(
+        "energy",
+        customerName,
+        stateToSave
+      );
+      alert("Simulazione Energia salvata.");
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Errore durante il salvataggio."
+      );
+    } finally {
+      setEnergySaving(false);
+    }
+  };
+
+  const openSavedEnergySimulation = (
+    simulation: SavedSimulation
+  ) => {
+    const restored = {
+      ...buildEnergyInitialState(),
+      ...(simulation.state || {}),
+    };
+
+    setS(restored);
+    setLastEnergyInputAt(Date.now());
+    setEnergySavedOpen(false);
+  };
+
   const energyFixedMode = isFixedCompetenceMonth(s.mese1);
 
   const compatibleEnergyOffers = visibleEnergyOffers.filter(
@@ -1840,21 +2240,64 @@ return (
       <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
         Salvataggio temporaneo attivo · reset automatico dopo 15 minuti di inattività
       </div>
-      <button
-        type="button"
-        onClick={resetEnergySimulation}
+      <div
         style={{
-          border: "1px solid #ef4444",
-          background: "#fff",
-          color: "#b91c1c",
-          borderRadius: 10,
-          padding: "9px 13px",
-          fontWeight: 900,
-          cursor: "pointer",
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          justifyContent: "flex-end",
         }}
       >
-        NUOVA SIMULAZIONE
-      </button>
+        <button
+          type="button"
+          onClick={resetEnergySimulation}
+          style={{
+            border: "1px solid #ef4444",
+            background: "#fff",
+            color: "#b91c1c",
+            borderRadius: 10,
+            padding: "9px 13px",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          NUOVA SIMULAZIONE
+        </button>
+        <button
+          type="button"
+          disabled={energySaving}
+          onClick={() => void saveEnergySimulation()}
+          style={{
+            border: "1px solid #16a34a",
+            background: "#16a34a",
+            color: "white",
+            borderRadius: 10,
+            padding: "9px 13px",
+            fontWeight: 900,
+            cursor: energySaving ? "wait" : "pointer",
+            opacity: energySaving ? 0.7 : 1,
+          }}
+        >
+          {energySaving
+            ? "SALVATAGGIO..."
+            : "SALVA SIMULAZIONE"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEnergySavedOpen(true)}
+          style={{
+            border: "1px solid #2563eb",
+            background: "#fff",
+            color: "#1d4ed8",
+            borderRadius: 10,
+            padding: "9px 13px",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          APRI SIMULAZIONE
+        </button>
+      </div>
     </div>
 
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -2344,6 +2787,14 @@ Base suggerito
         </>
       )}
     </div>
+
+    <SavedSimulationsModal
+      open={energySavedOpen}
+      type="energy"
+      title="Simulazioni Energia salvate"
+      onClose={() => setEnergySavedOpen(false)}
+      onOpenSimulation={openSavedEnergySimulation}
+    />
   </div>
 );
 }
@@ -2449,6 +2900,67 @@ function Gas({
     setS(buildGasInitialState());
     setLastGasInputAt(Date.now());
   };
+
+  const [gasSavedOpen, setGasSavedOpen] =
+    useState(false);
+  const [gasSaving, setGasSaving] =
+    useState(false);
+
+  const saveGasSimulation = async () => {
+    let customerName = String(s.nome || "").trim();
+
+    if (!customerName) {
+      const entered = window.prompt(
+        "Per salvare la simulazione devi inserire il nome del cliente."
+      );
+
+      customerName = String(entered || "").trim();
+      if (!customerName) {
+        alert("Il campo Nome è obbligatorio.");
+        return;
+      }
+    }
+
+    const stateToSave = {
+      ...s,
+      nome: customerName,
+    };
+
+    setS(stateToSave);
+    setLastGasInputAt(Date.now());
+    setGasSaving(true);
+
+    try {
+      await saveSimulationArchive(
+        "gas",
+        customerName,
+        stateToSave
+      );
+      alert("Simulazione Gas salvata.");
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Errore durante il salvataggio."
+      );
+    } finally {
+      setGasSaving(false);
+    }
+  };
+
+  const openSavedGasSimulation = (
+    simulation: SavedSimulation
+  ) => {
+    const restored = {
+      ...buildGasInitialState(),
+      ...(simulation.state || {}),
+    };
+
+    setS(restored);
+    setLastGasInputAt(Date.now());
+    setGasSavedOpen(false);
+  };
+
   const gasFixedMode =
     isFixedCompetenceMonth(s.periodo1);
 
@@ -2953,21 +3465,64 @@ function Gas({
         <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
           Salvataggio temporaneo attivo · reset automatico dopo 15 minuti di inattività
         </div>
-        <button
-          type="button"
-          onClick={resetGasSimulation}
+        <div
           style={{
-            border: "1px solid #ef4444",
-            background: "#fff",
-            color: "#b91c1c",
-            borderRadius: 10,
-            padding: "9px 13px",
-            fontWeight: 900,
-            cursor: "pointer",
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
           }}
         >
-          NUOVA SIMULAZIONE
-        </button>
+          <button
+            type="button"
+            onClick={resetGasSimulation}
+            style={{
+              border: "1px solid #ef4444",
+              background: "#fff",
+              color: "#b91c1c",
+              borderRadius: 10,
+              padding: "9px 13px",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            NUOVA SIMULAZIONE
+          </button>
+          <button
+            type="button"
+            disabled={gasSaving}
+            onClick={() => void saveGasSimulation()}
+            style={{
+              border: "1px solid #16a34a",
+              background: "#16a34a",
+              color: "white",
+              borderRadius: 10,
+              padding: "9px 13px",
+              fontWeight: 900,
+              cursor: gasSaving ? "wait" : "pointer",
+              opacity: gasSaving ? 0.7 : 1,
+            }}
+          >
+            {gasSaving
+              ? "SALVATAGGIO..."
+              : "SALVA SIMULAZIONE"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setGasSavedOpen(true)}
+            style={{
+              border: "1px solid #2563eb",
+              background: "#fff",
+              color: "#1d4ed8",
+              borderRadius: 10,
+              padding: "9px 13px",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            APRI SIMULAZIONE
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -3301,6 +3856,14 @@ border: "1px solid #bfd8f6",
           </>
         )}
       </div>
+
+      <SavedSimulationsModal
+        open={gasSavedOpen}
+        type="gas"
+        title="Simulazioni Gas salvate"
+        onClose={() => setGasSavedOpen(false)}
+        onOpenSimulation={openSavedGasSimulation}
+      />
     </div>
   );
 }
