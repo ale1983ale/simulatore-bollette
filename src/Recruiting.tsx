@@ -739,6 +739,91 @@ function crmPlainText(value: string) {
     .trim();
 }
 
+const CRM_PROVINCE_CODES = new Set(
+  "AG AL AN AO AP AQ AR AT AV BA BG BI BL BN BO BR BS BT BZ CA CB CE CH CI CL CN CO CR CS CT CZ EN FC FE FG FI FM FR GE GO GR IM IS KR LC LE LI LO LT LU MB MC ME MI MN MO MS MT NA NO NU OG OR OT PA PC PD PE PG PI PN PO PR PT PU PV PZ RA RC RE RG RI RM RN RO SA SI SO SP SR SS SU SV TA TE TN TO TP TR TS TV UD VA VB VC VE VI VR VS VT VV".split(
+    " "
+  )
+);
+
+function crmMapUrl(event: CrmCalendarEvent) {
+  const raw = `${event.notes || ""}\n${event.title || ""}`.replace(
+    /&amp;/gi,
+    "&"
+  );
+
+  const hrefMatch = raw.match(
+    /href\s*=\s*["'](https?:\/\/[^"']*(?:maps|goo\.gl|google)[^"']*)["']/i
+  );
+  if (hrefMatch?.[1]) return hrefMatch[1];
+
+  const bareMatch = raw.match(
+    /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[^\s"'<>]+\/maps)[^\s"'<>]*/i
+  );
+  return bareMatch?.[0] || "";
+}
+
+function crmPhoneNumbers(event: CrmCalendarEvent) {
+  const text = crmPlainText(
+    `${event.notes || ""} ${event.title || ""}`
+  );
+  const results: Array<{ display: string; dial: string }> = [];
+  const seen = new Set<string>();
+  const pattern =
+    /(?:^|[^\d])((?:(?:\+|00)39[\s./-]*)?(?:\d[\s./-]*){8,12})(?=$|[^\d])/g;
+
+  for (const match of text.matchAll(pattern)) {
+    const display = String(match[1] || "").trim();
+    let digits = display.replace(/\D/g, "");
+
+    if (digits.startsWith("0039")) digits = digits.slice(2);
+    const localDigits =
+      digits.startsWith("39") && digits.length >= 11
+        ? digits.slice(2)
+        : digits;
+
+    if (localDigits.length < 8 || localDigits.length > 11) continue;
+
+    const key = digits || localDigits;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    results.push({
+      display,
+      dial: digits.startsWith("39") && digits.length >= 11
+        ? `+${digits}`
+        : localDigits,
+    });
+  }
+
+  return results;
+}
+
+function crmZone(event: CrmCalendarEvent) {
+  const text = crmPlainText(
+    `${event.notes || ""} ${event.title || ""}`
+  ).toLocaleUpperCase("it");
+
+  const matches = Array.from(
+    text.matchAll(
+      /\b([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*(?:\s+[A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*){0,3})\s+([A-Z]{2})\b/g
+    )
+  );
+
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const city = String(matches[index]?.[1] || "").trim();
+    const province = String(matches[index]?.[2] || "").trim();
+
+    if (!CRM_PROVINCE_CODES.has(province)) continue;
+    if (!city || /^(VIA|TEL|EMAIL|CLIENTE|APPUNTAMENTO)$/i.test(city)) {
+      continue;
+    }
+
+    return `${city} · ${province}`;
+  }
+
+  return "";
+}
+
 function activeAgentFromRow(row: any): ActiveAgent {
   return {
     id: String(row.id),
@@ -941,6 +1026,12 @@ export default function Recruiting() {
   const [eventEditTime, setEventEditTime] = useState("");
   const [eventEditNotes, setEventEditNotes] = useState("");
   const [calendarContactPreviewId, setCalendarContactPreviewId] = useState<string | null>(null);
+  const [crmDetailEventId, setCrmDetailEventId] = useState<string | null>(
+    null
+  );
+  const [crmPhoneChoices, setCrmPhoneChoices] = useState<
+    Array<{ display: string; dial: string }>
+  >([]);
 
   const [mapView, setMapView] =
     useState<"agents" | "candidates">("agents");
@@ -2691,6 +2782,11 @@ export default function Recruiting() {
 
   const eventModalEvent =
     events.find((event) => event.id === eventModalId) || null;
+
+  const crmDetailEvent =
+    crmCalendarEvents.find(
+      (event) => event.id === crmDetailEventId
+    ) || null;
 
   const calendarContactPreview =
     candidates.find(
@@ -6448,6 +6544,155 @@ export default function Recruiting() {
 
                         if (item.kind === "crm") {
                           const event = item.event;
+                          const cleanClient =
+                            crmPlainText(event.clientName) ||
+                            crmPlainText(event.title) ||
+                            "CLIENTE CRM";
+                          const zone = crmZone(event);
+                          const mapUrl = crmMapUrl(event);
+                          const phones = crmPhoneNumbers(event);
+
+                          const openPhone = () => {
+                            if (!phones.length) return;
+
+                            if (phones.length === 1) {
+                              window.location.href = `tel:${phones[0].dial}`;
+                              return;
+                            }
+
+                            setCrmPhoneChoices(phones);
+                          };
+
+                          return (
+                            <div
+                              key={`crm-${event.crmEventId}`}
+                              style={{
+                                borderRadius: 7,
+                                padding: 7,
+                                background: "#ea580c",
+                                color: "#ffffff",
+                                border: "1px solid #c2410c",
+                                borderLeft: "5px solid #9a3412",
+                                fontSize: 11,
+                                boxShadow:
+                                  "0 1px 2px rgba(124,45,18,.18)",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: 900,
+                                  color: "#ffffff",
+                                }}
+                              >
+                                {event.startTime
+                                  ? `${event.startTime} · `
+                                  : ""}
+                                CRM +ENERGIA
+                              </div>
+
+                              <div
+                                style={{
+                                  marginTop: 3,
+                                  fontWeight: 900,
+                                  color: "#ffffff",
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                {cleanClient}
+                              </div>
+
+                              <div
+                                style={{
+                                  marginTop: 3,
+                                  color: "#ffedd5",
+                                  fontSize: 10,
+                                  fontWeight: 900,
+                                }}
+                              >
+                                {zone || "ZONA NON DISPONIBILE"}
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 4,
+                                  flexWrap: "wrap",
+                                  marginTop: 7,
+                                }}
+                              >
+                                {mapUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={(clickEvent) => {
+                                      clickEvent.stopPropagation();
+                                      window.open(
+                                        mapUrl,
+                                        "_blank",
+                                        "noopener,noreferrer"
+                                      );
+                                    }}
+                                    style={{
+                                      border: 0,
+                                      borderRadius: 5,
+                                      padding: "4px 6px",
+                                      background: "#ffffff",
+                                      color: "#c2410c",
+                                      fontSize: 9,
+                                      fontWeight: 900,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    MAPPA
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={(clickEvent) => {
+                                    clickEvent.stopPropagation();
+                                    setCrmDetailEventId(event.id);
+                                  }}
+                                  style={{
+                                    border: 0,
+                                    borderRadius: 5,
+                                    padding: "4px 6px",
+                                    background: "#ffffff",
+                                    color: "#c2410c",
+                                    fontSize: 9,
+                                    fontWeight: 900,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  SCHEDA
+                                </button>
+
+                                {phones.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(clickEvent) => {
+                                      clickEvent.stopPropagation();
+                                      openPhone();
+                                    }}
+                                    style={{
+                                      border: 0,
+                                      borderRadius: 5,
+                                      padding: "4px 6px",
+                                      background: "#ffffff",
+                                      color: "#c2410c",
+                                      fontSize: 9,
+                                      fontWeight: 900,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    TELEFONO
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        const event = item.event;
                           const cleanTitle = crmPlainText(event.title);
                           const cleanNotes = crmPlainText(event.notes);
                           const cleanAssignedTo = crmPlainText(
@@ -7175,6 +7420,244 @@ export default function Recruiting() {
             </>
           )}
         </>
+      )}
+
+      {crmDetailEvent && (
+        <div
+          className="recruiting-modal-backdrop"
+          onClick={() => setCrmDetailEventId(null)}
+        >
+          <div
+            className="recruiting-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {(() => {
+              const cleanTitle = crmPlainText(crmDetailEvent.title);
+              const cleanNotes = crmPlainText(crmDetailEvent.notes);
+              const cleanClient =
+                crmPlainText(crmDetailEvent.clientName) ||
+                cleanTitle ||
+                "CLIENTE CRM";
+              const cleanAssignedTo = crmPlainText(
+                crmDetailEvent.assignedTo
+              );
+              const zone = crmZone(crmDetailEvent);
+              const mapUrl = crmMapUrl(crmDetailEvent);
+              const phones = crmPhoneNumbers(crmDetailEvent);
+
+              return (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <h3 style={{ margin: 0 }}>
+                        CRM +ENERGIA · {cleanClient}
+                      </h3>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        ID CRM #{crmDetailEvent.crmEventId}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setCrmDetailEventId(null)}
+                      style={{
+                        ...buttonStyle,
+                        background: "#e2e8f0",
+                      }}
+                    >
+                      Chiudi
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit,minmax(180px,1fr))",
+                      gap: 10,
+                      marginTop: 14,
+                    }}
+                  >
+                    <div>
+                      <div style={labelStyle}>Cliente</div>
+                      <strong>{cleanClient}</strong>
+                    </div>
+
+                    <div>
+                      <div style={labelStyle}>Data e ora</div>
+                      <strong>
+                        {formatDate(crmDetailEvent.startDate)}
+                        {crmDetailEvent.startTime
+                          ? ` · ${crmDetailEvent.startTime}`
+                          : ""}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <div style={labelStyle}>Zona</div>
+                      <strong>{zone || "—"}</strong>
+                    </div>
+
+                    <div>
+                      <div style={labelStyle}>In carico a</div>
+                      <strong>{cleanAssignedTo || "—"}</strong>
+                    </div>
+
+                    {cleanTitle && (
+                      <div
+                        style={{
+                          gridColumn: "1 / -1",
+                        }}
+                      >
+                        <div style={labelStyle}>Attività / stato CRM</div>
+                        <strong>{cleanTitle}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {cleanNotes && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        padding: 12,
+                        borderRadius: 9,
+                        background: "#fff7ed",
+                        border: "1px solid #fed7aa",
+                        whiteSpace: "pre-wrap",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {cleanNotes}
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      flexWrap: "wrap",
+                      marginTop: 14,
+                    }}
+                  >
+                    {mapUrl && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            mapUrl,
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                        style={{
+                          ...buttonStyle,
+                          background: "#ea580c",
+                          color: "white",
+                        }}
+                      >
+                        MAPPA
+                      </button>
+                    )}
+
+                    {phones.map((phone) => (
+                      <button
+                        key={phone.dial}
+                        type="button"
+                        onClick={() => {
+                          window.location.href = `tel:${phone.dial}`;
+                        }}
+                        style={{
+                          ...buttonStyle,
+                          background: "#16a34a",
+                          color: "white",
+                        }}
+                      >
+                        ☎ {phone.display}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {crmPhoneChoices.length > 0 && (
+        <div
+          className="recruiting-modal-backdrop"
+          onClick={() => setCrmPhoneChoices([])}
+        >
+          <div
+            className="recruiting-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 10,
+                alignItems: "center",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>
+                Scegli il numero da chiamare
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCrmPhoneChoices([])}
+                style={{
+                  ...buttonStyle,
+                  background: "#e2e8f0",
+                }}
+              >
+                Chiudi
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: 8,
+                marginTop: 14,
+              }}
+            >
+              {crmPhoneChoices.map((phone) => (
+                <button
+                  key={phone.dial}
+                  type="button"
+                  onClick={() => {
+                    setCrmPhoneChoices([]);
+                    window.location.href = `tel:${phone.dial}`;
+                  }}
+                  style={{
+                    ...buttonStyle,
+                    minHeight: 44,
+                    background: "#16a34a",
+                    color: "white",
+                    fontSize: 14,
+                  }}
+                >
+                  ☎ {phone.display}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {eventModalId && eventModalEvent && (
