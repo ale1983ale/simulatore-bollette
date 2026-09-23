@@ -2615,6 +2615,96 @@ export default function Recruiting({
     await loadAll(ctx);
   };
 
+  const completeHrSyncNote = async (note: ContactNote) => {
+    if (!ctx) return;
+
+    const candidate = allCandidates.find(
+      (item) => item.id === note.candidateId
+    );
+    const candidateName =
+      candidate?.fullName || "questo nominativo";
+
+    if (
+      !window.confirm(
+        `Confermi che la nota di ${candidateName} è stata sincronizzata su HR Specialist?`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_notes")
+        .update({ hr_sync_pending: false })
+        .eq("id", note.id)
+        .eq("owner_key", ctx.ownerKey);
+
+      if (error) throw error;
+
+      setNotes((current) =>
+        current.map((item) =>
+          item.id === note.id
+            ? { ...item, hrSyncPending: false }
+            : item
+        )
+      );
+      setMessage(
+        "Fatto: la nota è stata rimossa dalle NOTE DA SINCRONIZZARE. Rimane salvata nella scheda del contatto."
+      );
+    } catch (error: any) {
+      setMessage(
+        "Errore nel completamento della sincronizzazione nota: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const completeHrStatusSync = async (item: HrStatusSyncItem) => {
+    if (!ctx) return;
+
+    const candidate = allCandidates.find(
+      (candidate) => candidate.id === item.candidateId
+    );
+    const candidateName =
+      candidate?.fullName || "questo nominativo";
+
+    if (
+      !window.confirm(
+        `Confermi che lo stato di ${candidateName} è stato sincronizzato su HR Specialist?`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_hr_status_sync_queue")
+        .delete()
+        .eq("id", item.id)
+        .eq("owner_key", ctx.ownerKey);
+
+      if (error) throw error;
+
+      setHrStatusSyncItems((current) =>
+        current.filter((queueItem) => queueItem.id !== item.id)
+      );
+      setMessage(
+        "Fatto: lo stato è stato rimosso dagli STATI DA SINCRONIZZARE."
+      );
+    } catch (error: any) {
+      setMessage(
+        "Errore nel completamento della sincronizzazione stato: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const insertEvent = async ({
     candidateId,
     type,
@@ -8416,12 +8506,42 @@ export default function Recruiting({
                   <div
                     style={{
                       marginTop: 10,
-                      color: "#2563eb",
-                      fontSize: 11,
-                      fontWeight: 900,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
                     }}
                   >
-                    CLICCA PER APRIRE LA SCHEDA COMPLETA
+                    <div
+                      style={{
+                        color: "#2563eb",
+                        fontSize: 11,
+                        fontWeight: 900,
+                      }}
+                    >
+                      CLICCA PER APRIRE LA SCHEDA COMPLETA
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void completeHrStatusSync(item);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      style={{
+                        ...buttonStyle,
+                        padding: "7px 13px",
+                        background: "#16a34a",
+                        color: "white",
+                        borderColor: "#16a34a",
+                        opacity: busy ? 0.6 : 1,
+                      }}
+                    >
+                      FATTO
+                    </button>
                   </div>
                 </div>
               );
@@ -8587,28 +8707,58 @@ export default function Recruiting({
                       CLICCA PER APRIRE LA SCHEDA COMPLETA
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={async (event) => {
-                        event.stopPropagation();
-                        const copied = await copyPlainText(
-                          `${formatDate(note.noteDate)} - ALESSIO CEDRONI: - ${note.noteText}`
-                        );
-                        setMessage(
-                          copied
-                            ? "Testo della nota copiato."
-                            : "Non riesco a copiare il testo della nota."
-                        );
-                      }}
+                    <div
                       style={{
-                        ...buttonStyle,
-                        padding: "7px 11px",
-                        background: "#2563eb",
-                        color: "white",
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
                       }}
                     >
-                      COPIA
-                    </button>
+                      <button
+                        type="button"
+                        onClick={async (event) => {
+                          event.stopPropagation();
+                          const copied = await copyPlainText(
+                            `${formatDate(note.noteDate)} - ALESSIO CEDRONI: - ${note.noteText}`
+                          );
+                          setMessage(
+                            copied
+                              ? "Testo della nota copiato."
+                              : "Non riesco a copiare il testo della nota."
+                          );
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        style={{
+                          ...buttonStyle,
+                          padding: "7px 11px",
+                          background: "#2563eb",
+                          color: "white",
+                        }}
+                      >
+                        COPIA
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void completeHrSyncNote(note);
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        style={{
+                          ...buttonStyle,
+                          padding: "7px 13px",
+                          background: "#16a34a",
+                          color: "white",
+                          borderColor: "#16a34a",
+                          opacity: busy ? 0.6 : 1,
+                        }}
+                      >
+                        FATTO
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
