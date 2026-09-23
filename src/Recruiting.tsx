@@ -781,7 +781,8 @@ function crmPhoneNumbers(event: CrmCalendarEvent) {
         ? digits.slice(2)
         : digits;
 
-    if (localDigits.length < 8 || localDigits.length > 11) continue;
+    if (localDigits.length < 9 || localDigits.length > 11) continue;
+    if (!/^[03]/.test(localDigits)) continue;
 
     const key = digits || localDigits;
     if (seen.has(key)) continue;
@@ -798,27 +799,63 @@ function crmPhoneNumbers(event: CrmCalendarEvent) {
   return results;
 }
 
+function crmTextLines(event: CrmCalendarEvent) {
+  return String(`${event.notes || ""}\n${event.title || ""}`)
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(div|p|li|tr|h[1-6])>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
 function crmZone(event: CrmCalendarEvent) {
-  const text = crmPlainText(
-    `${event.notes || ""} ${event.title || ""}`
-  ).toLocaleUpperCase("it");
+  const lines = crmTextLines(event);
 
-  const matches = Array.from(
-    text.matchAll(
-      /\b([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*(?:\s+[A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*){0,3})\s+([A-Z]{2})\b/g
-    )
-  );
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].toLocaleUpperCase("it");
 
-  for (let index = matches.length - 1; index >= 0; index -= 1) {
-    const city = String(matches[index]?.[1] || "").trim();
-    const province = String(matches[index]?.[2] || "").trim();
-
-    if (!CRM_PROVINCE_CODES.has(province)) continue;
-    if (!city || /^(VIA|TEL|EMAIL|CLIENTE|APPUNTAMENTO)$/i.test(city)) {
-      continue;
+    const postalMatch = line.match(
+      /(?:\b\d{5}\s+)?([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*(?:\s+[A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*){0,3})\s*\(([A-Z]{2})\)\b/
+    );
+    if (postalMatch && CRM_PROVINCE_CODES.has(postalMatch[2])) {
+      return `${postalMatch[1].trim()} · ${postalMatch[2]}`;
     }
 
-    return `${city} · ${province}`;
+    const plainMatch = line.match(
+      /\b([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*(?:\s+[A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'’.\-]*){0,3})\s+([A-Z]{2})\b/
+    );
+    if (plainMatch && CRM_PROVINCE_CODES.has(plainMatch[2])) {
+      return `${plainMatch[1].trim()} · ${plainMatch[2]}`;
+    }
+  }
+
+  return "";
+}
+
+function crmZoneHint(event: CrmCalendarEvent) {
+  const lines = crmTextLines(event);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    if (/https?:\/\//i.test(line)) continue;
+    if (/\d{5}/.test(line)) continue;
+    if (/\b(?:CELLULARE|FISSO|TEL|EMAIL|REFERENTE|RECESSO|VALUTA|APP\.FIS|CLI\.ASS)\b/i.test(line)) continue;
+    if (/\d{5,}/.test(line)) continue;
+    if (line.length > 40) continue;
+
+    const clean = line
+      .replace(/[^A-Za-zÀ-ÿ'’\-\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!clean || clean.split(" ").length > 4) continue;
+    return clean.toLocaleUpperCase("it");
   }
 
   return "";
@@ -1032,6 +1069,9 @@ export default function Recruiting() {
   const [crmPhoneChoices, setCrmPhoneChoices] = useState<
     Array<{ display: string; dial: string }>
   >([]);
+  const [crmResolvedZones, setCrmResolvedZones] = useState<
+    Record<string, string>
+  >({});
 
   const [mapView, setMapView] =
     useState<"agents" | "candidates">("agents");
@@ -2823,6 +2863,79 @@ export default function Recruiting() {
     () => getMonthCells(calendarMonth),
     [calendarMonth]
   );
+
+  useEffect(() => {
+    if (section !== "calendar") return;
+
+    let cancelled = false;
+
+    const pending = crmCalendarEvents
+      .map((event) => ({
+        event,
+        directZone: crmZone(event),
+        hint: crmZoneHint(event),
+      }))
+      .filter(
+        (item) =>
+          !item.directZone &&
+          item.hint &&
+          !crmResolvedZones[item.event.crmEventId]
+      );
+
+    const uniqueHints = new Map<
+      string,
+      Array<CrmCalendarEvent>
+    >();
+
+    pending.forEach(({ event, hint }) => {
+      const key = normalizePlaceName(hint);
+      const group = uniqueHints.get(key) || [];
+      group.push(event);
+      uniqueHints.set(key, group);
+    });
+
+    if (!uniqueHints.size) return;
+
+    void (async () => {
+      for (const [, groupedEvents] of uniqueHints) {
+        if (cancelled) return;
+
+        const hint = crmZoneHint(groupedEvents[0]);
+        if (!hint) continue;
+
+        try {
+          const geo = await geocodeRecruitingCandidateZone(hint);
+          const province = geo.provinceCode || "";
+          const city = hint.toLocaleUpperCase("it");
+          const label = province ? `${city} · ${province}` : city;
+
+          if (!cancelled) {
+            setCrmResolvedZones((current) => {
+              const next = { ...current };
+              groupedEvents.forEach((event) => {
+                next[event.crmEventId] = label;
+              });
+              return next;
+            });
+          }
+        } catch (error) {
+          console.warn("CRM ZONE GEOCODING ERROR:", hint, error);
+        }
+
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, 350)
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    section,
+    crmCalendarEvents,
+    crmResolvedZones,
+  ]);
 
   useEffect(() => {
     if (
@@ -6548,7 +6661,10 @@ export default function Recruiting() {
                             crmPlainText(event.clientName) ||
                             crmPlainText(event.title) ||
                             "CLIENTE CRM";
-                          const zone = crmZone(event);
+                          const zone =
+                            crmZone(event) ||
+                            crmResolvedZones[event.crmEventId] ||
+                            crmZoneHint(event);
                           const mapUrl = crmMapUrl(event);
                           const phones = crmPhoneNumbers(event);
 
@@ -6688,78 +6804,6 @@ export default function Recruiting() {
                                   </button>
                                 )}
                               </div>
-                            </div>
-                          );
-                        }
-
-                        const event = item.event;
-                          const cleanTitle = crmPlainText(event.title);
-                          const cleanNotes = crmPlainText(event.notes);
-                          const cleanAssignedTo = crmPlainText(
-                            event.assignedTo
-                          );
-                          const secondLine =
-                            cleanTitle || cleanNotes || "APPUNTAMENTO CRM";
-                          const shortSecondLine =
-                            secondLine.length > 82
-                              ? `${secondLine.slice(0, 82)}…`
-                              : secondLine;
-
-                          return (
-                            <div
-                              key={`crm-${event.crmEventId}`}
-                              title={
-                                cleanNotes ||
-                                cleanTitle ||
-                                "Appuntamento CRM +Energia"
-                              }
-                              style={{
-                                borderRadius: 7,
-                                padding: 7,
-                                background: "#ea580c",
-                                color: "#ffffff",
-                                border: "1px solid #c2410c",
-                                borderLeft: "5px solid #9a3412",
-                                fontSize: 11,
-                                boxShadow:
-                                  "0 1px 2px rgba(124,45,18,.18)",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontWeight: 900,
-                                  color: "#ffffff",
-                                }}
-                              >
-                                {event.startTime
-                                  ? `${event.startTime} · `
-                                  : ""}
-                                CRM +ENERGIA
-                              </div>
-
-                              <div
-                                style={{
-                                  marginTop: 2,
-                                  fontWeight: 800,
-                                  color: "#ffffff",
-                                  lineHeight: 1.22,
-                                }}
-                              >
-                                {shortSecondLine}
-                              </div>
-
-                              {cleanAssignedTo && (
-                                <div
-                                  style={{
-                                    marginTop: 3,
-                                    color: "#ffedd5",
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                  }}
-                                >
-                                  In carico a: {cleanAssignedTo}
-                                </div>
-                              )}
                             </div>
                           );
                         }
@@ -7441,7 +7485,10 @@ export default function Recruiting() {
               const cleanAssignedTo = crmPlainText(
                 crmDetailEvent.assignedTo
               );
-              const zone = crmZone(crmDetailEvent);
+              const zone =
+                crmZone(crmDetailEvent) ||
+                crmResolvedZones[crmDetailEvent.crmEventId] ||
+                crmZoneHint(crmDetailEvent);
               const mapUrl = crmMapUrl(crmDetailEvent);
               const phones = crmPhoneNumbers(crmDetailEvent);
 
