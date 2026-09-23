@@ -1326,9 +1326,13 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       }
 
       // Ultima rete di sicurezza: il PDF scaricato non deve superare 2 MB.
-      while (blob.size > maxPdfBytes && workingCanvas.width > 900) {
-        workingCanvas = resizeCanvas(workingCanvas, 0.82);
-        quality = Math.min(quality, 0.56);
+      // Se un preventivo fosse eccezionalmente lungo, riduce gradualmente
+      // la risoluzione fino a rientrare nel limite.
+      let safetyAttempts = 0;
+      while (blob.size > maxPdfBytes && safetyAttempts < 12) {
+        safetyAttempts += 1;
+        workingCanvas = resizeCanvas(workingCanvas, 0.84);
+        quality = Math.max(0.42, Math.min(quality, 0.56) - 0.015);
         pdf = buildPdf(workingCanvas, quality);
         blob = pdf.output("blob");
       }
