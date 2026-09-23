@@ -147,8 +147,17 @@ async function getOwnerKey() {
   if (!admin?.id || !admin?.username) {
     throw new Error("Sessione amministratore non trovata. Esci e accedi di nuovo all'area Admin.");
   }
-  const seed = `${admin.id}|${admin.username}|${admin.password || ""}|email-recipient-sync-v1`;
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed));
+
+  // Chiave stabile: non dipende più dalla password, che nelle nuove
+  // sessioni admin sicure non viene memorizzata nel browser.
+  const seed = `${admin.id}|${String(admin.username)
+    .trim()
+    .toLowerCase()}|email-recipient-sync-v2`;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(seed)
+  );
+
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
