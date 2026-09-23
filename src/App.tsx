@@ -386,6 +386,90 @@ const isFixedCompetenceMonth = (month: string) =>
 const isSicuraOffer = (offer: string) =>
   normalizeOfferName(offer).includes("SICURA");
 
+const SIMULATION_DRAFT_IDLE_MS = 15 * 60 * 1000;
+const ENERGY_SIMULATION_DRAFT_KEY =
+  "gestione_energia_energy_draft_v1";
+const GAS_SIMULATION_DRAFT_KEY =
+  "gestione_energia_gas_draft_v1";
+
+function readSimulationDraft<
+  T extends Record<string, any>
+>(key: string, fallback: T): {
+  state: T;
+  updatedAt: number;
+} {
+  const now = Date.now();
+
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return { state: fallback, updatedAt: now };
+
+    const parsed = JSON.parse(raw);
+    const updatedAt = Number(parsed?.updatedAt || 0);
+
+    if (
+      !updatedAt ||
+      now - updatedAt >= SIMULATION_DRAFT_IDLE_MS
+    ) {
+      sessionStorage.removeItem(key);
+      return { state: fallback, updatedAt: now };
+    }
+
+    return {
+      state: {
+        ...fallback,
+        ...(parsed?.state &&
+        typeof parsed.state === "object"
+          ? parsed.state
+          : {}),
+      },
+      updatedAt,
+    };
+  } catch {
+    sessionStorage.removeItem(key);
+    return { state: fallback, updatedAt: now };
+  }
+}
+
+function writeSimulationDraft(
+  key: string,
+  state: Record<string, any>,
+  updatedAt: number
+) {
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ state, updatedAt })
+    );
+  } catch {}
+}
+
+function clearExpiredSimulationDraft(key: string) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    const updatedAt = Number(parsed?.updatedAt || 0);
+
+    if (
+      !updatedAt ||
+      Date.now() - updatedAt >= SIMULATION_DRAFT_IDLE_MS
+    ) {
+      sessionStorage.removeItem(key);
+    }
+  } catch {
+    sessionStorage.removeItem(key);
+  }
+}
+
+function clearAllSimulationDrafts() {
+  try {
+    sessionStorage.removeItem(ENERGY_SIMULATION_DRAFT_KEY);
+    sessionStorage.removeItem(GAS_SIMULATION_DRAFT_KEY);
+  } catch {}
+}
+
 const energyMonths = (f: string) =>
   f === "BIMESTRALE" || f === "MULTI POD BIMESTRALE" ? 2 : 1;
 
@@ -1056,7 +1140,7 @@ function Energia({
 }) {
   const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
 
-  const [s, setS] = useState({
+  const buildEnergyInitialState = () => ({
     iva: "22",
     nome: "",
     pod: "",
@@ -1095,6 +1179,64 @@ function Energia({
     acciseManualiValore: "",
     canoneRaiGiaPagato: "0",
   });
+
+  const energyDraftRef = useRef<{
+    state: ReturnType<typeof buildEnergyInitialState>;
+    updatedAt: number;
+  } | null>(null);
+
+  if (!energyDraftRef.current) {
+    energyDraftRef.current = readSimulationDraft(
+      ENERGY_SIMULATION_DRAFT_KEY,
+      buildEnergyInitialState()
+    );
+  }
+
+  const [s, setS] = useState(
+    () => energyDraftRef.current!.state
+  );
+  const [lastEnergyInputAt, setLastEnergyInputAt] =
+    useState(() => energyDraftRef.current!.updatedAt);
+
+  useEffect(() => {
+    writeSimulationDraft(
+      ENERGY_SIMULATION_DRAFT_KEY,
+      s,
+      lastEnergyInputAt
+    );
+  }, [s, lastEnergyInputAt]);
+
+  useEffect(() => {
+    const remaining = Math.max(
+      0,
+      SIMULATION_DRAFT_IDLE_MS -
+        (Date.now() - lastEnergyInputAt)
+    );
+
+    const timer = window.setTimeout(() => {
+      sessionStorage.removeItem(
+        ENERGY_SIMULATION_DRAFT_KEY
+      );
+      setS(buildEnergyInitialState());
+      setLastEnergyInputAt(Date.now());
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [lastEnergyInputAt]);
+
+  const resetEnergySimulation = () => {
+    if (
+      !window.confirm(
+        "Vuoi iniziare una nuova simulazione Energia? Tutti i dati inseriti verranno cancellati."
+      )
+    ) return;
+
+    sessionStorage.removeItem(
+      ENERGY_SIMULATION_DRAFT_KEY
+    );
+    setS(buildEnergyInitialState());
+    setLastEnergyInputAt(Date.now());
+  };
   const energyFixedMode = isFixedCompetenceMonth(s.mese1);
 
   const compatibleEnergyOffers = visibleEnergyOffers.filter(
@@ -1371,7 +1513,8 @@ function Energia({
     }
   }, [r.dispCpBase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const set = (k: string, v: string) =>
+  const set = (k: string, v: string) => {
+    setLastEnergyInputAt(Date.now());
     setS((prev) => {
       const newState = { ...prev, [k]: v };
 
@@ -1400,6 +1543,7 @@ function Energia({
 
       return newState;
     });
+  };
 
   const consumoAnnuoEnergia =
     r.consumiTot *
@@ -1683,6 +1827,36 @@ return (
       alignItems: "start",
     }}
   >
+    <div
+      style={{
+        gridColumn: "1 / -1",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 10,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
+        Salvataggio temporaneo attivo · reset automatico dopo 15 minuti di inattività
+      </div>
+      <button
+        type="button"
+        onClick={resetEnergySimulation}
+        style={{
+          border: "1px solid #ef4444",
+          background: "#fff",
+          color: "#b91c1c",
+          borderRadius: 10,
+          padding: "9px 13px",
+          fontWeight: 900,
+          cursor: "pointer",
+        }}
+      >
+        NUOVA SIMULAZIONE
+      </button>
+    </div>
+
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {sectionCard(
         "dati",
@@ -2185,7 +2359,7 @@ function Gas({
 }) {
   const visibleGasOffers = gasOffers.filter((offer) => offer.visibile !== false);
 
-  const [s, setS] = useState({
+  const buildGasInitialState = () => ({
     iva: "10",
     nome: "",
     pdr: "",
@@ -2217,6 +2391,64 @@ function Gas({
     ricalcoloFlag: "NO",
     ricalcoloValore: "",
   });
+
+  const gasDraftRef = useRef<{
+    state: ReturnType<typeof buildGasInitialState>;
+    updatedAt: number;
+  } | null>(null);
+
+  if (!gasDraftRef.current) {
+    gasDraftRef.current = readSimulationDraft(
+      GAS_SIMULATION_DRAFT_KEY,
+      buildGasInitialState()
+    );
+  }
+
+  const [s, setS] = useState(
+    () => gasDraftRef.current!.state
+  );
+  const [lastGasInputAt, setLastGasInputAt] =
+    useState(() => gasDraftRef.current!.updatedAt);
+
+  useEffect(() => {
+    writeSimulationDraft(
+      GAS_SIMULATION_DRAFT_KEY,
+      s,
+      lastGasInputAt
+    );
+  }, [s, lastGasInputAt]);
+
+  useEffect(() => {
+    const remaining = Math.max(
+      0,
+      SIMULATION_DRAFT_IDLE_MS -
+        (Date.now() - lastGasInputAt)
+    );
+
+    const timer = window.setTimeout(() => {
+      sessionStorage.removeItem(
+        GAS_SIMULATION_DRAFT_KEY
+      );
+      setS(buildGasInitialState());
+      setLastGasInputAt(Date.now());
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [lastGasInputAt]);
+
+  const resetGasSimulation = () => {
+    if (
+      !window.confirm(
+        "Vuoi iniziare una nuova simulazione Gas? Tutti i dati inseriti verranno cancellati."
+      )
+    ) return;
+
+    sessionStorage.removeItem(
+      GAS_SIMULATION_DRAFT_KEY
+    );
+    setS(buildGasInitialState());
+    setLastGasInputAt(Date.now());
+  };
   const gasFixedMode =
     isFixedCompetenceMonth(s.periodo1);
 
@@ -2457,7 +2689,8 @@ function Gas({
         isFixedCompetenceMonth(month) === gasFixedMode
     );
 
-  const set = (k: string, v: string) =>
+  const set = (k: string, v: string) => {
+    setLastGasInputAt(Date.now());
     setS((prev) => {
       const newState = { ...prev, [k]: v };
 
@@ -2491,6 +2724,7 @@ function Gas({
 
       return newState;
     });
+  };
 
   const consumoAnnuoGas =
     r.consumoTotale *
@@ -2706,6 +2940,36 @@ function Gas({
         alignItems: "start",
       }}
     >
+      <div
+        style={{
+          gridColumn: "1 / -1",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
+          Salvataggio temporaneo attivo · reset automatico dopo 15 minuti di inattività
+        </div>
+        <button
+          type="button"
+          onClick={resetGasSimulation}
+          style={{
+            border: "1px solid #ef4444",
+            background: "#fff",
+            color: "#b91c1c",
+            borderRadius: 10,
+            padding: "9px 13px",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          NUOVA SIMULAZIONE
+        </button>
+      </div>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {sectionCard(
           "dati",
@@ -5957,6 +6221,25 @@ export default function App() {
   const openOutlookEmail = () => {
     window.dispatchEvent(new CustomEvent("open-outlook-email"));
   };
+
+  useEffect(() => {
+    const clearExpiredDrafts = () => {
+      clearExpiredSimulationDraft(
+        ENERGY_SIMULATION_DRAFT_KEY
+      );
+      clearExpiredSimulationDraft(
+        GAS_SIMULATION_DRAFT_KEY
+      );
+    };
+
+    clearExpiredDrafts();
+    const timer = window.setInterval(
+      clearExpiredDrafts,
+      30000
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     void (async () => {
       const admin = await ensureAdminSession();
@@ -6718,6 +7001,7 @@ const renderAdminContent = () => {
     onClick={() => {
       void adminLogout();
       localStorage.removeItem("agent_session");
+      clearAllSimulationDrafts();
 
       setAdminSession(null);
       setAdminProfile(null);
