@@ -721,6 +721,24 @@ function crmEventFromRow(row: any): CrmCalendarEvent {
   };
 }
 
+function crmPlainText(value: string) {
+  return String(value || "")
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(div|p|li|tr|h[1-6])>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
 function activeAgentFromRow(row: any): ActiveAgent {
   return {
     id: String(row.id),
@@ -1137,10 +1155,20 @@ export default function Recruiting() {
       const result = await syncRecruitingCrmNow();
       await loadAll(ctx || undefined);
       await refreshCrmStatus();
+      const googleMessage = result?.google_connected
+        ? ` · Google CRM +ENERGIA: ${Number(
+            result?.google_synced || 0
+          )} aggiornati${Number(result?.google_deleted || 0)
+            ? `, ${Number(result.google_deleted)} rimossi`
+            : ""}${Number(result?.google_errors || 0)
+            ? `, ${Number(result.google_errors)} errori`
+            : ""}`
+        : " · Google Calendar non collegato.";
+
       setCrmMessage(
         `Sincronizzazione CRM completata: ${Number(
           result?.event_count || 0
-        )} appuntamenti letti.`
+        )} appuntamenti letti.${googleMessage}`
       );
     } catch (error: any) {
       await refreshCrmStatus();
@@ -5789,6 +5817,7 @@ export default function Recruiting() {
                       ["APPUNTAMENTO IN SEDE HR", "#7c3aed"],
                       ["VIDEOCALL HR", "#16a34a"],
                       ["ALTRO HR", "#64748b"],
+                      ["CRM +ENERGIA", "#ea580c"],
                     ].map(([label, color]) => (
                       <span
                         key={label}
@@ -6419,33 +6448,42 @@ export default function Recruiting() {
 
                         if (item.kind === "crm") {
                           const event = item.event;
-                          const crmColor = /^#[0-9a-f]{6}$/i.test(
-                            event.crmColor
-                          )
-                            ? event.crmColor
-                            : "#0f766e";
+                          const cleanTitle = crmPlainText(event.title);
+                          const cleanNotes = crmPlainText(event.notes);
+                          const cleanAssignedTo = crmPlainText(
+                            event.assignedTo
+                          );
+                          const secondLine =
+                            cleanTitle || cleanNotes || "APPUNTAMENTO CRM";
+                          const shortSecondLine =
+                            secondLine.length > 82
+                              ? `${secondLine.slice(0, 82)}…`
+                              : secondLine;
 
                           return (
                             <div
                               key={`crm-${event.crmEventId}`}
                               title={
-                                event.notes ||
-                                event.title ||
+                                cleanNotes ||
+                                cleanTitle ||
                                 "Appuntamento CRM +Energia"
                               }
                               style={{
                                 borderRadius: 7,
-                                padding: 6,
-                                background: "#f0fdfa",
-                                border: `1px solid ${crmColor}`,
-                                borderLeft: `5px solid ${crmColor}`,
+                                padding: 7,
+                                background: "#ea580c",
+                                color: "#ffffff",
+                                border: "1px solid #c2410c",
+                                borderLeft: "5px solid #9a3412",
                                 fontSize: 11,
+                                boxShadow:
+                                  "0 1px 2px rgba(124,45,18,.18)",
                               }}
                             >
                               <div
                                 style={{
                                   fontWeight: 900,
-                                  color: "#0f766e",
+                                  color: "#ffffff",
                                 }}
                               >
                                 {event.startTime
@@ -6453,35 +6491,28 @@ export default function Recruiting() {
                                   : ""}
                                 CRM +ENERGIA
                               </div>
-                              <div style={{ fontWeight: 900 }}>
-                                {event.clientName ||
-                                  event.title ||
-                                  "APPUNTAMENTO CRM"}
+
+                              <div
+                                style={{
+                                  marginTop: 2,
+                                  fontWeight: 800,
+                                  color: "#ffffff",
+                                  lineHeight: 1.22,
+                                }}
+                              >
+                                {shortSecondLine}
                               </div>
-                              {event.title &&
-                                event.title !== event.clientName && (
-                                  <div>{event.title}</div>
-                                )}
-                              {event.assignedTo && (
+
+                              {cleanAssignedTo && (
                                 <div
                                   style={{
-                                    marginTop: 2,
-                                    color: "#475569",
+                                    marginTop: 3,
+                                    color: "#ffedd5",
+                                    fontSize: 10,
+                                    fontWeight: 800,
                                   }}
                                 >
-                                  In carico a: {event.assignedTo}
-                                </div>
-                              )}
-                              {event.notes && (
-                                <div
-                                  style={{
-                                    marginTop: 2,
-                                    color: "#475569",
-                                  }}
-                                >
-                                  {event.notes.length > 120
-                                    ? `${event.notes.slice(0, 120)}…`
-                                    : event.notes}
+                                  In carico a: {cleanAssignedTo}
                                 </div>
                               )}
                             </div>
