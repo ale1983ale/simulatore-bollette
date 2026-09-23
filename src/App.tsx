@@ -371,6 +371,21 @@ const isFixedDedicatedOffer = (offer: string) =>
 const isDedicatedOffer = (offer: string) =>
   normalizeOfferName(offer) === "DEDICATA" || isFixedDedicatedOffer(offer);
 
+const FIXED_COMPETENCE_MONTHS = [
+  "FISSO DOMESTICO",
+  "FISSO BUSINESS",
+  "FISSO AD HOC",
+] as const;
+
+const isFixedCompetenceMonth = (month: string) =>
+  FIXED_COMPETENCE_MONTHS.includes(
+    String(month || "").trim().toUpperCase() as
+      (typeof FIXED_COMPETENCE_MONTHS)[number]
+  );
+
+const isSicuraOffer = (offer: string) =>
+  normalizeOfferName(offer).includes("SICURA");
+
 const energyMonths = (f: string) =>
   f === "BIMESTRALE" || f === "MULTI POD BIMESTRALE" ? 2 : 1;
 
@@ -1080,14 +1095,32 @@ function Energia({
     acciseManualiValore: "",
     canoneRaiGiaPagato: "0",
   });
+  const energyFixedMode = isFixedCompetenceMonth(s.mese1);
+
+  const compatibleEnergyOffers = visibleEnergyOffers.filter(
+    (offer) => isSicuraOffer(offer.nome) === energyFixedMode
+  );
+
   useEffect(() => {
-    if (visibleEnergyOffers.some((offer) => offer.nome === s.offerta)) return;
+    if (!s.mese1) return;
+    if (
+      compatibleEnergyOffers.some(
+        (offer) => offer.nome === s.offerta
+      )
+    ) {
+      return;
+    }
 
     setS((prev) => ({
       ...prev,
-      offerta: visibleEnergyOffers[0]?.nome || "",
+      offerta: compatibleEnergyOffers[0]?.nome || "",
     }));
-  }, [energyOffers, s.offerta]);
+  }, [
+    energyOffers,
+    s.mese1,
+    s.offerta,
+    energyFixedMode,
+  ]);
 
   useEffect(() => {
     const validMonthOptions = [...punPsvRows]
@@ -1180,6 +1213,15 @@ function Energia({
 
     return getMeseNumero(b.mese) - getMeseNumero(a.mese);
   });
+
+  const energyAllMonthOptions = mesiOrdinati.map(
+    (item) => item.mese
+  );
+  const energySecondaryMonthOptions =
+    energyAllMonthOptions.filter(
+      (month) =>
+        isFixedCompetenceMonth(month) === energyFixedMode
+    );
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [openSections, setOpenSections] = useState({
@@ -1340,6 +1382,19 @@ function Energia({
           ["BTA1", "BTA2", "BTA3", "BTA4", "BTA5", "BTA6", "MTA1", "MTA2", "MTA3"].includes(v)
         ) {
           newState.iva = "22";
+        }
+      }
+
+      if (k === "mese1") {
+        const nextFixedMode =
+          isFixedCompetenceMonth(v);
+
+        if (
+          newState.mese2 &&
+          isFixedCompetenceMonth(newState.mese2) !==
+            nextFixedMode
+        ) {
+          newState.mese2 = "";
         }
       }
 
@@ -1646,7 +1701,12 @@ return (
             {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
             {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
             {selectField("Tipo", s.tipo, (v) => set("tipo", v), energyTypes)}
-            {selectField("Offerta", s.offerta, (v) => set("offerta", v), visibleEnergyOffers.map((x) => x.nome))}
+            {selectField(
+              "Offerta",
+              s.offerta,
+              (v) => set("offerta", v),
+              compatibleEnergyOffers.map((x) => x.nome)
+            )}
             {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
           </div>
 
@@ -1759,7 +1819,7 @@ return (
         "Mese 1",
         s.mese1,
         (v) => set("mese1", v),
-        [...mesiOrdinati.map((m) => m.mese)]
+        energyAllMonthOptions
       )}
 
       {(s.mese1 === "FISSO DOMESTICO" || s.mese1 === "FISSO BUSINESS" || s.mese1 === "FISSO AD HOC") &&
@@ -1803,7 +1863,7 @@ return (
         "Mese 2",
         s.mese2,
         (v) => set("mese2", v),
-        ["", ...mesiOrdinati.map((m) => m.mese)]
+        ["", ...energySecondaryMonthOptions]
       )}
 
       {(s.mese2 === "FISSO DOMESTICO" || s.mese2 === "FISSO BUSINESS" || s.mese2 === "FISSO AD HOC") &&
@@ -2157,14 +2217,33 @@ function Gas({
     ricalcoloFlag: "NO",
     ricalcoloValore: "",
   });
+  const gasFixedMode =
+    isFixedCompetenceMonth(s.periodo1);
+
+  const compatibleGasOffers = visibleGasOffers.filter(
+    (offer) => isSicuraOffer(offer.nome) === gasFixedMode
+  );
+
   useEffect(() => {
-    if (visibleGasOffers.some((offer) => offer.nome === s.offerta)) return;
+    if (!s.periodo1) return;
+    if (
+      compatibleGasOffers.some(
+        (offer) => offer.nome === s.offerta
+      )
+    ) {
+      return;
+    }
 
     setS((prev) => ({
       ...prev,
-      offerta: visibleGasOffers[0]?.nome || "",
+      offerta: compatibleGasOffers[0]?.nome || "",
     }));
-  }, [gasOffers, s.offerta]);
+  }, [
+    gasOffers,
+    s.periodo1,
+    s.offerta,
+    gasFixedMode,
+  ]);
 
   useEffect(() => {
     const validMonthOptions = [...punPsvRows]
@@ -2372,6 +2451,12 @@ function Gas({
   })
   .map((m) => m.mese);
 
+  const gasSecondaryMonthOptions =
+    gasMonthOptions.filter(
+      (month) =>
+        isFixedCompetenceMonth(month) === gasFixedMode
+    );
+
   const set = (k: string, v: string) =>
     setS((prev) => {
       const newState = { ...prev, [k]: v };
@@ -2385,6 +2470,23 @@ function Gas({
           v === "SI"
             ? String(gasAcciseSettings.agevolata)
             : String(gasAcciseSettings.nonAgevolata);
+      }
+
+      if (k === "periodo1") {
+        const nextFixedMode =
+          isFixedCompetenceMonth(v);
+
+        (
+          ["periodo2", "periodo3", "periodo4"] as const
+        ).forEach((key) => {
+          if (
+            newState[key] &&
+            isFixedCompetenceMonth(newState[key]) !==
+              nextFixedMode
+          ) {
+            newState[key] = "";
+          }
+        });
       }
 
       return newState;
@@ -2621,7 +2723,12 @@ function Gas({
               {selectField("Uso", s.uso, (v) => set("uso", v), ["DOMESTICO", "BUSINESS"])}
               {field("IVA %", s.iva, (v) => set("iva", v), "number")}
               {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), gasBilling)}
-              {selectField("Offerta", s.offerta, (v) => set("offerta", v), visibleGasOffers.map((x) => x.nome))}
+              {selectField(
+                "Offerta",
+                s.offerta,
+                (v) => set("offerta", v),
+                compatibleGasOffers.map((x) => x.nome)
+              )}
               {selectField("Accisa agevolata", s.accisaAgevolata, (v) => set("accisaAgevolata", v), ["NO", "SI"])}
               {field("Valore accisa", s.accisaValore, (v) => set("accisaValore", v), "number")}
               {field("Adeguamento parametro", s.adeguamentoParametro, (v) => set("adeguamentoParametro", v), "number")}
@@ -2733,7 +2840,7 @@ border: "1px solid #bfd8f6",
       gap: 12,
     }}
   >
-    {selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasMonthOptions])}
+    {selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasSecondaryMonthOptions])}
     {field("Consumo 2", s.consumo2, (v) => set("consumo2", v), "number")}
   </div>
 
@@ -2749,7 +2856,7 @@ border: "1px solid #bfd8f6",
       gap: 12,
     }}
   >
-    {selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasMonthOptions])}
+    {selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasSecondaryMonthOptions])}
     {field("Consumo 3", s.consumo3, (v) => set("consumo3", v), "number")}
   </div>
 
@@ -2765,7 +2872,7 @@ border: "1px solid #bfd8f6",
       gap: 12,
     }}
   >
-    {selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasMonthOptions])}
+    {selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasSecondaryMonthOptions])}
     {field("Consumo 4", s.consumo4, (v) => set("consumo4", v), "number")}
   </div>
 </div>
