@@ -602,27 +602,27 @@ table {
     background: transparent;
   }
 
-  .ge-list-table,
-  .ge-list-table tbody,
-  .ge-list-table tr,
-  .ge-list-table td {
+  .ge-report-table,
+  .ge-report-table tbody,
+  .ge-report-table tr,
+  .ge-report-table td {
     display: block;
     width: 100%;
     box-sizing: border-box;
   }
 
-  .ge-list-table thead {
+  .ge-report-table thead {
     display: none;
   }
 
-  .ge-list-table tbody {
+  .ge-report-table tbody {
     display: grid;
     gap: 12px;
   }
 
-  .ge-list-table tbody tr,
-  .ge-list-table tbody tr:nth-child(even),
-  .ge-list-table tbody tr:hover {
+  .ge-report-table tbody tr,
+  .ge-report-table tbody tr:nth-child(even),
+  .ge-report-table tbody tr:hover {
     padding: 7px 13px;
     border: 1px solid #e2e8f0;
     border-radius: 16px;
@@ -630,7 +630,7 @@ table {
     box-shadow: 0 4px 14px rgba(15, 45, 105, .07);
   }
 
-  .ge-list-table tbody td {
+  .ge-report-table tbody td {
     min-width: 0;
     padding: 9px 0 !important;
     display: grid;
@@ -642,7 +642,7 @@ table {
     white-space: normal;
   }
 
-  .ge-list-table tbody td::before {
+  .ge-report-table tbody td::before {
     content: attr(data-label);
     color: #94a3b8;
     font-size: 10px;
@@ -652,20 +652,20 @@ table {
     text-transform: uppercase;
   }
 
-  .ge-list-table tbody td:last-child {
+  .ge-report-table tbody td:last-child {
     border-bottom: 0 !important;
   }
 
-  .ge-list-table .ge-agent-cell {
+  .ge-report-table .ge-agent-cell {
     color: #0f2d69;
     font-size: 15px;
   }
 
-  .ge-list-table .ge-action-cell {
+  .ge-report-table .ge-action-cell {
     width: 100%;
   }
 
-  .ge-list-table .ge-action-cell .ge-icon-danger {
+  .ge-report-table .ge-action-cell .ge-icon-danger {
     justify-self: start;
   }
 }
