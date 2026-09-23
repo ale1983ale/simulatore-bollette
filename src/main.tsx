@@ -27,3 +27,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     {hasAdminSession && <OutlookEmailAndroidHelper />}
   </React.StrictMode>
 );
+
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/" })
+      .catch((error) => {
+        console.error("PWA SERVICE WORKER REGISTRATION ERROR:", error);
+      });
+  });
+}
