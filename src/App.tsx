@@ -6,6 +6,7 @@ import Ateco from "./Ateco";
 import Archive from "./Archive";
 import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
 import Recruiting from "./Recruiting";
+import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
 
 
@@ -5979,7 +5980,7 @@ useEffect(() => {
 }, [tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
-  const adminTabs = ["reportAdmin", "archive", "recruiting", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6206,6 +6207,16 @@ const renderAdminContent = () => {
           </button>
 
           <button
+            onClick={() => setTab("appointments")}
+            style={{
+              ...baseBtn,
+              ...(tab === "appointments" ? activeBtn : {}),
+            }}
+          >
+            APPUNTAMENTI
+          </button>
+
+          <button
             onClick={() => setTab("reportAdmin")}
             style={{
               ...baseBtn,
@@ -6311,6 +6322,12 @@ const renderAdminContent = () => {
           >
             GESTIONE RECRUITING
           </button>
+        </div>
+      )}
+
+      {tab === "appointments" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Appointments />
         </div>
       )}
 
