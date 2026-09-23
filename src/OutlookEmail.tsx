@@ -410,7 +410,6 @@ export default function OutlookEmail() {
         if (host?.isConnected) host.remove();
         host = null;
         setPortalHost(null);
-        setOpen(false);
         return;
       }
 
