@@ -5793,11 +5793,33 @@ export default function App() {
   const [tab, setTab] = useState(() => {
     return localStorage.getItem("app_tab") || "dashboard";
   });
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
   const navigateTo = (nextTab: string) => {
     setTab(nextTab);
+    if (nextTab === "dashboard") {
+      setAdminMenuOpen(false);
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const toggleAdminMenu = () => {
+    if (tab === "dashboard") {
+      setAdminMenuOpen((current) => !current);
+      return;
+    }
+
+    setTab("dashboard");
+    setAdminMenuOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (tab === "adminMenu") {
+      setTab("dashboard");
+      setAdminMenuOpen(true);
+    }
+  }, [tab]);
 
   const openOutlookEmail = () => {
     window.dispatchEvent(new CustomEvent("open-outlook-email"));
@@ -6195,7 +6217,7 @@ useEffect(() => {
 }, [tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
-  const adminTabs = ["dashboard", "adminMenu", "calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = true;
 
@@ -6389,7 +6411,7 @@ const renderAdminContent = () => {
         minWidth: 0,
       }}
     >
-      {tab !== "dashboard" && (
+      {(tab !== "dashboard" || adminMenuOpen) && (
       <div
         style={{
           display: "flex",
@@ -6403,7 +6425,31 @@ const renderAdminContent = () => {
           flexWrap: "wrap",
         }}
       >
-        <strong>Area Admin</strong>
+        <button
+          type="button"
+          onClick={() => {
+            if (tab === "dashboard") {
+              setAdminMenuOpen(false);
+            } else {
+              navigateTo("dashboard");
+            }
+          }}
+          style={{
+            border: 0,
+            background: "transparent",
+            padding: 0,
+            color: "#0f2d69",
+            fontWeight: 900,
+            fontSize: 18,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          ⚙ Area Admin
+          {tab === "dashboard" && adminMenuOpen ? "⌃" : ""}
+        </button>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
@@ -6760,7 +6806,10 @@ if (!agentSession && !adminSession) {
       <button
         type="button"
         className="ge-brand"
-        onClick={() => navigateTo("dashboard")}
+        onClick={() => {
+          setAdminMenuOpen(false);
+          navigateTo("dashboard");
+        }}
         aria-label="Torna alla dashboard"
       >
         <span className="ge-brand__bolt">⚡</span>
@@ -6832,10 +6881,12 @@ if (!agentSession && !adminSession) {
 
   {adminProfile?.role === "super_admin" && (
     <button
-      onClick={() => navigateTo("adminMenu")}
+      onClick={toggleAdminMenu}
       style={{
         ...baseBtn,
-        ...(isAdminTab && tab !== "dashboard" ? activeBtn : {}),
+        ...((tab !== "dashboard" || adminMenuOpen)
+          ? activeBtn
+          : {}),
       }}
     >
       Area Admin
@@ -6897,7 +6948,15 @@ if (!agentSession && !adminSession) {
               boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
             }}
           >
-            <h2 style={{ marginTop: 0, marginBottom: 20 }}>Andamento PUN / PSV</h2>
+            <div className="ge-section-hero ge-section-hero--pun">
+              <div className="ge-section-hero__icon">▥</div>
+              <div>
+                <div className="ge-section-hero__title">PUN / PSV</div>
+                <div className="ge-section-hero__subtitle">
+                  Andamento dei principali indici del mercato energetico
+                </div>
+              </div>
+            </div>
         
             <div
               style={{
