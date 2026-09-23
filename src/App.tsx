@@ -5549,6 +5549,51 @@ function AdminUsersManager({
 
 type DashboardNavigate = (tab: string) => void;
 
+function DashboardCard({
+  title,
+  description,
+  icon,
+  className,
+  onClick,
+  compact = false,
+  spanMobile = false,
+}: {
+  title: string;
+  description: string;
+  icon: string;
+  className: string;
+  onClick: () => void;
+  compact?: boolean;
+  spanMobile?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        "ge-dashboard-card",
+        compact ? "ge-dashboard-card--compact" : "",
+        spanMobile ? "ge-dashboard-card--span-mobile" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      onClick={onClick}
+    >
+      <div className="ge-dashboard-card__icon">{icon}</div>
+      <div className="ge-dashboard-card__body">
+        <div className="ge-dashboard-card__title">{title}</div>
+        <div className="ge-dashboard-card__description">
+          {description}
+        </div>
+        <div className="ge-dashboard-card__link">
+          Vai alla sezione <span>→</span>
+        </div>
+      </div>
+      <div className="ge-dashboard-card__arrow">›</div>
+    </button>
+  );
+}
+
 function AdminDashboard({
   navigate,
   openEmail,
