@@ -9,6 +9,7 @@ export type SecureAdminSession = {
   email?: string;
   username: string;
   role?: string;
+  full_access?: boolean;
 };
 
 function normalizeRpcData<T>(data: T | null): T | null {
@@ -157,6 +158,24 @@ export async function adminDeleteUser(adminId: number) {
     p_session_token: token,
     p_admin_id: adminId,
   });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function adminSetFullAccess(
+  adminId: number,
+  fullAccess: boolean
+) {
+  const token = await getAdminSessionToken();
+  const { data, error } = await supabase.rpc(
+    "admin_set_full_access",
+    {
+      p_session_token: token,
+      p_admin_id: adminId,
+      p_full_access: fullAccess,
+    }
+  );
 
   if (error) throw error;
   return data;
