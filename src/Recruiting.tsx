@@ -2522,14 +2522,10 @@ export default function Recruiting({
 
     const resolvedNewSector = newSectorEnergy
       ? ""
-      : newSectorChoice === "__NEW__" || !existingOtherSectors.length
-      ? newSectorOther.trim()
-      : newSectorChoice.trim();
+      : (newSectorOther || newSectorChoice).trim();
 
     const resolvedNewCompany = newSectorEnergy
-      ? newCompanyChoice === "__NEW__" || !existingCompanies.length
-        ? newCompanyName.trim()
-        : newCompanyChoice.trim()
+      ? (newCompanyName || newCompanyChoice).trim()
       : "";
 
     if (newSectorEnergy && !resolvedNewCompany) {
@@ -2636,9 +2632,7 @@ export default function Recruiting({
     }
 
     const resolvedEditCompany = editSectorEnergy
-      ? editCompanyChoice === "__NEW__" || !existingCompanies.length
-        ? editCompanyName.trim()
-        : editCompanyChoice.trim()
+      ? (editCompanyName || editCompanyChoice).trim()
       : "";
 
     if (editSectorEnergy && !resolvedEditCompany) {
@@ -4557,9 +4551,6 @@ export default function Recruiting({
                         } else {
                           setNewCompanyChoice("");
                           setNewCompanyName("");
-                          if (!existingOtherSectors.length) {
-                            setNewSectorChoice("__NEW__");
-                          }
                         }
                       }}
                       style={inputStyle}
@@ -4570,87 +4561,61 @@ export default function Recruiting({
                   </div>
 
                   {newSectorEnergy ? (
-                    <>
-                      {existingCompanies.length > 0 && (
-                        <div>
-                          <label style={labelStyle}>Azienda</label>
-                          <select
-                            value={newCompanyChoice}
-                            onChange={(e) => {
-                              setNewCompanyChoice(e.target.value);
-                              if (e.target.value !== "__NEW__") {
-                                setNewCompanyName("");
-                              }
-                            }}
-                            style={inputStyle}
-                          >
-                            <option value="">Seleziona azienda...</option>
-                            {existingCompanies.map((company) => (
-                              <option key={company} value={company}>
-                                {company}
-                              </option>
-                            ))}
-                            <option value="__NEW__">
-                              + Aggiungi nuova azienda
-                            </option>
-                          </select>
-                        </div>
-                      )}
-
-                      {(newCompanyChoice === "__NEW__" ||
-                        !existingCompanies.length) && (
-                        <div>
-                          <label style={labelStyle}>Nuova azienda</label>
-                          <input
-                            value={newCompanyName}
-                            onChange={(e) =>
-                              setNewCompanyName(e.target.value)
-                            }
-                            placeholder="Scrivi il nome azienda"
-                            style={inputStyle}
-                          />
-                        </div>
-                      )}
-                    </>
+                    <div>
+                      <label style={labelStyle}>Azienda</label>
+                      <input
+                        list="recruiting-company-options"
+                        value={newCompanyName || newCompanyChoice}
+                        onChange={(e) => {
+                          setNewCompanyName(e.target.value);
+                          setNewCompanyChoice("");
+                        }}
+                        placeholder="Scrivi o seleziona un'azienda"
+                        style={inputStyle}
+                      />
+                      <datalist id="recruiting-company-options">
+                        {existingCompanies.map((company) => (
+                          <option key={company} value={company} />
+                        ))}
+                      </datalist>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 11,
+                        }}
+                      >
+                        Puoi scegliere un'azienda esistente oppure scriverne una nuova.
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      {existingOtherSectors.length > 0 && (
-                        <div>
-                          <label style={labelStyle}>Settore attuale</label>
-                          <select
-                            value={newSectorChoice}
-                            onChange={(e) => {
-                              setNewSectorChoice(e.target.value);
-                              if (e.target.value !== "__NEW__") {
-                                setNewSectorOther("");
-                              }
-                            }}
-                            style={inputStyle}
-                          >
-                            <option value="">Seleziona settore...</option>
-                            {existingOtherSectors.map((sector) => (
-                              <option key={sector} value={sector}>
-                                {sector}
-                              </option>
-                            ))}
-                            <option value="__NEW__">+ Aggiungi nuovo settore</option>
-                          </select>
-                        </div>
-                      )}
-
-                      {(newSectorChoice === "__NEW__" ||
-                        !existingOtherSectors.length) && (
-                        <div>
-                          <label style={labelStyle}>Nuovo settore</label>
-                          <input
-                            value={newSectorOther}
-                            onChange={(e) => setNewSectorOther(e.target.value)}
-                            placeholder="Scrivi il nuovo settore"
-                            style={inputStyle}
-                          />
-                        </div>
-                      )}
-                    </>
+                    <div>
+                      <label style={labelStyle}>Settore attuale</label>
+                      <input
+                        list="recruiting-sector-options"
+                        value={newSectorOther || newSectorChoice}
+                        onChange={(e) => {
+                          setNewSectorOther(e.target.value);
+                          setNewSectorChoice("");
+                        }}
+                        placeholder="Scrivi o seleziona un settore"
+                        style={inputStyle}
+                      />
+                      <datalist id="recruiting-sector-options">
+                        {existingOtherSectors.map((sector) => (
+                          <option key={sector} value={sector} />
+                        ))}
+                      </datalist>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 11,
+                        }}
+                      >
+                        Puoi scegliere un settore esistente oppure scriverne uno nuovo.
+                      </div>
+                    </div>
                   )}
                   <div>
                     <label style={labelStyle}>Numero di telefono</label>
@@ -5987,76 +5952,43 @@ export default function Recruiting({
                           </div>
 
                           {editSectorEnergy ? (
-                            <>
-                              {existingCompanies.length > 0 && (
-                                <div>
-                                  <label style={labelStyle}>Azienda</label>
-                                  <select
-                                    value={editCompanyChoice}
-                                    onChange={(e) => {
-                                      setEditCompanyChoice(
-                                        e.target.value
-                                      );
-                                      if (
-                                        e.target.value !== "__NEW__"
-                                      ) {
-                                        setEditCompanyName("");
-                                      }
-                                    }}
-                                    style={inputStyle}
-                                  >
-                                    <option value="">
-                                      Seleziona azienda...
-                                    </option>
-                                    {existingCompanies.map(
-                                      (company) => (
-                                        <option
-                                          key={company}
-                                          value={company}
-                                        >
-                                          {company}
-                                        </option>
-                                      )
-                                    )}
-                                    <option value="__NEW__">
-                                      + Aggiungi nuova azienda
-                                    </option>
-                                  </select>
-                                </div>
-                              )}
-
-                              {(editCompanyChoice === "__NEW__" ||
-                                !existingCompanies.length) && (
-                                <div>
-                                  <label style={labelStyle}>
-                                    Nuova azienda
-                                  </label>
-                                  <input
-                                    value={editCompanyName}
-                                    onChange={(e) =>
-                                      setEditCompanyName(
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Scrivi il nome azienda"
-                                    style={inputStyle}
-                                  />
-                                </div>
-                              )}
-                            </>
+                            <div>
+                              <label style={labelStyle}>Azienda</label>
+                              <input
+                                list="recruiting-company-options-edit"
+                                value={editCompanyName || editCompanyChoice}
+                                onChange={(e) => {
+                                  setEditCompanyName(e.target.value);
+                                  setEditCompanyChoice("");
+                                }}
+                                placeholder="Scrivi o seleziona un'azienda"
+                                style={inputStyle}
+                              />
+                              <datalist id="recruiting-company-options-edit">
+                                {existingCompanies.map((company) => (
+                                  <option key={company} value={company} />
+                                ))}
+                              </datalist>
+                            </div>
                           ) : (
                             <div>
                               <label style={labelStyle}>
                                 Settore attuale
                               </label>
                               <input
+                                list="recruiting-sector-options-edit"
                                 value={editSectorOther}
                                 onChange={(e) =>
                                   setEditSectorOther(e.target.value)
                                 }
-                                placeholder="Scrivi il settore"
+                                placeholder="Scrivi o seleziona il settore"
                                 style={inputStyle}
                               />
+                              <datalist id="recruiting-sector-options-edit">
+                                {existingOtherSectors.map((sector) => (
+                                  <option key={sector} value={sector} />
+                                ))}
+                              </datalist>
                             </div>
                           )}
 
