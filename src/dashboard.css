@@ -54,10 +54,14 @@
   position: absolute;
   z-index: 5;
   top: 50%;
-  right: 20px;
+  right: 18px;
   transform: translateY(-50%);
-  width: 66px;
-  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  width: auto;
+  height: auto;
   padding: 0;
   border: 0;
   background: transparent;
@@ -66,7 +70,7 @@
 
 .ge-brand-waiting__incoming,
 .ge-brand-waiting__outgoing {
-  position: absolute;
+  position: static;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -80,8 +84,6 @@
 }
 
 .ge-brand-waiting__incoming {
-  top: 0;
-  right: 0;
   min-width: 44px;
   height: 44px;
   padding: 0 10px;
@@ -90,11 +92,9 @@
 }
 
 .ge-brand-waiting__outgoing {
-  left: 0;
-  bottom: 0;
-  min-width: 25px;
-  height: 25px;
-  padding: 0 6px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
   background: #ef4444;
   font-size: 10px;
 }
@@ -290,22 +290,26 @@
 }
 
 .ge-card-waiting {
-  padding-right: 66px !important;
+  padding-right: 58px !important;
 }
 
 .ge-waiting-badges {
   position: absolute;
   top: 50%;
-  right: 9px;
+  right: 8px;
   z-index: 4;
-  width: 50px;
-  height: 48px;
   transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  height: auto;
   pointer-events: none;
 }
 
 .ge-waiting-badge {
-  position: absolute;
+  position: static;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -318,22 +322,18 @@
 }
 
 .ge-waiting-badge--incoming {
-  top: 0;
-  right: 0;
-  min-width: 38px;
-  height: 38px;
+  min-width: 36px;
+  height: 36px;
   padding: 0 8px;
   background: #22c55e;
   color: #fff;
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .ge-waiting-badge--outgoing {
-  left: 0;
-  bottom: 0;
   min-width: 22px;
   height: 22px;
-  padding: 0 5px;
+  padding: 0 6px;
   background: #ef4444;
   color: #fff;
   font-size: 9px;
@@ -342,10 +342,6 @@
 .ge-waiting-badge:not(.ge-waiting-badge--has-value) {
   opacity: .3;
   filter: saturate(.4);
-}
-
-.ge-card-calendar--wide {
-  grid-column: span 2;
 }
 
 .ge-card-appointments {
@@ -952,9 +948,8 @@ table {
   }
 
   .ge-brand-waiting {
-    right: 11px;
-    width: 55px;
-    height: 46px;
+    right: 10px;
+    gap: 5px;
   }
 
   .ge-brand-waiting__incoming {
@@ -972,20 +967,19 @@ table {
   }
 
   .ge-card-waiting {
-    padding-right: 56px !important;
+    padding-right: 52px !important;
   }
 
   .ge-waiting-badges {
-    right: 7px;
-    width: 43px;
-    height: 42px;
+    right: 6px;
+    gap: 3px;
   }
 
   .ge-waiting-badge--incoming {
-    min-width: 33px;
-    height: 33px;
+    min-width: 32px;
+    height: 32px;
     padding: 0 7px;
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .ge-waiting-badge--outgoing {
