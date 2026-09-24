@@ -4663,7 +4663,7 @@ export default function Recruiting({
               border: "1px solid #93c5fd",
             }}
           >
-            NOTE DA SINCRONIZZARE SU HR SPECIALIST
+            SINCRONIZZAZIONE HR SPECIALIST
             {hrSyncPendingCount > 0 && (
               <span
                 style={{
