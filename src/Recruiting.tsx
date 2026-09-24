@@ -64,6 +64,32 @@ type HrStatusSyncItem = {
   createdAt: string;
 };
 
+type HrIncomingNote = {
+  id: string;
+  noteDate: string;
+  noteText: string;
+  createdAt: string;
+};
+
+type HrIncomingCandidate = {
+  id: string;
+  sourceSystem: string;
+  sourceCandidateId: string;
+  fullName: string;
+  operationalZone: string;
+  provinceCode: string;
+  region: string;
+  phone: string;
+  email: string;
+  sectorEnergy: boolean;
+  sectorOther: string;
+  companyName: string;
+  sourceStatus: string;
+  sourceUpdatedAt: string;
+  receivedAt: string;
+  notes: HrIncomingNote[];
+};
+
 type EventType = "CHIAMARE" | "APPUNTAMENTO_ZONA" | "APPUNTAMENTO_SEDE" | "VIDEOCALL" | "ALTRO";
 
 type RecruitingEvent = {
@@ -1066,6 +1092,19 @@ export default function Recruiting({
   const [hrStatusSyncItems, setHrStatusSyncItems] = useState<
     HrStatusSyncItem[]
   >([]);
+  const [hrIncomingCandidates, setHrIncomingCandidates] = useState<
+    HrIncomingCandidate[]
+  >([]);
+  const [incomingNotificationPermission, setIncomingNotificationPermission] =
+    useState<NotificationPermission>(() => {
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window
+      ) {
+        return Notification.permission;
+      }
+      return "default";
+    });
   const [events, setEvents] = useState<RecruitingEvent[]>([]);
   const [crmCalendarEvents, setCrmCalendarEvents] = useState<
     CrmCalendarEvent[]
@@ -1233,6 +1272,102 @@ export default function Recruiting({
   const candidateMapGeocodingRef = useRef(false);
   const candidateMapFailedZonesRef = useRef<Set<string>>(new Set());
 
+  const notifyNewIncomingCandidates = (
+    ownerKey: string,
+    items: HrIncomingCandidate[]
+  ) => {
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      Notification.permission !== "granted"
+    ) {
+      return;
+    }
+
+    const storageKey = `recruiting_hr_incoming_notified_${ownerKey}`;
+    let notified = new Set<string>();
+
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) {
+        notified = new Set(parsed.map(String));
+      }
+    } catch {
+      notified = new Set<string>();
+    }
+
+    const fresh = items.filter((item) => !notified.has(item.id));
+    if (!fresh.length) return;
+
+    try {
+      const body =
+        fresh.length === 1
+          ? fresh[0].fullName
+          : `${fresh
+              .slice(0, 3)
+              .map((item) => item.fullName)
+              .join(", ")}${fresh.length > 3 ? "…" : ""}`;
+
+      new Notification(
+        fresh.length === 1
+          ? "Nuovo nominativo da HR"
+          : `${fresh.length} nuovi nominativi da HR`,
+        {
+          body,
+          icon: "/pwa-icon-192-v2.png",
+          tag: "recruiting-hr-incoming",
+        }
+      );
+
+      fresh.forEach((item) => notified.add(item.id));
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify(Array.from(notified).slice(-500))
+      );
+    } catch (error) {
+      console.warn("HR INCOMING NOTIFICATION ERROR:", error);
+    }
+  };
+
+  const enableIncomingNotifications = async () => {
+    if (
+      typeof window === "undefined" ||
+      !("Notification" in window)
+    ) {
+      setMessage(
+        "Le notifiche di sistema non sono supportate da questo browser."
+      );
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setIncomingNotificationPermission(permission);
+
+      if (permission === "granted") {
+        setMessage(
+          "Notifiche attivate: ti avviserò quando arrivano nuovi nominativi HR mentre la webapp è attiva."
+        );
+        if (ctx) {
+          notifyNewIncomingCandidates(
+            ctx.ownerKey,
+            hrIncomingCandidates
+          );
+        }
+      } else {
+        setMessage(
+          "Notifiche non attivate. I nuovi nominativi resteranno comunque evidenziati nella sezione IN ARRIVO."
+        );
+      }
+    } catch (error: any) {
+      setMessage(
+        "Non riesco ad attivare le notifiche: " +
+          (error?.message || error)
+      );
+    }
+  };
+
   const loadAll = async (context?: RecruitingContext) => {
     const active = context || ctx || (await getRecruitingContext());
     if (!ctx) setCtx(active);
@@ -1241,6 +1376,8 @@ export default function Recruiting({
       candidatesResult,
       notesResult,
       hrStatusSyncResult,
+      incomingCandidatesResult,
+      incomingNotesResult,
       eventsResult,
       crmEventsResult,
       macroResult,
@@ -1261,6 +1398,16 @@ export default function Recruiting({
         .from("recruiting_hr_status_sync_queue")
         .select("id,candidate_id,previous_status,new_status,created_at")
         .order("created_at", { ascending: false }),
+      active.client
+        .from("recruiting_hr_incoming_candidates")
+        .select("id,source_system,source_candidate_id,full_name,operational_zone,province_code,region,phone,email,sector_energy,sector_other,company_name,source_status,source_updated_at,received_at")
+        .eq("status", "pending")
+        .order("received_at", { ascending: false }),
+      active.client
+        .from("recruiting_hr_incoming_notes")
+        .select("id,incoming_candidate_id,note_date,note_text,created_at")
+        .order("note_date", { ascending: true })
+        .order("created_at", { ascending: true }),
       active.client
         .from("recruiting_events")
         .select("id,candidate_id,event_date,event_time,event_type,custom_type,notes,completed,google_sync_status,google_sync_error,google_synced_at,source_type,source_external_id,source_external_calendar_id")
@@ -1294,6 +1441,8 @@ export default function Recruiting({
       candidatesResult,
       notesResult,
       hrStatusSyncResult,
+      incomingCandidatesResult,
+      incomingNotesResult,
       eventsResult,
       crmEventsResult,
       macroResult,
@@ -1320,6 +1469,49 @@ export default function Recruiting({
         createdAt: String(row.created_at || ""),
       }))
     );
+
+    const incomingNotesByCandidate = new Map<
+      string,
+      HrIncomingNote[]
+    >();
+    (incomingNotesResult.data || []).forEach((row: any) => {
+      const incomingId = String(row.incoming_candidate_id || "");
+      const list = incomingNotesByCandidate.get(incomingId) || [];
+      list.push({
+        id: String(row.id),
+        noteDate: String(row.note_date || ""),
+        noteText: String(row.note_text || ""),
+        createdAt: String(row.created_at || ""),
+      });
+      incomingNotesByCandidate.set(incomingId, list);
+    });
+
+    const nextIncomingCandidates: HrIncomingCandidate[] =
+      (incomingCandidatesResult.data || []).map((row: any) => ({
+        id: String(row.id),
+        sourceSystem: String(row.source_system || "PERFORMA"),
+        sourceCandidateId: String(row.source_candidate_id || ""),
+        fullName: String(row.full_name || ""),
+        operationalZone: String(row.operational_zone || ""),
+        provinceCode: String(row.province_code || ""),
+        region: String(row.region || ""),
+        phone: String(row.phone || ""),
+        email: String(row.email || ""),
+        sectorEnergy: Boolean(row.sector_energy),
+        sectorOther: String(row.sector_other || ""),
+        companyName: String(row.company_name || ""),
+        sourceStatus: String(row.source_status || ""),
+        sourceUpdatedAt: String(row.source_updated_at || ""),
+        receivedAt: String(row.received_at || ""),
+        notes: incomingNotesByCandidate.get(String(row.id)) || [],
+      }));
+
+    setHrIncomingCandidates(nextIncomingCandidates);
+    notifyNewIncomingCandidates(
+      active.ownerKey,
+      nextIncomingCandidates
+    );
+
     setEvents((eventsResult.data || []).map(eventFromRow));
     setCrmCalendarEvents(
       (crmEventsResult.data || []).map(crmEventFromRow)
@@ -2092,8 +2284,10 @@ export default function Recruiting({
     [notes]
   );
 
-  const hrSyncPendingCount =
+  const hrOutgoingPendingCount =
     hrSyncNotes.length + hrStatusSyncItems.length;
+  const hrSyncPendingCount =
+    hrIncomingCandidates.length + hrOutgoingPendingCount;
 
   const selectedFutureEvents = useMemo(
     () =>
@@ -3026,6 +3220,87 @@ export default function Recruiting({
       setBusy(false);
     }
   };
+
+  const acceptIncomingCandidate = async (
+    incoming: HrIncomingCandidate
+  ) => {
+    if (!ctx) return;
+
+    if (
+      !window.confirm(
+        `Accettare ${incoming.fullName} e inserirlo nei CONTATTI con tutte le note importate?`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { data, error } = await ctx.client.rpc(
+        "recruiting_accept_incoming_candidate",
+        { p_incoming_id: incoming.id }
+      );
+
+      if (error) throw error;
+
+      await loadAll(ctx);
+      setMessage(
+        `${incoming.fullName} accettato: nominativo e ${incoming.notes.length} note importati nei CONTATTI.`
+      );
+
+      if (data) {
+        selectedCandidateIdRef.current = String(data);
+        setSelectedCandidateId(String(data));
+      }
+    } catch (error: any) {
+      setMessage(
+        "Errore nell'accettazione del nominativo: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rejectIncomingCandidate = async (
+    incoming: HrIncomingCandidate
+  ) => {
+    if (!ctx) return;
+
+    if (
+      !window.confirm(
+        `Scartare ${incoming.fullName}? Non verrà inserito nei CONTATTI.`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_hr_incoming_candidates")
+        .update({
+          status: "rejected",
+          decided_at: new Date().toISOString(),
+        })
+        .eq("id", incoming.id);
+
+      if (error) throw error;
+
+      await loadAll(ctx);
+      setMessage(
+        `${incoming.fullName} rimosso dalla coda IN ARRIVO.`
+      );
+    } catch (error: any) {
+      setMessage(
+        "Errore nello scarto del nominativo: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
   const insertEvent = async ({
     candidateId,
