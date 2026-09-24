@@ -1065,6 +1065,11 @@ type RecruitingSection =
   | "crm_management";
 
 type RecruitingContactScope = "internal" | "external";
+type CandidateSortMode =
+  | "priority_chronological"
+  | "chronological"
+  | "alphabetical"
+  | "activity";
 
 export default function Recruiting({
   initialSection = "contacts",
@@ -1155,6 +1160,25 @@ export default function Recruiting({
   const [statusFilter, setStatusFilter] = useState<"" | CandidateStatus>("");
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
+  const [candidateSortMode, setCandidateSortMode] =
+    useState<CandidateSortMode>(() => {
+      try {
+        const saved = window.localStorage.getItem(
+          "recruiting_candidate_sort_mode"
+        ) as CandidateSortMode | null;
+
+        return [
+          "priority_chronological",
+          "chronological",
+          "alphabetical",
+          "activity",
+        ].includes(saved || "")
+          ? (saved as CandidateSortMode)
+          : "priority_chronological";
+      } catch {
+        return "priority_chronological";
+      }
+    });
   const selectedCandidateStorageKey =
     `recruiting_selected_candidate_${contactScope}`;
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(
@@ -2085,6 +2109,17 @@ export default function Recruiting({
     candidates.find((candidate) => candidate.id === selectedCandidateId) || null;
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "recruiting_candidate_sort_mode",
+        candidateSortMode
+      );
+    } catch {
+      // La preferenza resta comunque valida nella sessione corrente.
+    }
+  }, [candidateSortMode]);
+
+  useEffect(() => {
     selectedCandidateIdRef.current = selectedCandidateId;
 
     try {
@@ -2306,6 +2341,105 @@ export default function Recruiting({
     const companyNeedle = normalizeFilterValue(companyFilter);
     const forwardedNeedle = normalizeFilterValue(forwardedToFilter);
 
+    const candidateGeneralChronologyKey = (candidate: Candidate) => {
+      const lastNote =
+        lastNoteSortKeyByCandidateId.get(candidate.id) || "";
+      const updated = candidate.updatedAt
+        ? `${candidate.updatedAt.slice(0, 10)}|${candidate.updatedAt}`
+        : "";
+      const created = candidate.createdAt
+        ? `${candidate.createdAt.slice(0, 10)}|${candidate.createdAt}`
+        : "";
+
+      return [lastNote, updated, created]
+        .filter(Boolean)
+        .sort()
+        .at(-1) || "";
+    };
+
+    const candidateNoteChronologyKey = (candidate: Candidate) => {
+      const lastNote =
+        lastNoteSortKeyByCandidateId.get(candidate.id) || "";
+      if (lastNote) return lastNote;
+
+      const fallback = candidate.updatedAt || candidate.createdAt || "";
+      return fallback
+        ? `${fallback.slice(0, 10)}|${fallback}`
+        : "";
+    };
+
+    const activityRank = (candidate: Candidate) => {
+      const code = String(candidate.status || "")
+        .trim()
+        .toLocaleUpperCase("it");
+      const label = String(
+        getStatusDefinition(candidate.status).label || ""
+      )
+        .trim()
+        .toLocaleUpperCase("it");
+
+      if (code === "DA_CHIAMARE") return 0;
+
+      if (
+        code === "DA_RICHIAMARE" ||
+        code === "DA_RISENTIRE" ||
+        code === "CHIAMATO" ||
+        label.includes("DA RICHIAMARE") ||
+        label.includes("DA RISENTIRE")
+      ) {
+        return 1;
+      }
+
+      if (code === "IN_TRATTATIVA" || label.includes("IN TRATTATIVA")) {
+        return 2;
+      }
+
+      if (code === "INVIATO_MANDATO" || label.includes("INVIATO MANDATO")) {
+        return 3;
+      }
+
+      if (
+        code === "INVIATO_PROVVIGIONALE" ||
+        label.includes("INVIATO PROVVIGIONALE")
+      ) {
+        return 4;
+      }
+
+      if (
+        code === "FISSATA_VIDEOCALL" ||
+        code === "FISSATO_VIDEOCALL" ||
+        label.includes("VIDEOCALL")
+      ) {
+        return 5;
+      }
+
+      if (
+        code === "FISSATO_APPUNTAMENTO" ||
+        code === "FISSATA_APPUNTAMENTO" ||
+        label.includes("FISSATO APPUNTAMENTO") ||
+        label.includes("FISSATA APPUNTAMENTO")
+      ) {
+        return 6;
+      }
+
+      if (
+        code === "DA_CHIAMARE_NUOVAMENTE" ||
+        label.includes("DA CHIAMARE NUOVAMENTE")
+      ) {
+        return 7;
+      }
+
+      if (code === "INOLTRATO_A" || label.includes("INOLTRATO A")) {
+        return 8;
+      }
+
+      if (code === "KO" || label === "KO") {
+        return 100;
+      }
+
+      return 9;
+    };
+
     return candidates.filter((candidate) => {
       if (
         nameNeedle &&
@@ -2363,8 +2497,9 @@ export default function Recruiting({
 
       return true;
     }).sort((a, b) => {
-      // I nominativi appena accettati dalla SALA D'ATTESA restano
-      // sempre in cima finché non vengono realmente lavorati/modificati.
+      // Questa priorità resta sempre valida, qualunque ordinamento venga
+      // scelto: i nuovi accettati dalla SALA D'ATTESA devono rimanere in cima
+      // finché non vengono realmente lavorati.
       if (a.waitingRoomNew !== b.waitingRoomNew) {
         return a.waitingRoomNew ? -1 : 1;
       }
@@ -2377,56 +2512,63 @@ export default function Recruiting({
         }
       }
 
+      if (candidateSortMode === "alphabetical") {
+        return a.fullName.localeCompare(b.fullName, "it");
+      }
+
+      if (candidateSortMode === "chronological") {
+        const aLast = candidateNoteChronologyKey(a);
+        const bLast = candidateNoteChronologyKey(b);
+
+        if (aLast !== bLast) {
+          return bLast.localeCompare(aLast);
+        }
+
+        return a.fullName.localeCompare(b.fullName, "it");
+      }
+
+      if (candidateSortMode === "activity") {
+        const aRank = activityRank(a);
+        const bRank = activityRank(b);
+
+        if (aRank !== bRank) {
+          return aRank - bRank;
+        }
+
+        const aLast = candidateGeneralChronologyKey(a);
+        const bLast = candidateGeneralChronologyKey(b);
+
+        if (aLast !== bLast) {
+          return bLast.localeCompare(aLast);
+        }
+
+        return a.fullName.localeCompare(b.fullName, "it");
+      }
+
+      // PRIORITÀ + CRONOLOGICO: comportamento precedente.
       const aFirstCall = a.status === "DA_CHIAMARE";
       const bFirstCall = b.status === "DA_CHIAMARE";
 
-      // I "DA CHIAMARE PER LA PRIMA VOLTA" restano sempre in testa.
       if (aFirstCall !== bFirstCall) {
         return aFirstCall ? -1 : 1;
       }
 
-      // Tra i nominativi già lavorati, ordina dal più recente in base
-      // all'ultima nota O all'ultimo aggiornamento della scheda/stato.
       if (!aFirstCall && !bFirstCall) {
-        const aLastNote =
-          lastNoteSortKeyByCandidateId.get(a.id) || "";
-        const bLastNote =
-          lastNoteSortKeyByCandidateId.get(b.id) || "";
-
-        const aUpdated = a.updatedAt
-          ? `${a.updatedAt.slice(0, 10)}|${a.updatedAt}`
-          : "";
-        const bUpdated = b.updatedAt
-          ? `${b.updatedAt.slice(0, 10)}|${b.updatedAt}`
-          : "";
-
-        const aCreated = a.createdAt
-          ? `${a.createdAt.slice(0, 10)}|${a.createdAt}`
-          : "";
-        const bCreated = b.createdAt
-          ? `${b.createdAt.slice(0, 10)}|${b.createdAt}`
-          : "";
-
-        const aLast = [aLastNote, aUpdated, aCreated]
-          .filter(Boolean)
-          .sort()
-          .at(-1) || "";
-        const bLast = [bLastNote, bUpdated, bCreated]
-          .filter(Boolean)
-          .sort()
-          .at(-1) || "";
+        const aLast = candidateGeneralChronologyKey(a);
+        const bLast = candidateGeneralChronologyKey(b);
 
         if (aLast !== bLast) {
           return bLast.localeCompare(aLast);
         }
       }
 
-      // A parità di priorità/data, ordine alfabetico stabile.
       return a.fullName.localeCompare(b.fullName, "it");
     });
   }, [
     candidates,
     lastNoteSortKeyByCandidateId,
+    candidateSortMode,
+    statusDefinitions,
     nameFilter,
     zoneFilter,
     regionFilter,
@@ -5889,25 +6031,79 @@ export default function Recruiting({
               <div
                 style={{
                   display: "flex",
-                  alignItems: "baseline",
-                  gap: 9,
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
                   flexWrap: "wrap",
+                  marginBottom: 8,
                 }}
               >
-                <h3 style={{ marginTop: 0, marginBottom: 0 }}>
-                  Lista nominativi
-                </h3>
-                <span
+                <div
                   style={{
-                    color: "#dc2626",
-                    fontSize: 17,
-                    fontWeight: 950,
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 9,
+                    flexWrap: "wrap",
                   }}
                 >
-                  {hasActiveContactFilters
-                    ? `${filteredCandidates.length} SU ${candidates.length}`
-                    : candidates.length}
-                </span>
+                  <h3 style={{ marginTop: 0, marginBottom: 0 }}>
+                    Lista nominativi
+                  </h3>
+                  <span
+                    style={{
+                      color: "#dc2626",
+                      fontSize: 17,
+                      fontWeight: 950,
+                    }}
+                  >
+                    {hasActiveContactFilters
+                      ? `${filteredCandidates.length} SU ${candidates.length}`
+                      : candidates.length}
+                  </span>
+                </div>
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    fontSize: 11,
+                    fontWeight: 900,
+                    color: "#475569",
+                  }}
+                >
+                  ORDINA
+                  <select
+                    value={candidateSortMode}
+                    onChange={(event) =>
+                      setCandidateSortMode(
+                        event.target.value as CandidateSortMode
+                      )
+                    }
+                    style={{
+                      ...inputStyle,
+                      width: "auto",
+                      minWidth: 205,
+                      padding: "7px 9px",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      background: "white",
+                    }}
+                  >
+                    <option value="priority_chronological">
+                      Priorità + cronologico
+                    </option>
+                    <option value="chronological">
+                      Cronologico
+                    </option>
+                    <option value="alphabetical">
+                      Alfabetico
+                    </option>
+                    <option value="activity">
+                      Per attività
+                    </option>
+                  </select>
+                </label>
               </div>
               <div style={{ maxHeight: 720, overflow: "auto", display: "grid", gap: 7 }}>
                 {filteredCandidates.map((candidate) => {
@@ -9389,6 +9585,11 @@ export default function Recruiting({
           <div
             className="recruiting-modal"
             onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(1100px, 96vw)",
+              maxHeight: "92vh",
+              padding: 24,
+            }}
           >
             <div
               style={{
