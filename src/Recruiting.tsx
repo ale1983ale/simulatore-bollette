@@ -1152,7 +1152,7 @@ export default function Recruiting({
   type CalendarOrigin = "APP" | "CRM" | "EXTERNAL" | "GOOGLE";
   const [calendarOriginFilters, setCalendarOriginFilters] = useState<
     CalendarOrigin[]
-  >([]);
+  >(["APP", "CRM"]);
   const [calendarCandidateId, setCalendarCandidateId] = useState("");
   const [calendarType, setCalendarType] = useState<EventType>("CHIAMARE");
   const [calendarCustom, setCalendarCustom] = useState("");
@@ -2036,7 +2036,7 @@ export default function Recruiting({
     setCalendarSearchFilter("");
     setCalendarCandidateFilter("");
     setCalendarTypeFilter("");
-    setCalendarOriginFilters([]);
+    setCalendarOriginFilters(["APP", "CRM"]);
     setShowFullGoogleCalendar(false);
   };
 
@@ -6596,13 +6596,20 @@ export default function Recruiting({
                     setGoogleExternalError("");
 
                     if (!showFullGoogleCalendar) {
-                      // "Calendario completo" deve significare davvero tutte
-                      // le origini: APP HR + CONTATTI ESTERNI + CRM + GOOGLE.
-                      setCalendarOriginFilters([]);
+                      // "Calendario completo" seleziona esplicitamente tutte
+                      // le origini. Nessun pulsante attivo = nessun evento.
+                      setCalendarOriginFilters([
+                        "APP",
+                        "CRM",
+                        "EXTERNAL",
+                        "GOOGLE",
+                      ]);
                       setCalendarCandidateFilter("");
                       setCalendarTypeFilter("");
                       setShowFullGoogleCalendar(true);
                     } else {
+                      // Uscendo dal completo si torna alla vista predefinita.
+                      setCalendarOriginFilters(["APP", "CRM"]);
                       setShowFullGoogleCalendar(false);
                     }
                   }}
@@ -6676,27 +6683,32 @@ export default function Recruiting({
                         type="button"
                         disabled={googleCalendarBusy}
                         onClick={() => {
-                          const alreadyOnlyThisOrigin =
-                            calendarOriginFilters.length === 1 &&
+                          const isCurrentlyActive =
                             calendarOriginFilters.includes(
                               origin.key
                             );
 
-                          // I pulsanti origine funzionano come viste esclusive:
-                          // CRM mostra solo CRM, GOOGLE solo Google, ecc.
-                          // Questo evita che più sorgenti selezionate insieme
-                          // facciano sembrare il filtro inefficace.
-                          setCalendarOriginFilters(
-                            alreadyOnlyThisOrigin
-                              ? []
-                              : [origin.key]
+                          // Ogni pulsante è un vero interruttore indipendente:
+                          // se è spento, quella sorgente sparisce dal calendario.
+                          setCalendarOriginFilters((current) =>
+                            isCurrentlyActive
+                              ? current.filter(
+                                  (item) => item !== origin.key
+                                )
+                              : [...current, origin.key]
                           );
 
-                          // I filtri nominativo/tipologia non sono applicabili
-                          // a CRM e Google esterni e potevano nascondere tutto.
+                          // Qualsiasi intervento manuale sui pulsanti esce
+                          // dalla modalità "Calendario completo".
+                          setShowFullGoogleCalendar(false);
+
+                          // Questi filtri non si applicano a CRM/Google:
+                          // quando li si accende, li azzeriamo per evitare
+                          // che la sorgente sembri vuota.
                           if (
-                            origin.key === "CRM" ||
-                            origin.key === "GOOGLE"
+                            !isCurrentlyActive &&
+                            (origin.key === "CRM" ||
+                              origin.key === "GOOGLE")
                           ) {
                             setCalendarCandidateFilter("");
                             setCalendarTypeFilter("");
@@ -6704,12 +6716,9 @@ export default function Recruiting({
 
                           if (
                             origin.key === "GOOGLE" &&
-                            !alreadyOnlyThisOrigin
+                            !isCurrentlyActive
                           ) {
                             setGoogleExternalError("");
-                            setShowFullGoogleCalendar(true);
-                          } else {
-                            setShowFullGoogleCalendar(false);
                           }
                         }}
                         style={{
@@ -6931,7 +6940,6 @@ export default function Recruiting({
                   normalizeFilterValue(calendarSearchFilter);
 
                 const internalOriginsRequested =
-                  calendarOriginFilters.length === 0 ||
                   calendarOriginFilters.includes("APP") ||
                   calendarOriginFilters.includes("EXTERNAL");
 
@@ -6997,10 +7005,7 @@ export default function Recruiting({
                   : [];
 
                 const dayGoogleEvents =
-                  ((calendarOriginFilters.length > 0 &&
-                    calendarOriginFilters.includes("GOOGLE")) ||
-                    (calendarOriginFilters.length === 0 &&
-                      showFullGoogleCalendar)) &&
+                  calendarOriginFilters.includes("GOOGLE") &&
                   !calendarCandidateFilter &&
                   !calendarTypeFilter
                     ? googleExternalEvents
@@ -7045,8 +7050,7 @@ export default function Recruiting({
                 const dayCrmEvents =
                   !calendarCandidateFilter &&
                   !calendarTypeFilter &&
-                  (calendarOriginFilters.length === 0 ||
-                    calendarOriginFilters.includes("CRM"))
+                  calendarOriginFilters.includes("CRM")
                     ? crmCalendarEvents.filter((event) => {
                         if (event.startDate !== cell.dateKey) {
                           return false;
