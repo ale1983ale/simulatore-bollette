@@ -370,26 +370,61 @@ export default function OutlookEmail() {
     if (!open) return;
 
     const positionOverlay = () => {
-      const brand = document.querySelector(
-        ".ge-brand-shell"
-      ) as HTMLElement | null;
+      const visibleShells = Array.from(
+        document.querySelectorAll(
+          ".ge-brand-shell, .ge-main-nav, .ge-admin-nav"
+        )
+      ).filter(
+        (node) =>
+          node instanceof HTMLElement &&
+          node.offsetParent !== null
+      ) as HTMLElement[];
 
-      if (!brand) {
-        setOverlayTop(0);
-        return;
-      }
+      const bottom = visibleShells.reduce(
+        (max, node) =>
+          Math.max(max, node.getBoundingClientRect().bottom),
+        0
+      );
 
-      const rect = brand.getBoundingClientRect();
-      setOverlayTop(Math.max(0, Math.ceil(rect.bottom + 8)));
+      setOverlayTop(
+        Math.max(0, Math.ceil(bottom > 0 ? bottom + 8 : 0))
+      );
+    };
+
+    const closeOnNavigation = (event: MouseEvent) => {
+      const target =
+        event.target instanceof Element ? event.target : null;
+      if (!target) return;
+
+      const navigationTarget = target.closest(
+        ".ge-brand, .ge-main-nav, .ge-admin-nav"
+      );
+      if (!navigationTarget) return;
+
+      const label =
+        navigationTarget.textContent?.toLocaleUpperCase("it") || "";
+      if (label.includes("INVIO EMAIL")) return;
+
+      setOpen(false);
     };
 
     window.scrollTo({ top: 0, behavior: "auto" });
     const frame = window.requestAnimationFrame(positionOverlay);
     window.addEventListener("resize", positionOverlay);
+    document.addEventListener(
+      "click",
+      closeOnNavigation,
+      true
+    );
 
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", positionOverlay);
+      document.removeEventListener(
+        "click",
+        closeOnNavigation,
+        true
+      );
     };
   }, [open]);
 
