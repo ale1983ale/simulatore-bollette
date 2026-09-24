@@ -66,7 +66,7 @@
 }
 
 .ge-dashboard-secondary--admin {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .ge-dashboard-secondary--agent {
@@ -88,6 +88,33 @@
   cursor: pointer;
   box-shadow: 0 7px 18px rgba(22, 60, 105, .10);
   transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.ge-dashboard-card__badge {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 3;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(100, 116, 139, .16);
+  border: 1px solid rgba(100, 116, 139, .28);
+  color: #475569;
+  font-size: 12px;
+  font-weight: 950;
+  box-shadow: 0 3px 9px rgba(15, 23, 42, .08);
+}
+
+.ge-dashboard-card__badge--active {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(239, 68, 68, .28);
 }
 
 .ge-dashboard-card:hover {
@@ -197,6 +224,15 @@
   background: linear-gradient(135deg, #fff8e8 0%, #ffe7ba 100%);
 }
 
+.ge-card-waiting {
+  color: #8a3ffc;
+  background: linear-gradient(135deg, #f4efff 0%, #e5d8ff 100%);
+}
+
+.ge-card-calendar--wide {
+  grid-column: span 2;
+}
+
 .ge-card-appointments {
   color: #6331df;
   background: linear-gradient(135deg, #f4ecff 0%, #e5d8ff 100%);
@@ -224,6 +260,7 @@
 
 .ge-card-calendar .ge-dashboard-card__icon,
 .ge-card-recruiting .ge-dashboard-card__icon,
+.ge-card-waiting .ge-dashboard-card__icon,
 .ge-card-appointments .ge-dashboard-card__icon,
 .ge-card-production .ge-dashboard-card__icon,
 .ge-card-email .ge-dashboard-card__icon,
@@ -238,7 +275,7 @@
   }
 
   .ge-dashboard-secondary--admin {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -285,7 +322,8 @@
   .ge-dashboard-card--span-mobile,
   .ge-dashboard-primary--agent .ge-card-energy,
   .ge-dashboard-primary--agent .ge-card-gas,
-  .ge-dashboard-secondary--agent .ge-card-agent-dashboard-report {
+  .ge-dashboard-secondary--agent .ge-card-agent-dashboard-report,
+  .ge-dashboard-secondary--admin .ge-card-calendar--wide {
     grid-column: 1 / -1;
   }
 
@@ -453,6 +491,9 @@
 }
 .ge-section-hero--recruiting {
   background: linear-gradient(105deg, #d97706 0%, #f59e0b 55%, #fb923c 100%);
+}
+.ge-section-hero--waiting {
+  background: linear-gradient(105deg, #6d28d9 0%, #8b5cf6 52%, #2563eb 100%);
 }
 .ge-section-hero--appointments {
   background: linear-gradient(105deg, #7c3aed 0%, #9333ea 52%, #c026d3 100%);
@@ -776,5 +817,22 @@ table {
 @media (max-width: 900px) {
   .hr-sync-columns {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+/* Sala d'attesa dashboard */
+@media (max-width: 720px) {
+  .ge-dashboard-card__badge {
+    top: 7px;
+    right: 7px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
+
+  .ge-dashboard-secondary--admin .ge-card-calendar--wide {
+    min-height: 86px;
   }
 }
