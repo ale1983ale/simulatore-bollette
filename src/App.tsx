@@ -7708,6 +7708,15 @@ export default function App() {
   };
   
   const [tab, setTab] = useState(() => {
+    const requestedTab =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("tab")
+        : "";
+
+    if (requestedTab === "recruitingWaiting") {
+      return "recruitingWaiting";
+    }
+
     return localStorage.getItem("app_tab") || "dashboard";
   });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -8222,6 +8231,20 @@ useEffect(() => {
   localStorage.setItem("app_tab", tab);
 }, [tab]);
 
+useEffect(() => {
+  if (!adminSession || tab !== "recruitingWaiting") return;
+
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("tab") !== "recruitingWaiting") return;
+
+  url.searchParams.delete("tab");
+  window.history.replaceState(
+    {},
+    "",
+    `${url.pathname}${url.search}${url.hash}`
+  );
+}, [adminSession, tab]);
+
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
   const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
 
@@ -8474,8 +8497,15 @@ const renderAdminContent = () => {
         setAdminProfile={setAdminProfile}
         setAgentSession={setAgentSession}
         onLoginSuccess={() => {
-          setTab("dashboard");
-          localStorage.setItem("app_tab", "dashboard");
+          const requestedTab =
+            new URLSearchParams(window.location.search).get("tab");
+          const nextTab =
+            requestedTab === "recruitingWaiting"
+              ? "recruitingWaiting"
+              : "dashboard";
+
+          setTab(nextTab);
+          localStorage.setItem("app_tab", nextTab);
         }}
       />
     );
