@@ -7692,6 +7692,8 @@ export default function App() {
     return "dashboard";
   });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [openAdminMenuAfterDashboard, setOpenAdminMenuAfterDashboard] =
+    useState(false);
 
   useEffect(() => {
     const requestedTab =
@@ -7704,28 +7706,41 @@ export default function App() {
   }, []);
 
   const navigateTo = (nextTab: string) => {
+    setOpenAdminMenuAfterDashboard(false);
     setAdminMenuOpen(false);
     setTab(nextTab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const openDatabaseSettings = () => {
+    setOpenAdminMenuAfterDashboard(false);
     setAdminMenuOpen(false);
     setTab("agents");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const toggleAdminMenu = () => {
-    if (tab !== "dashboard") {
-      setTab("dashboard");
-      localStorage.setItem("app_tab", "dashboard");
-      setAdminMenuOpen(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (tab === "dashboard") {
+      setOpenAdminMenuAfterDashboard(false);
+      setAdminMenuOpen((current) => !current);
       return;
     }
 
-    setAdminMenuOpen((current) => !current);
+    setAdminMenuOpen(false);
+    setOpenAdminMenuAfterDashboard(true);
+    setTab("dashboard");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  useEffect(() => {
+    if (
+      openAdminMenuAfterDashboard &&
+      tab === "dashboard"
+    ) {
+      setAdminMenuOpen(true);
+      setOpenAdminMenuAfterDashboard(false);
+    }
+  }, [tab, openAdminMenuAfterDashboard]);
 
   useEffect(() => {
     if (tab === "adminMenu") {
@@ -8259,13 +8274,19 @@ useEffect(() => {
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingManagement", "recruitingCrm"];
 
   useEffect(() => {
-    if (
-      databaseAdminTabs.includes(tab) &&
-      adminMenuOpen
-    ) {
+    if (!databaseAdminTabs.includes(tab)) return;
+
+    if (adminMenuOpen) {
       setAdminMenuOpen(false);
     }
-  }, [tab, adminMenuOpen]);
+    if (openAdminMenuAfterDashboard) {
+      setOpenAdminMenuAfterDashboard(false);
+    }
+  }, [
+    tab,
+    adminMenuOpen,
+    openAdminMenuAfterDashboard,
+  ]);
   const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
@@ -8992,120 +9013,150 @@ if (!agentSession && !adminSession) {
       </div>
   
       <div
-  className="ge-main-nav"
-  style={{
-    display: "flex",
-    gap: 8,
-    marginBottom: 16,
-    flexWrap: "wrap",
-  }}
->
-  <button
-    onClick={() => setTab("energia")}
-    style={{
-      ...baseBtn,
-      ...(tab === "energia" ? activeBtn : {}),
-    }}
-  >
-    Energia
-  </button>
+        className="ge-main-nav"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 16,
+          flexWrap: "wrap",
+          width: "100%",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <button
+            onClick={() => navigateTo("energia")}
+            style={{
+              ...baseBtn,
+              ...(tab === "energia" ? activeBtn : {}),
+            }}
+          >
+            Energia
+          </button>
 
-  <button
-    onClick={() => setTab("gas")}
-    style={{
-      ...baseBtn,
-      ...(tab === "gas" ? activeBtn : {}),
-    }}
-  >
-    Gas
-  </button>
+          <button
+            onClick={() => navigateTo("gas")}
+            style={{
+              ...baseBtn,
+              ...(tab === "gas" ? activeBtn : {}),
+            }}
+          >
+            Gas
+          </button>
 
-  <button
-    onClick={() => setTab("report")}
-    style={{
-      ...baseBtn,
-      ...(tab === "report" ? activeBtn : {}),
-    }}
-  >
-    Report
-  </button>
+          <button
+            onClick={() => navigateTo("report")}
+            style={{
+              ...baseBtn,
+              ...(tab === "report" ? activeBtn : {}),
+            }}
+          >
+            Report
+          </button>
 
-  <button
-    onClick={() => setTab("punpsvPublic")}
-    style={{
-      ...baseBtn,
-      ...(tab === "punpsvPublic" ? activeBtn : {}),
-    }}
-  >
-    PUN / PSV
-  </button>
+          <button
+            onClick={() => navigateTo("punpsvPublic")}
+            style={{
+              ...baseBtn,
+              ...(tab === "punpsvPublic" ? activeBtn : {}),
+            }}
+          >
+            PUN / PSV
+          </button>
 
-  <button
-    onClick={() => setTab("ateco")}
-    style={{
-      ...baseBtn,
-      ...(tab === "ateco" ? activeBtn : {}),
-    }}
-  >
-    ATECO
-  </button>
+          <button
+            onClick={() => navigateTo("ateco")}
+            style={{
+              ...baseBtn,
+              ...(tab === "ateco" ? activeBtn : {}),
+            }}
+          >
+            ATECO
+          </button>
 
-  {adminSession && (
-    <button
-      onClick={toggleAdminMenu}
-      style={{
-        ...baseBtn,
-        ...(adminMenuOpen ? activeBtn : {}),
-      }}
-    >
-      Area Admin
-    </button>
-  )}
+          {adminSession && (
+            <button
+              type="button"
+              onClick={toggleAdminMenu}
+              style={{
+                ...baseBtn,
+                ...(adminMenuOpen &&
+                tab === "dashboard"
+                  ? activeBtn
+                  : {}),
+              }}
+            >
+              Area Admin
+            </button>
+          )}
+        </div>
 
-  {(agentSession || adminSession) && (
-    <button
-      onClick={() => {
-        localStorage.removeItem("admin_session");
-        localStorage.removeItem("agent_session");
-        setAdminSession(null);
-        setAdminProfile(null);
-        setAgentSession(null);
-        setTab("energia");
-        localStorage.removeItem("app_tab");
-      }}
-      style={{
-        ...baseBtn,
-        background: "#ef4444",
-        color: "white",
-        border: "1px solid #ef4444",
-      }}
-    >
-    ESCI
-  </button>
-  )}
+        <div
+          className="ge-main-nav__actions"
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginLeft: "auto",
+          }}
+        >
+          {(agentSession || adminSession) && (
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem("admin_session");
+                localStorage.removeItem("agent_session");
+                setAdminSession(null);
+                setAdminProfile(null);
+                setAgentSession(null);
+                setOpenAdminMenuAfterDashboard(false);
+                setAdminMenuOpen(false);
+                setTab("energia");
+                localStorage.removeItem("app_tab");
+              }}
+              style={{
+                ...baseBtn,
+                background: "#ef4444",
+                color: "white",
+                border: "1px solid #ef4444",
+              }}
+            >
+              ESCI
+            </button>
+          )}
 
-  {adminSession && hasFullAdminAccess && (
-    <button
-      type="button"
-      title="IMPOSTAZIONI E DATABASE"
-      aria-label="Apri Impostazioni e Database"
-      onClick={openDatabaseSettings}
-      style={{
-        ...baseBtn,
-        padding: "8px 12px",
-        fontSize: 22,
-        lineHeight: 1,
-        color: "#64748b",
-        background: "#e2e8f0",
-        border: "1px solid #cbd5e1",
-        fontFamily: "Arial, 'Segoe UI Symbol', sans-serif",
-        fontWeight: 900,
-      }}
-    >
-      ⚙
-    </button>
-  )}
-</div>
+          {adminSession && hasFullAdminAccess && (
+            <button
+              type="button"
+              title="IMPOSTAZIONI E DATABASE"
+              aria-label="Apri Impostazioni e Database"
+              onClick={openDatabaseSettings}
+              style={{
+                ...baseBtn,
+                padding: "8px 12px",
+                fontSize: 22,
+                lineHeight: 1,
+                color: "#64748b",
+                background: "#e2e8f0",
+                border: "1px solid #cbd5e1",
+                fontFamily:
+                  "Arial, 'Segoe UI Symbol', sans-serif",
+                fontWeight: 900,
+              }}
+            >
+              ⚙
+            </button>
+          )}
+        </div>
+      </div>
+  
   
 {tab === "dashboard" ? (
   adminSession ? (
