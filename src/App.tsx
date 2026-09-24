@@ -7072,16 +7072,6 @@ function AdminDashboard({
           onClick={() => navigate("calendarAdmin")}
         />
         <DashboardCard
-          title="SALA D'ATTESA"
-          description="Gestisci nominativi in arrivo e sincronizzazioni HR."
-          icon="⌛"
-          className="ge-card-waiting"
-          compact
-          incomingCount={waitingIncomingCount}
-          outgoingCount={waitingOutgoingCount}
-          onClick={() => navigate("recruitingWaiting")}
-        />
-        <DashboardCard
           title="RECRUITING"
           description="Gestisci candidati e nuove risorse."
           icon="●●"
@@ -7120,6 +7110,16 @@ function AdminDashboard({
           className="ge-card-agent-report"
           compact
           onClick={() => navigate("reportAdmin")}
+        />
+        <DashboardCard
+          title="SALA D'ATTESA"
+          description="Gestisci nominativi in arrivo e sincronizzazioni HR."
+          icon="⌛"
+          className="ge-card-waiting"
+          compact
+          incomingCount={waitingIncomingCount}
+          outgoingCount={waitingOutgoingCount}
+          onClick={() => navigate("recruitingWaiting")}
         />
       </div>
     </div>
@@ -8424,23 +8424,42 @@ if (!agentSession && !adminSession) {
 }
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20 }}>
-      <button
-        type="button"
-        className="ge-brand"
-        onClick={() => {
-          setAdminMenuOpen(false);
-          navigateTo("dashboard");
-        }}
-        aria-label="Torna alla dashboard"
-      >
-        <span className="ge-brand__bolt">⚡</span>
-        <span>
-          <span className="ge-brand__title">GESTIONE ENERGIA</span>
-          <span className="ge-brand__subtitle">
-            PIÙ ENERGIA AL TUO LAVORO
+      <div className="ge-brand-shell">
+        <button
+          type="button"
+          className="ge-brand"
+          onClick={() => {
+            setAdminMenuOpen(false);
+            navigateTo("dashboard");
+          }}
+          aria-label="Torna alla dashboard"
+        >
+          <span className="ge-brand__bolt">⚡</span>
+          <span>
+            <span className="ge-brand__title">GESTIONE ENERGIA</span>
+            <span className="ge-brand__subtitle">
+              PIÙ ENERGIA AL TUO LAVORO
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+
+        {adminProfile?.role === "super_admin" && (
+          <button
+            type="button"
+            className="ge-brand-waiting"
+            onClick={() => navigateTo("recruitingWaiting")}
+            aria-label={`Apri Sala d'attesa: ${waitingRoomIncomingCount} in entrata, ${waitingRoomOutgoingCount} in uscita`}
+            title="Apri Sala d'attesa"
+          >
+            <span className="ge-brand-waiting__incoming">
+              {waitingRoomIncomingCount}
+            </span>
+            <span className="ge-brand-waiting__outgoing">
+              {waitingRoomOutgoingCount}
+            </span>
+          </button>
+        )}
+      </div>
   
       <div
   style={{
