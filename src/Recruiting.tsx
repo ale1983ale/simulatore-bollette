@@ -1162,6 +1162,8 @@ export default function Recruiting({
   const [statusFilter, setStatusFilter] = useState<"" | CandidateStatus>("");
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
+  const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
+    useState(false);
   const [candidateSortMode, setCandidateSortMode] =
     useState<CandidateSortMode>(() => {
       try {
@@ -5126,6 +5128,21 @@ export default function Recruiting({
           gap: 7px;
         }
 
+        .recruiting-contact-filter-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit,minmax(160px,1fr));
+          gap: 10px;
+          margin-top: 14px;
+        }
+
+        .recruiting-extra-filters-toggle {
+          display: none;
+        }
+
+        .recruiting-extra-filters {
+          display: contents;
+        }
+
         .recruiting-candidate-card {
           display: grid;
           grid-template-columns: minmax(0, 1fr) minmax(150px, 185px);
@@ -5185,6 +5202,38 @@ export default function Recruiting({
         }
 
         @media (max-width: 820px) {
+          .recruiting-contact-filter-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .recruiting-extra-filters-toggle {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            min-height: 42px;
+            padding: 9px 11px;
+            border: 1px solid #cbd5e1;
+            border-radius: 9px;
+            background: #f8fafc;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+          }
+
+          .recruiting-extra-filters {
+            display: none;
+            grid-column: 1 / -1;
+          }
+
+          .recruiting-extra-filters.is-open {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
+          }
+
           .recruiting-contact-layout,
           .recruiting-detail-bottom-layout {
             grid-template-columns: minmax(0, 1fr);
@@ -5687,14 +5736,7 @@ export default function Recruiting({
               </div>
             )}
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
-                gap: 10,
-                marginTop: 14,
-              }}
-            >
+            <div className="recruiting-contact-filter-grid">
               <div>
                 <label style={labelStyle}>Nome</label>
                 <input
@@ -5723,6 +5765,25 @@ export default function Recruiting({
                 </datalist>
               </div>
 
+              <button
+                type="button"
+                className="recruiting-extra-filters-toggle"
+                onClick={() =>
+                  setMobileExtraFiltersOpen((current) => !current)
+                }
+                aria-expanded={mobileExtraFiltersOpen}
+              >
+                <span>Altri filtri</span>
+                <span aria-hidden="true">
+                  {mobileExtraFiltersOpen ? "▲" : "▼"}
+                </span>
+              </button>
+
+              <div
+                className={`recruiting-extra-filters${
+                  mobileExtraFiltersOpen ? " is-open" : ""
+                }`}
+              >
               <div>
                 <label style={labelStyle}>Regione</label>
                 <select
@@ -5912,6 +5973,7 @@ export default function Recruiting({
                 >
                   AZZERA FILTRI
                 </button>
+              </div>
               </div>
             </div>
           </div>
