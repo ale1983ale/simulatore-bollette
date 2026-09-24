@@ -7526,12 +7526,14 @@ function SectionHero({
 function AdminDashboard({
   navigate,
   openEmail,
+  openDatabase,
   waitingIncomingCount,
   waitingOutgoingCount,
   fullAccess,
 }: {
   navigate: DashboardNavigate;
   openEmail: () => void;
+  openDatabase: () => void;
   waitingIncomingCount: number;
   waitingOutgoingCount: number;
   fullAccess: boolean;
@@ -7558,10 +7560,10 @@ function AdminDashboard({
           <DashboardCard
             title="IMPOSTAZIONI E DATABASE"
             description="Apri configurazioni, database e strumenti amministrativi."
-            icon="⚙️"
+            icon="⚙"
             className="ge-card-settings"
             compact
-            onClick={() => navigate("agents")}
+            onClick={openDatabase}
           />
         )}
         {fullAccess && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
@@ -7691,6 +7693,13 @@ export default function App() {
   const navigateTo = (nextTab: string) => {
     setAdminMenuOpen(false);
     setTab(nextTab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openDatabaseSettings = () => {
+    setAdminMenuOpen(false);
+    setTab("agents");
+    localStorage.setItem("app_tab", "agents");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -8273,43 +8282,43 @@ useEffect(() => {
     agents: {
       title: "DATABASE",
       subtitle: "Gestisci agenti, utenti e configurazioni amministrative.",
-      icon: "⚙️",
+      icon: "⚙",
       variant: "database",
     },
     listini: {
       title: "DATABASE · LISTINI",
       subtitle: "Gestisci listini, offerte e parametri commerciali.",
-      icon: "⚙️",
+      icon: "⚙",
       variant: "database",
     },
     punpsvAdmin: {
       title: "DATABASE · PUN / PSV",
       subtitle: "Aggiorna i valori PUN, PSV e i riferimenti di mercato.",
-      icon: "⚙️",
+      icon: "⚙",
       variant: "database",
     },
     recruitingZones: {
       title: "AGENTI / ZONE",
       subtitle: "Gestisci macroaree, agenti attivi e zone della mappa Recruiting.",
-      icon: "⚙️",
+      icon: "⚙",
       variant: "database",
     },
     recruitingManagement: {
       title: "GESTIONE RECRUITING",
       subtitle: "Configura stati, colori e impostazioni del recruiting.",
-      icon: "⚙️",
+      icon: "⚙",
       variant: "database",
     },
     recruitingCrm: {
       title: "GESTIONE CRM",
       subtitle: "Configura e sincronizza il CRM aziendale.",
-      icon: "⚙️",
+      icon: "⚙",
       variant: "database",
     },
     adminUsers: {
       title: "DATABASE · ADMIN",
       subtitle: "Gestisci gli amministratori della web app.",
-      icon: "⚙️",
+      icon: "⚙",
       variant: "database",
     },
   };
@@ -8700,6 +8709,7 @@ const renderAdminContent = () => {
           waitingIncomingCount={waitingRoomIncomingCount}
           waitingOutgoingCount={waitingRoomOutgoingCount}
           fullAccess={hasFullAdminAccess}
+          openDatabase={openDatabaseSettings}
         />
       )}
 
@@ -9050,16 +9060,20 @@ if (!agentSession && !adminSession) {
       type="button"
       title="IMPOSTAZIONI E DATABASE"
       aria-label="Apri Impostazioni e Database"
-      onClick={() => navigateTo("agents")}
+      onClick={openDatabaseSettings}
       style={{
         ...baseBtn,
-        ...(databaseAdminTabs.includes(tab) ? activeBtn : {}),
         padding: "8px 12px",
-        fontSize: 20,
+        fontSize: 22,
         lineHeight: 1,
+        color: "#64748b",
+        background: "#e2e8f0",
+        border: "1px solid #cbd5e1",
+        fontFamily: "Arial, 'Segoe UI Symbol', sans-serif",
+        fontWeight: 900,
       }}
     >
-      ⚙️
+      ⚙
     </button>
   )}
 </div>
