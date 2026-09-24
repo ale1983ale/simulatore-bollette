@@ -1075,10 +1075,12 @@ export default function Recruiting({
   initialSection = "contacts",
   contactScope = "internal",
   contactsOnly = false,
+  hideNavigation = false,
 }: {
   initialSection?: RecruitingSection;
   contactScope?: RecruitingContactScope;
   contactsOnly?: boolean;
+  hideNavigation?: boolean;
 }) {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [section, setSection] = useState<RecruitingSection>(
@@ -5210,7 +5212,7 @@ export default function Recruiting({
           padding: 18px;
         }
       `}</style>
-      {!contactsOnly && (
+      {!contactsOnly && !hideNavigation && (
         <>
       <div style={cardStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -5280,7 +5282,7 @@ export default function Recruiting({
               border: "1px solid #93c5fd",
             }}
           >
-            SINCRONIZZAZIONE HR SPECIALIST
+            SALA D'ATTESA HR
             {hrSyncPendingCount > 0 && (
               <span
                 style={{
@@ -5323,20 +5325,6 @@ export default function Recruiting({
             GESTIONE RECRUITING
           </button>
 
-          <button
-            type="button"
-            onClick={() => setSection("crm_management")}
-            style={{
-              ...buttonStyle,
-              background:
-                section === "crm_management" ? "#0f766e" : "white",
-              color:
-                section === "crm_management" ? "white" : "#0f766e",
-              border: "1px solid #5eead4",
-            }}
-          >
-            GESTIONE CRM
-          </button>
         </div>
       </div>
 
