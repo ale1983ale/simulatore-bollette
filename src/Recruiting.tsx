@@ -485,29 +485,40 @@ async function geocodeRecruitingCandidateZone(zone: string) {
     return Array.isArray(rows) ? rows : [];
   };
 
-  // Prima prova: ricerca strutturata come città/comune.
+  const addCommonParams = (url: URL) => {
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("countrycodes", "it");
+    url.searchParams.set("limit", "20");
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("namedetails", "1");
+    url.searchParams.set("extratags", "1");
+  };
+
+  // Prima prova: ricerca strutturata come città/comune italiano.
   const structuredUrl = new URL("https://nominatim.openstreetmap.org/search");
-  structuredUrl.searchParams.set("format", "jsonv2");
+  addCommonParams(structuredUrl);
   structuredUrl.searchParams.set("city", query);
   structuredUrl.searchParams.set("country", "Italia");
-  structuredUrl.searchParams.set("countrycodes", "it");
-  structuredUrl.searchParams.set("limit", "8");
-  structuredUrl.searchParams.set("addressdetails", "1");
-  structuredUrl.searchParams.set("namedetails", "1");
 
   let rows = await fetchRows(structuredUrl);
 
-  // Fallback: ricerca libera più ampia se la query strutturata non trova nulla.
-  if (!rows.length) {
-    const fallbackUrl = new URL("https://nominatim.openstreetmap.org/search");
-    fallbackUrl.searchParams.set("format", "jsonv2");
-    fallbackUrl.searchParams.set("q", `${query}, Italia`);
-    fallbackUrl.searchParams.set("countrycodes", "it");
-    fallbackUrl.searchParams.set("limit", "12");
-    fallbackUrl.searchParams.set("addressdetails", "1");
-    fallbackUrl.searchParams.set("namedetails", "1");
-    rows = await fetchRows(fallbackUrl);
-  }
+  // Aggiunge anche una ricerca libera: alcuni comuni italiani vengono
+  // classificati da OpenStreetMap come municipality/boundary e non come city.
+  const fallbackUrl = new URL("https://nominatim.openstreetmap.org/search");
+  addCommonParams(fallbackUrl);
+  fallbackUrl.searchParams.set("q", `${query}, Italia`);
+  const fallbackRows = await fetchRows(fallbackUrl);
+
+  // Unisce i risultati eliminando i duplicati.
+  const byPlaceId = new Map<string, any>();
+  [...rows, ...fallbackRows].forEach((row: any) => {
+    const key = String(
+      row?.place_id ||
+        `${row?.lat || ""}|${row?.lon || ""}|${row?.display_name || ""}`
+    );
+    if (!byPlaceId.has(key)) byPlaceId.set(key, row);
+  });
+  rows = Array.from(byPlaceId.values());
 
   if (!rows.length) {
     return {
@@ -522,14 +533,22 @@ async function geocodeRecruitingCandidateZone(zone: string) {
   const scoredRows = rows
     .map((row: any) => {
       const address = row?.address || {};
-      const names = [
+      const mainLocalityNames = [
         address.city,
         address.town,
-        address.village,
         address.municipality,
-        address.hamlet,
         row?.name,
         row?.namedetails?.name,
+      ]
+        .filter(Boolean)
+        .map((value: string) => normalizePlaceName(value));
+
+      const minorLocalityNames = [
+        address.village,
+        address.hamlet,
+        address.suburb,
+        address.quarter,
+        address.neighbourhood,
       ]
         .filter(Boolean)
         .map((value: string) => normalizePlaceName(value));
@@ -538,29 +557,78 @@ async function geocodeRecruitingCandidateZone(zone: string) {
         String(row?.addresstype || row?.type || "")
       );
 
+      const placeRank = Number(row?.place_rank || 0);
+      const importance = Number(row?.importance || 0);
+      const population = Number(
+        row?.extratags?.population ||
+          row?.namedetails?.population ||
+          0
+      );
+
       let score = 0;
 
-      if (names.some((name: string) => name === exactNeedle)) score += 100;
-      if (names.some((name: string) => name.startsWith(exactNeedle))) score += 35;
-
-      if (
-        ["city", "town", "village", "municipality"].includes(addressType)
+      // Il nome deve corrispondere soprattutto alla città/comune, non a una
+      // frazione omonima. Questo evita casi come PRATO -> località in provincia
+      // di Udine invece del Comune di Prato (PO).
+      if (mainLocalityNames.some((name: string) => name === exactNeedle)) {
+        score += 220;
+      } else if (
+        mainLocalityNames.some((name: string) =>
+          name.startsWith(exactNeedle)
+        )
       ) {
-        score += 30;
+        score += 90;
       }
 
-      if (
-        ["county", "state district", "province", "provincia"].includes(
+      if (minorLocalityNames.some((name: string) => name === exactNeedle)) {
+        score += 35;
+      }
+
+      if (addressType === "city") score += 110;
+      else if (addressType === "town") score += 90;
+      else if (addressType === "municipality") score += 85;
+      else if (addressType === "village") score += 25;
+      else if (addressType === "hamlet") score -= 25;
+      else if (
+        ["suburb", "quarter", "neighbourhood", "locality"].includes(
           addressType
         )
       ) {
-        score -= 80;
+        score -= 45;
       }
 
-      if (row?.class === "place") score += 20;
-      if (row?.class === "boundary" && addressType === "administrative") {
-        score -= 10;
+      if (row?.class === "place") score += 25;
+
+      if (
+        row?.class === "boundary" &&
+        addressType === "administrative"
+      ) {
+        // Un confine amministrativo può essere il Comune corretto: non va
+        // scartato, ma deve avere il nome esatto per competere con una città.
+        if (
+          mainLocalityNames.some(
+            (name: string) => name === exactNeedle
+          )
+        ) {
+          score += 75;
+        } else {
+          score -= 35;
+        }
       }
+
+      // Nominatim assegna "importance" maggiore ai centri principali.
+      // Serve come spareggio robusto fra località omonime.
+      if (Number.isFinite(importance)) {
+        score += importance * 120;
+      }
+
+      if (Number.isFinite(population) && population > 0) {
+        score += Math.min(55, Math.log10(population + 1) * 8);
+      }
+
+      // I centri urbani/comuni hanno in genere rank più forte delle frazioni.
+      if (placeRank > 0 && placeRank <= 16) score += 25;
+      else if (placeRank >= 21) score -= 10;
 
       return { row, score };
     })
