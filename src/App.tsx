@@ -842,12 +842,14 @@ function SaveSimulationModal({
   open,
   type,
   initialName,
+  showAgentAssociation,
   onClose,
   onConfirm,
 }: {
   open: boolean;
   type: SavedSimulationType;
   initialName: string;
+  showAgentAssociation: boolean;
   onClose: () => void;
   onConfirm: (
     customerName: string,
@@ -869,8 +871,14 @@ function SaveSimulationModal({
     setAgentChoice("");
     setCustomAgent("");
     setError("");
-    setLoadingAgents(true);
 
+    if (!showAgentAssociation) {
+      setAgentOptions([]);
+      setLoadingAgents(false);
+      return;
+    }
+
+    setLoadingAgents(true);
     let cancelled = false;
 
     void loadSimulationAgentOptions()
@@ -884,7 +892,7 @@ function SaveSimulationModal({
     return () => {
       cancelled = true;
     };
-  }, [open, initialName, type]);
+  }, [open, initialName, type, showAgentAssociation]);
 
   if (!open) return null;
 
@@ -898,12 +906,14 @@ function SaveSimulationModal({
       return;
     }
 
-    const cleanAgent =
-      agentChoice === "__ALTRO__"
+    const cleanAgent = showAgentAssociation
+      ? agentChoice === "__ALTRO__"
         ? customAgent.trim()
-        : agentChoice.trim();
+        : agentChoice.trim()
+      : "";
 
     if (
+      showAgentAssociation &&
       agentChoice === "__ALTRO__" &&
       !cleanAgent
     ) {
@@ -980,7 +990,9 @@ function SaveSimulationModal({
               color: "#64748b",
             }}
           >
-            Il nome cliente è obbligatorio. L'agente associato è facoltativo.
+            {showAgentAssociation
+              ? "Il nome cliente è obbligatorio. L'agente associato è facoltativo."
+              : "Il nome cliente è obbligatorio."}
           </div>
         </div>
 
@@ -1011,49 +1023,51 @@ function SaveSimulationModal({
           />
         </label>
 
-        <label
-          style={{
-            display: "grid",
-            gap: 5,
-            fontWeight: 800,
-            color: "#334155",
-          }}
-        >
-          Agente associato
-          <select
-            value={agentChoice}
-            disabled={loadingAgents}
-            onChange={(event) => {
-              setAgentChoice(event.target.value);
-              if (event.target.value !== "__ALTRO__") {
-                setCustomAgent("");
-              }
-            }}
+        {showAgentAssociation && (
+          <label
             style={{
-              width: "100%",
-              boxSizing: "border-box",
-              border: "1px solid #cbd5e1",
-              borderRadius: 10,
-              padding: "10px 12px",
-              fontSize: 15,
-              background: "white",
+              display: "grid",
+              gap: 5,
+              fontWeight: 800,
+              color: "#334155",
             }}
           >
-            <option value="">
-              {loadingAgents
-                ? "Carico nominativi..."
-                : "Nessun agente associato"}
-            </option>
-            {agentOptions.map((agent) => (
-              <option key={agent} value={agent}>
-                {agent}
+            Agente associato
+            <select
+              value={agentChoice}
+              disabled={loadingAgents}
+              onChange={(event) => {
+                setAgentChoice(event.target.value);
+                if (event.target.value !== "__ALTRO__") {
+                  setCustomAgent("");
+                }
+              }}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                border: "1px solid #cbd5e1",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 15,
+                background: "white",
+              }}
+            >
+              <option value="">
+                {loadingAgents
+                  ? "Carico nominativi..."
+                  : "Nessun agente associato"}
               </option>
-            ))}
-            <option value="__ALTRO__">ALTRO</option>
-          </select>
-        </label>
+              {agentOptions.map((agent) => (
+                <option key={agent} value={agent}>
+                  {agent}
+                </option>
+              ))}
+              <option value="__ALTRO__">ALTRO</option>
+            </select>
+          </label>
+        )}
 
-        {agentChoice === "__ALTRO__" && (
+        {showAgentAssociation && agentChoice === "__ALTRO__" && (
           <label
             style={{
               display: "grid",
@@ -2250,10 +2264,12 @@ function Energia({
   punPsvRows,
   energyOffers,
   dispCpRows,
+  showAgentAssociation,
 }: {
   punPsvRows: PunPsvRow[];
   energyOffers: EnergyOffer[];
   dispCpRows: DispCpRow[];
+  showAgentAssociation: boolean;
 }) {
   const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
 
@@ -3602,6 +3618,7 @@ Base suggerito
       open={energySaveConfirmOpen}
       type="energy"
       initialName={s.nome}
+      showAgentAssociation={showAgentAssociation}
       onClose={() => setEnergySaveConfirmOpen(false)}
       onConfirm={confirmEnergySimulationSave}
     />
@@ -3621,10 +3638,12 @@ function Gas({
   punPsvRows,
   gasOffers,
   gasAcciseSettings,
+  showAgentAssociation,
 }: {
   punPsvRows: PunPsvRow[];
   gasOffers: GasOffer[];
   gasAcciseSettings: GasAcciseSettings;
+  showAgentAssociation: boolean;
 }) {
   const visibleGasOffers = gasOffers.filter((offer) => offer.visibile !== false);
 
@@ -4711,6 +4730,7 @@ border: "1px solid #bfd8f6",
         open={gasSaveConfirmOpen}
         type="gas"
         initialName={s.nome}
+        showAgentAssociation={showAgentAssociation}
         onClose={() => setGasSaveConfirmOpen(false)}
         onConfirm={confirmGasSimulationSave}
       />
@@ -9031,6 +9051,7 @@ if (!agentSession && !adminSession) {
       punPsvRows={punPsvRows}
       energyOffers={energyOffers}
       dispCpRows={dispCpRows}
+      showAgentAssociation={Boolean(adminSession)}
     />
   </>
 ) : tab === "gas" ? (
@@ -9045,6 +9066,7 @@ if (!agentSession && !adminSession) {
       punPsvRows={punPsvRows}
       gasOffers={gasOffers}
       gasAcciseSettings={gasAcciseSettings}
+      showAgentAssociation={Boolean(adminSession)}
     />
   </>
 ) : tab === "report" ? (
