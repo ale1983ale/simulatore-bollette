@@ -364,6 +364,12 @@
   background: linear-gradient(135deg, #f8fafc 0%, #dfe7f1 100%);
 }
 
+.ge-card-settings .ge-dashboard-card__icon {
+  color: #64748b;
+  font-family: Arial, "Segoe UI Symbol", sans-serif;
+  font-weight: 900;
+}
+
 .ge-card-agent-report {
   color: #a85a00;
   background: linear-gradient(135deg, #fff8dc 0%, #ffe69a 100%);
@@ -984,26 +990,35 @@ table {
   }
 
   .ge-card-waiting {
-    padding-right: 52px !important;
+    padding-right: 10px !important;
+    padding-bottom: 34px !important;
   }
 
   .ge-waiting-badges {
-    right: 6px;
-    gap: 3px;
+    top: auto;
+    right: 7px;
+    bottom: 7px;
+    transform: none;
+    flex-direction: row;
+    gap: 5px;
   }
 
   .ge-waiting-badge--incoming {
-    min-width: 35px;
-    height: 35px;
-    padding: 0 7px;
-    font-size: 16px;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    font-size: 14px;
   }
 
   .ge-waiting-badge--outgoing {
-    min-width: 25px;
-    height: 25px;
+    min-width: 27px;
+    height: 27px;
     padding: 0 5px;
-    font-size: 11px;
+    font-size: 12px;
+  }
+
+  .ge-card-waiting .ge-dashboard-card__body {
+    padding-right: 0;
   }
 
   .ge-card-waiting .ge-dashboard-card__title {
