@@ -5,12 +5,18 @@
   --ge-border: #dbe5f2;
 }
 
+.ge-brand-shell {
+  position: relative;
+  width: 100%;
+  margin: 0 0 12px;
+}
+
 .ge-brand {
   width: 100%;
   border: 0;
   border-radius: 18px;
-  padding: 18px 26px;
-  margin: 0 0 12px;
+  padding: 18px 100px 18px 26px;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -42,6 +48,60 @@
   font-weight: 800;
   letter-spacing: .3em;
   opacity: .92;
+}
+
+.ge-brand-waiting {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  width: 66px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ge-brand-waiting__incoming,
+.ge-brand-waiting__outgoing {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 950;
+  line-height: 1;
+  border: 2px solid rgba(255,255,255,.95);
+  box-shadow: 0 5px 14px rgba(15,23,42,.22);
+  font-variant-numeric: tabular-nums;
+}
+
+.ge-brand-waiting__incoming {
+  top: 0;
+  right: 0;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  background: #22c55e;
+  font-size: 19px;
+}
+
+.ge-brand-waiting__outgoing {
+  left: 0;
+  bottom: 0;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 6px;
+  background: #ef4444;
+  font-size: 10px;
+}
+
+.ge-brand-waiting:hover .ge-brand-waiting__incoming,
+.ge-brand-waiting:hover .ge-brand-waiting__outgoing {
+  filter: brightness(1.05);
 }
 
 .ge-dashboard {
@@ -229,13 +289,18 @@
   background: linear-gradient(135deg, #f4efff 0%, #e5d8ff 100%);
 }
 
+.ge-card-waiting {
+  padding-right: 66px !important;
+}
+
 .ge-waiting-badges {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 50%;
+  right: 9px;
   z-index: 4;
-  width: 58px;
+  width: 50px;
   height: 48px;
+  transform: translateY(-50%);
   pointer-events: none;
 }
 
@@ -247,36 +312,36 @@
   border-radius: 999px;
   font-weight: 950;
   line-height: 1;
-  border: 2px solid rgba(255,255,255,.95);
-  box-shadow: 0 5px 13px rgba(15,23,42,.16);
+  border: 2px solid rgba(255,255,255,.98);
+  box-shadow: 0 5px 13px rgba(15,23,42,.15);
   font-variant-numeric: tabular-nums;
 }
 
 .ge-waiting-badge--incoming {
   top: 0;
   right: 0;
-  min-width: 40px;
-  height: 40px;
-  padding: 0 9px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 8px;
   background: #22c55e;
   color: #fff;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .ge-waiting-badge--outgoing {
-  right: 34px;
+  left: 0;
   bottom: 0;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
   background: #ef4444;
   color: #fff;
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .ge-waiting-badge:not(.ge-waiting-badge--has-value) {
-  opacity: .35;
-  filter: saturate(.45);
+  opacity: .3;
+  filter: saturate(.4);
 }
 
 .ge-card-calendar--wide {
@@ -882,26 +947,58 @@ table {
     font-size: 10px;
   }
 
-  .ge-waiting-badges {
-    top: 5px;
-    right: 5px;
-    width: 50px;
-    height: 42px;
+  .ge-brand {
+    padding-right: 80px;
   }
 
-  .ge-waiting-badge--incoming {
-    min-width: 35px;
-    height: 35px;
+  .ge-brand-waiting {
+    right: 11px;
+    width: 55px;
+    height: 46px;
+  }
+
+  .ge-brand-waiting__incoming {
+    min-width: 38px;
+    height: 38px;
     padding: 0 8px;
     font-size: 16px;
   }
 
-  .ge-waiting-badge--outgoing {
-    right: 30px;
-    min-width: 21px;
-    height: 21px;
+  .ge-brand-waiting__outgoing {
+    min-width: 22px;
+    height: 22px;
     padding: 0 5px;
     font-size: 9px;
+  }
+
+  .ge-card-waiting {
+    padding-right: 56px !important;
+  }
+
+  .ge-waiting-badges {
+    right: 7px;
+    width: 43px;
+    height: 42px;
+  }
+
+  .ge-waiting-badge--incoming {
+    min-width: 33px;
+    height: 33px;
+    padding: 0 7px;
+    font-size: 15px;
+  }
+
+  .ge-waiting-badge--outgoing {
+    min-width: 19px;
+    height: 19px;
+    padding: 0 4px;
+    font-size: 8px;
+  }
+
+  .ge-card-waiting .ge-dashboard-card__title {
+    font-size: 11px;
+    line-height: 1.08;
+    white-space: normal;
   }
 
   .ge-dashboard-secondary--admin .ge-card-calendar--wide {
