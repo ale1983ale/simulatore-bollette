@@ -7682,13 +7682,26 @@ export default function App() {
         ? new URLSearchParams(window.location.search).get("tab")
         : "";
 
+    // L'unica apertura diretta consentita è il link delle email
+    // della Sala d'attesa. In tutti gli altri casi l'app parte
+    // sempre dalla DASHBOARD pulita.
     if (requestedTab === "recruitingWaiting") {
       return "recruitingWaiting";
     }
 
-    return localStorage.getItem("app_tab") || "dashboard";
+    return "dashboard";
   });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const requestedTab =
+      new URLSearchParams(window.location.search).get("tab");
+
+    if (requestedTab === "recruitingWaiting") return;
+
+    setAdminMenuOpen(false);
+    localStorage.setItem("app_tab", "dashboard");
+  }, []);
 
   const navigateTo = (nextTab: string) => {
     setAdminMenuOpen(false);
@@ -7699,11 +7712,18 @@ export default function App() {
   const openDatabaseSettings = () => {
     setAdminMenuOpen(false);
     setTab("agents");
-    localStorage.setItem("app_tab", "agents");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const toggleAdminMenu = () => {
+    if (tab !== "dashboard") {
+      setTab("dashboard");
+      localStorage.setItem("app_tab", "dashboard");
+      setAdminMenuOpen(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setAdminMenuOpen((current) => !current);
   };
 
@@ -8536,7 +8556,7 @@ const renderAdminContent = () => {
         minWidth: 0,
       }}
     >
-      {adminMenuOpen && !databaseAdminTabs.includes(tab) && (
+      {adminMenuOpen && tab === "dashboard" && (
       <div
         className="ge-admin-nav"
         style={{
