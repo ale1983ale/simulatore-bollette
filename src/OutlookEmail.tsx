@@ -337,6 +337,7 @@ async function buildNonAssignedWorkbook(
 
 export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
+  const [overlayTop, setOverlayTop] = useState(0);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [files, setFiles] = useState<File[]>([]);
@@ -364,6 +365,33 @@ export default function OutlookEmail() {
     return () =>
       window.removeEventListener("open-outlook-email", onOpenEmail);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const positionOverlay = () => {
+      const brand = document.querySelector(
+        ".ge-brand-shell"
+      ) as HTMLElement | null;
+
+      if (!brand) {
+        setOverlayTop(0);
+        return;
+      }
+
+      const rect = brand.getBoundingClientRect();
+      setOverlayTop(Math.max(0, Math.ceil(rect.bottom + 8)));
+    };
+
+    window.scrollTo({ top: 0, behavior: "auto" });
+    const frame = window.requestAnimationFrame(positionOverlay);
+    window.addEventListener("resize", positionOverlay);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", positionOverlay);
+    };
+  }, [open]);
 
   useEffect(() => {
     const onToggleRemoved = (event: Event) => {
@@ -902,7 +930,20 @@ export default function OutlookEmail() {
       )}
 
       {open && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f8fafc", overflow: "auto", color: "#0f172a" }}>
+        <div
+          style={{
+            position: "fixed",
+            top: overlayTop,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            background: "#f8fafc",
+            overflow: "auto",
+            color: "#0f172a",
+            borderTop: "1px solid #dbe5f2",
+          }}
+        >
           <div style={{ maxWidth: 1180, margin: "0 auto", padding: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap" }}>
               <div
