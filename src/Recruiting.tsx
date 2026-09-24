@@ -7057,15 +7057,15 @@ export default function Recruiting({
           <div
             style={{
               ...cardStyle,
-              borderColor: googleCalendarConnected
-                ? "#86efac"
-                : googleCalendarNeedsReconnect
+              borderColor: googleCalendarNeedsReconnect
                 ? "#facc15"
+                : googleCalendarConnected
+                ? "#86efac"
                 : "#bfdbfe",
-              background: googleCalendarConnected
-                ? "#f0fdf4"
-                : googleCalendarNeedsReconnect
+              background: googleCalendarNeedsReconnect
                 ? "#fefce8"
+                : googleCalendarConnected
+                ? "#f0fdf4"
                 : "#eff6ff",
             }}
           >
@@ -7100,15 +7100,19 @@ export default function Recruiting({
                 <div
                   style={{
                     marginTop: 5,
-                    color: googleCalendarConnected ? "#166534" : "#1e40af",
+                    color: googleCalendarNeedsReconnect
+                      ? "#a16207"
+                      : googleCalendarConnected
+                      ? "#166534"
+                      : "#1e40af",
                     fontSize: 13,
                     fontWeight: 800,
                   }}
                 >
-                  {googleCalendarConnected
-                    ? "● COLLEGATO · ogni attività viene sincronizzata automaticamente nel proprio calendario HR."
-                    : googleCalendarNeedsReconnect
-                    ? "⚠ RICOLLEGA GOOGLE CALENDAR UNA VOLTA per autorizzare la creazione dei calendari separati HR."
+                  {googleCalendarNeedsReconnect
+                    ? "⚠ RICOLLEGA GOOGLE UNA VOLTA per autorizzare anche l'invio delle notifiche email orarie della Sala d'attesa."
+                    : googleCalendarConnected
+                    ? "● COLLEGATO · calendario HR e autorizzazioni Google attive."
                     : googleCalendarConfigured
                     ? "○ NON COLLEGATO"
                     : "Configurazione Google Calendar non disponibile."}
@@ -7170,7 +7174,8 @@ export default function Recruiting({
                   flexWrap: "wrap",
                 }}
               >
-                {!googleCalendarConnected ? (
+                {(!googleCalendarConnected ||
+                  googleCalendarNeedsReconnect) ? (
                   <button
                     type="button"
                     disabled={
@@ -7192,7 +7197,7 @@ export default function Recruiting({
                     {googleCalendarBusy
                       ? "COLLEGAMENTO..."
                       : googleCalendarNeedsReconnect
-                      ? "RICOLLEGA GOOGLE CALENDAR"
+                      ? "RICOLLEGA GOOGLE"
                       : "COLLEGA GOOGLE CALENDAR"}
                   </button>
                 ) : (
