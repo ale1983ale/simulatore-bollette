@@ -1698,7 +1698,17 @@ export default function Recruiting({
     setEditCompanyName("");
     setEditPhone(selectedCandidate.phone);
     setEditEmail(selectedCandidate.email);
-  }, [selectedCandidateId, selectedCandidate?.fullName]);
+
+    // Lo stato mostrato nel blocco Note deve sempre partire dall'ultimo
+    // stato effettivamente salvato per questo contatto.
+    setNoteStatusDraft(
+      selectedCandidate.status || "DA_CHIAMARE"
+    );
+  }, [
+    selectedCandidateId,
+    selectedCandidate?.fullName,
+    selectedCandidate?.status,
+  ]);
 
   const normalizeFilterValue = (value: string) =>
     String(value || "")
@@ -2286,7 +2296,7 @@ export default function Recruiting({
           "Lo stato selezionato è già attivo: nessuno stato è stato aggiunto alla sincronizzazione HR."
         );
       }
-      setNoteStatusDraft("DA_CHIAMARE");
+      setNoteStatusDraft(nextStatus);
       return;
     }
 
@@ -2334,7 +2344,7 @@ export default function Recruiting({
       return;
     }
 
-    setNoteStatusDraft("DA_CHIAMARE");
+    setNoteStatusDraft(nextStatus);
 
     if (sendToHr) {
       try {
@@ -2678,7 +2688,9 @@ export default function Recruiting({
       setNoteText("");
       setNoteDate(localDateKey());
       setNoteCalledByMe(false);
-      setNoteStatusDraft("DA_CHIAMARE");
+      setNoteStatusDraft(
+        selectedCandidate.status || "DA_CHIAMARE"
+      );
       await loadAll(ctx);
       setMessage(
         sendToHr
@@ -2687,6 +2699,124 @@ export default function Recruiting({
       );
     } catch (error: any) {
       setMessage("Errore nel salvataggio della nota: " + (error?.message || error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addNoteAndStatusToHr = async () => {
+    if (!ctx || !selectedCandidate) return;
+    if (!noteText.trim()) {
+      setMessage("Scrivi la nota prima di salvarla.");
+      return;
+    }
+
+    const previousStatus =
+      selectedCandidate.status || "DA_CHIAMARE";
+    const nextStatus =
+      noteStatusDraft || previousStatus;
+
+    setBusy(true);
+
+    let insertedNoteId = "";
+    let insertedStatusQueueId = "";
+
+    try {
+      // 1. La nota viene salvata normalmente e marcata come da
+      // sincronizzare su HR.
+      const { data: noteData, error: noteError } = await ctx.client
+        .from("recruiting_notes")
+        .insert({
+          owner_key: ctx.ownerKey,
+          candidate_id: selectedCandidate.id,
+          note_date: noteDate,
+          note_text: noteText.trim(),
+          called_by_me: noteCalledByMe,
+          hr_sync_pending: true,
+        })
+        .select("id")
+        .single();
+
+      if (noteError) throw noteError;
+      insertedNoteId = String(noteData.id);
+
+      // 2. Inserisce SEMPRE anche lo stato scelto nella coda HR.
+      // Anche se coincide già con lo stato corrente, il pulsante specifico
+      // serve proprio a ricordare all'utente di sincronizzare entrambi.
+      const { data: queueData, error: queueError } =
+        await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .insert({
+            owner_key: ctx.ownerKey,
+            candidate_id: selectedCandidate.id,
+            previous_status: previousStatus,
+            new_status: nextStatus,
+          })
+          .select("id")
+          .single();
+
+      if (queueError) throw queueError;
+      insertedStatusQueueId = String(queueData.id);
+
+      // 3. Aggiorna anche lo stato effettivo della scheda.
+      const statusUpdated = await updateCandidateStatus(
+        selectedCandidate,
+        nextStatus
+      );
+
+      if (!statusUpdated) {
+        if (insertedStatusQueueId) {
+          await ctx.client
+            .from("recruiting_hr_status_sync_queue")
+            .delete()
+            .eq("id", insertedStatusQueueId);
+        }
+        if (insertedNoteId) {
+          await ctx.client
+            .from("recruiting_notes")
+            .delete()
+            .eq("id", insertedNoteId);
+        }
+        return;
+      }
+
+      setNoteText("");
+      setNoteDate(localDateKey());
+      setNoteCalledByMe(false);
+      setNoteStatusDraft(nextStatus);
+
+      try {
+        await loadAll(ctx);
+      } catch (refreshError) {
+        console.error(
+          "NOTE + STATUS HR REFRESH ERROR:",
+          refreshError
+        );
+      }
+
+      setMessage(
+        "Nota e stato aggiunti alla sincronizzazione HR: troverai entrambi in NOTE E STATI DA SINCRONIZZARE SU HR SPECIALIST."
+      );
+    } catch (error: any) {
+      // Se una delle due registrazioni non riesce, evita di lasciare
+      // una sincronizzazione incompleta.
+      if (insertedStatusQueueId) {
+        await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .delete()
+          .eq("id", insertedStatusQueueId);
+      }
+      if (insertedNoteId) {
+        await ctx.client
+          .from("recruiting_notes")
+          .delete()
+          .eq("id", insertedNoteId);
+      }
+
+      setMessage(
+        "Errore nel salvataggio di nota e stato per HR: " +
+          (error?.message || error)
+      );
     } finally {
       setBusy(false);
     }
@@ -5913,11 +6043,11 @@ export default function Recruiting({
                       </div>
                       <div
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 10,
-                          flexWrap: "wrap",
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit,minmax(190px,1fr))",
+                          alignItems: "stretch",
+                          gap: 8,
                           marginTop: 9,
                         }}
                       >
@@ -5927,12 +6057,13 @@ export default function Recruiting({
                           onClick={() => void addNote(false)}
                           style={{
                             ...buttonStyle,
+                            minHeight: 42,
                             background: "#0f172a",
                             color: "white",
                             opacity: busy ? 0.6 : 1,
                           }}
                         >
-                          Aggiungi nota
+                          AGGIUNGI NOTA
                         </button>
 
                         <button
@@ -5941,13 +6072,31 @@ export default function Recruiting({
                           onClick={() => void addNote(true)}
                           style={{
                             ...buttonStyle,
-                            marginLeft: "auto",
+                            minHeight: 42,
                             background: "#2563eb",
                             color: "white",
                             opacity: busy ? 0.6 : 1,
                           }}
                         >
                           AGGIUNGI NOTA E SU HR
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={busy || !noteStatusDraft}
+                          onClick={() =>
+                            void addNoteAndStatusToHr()
+                          }
+                          style={{
+                            ...buttonStyle,
+                            minHeight: 42,
+                            background: "#7c3aed",
+                            color: "white",
+                            opacity:
+                              busy || !noteStatusDraft ? 0.6 : 1,
+                          }}
+                        >
+                          AGGIUNGI NOTA E STATO SU HR
                         </button>
                       </div>
 
