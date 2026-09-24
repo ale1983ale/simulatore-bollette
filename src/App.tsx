@@ -7540,20 +7540,30 @@ function AdminDashboard({
     <div className="ge-dashboard">
       <div className="ge-dashboard-primary ge-dashboard-primary--admin">
         <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />
-        <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="◆" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />
-        <DashboardCard title="PUN" description="Analizza e monitora i dati PUN." icon="▥" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />
-        <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="▦" className="ge-card-ateco" onClick={() => navigate("ateco")} />
+        <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />
+        <DashboardCard title="PUN" description="Analizza e monitora i dati PUN." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />
+        <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
         {!fullAccess && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
         {fullAccess && <>
-          <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="▣" className="ge-card-calendar ge-card-calendar--wide" compact onClick={() => navigate("calendarAdmin")} />
+          <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />
           <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="●●" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />
           <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />
-          <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="▥" className="ge-card-production" compact onClick={() => navigate("archive")} />
+          <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
           <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
         </>}
         <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />
+        {fullAccess && (
+          <DashboardCard
+            title="IMPOSTAZIONI E DATABASE"
+            description="Apri configurazioni, database e strumenti amministrativi."
+            icon="⚙️"
+            className="ge-card-settings"
+            compact
+            onClick={() => navigate("agents")}
+          />
+        )}
         {fullAccess && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
       </div>
     </div>
@@ -8226,7 +8236,7 @@ useEffect(() => {
   );
 }, [adminSession, tab]);
 
-  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement", "recruitingCrm"];
+  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingManagement", "recruitingCrm"];
   const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
@@ -8285,6 +8295,12 @@ useEffect(() => {
       title: "DATABASE · PUN / PSV",
       subtitle: "Aggiorna i valori PUN, PSV e i riferimenti di mercato.",
       icon: "▥",
+      variant: "database",
+    },
+    recruitingZones: {
+      title: "AGENTI / ZONE",
+      subtitle: "Gestisci macroaree, agenti attivi e zone della mappa Recruiting.",
+      icon: "⌖",
       variant: "database",
     },
     recruitingManagement: {
@@ -8643,6 +8659,17 @@ const renderAdminContent = () => {
           )}
 
           <button
+            onClick={() => setTab("recruitingZones")}
+            style={{
+              ...baseBtn,
+              padding: "9px 14px",
+              ...(tab === "recruitingZones" ? activeBtn : {}),
+            }}
+          >
+            AGENTI / ZONE
+          </button>
+
+          <button
             onClick={() => setTab("recruitingManagement")}
             style={{
               ...baseBtn,
@@ -8724,6 +8751,12 @@ const renderAdminContent = () => {
             <AdminUsersManager adminProfile={adminProfile} />
           )}
         </>
+      )}
+
+      {tab === "recruitingZones" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <RecruitingManagement />
+        </div>
       )}
 
       {tab === "recruitingManagement" && (
