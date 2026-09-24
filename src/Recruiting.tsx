@@ -6261,7 +6261,7 @@ export default function Recruiting({
                       <div style={{ minWidth: 0 }}>
                         <div
                           style={{
-                            fontWeight: 900,
+                            fontWeight: 700,
                             fontSize: 16,
                           }}
                         >
@@ -6273,7 +6273,7 @@ export default function Recruiting({
                             marginTop: 5,
                             color: "#dc2626",
                             fontSize: 12,
-                            fontWeight: 900,
+                            fontWeight: 700,
                           }}
                         >
                           <span>
@@ -6315,7 +6315,7 @@ export default function Recruiting({
                                   color: "#111827",
                                   textDecoration: "underline",
                                   fontSize: 12,
-                                  fontWeight: 800,
+                                  fontWeight: 700,
                                 }}
                               >
                                 {candidate.phone}
@@ -6377,7 +6377,7 @@ export default function Recruiting({
                           style={{
                             marginTop: 4,
                             fontSize: 12,
-                            fontWeight: 800,
+                            fontWeight: 700,
                           }}
                         >
                           Settore energia:{" "}
