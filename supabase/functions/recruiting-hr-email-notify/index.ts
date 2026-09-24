@@ -7,7 +7,8 @@ const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CALENDAR_CLIENT_ID") ?? "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CALENDAR_CLIENT_SECRET") ?? "";
 
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
-const APP_URL = "https://simulatore-bollette.vercel.app/";
+const WAITING_ROOM_URL =
+  "https://simulatore-bollette.vercel.app/?tab=recruitingWaiting";
 
 const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -61,10 +62,10 @@ function base64UrlUtf8(value: string) {
     .replace(/=+$/g, "");
 }
 
-async function loadExpectedCronSecret() {
+async function loadEmailConfig() {
   const { data, error } = await db
     .from("recruiting_hr_email_internal_config")
-    .select("cron_secret")
+    .select("cron_secret,recipient_email")
     .eq("id", 1)
     .maybeSingle();
 
@@ -72,7 +73,10 @@ async function loadExpectedCronSecret() {
     throw new Error("Configurazione notifiche email non disponibile.");
   }
 
-  return String(data.cron_secret);
+  return {
+    cronSecret: String(data.cron_secret),
+    recipientEmail: String(data.recipient_email || "").trim(),
+  };
 }
 
 async function getGoogleConnection(adminId: number) {
@@ -190,7 +194,7 @@ function buildEmail(recipient: string, candidates: any[]) {
     <ul style="padding-left:20px">${rows}</ul>
     ${more}
     <p style="margin-top:20px">
-      <a href="${APP_URL}" style="display:inline-block;background:#0f766e;color:white;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:700">
+      <a href="${WAITING_ROOM_URL}" style="display:inline-block;background:#0f766e;color:white;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:700">
         Apri la Sala d'attesa
       </a>
     </p>
@@ -305,18 +309,18 @@ async function logDelivery(
   }
 }
 
-async function notifyWaitingRoom() {
+async function notifyWaitingRoom(recipientEmail: string) {
   const { data: admins, error: adminsError } = await db
     .from("admin_users")
-    .select("id,username,email")
-    .not("email", "is", null);
+    .select("id,username,email");
 
   if (adminsError) throw adminsError;
 
   const results: any[] = [];
 
   for (const admin of admins || []) {
-    const recipient = String(admin.email || "").trim();
+    const recipient =
+      recipientEmail || String(admin.email || "").trim();
     const username = String(admin.username || "").trim();
 
     if (!recipient || !username) continue;
@@ -413,12 +417,12 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Metodo non supportato." }, 405);
     }
 
-    const expected = await loadExpectedCronSecret();
+    const config = await loadEmailConfig();
     const provided = String(
       req.headers.get("x-hr-email-cron-secret") || ""
     );
 
-    if (!provided || provided !== expected) {
+    if (!provided || provided !== config.cronSecret) {
       return json({ error: "Non autorizzato." }, 401);
     }
 
@@ -427,7 +431,9 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Azione non riconosciuta." }, 400);
     }
 
-    const results = await notifyWaitingRoom();
+    const results = await notifyWaitingRoom(
+      config.recipientEmail
+    );
     return json({ ok: true, results });
   } catch (error: any) {
     console.error("HR EMAIL NOTIFY ERROR:", error);
