@@ -1172,6 +1172,8 @@ export default function Recruiting({
     selectedCandidateId
   );
   const [contactEditMode, setContactEditMode] = useState(false);
+  const [deleteCandidatePromptOpen, setDeleteCandidatePromptOpen] =
+    useState(false);
   const [showStatusManager, setShowStatusManager] = useState(false);
   const [newStatusLabel, setNewStatusLabel] = useState("");
   const [newStatusColorKey, setNewStatusColorKey] = useState("slate");
@@ -3229,23 +3231,44 @@ export default function Recruiting({
     }
   };
 
-  const deleteCandidate = async () => {
+  const deleteCandidate = async (allowReimport: boolean) => {
     if (!ctx || !selectedCandidate) return;
-    if (!window.confirm(`Eliminare definitivamente ${selectedCandidate.fullName}?`)) return;
 
+    const candidateName = selectedCandidate.fullName;
+    setDeleteCandidatePromptOpen(false);
     setBusy(true);
+
     try {
-      const { error } = await ctx.client
-        .from("recruiting_candidates")
-        .delete()
-        .eq("id", selectedCandidate.id);
+      const { data, error } = await ctx.client.rpc(
+        "recruiting_delete_candidate",
+        {
+          p_candidate_id: selectedCandidate.id,
+          p_allow_reimport: allowReimport,
+        }
+      );
+
       if (error) throw error;
 
       setSelectedCandidateId(null);
       await loadAll(ctx);
-      setMessage("Contatto eliminato.");
+
+      if (allowReimport && data?.reimport_enabled) {
+        setMessage(
+          `${candidateName} eliminato. Alla prossima sincronizzazione HR potrà tornare in SALA D'ATTESA come nuovo nominativo da importare.`
+        );
+      } else if (allowReimport) {
+        setMessage(
+          `${candidateName} eliminato. Non risultava collegato a un nominativo importato da HR, quindi non c'è una reimportazione automatica da riattivare.`
+        );
+      } else {
+        setMessage(
+          `${candidateName} eliminato definitivamente: non verrà riproposto dalla sincronizzazione HR.`
+        );
+      }
     } catch (error: any) {
-      setMessage("Errore nell'eliminazione: " + (error?.message || error));
+      setMessage(
+        "Errore nell'eliminazione: " + (error?.message || error)
+      );
     } finally {
       setBusy(false);
     }
@@ -6314,7 +6337,7 @@ export default function Recruiting({
 
                         <button
                           type="button"
-                          onClick={() => void deleteCandidate()}
+                          onClick={() => setDeleteCandidatePromptOpen(true)}
                           style={{ ...buttonStyle, padding: "7px 10px", background: "#fee2e2", color: "#991b1b" }}
                         >
                           Elimina contatto
@@ -11134,6 +11157,116 @@ export default function Recruiting({
               l'Agenda del CRM e non modifica, cancella o cambia lo stato
               degli appuntamenti nel CRM aziendale. Le credenziali non
               vengono salvate nel browser o nel repository GitHub.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteCandidatePromptOpen && selectedCandidate && (
+        <div
+          className="recruiting-modal-backdrop"
+          onClick={() => {
+            if (!busy) setDeleteCandidatePromptOpen(false);
+          }}
+        >
+          <div
+            className="recruiting-modal"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(620px, 100%)" }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 8 }}>
+              Elimina {selectedCandidate.fullName}
+            </h3>
+
+            <div
+              style={{
+                color: "#475569",
+                lineHeight: 1.55,
+                marginBottom: 16,
+              }}
+            >
+              Scegli cosa deve succedere dopo l'eliminazione.
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deleteCandidate(false)}
+                style={{
+                  ...buttonStyle,
+                  padding: "12px 14px",
+                  background: "#b91c1c",
+                  color: "white",
+                  textAlign: "left",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                <div style={{ fontWeight: 950 }}>
+                  ELIMINA DEFINITIVAMENTE
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    opacity: 0.9,
+                  }}
+                >
+                  Il nominativo viene cancellato e non verrà riproposto
+                  dalla sincronizzazione HR.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void deleteCandidate(true)}
+                style={{
+                  ...buttonStyle,
+                  padding: "12px 14px",
+                  background: "#f59e0b",
+                  color: "#111827",
+                  textAlign: "left",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                <div style={{ fontWeight: 950 }}>
+                  ELIMINA E CONSENTI REIMPORTAZIONE
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  Se arriva da Performa/HR, alla prossima sincronizzazione
+                  potrà tornare in SALA D'ATTESA come nuovo nominativo.
+                </div>
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: 14,
+              }}
+            >
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setDeleteCandidatePromptOpen(false)}
+                style={{
+                  ...buttonStyle,
+                  background: "#e2e8f0",
+                  color: "#334155",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                ANNULLA
+              </button>
             </div>
           </div>
         </div>
