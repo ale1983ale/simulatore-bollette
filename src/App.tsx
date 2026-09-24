@@ -7689,22 +7689,13 @@ export default function App() {
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
   const navigateTo = (nextTab: string) => {
+    setAdminMenuOpen(false);
     setTab(nextTab);
-    if (nextTab === "dashboard") {
-      setAdminMenuOpen(false);
-    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const toggleAdminMenu = () => {
-    if (tab === "dashboard") {
-      setAdminMenuOpen((current) => !current);
-      return;
-    }
-
-    setTab("dashboard");
-    setAdminMenuOpen(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setAdminMenuOpen((current) => !current);
   };
 
   useEffect(() => {
@@ -7715,7 +7706,7 @@ export default function App() {
   }, [tab]);
 
   const openOutlookEmail = () => {
-    setAdminMenuOpen(true);
+    setAdminMenuOpen(false);
     window.dispatchEvent(new CustomEvent("open-outlook-email"));
   };
 
@@ -8246,13 +8237,13 @@ useEffect(() => {
     calendarAdmin: {
       title: "CALENDARIO",
       subtitle: "Gestisci attività, appuntamenti e sincronizzazioni.",
-      icon: "▣",
+      icon: "📅",
       variant: "calendar",
     },
     archive: {
       title: "DATI PRODUZIONE",
       subtitle: "Consulta produzione, recessi e copertura territoriale.",
-      icon: "▥",
+      icon: "🧮",
       variant: "production",
     },
     recruiting: {
@@ -8282,43 +8273,43 @@ useEffect(() => {
     agents: {
       title: "DATABASE",
       subtitle: "Gestisci agenti, utenti e configurazioni amministrative.",
-      icon: "◫",
+      icon: "⚙️",
       variant: "database",
     },
     listini: {
       title: "DATABASE · LISTINI",
       subtitle: "Gestisci listini, offerte e parametri commerciali.",
-      icon: "▦",
+      icon: "⚙️",
       variant: "database",
     },
     punpsvAdmin: {
       title: "DATABASE · PUN / PSV",
       subtitle: "Aggiorna i valori PUN, PSV e i riferimenti di mercato.",
-      icon: "▥",
+      icon: "⚙️",
       variant: "database",
     },
     recruitingZones: {
       title: "AGENTI / ZONE",
       subtitle: "Gestisci macroaree, agenti attivi e zone della mappa Recruiting.",
-      icon: "⌖",
+      icon: "⚙️",
       variant: "database",
     },
     recruitingManagement: {
       title: "GESTIONE RECRUITING",
       subtitle: "Configura stati, colori e impostazioni del recruiting.",
-      icon: "⚙",
+      icon: "⚙️",
       variant: "database",
     },
     recruitingCrm: {
       title: "GESTIONE CRM",
       subtitle: "Configura e sincronizza il CRM aziendale.",
-      icon: "↻",
+      icon: "⚙️",
       variant: "database",
     },
     adminUsers: {
       title: "DATABASE · ADMIN",
       subtitle: "Gestisci gli amministratori della web app.",
-      icon: "●",
+      icon: "⚙️",
       variant: "database",
     },
   };
@@ -8527,7 +8518,7 @@ const renderAdminContent = () => {
         minWidth: 0,
       }}
     >
-      {(tab !== "dashboard" || adminMenuOpen) && (
+      {adminMenuOpen && (
       <div
         className="ge-admin-nav"
         style={{
@@ -9025,9 +9016,7 @@ if (!agentSession && !adminSession) {
       onClick={toggleAdminMenu}
       style={{
         ...baseBtn,
-        ...((tab !== "dashboard" || adminMenuOpen)
-          ? activeBtn
-          : {}),
+        ...(adminMenuOpen ? activeBtn : {}),
       }}
     >
       Area Admin
@@ -9054,6 +9043,24 @@ if (!agentSession && !adminSession) {
     >
     ESCI
   </button>
+  )}
+
+  {adminSession && hasFullAdminAccess && (
+    <button
+      type="button"
+      title="IMPOSTAZIONI E DATABASE"
+      aria-label="Apri Impostazioni e Database"
+      onClick={() => navigateTo("agents")}
+      style={{
+        ...baseBtn,
+        ...(databaseAdminTabs.includes(tab) ? activeBtn : {}),
+        padding: "8px 12px",
+        fontSize: 20,
+        lineHeight: 1,
+      }}
+    >
+      ⚙️
+    </button>
   )}
 </div>
   
@@ -9083,7 +9090,7 @@ if (!agentSession && !adminSession) {
     <SectionHero
       title="GAS"
       subtitle="Simula una fattura di gas metano."
-      icon="◆"
+      icon="🔥"
       variant="gas"
     />
     <Gas
@@ -9108,7 +9115,7 @@ if (!agentSession && !adminSession) {
             <SectionHero
               title="ATECO"
               subtitle="Ricerca codici e verifica le principali agevolazioni fiscali."
-              icon="▦"
+              icon="🧾"
               variant="ateco"
             />
             <Ateco />
@@ -9126,7 +9133,7 @@ if (!agentSession && !adminSession) {
             <SectionHero
               title="PUN / PSV"
               subtitle="Andamento dei principali indici del mercato energetico."
-              icon="▥"
+              icon="📈"
               variant="pun"
             />
         
