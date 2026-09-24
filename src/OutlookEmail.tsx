@@ -841,6 +841,35 @@ export default function OutlookEmail() {
   const button: React.CSSProperties = { border: 0, borderRadius: 10, padding: "10px 14px", fontWeight: 700, cursor: "pointer" };
   const hasAssociationAlerts = (unassociatedSourceAgencies.length > 0 && !nonAssignedConfigured) || unmatchedManualFiles.length > 0 || splitWarnings.length > 0;
 
+  const renderRecipientEditButtons = () => (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {editingRecipients && (
+        <button
+          onClick={addAgent}
+          style={{
+            ...button,
+            background: "#dcfce7",
+            color: "#166534",
+            padding: "7px 11px",
+          }}
+        >
+          + Aggiungi nominativo
+        </button>
+      )}
+      <button
+        onClick={() => setEditingRecipients((value) => !value)}
+        style={{
+          ...button,
+          background: editingRecipients ? "#16a34a" : "#e2e8f0",
+          color: editingRecipients ? "white" : "#0f172a",
+          padding: "7px 11px",
+        }}
+      >
+        {editingRecipients ? "✓ Fine modifica" : "✏️ Modifica"}
+      </button>
+    </div>
+  );
+
   return (
     <>
       {portalHost && createPortal(
@@ -940,10 +969,7 @@ export default function OutlookEmail() {
                   <strong>4. Controllo abbinamenti</strong>
                   <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>{readyRows.length} email pronte. I nominativi senza file associato vengono esclusi.</div>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {editingRecipients && <button onClick={addAgent} style={{ ...button, background: "#dcfce7", color: "#166534", padding: "7px 11px" }}>+ Aggiungi nominativo</button>}
-                  <button onClick={() => setEditingRecipients((value) => !value)} style={{ ...button, background: editingRecipients ? "#16a34a" : "#e2e8f0", color: editingRecipients ? "white" : "#0f172a", padding: "7px 11px" }}>{editingRecipients ? "✓ Fine modifica" : "✏️ Modifica"}</button>
-                </div>
+                {renderRecipientEditButtons()}
               </div>
 
               <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: 14 }}>
@@ -963,6 +989,16 @@ export default function OutlookEmail() {
                   {!matched.length && <tr><td colSpan={editingRecipients ? 5 : 4} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>Nessun nominativo presente.</td></tr>}
                 </tbody>
               </table>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: 12,
+                }}
+              >
+                {renderRecipientEditButtons()}
+              </div>
             </div>
 
             {notice && <div style={{ ...card, marginBottom: 16, background: "#eff6ff", borderColor: "#bfdbfe" }}>{notice}</div>}
