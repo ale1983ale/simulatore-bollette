@@ -6978,23 +6978,67 @@ export default function Recruiting({
                               <strong>{formatDate(event.eventDate)}</strong>
                               {event.eventTime && <> · {formatTime(event.eventTime)}</>}
                               <div>{eventDisplayLabel(event)}</div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openEventModal(event, "edit")
-                                }
+                              <div
                                 style={{
-                                  ...buttonStyle,
+                                  display: "flex",
+                                  gap: 6,
+                                  flexWrap: "wrap",
                                   marginTop: 6,
-                                  padding: "5px 8px",
-                                  background: "#fff",
-                                  color: "#c2410c",
-                                  border: "1px solid #fdba74",
-                                  fontSize: 10,
                                 }}
                               >
-                                MODIFICA
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openEventModal(event, "edit")
+                                  }
+                                  style={{
+                                    ...buttonStyle,
+                                    padding: "5px 8px",
+                                    background: "#fff",
+                                    color: "#c2410c",
+                                    border: "1px solid #fdba74",
+                                    fontSize: 10,
+                                  }}
+                                >
+                                  MODIFICA
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void toggleEventCompleted(event)
+                                  }
+                                  style={{
+                                    ...buttonStyle,
+                                    padding: "5px 8px",
+                                    background: "#16a34a",
+                                    color: "#fff",
+                                    border: "1px solid #16a34a",
+                                    fontSize: 10,
+                                    opacity: busy ? 0.6 : 1,
+                                  }}
+                                >
+                                  FATTO
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void deleteEvent(event)
+                                  }
+                                  style={{
+                                    ...buttonStyle,
+                                    padding: "5px 8px",
+                                    background: "#fff",
+                                    color: "#b91c1c",
+                                    border: "1px solid #ef4444",
+                                    fontSize: 10,
+                                    opacity: busy ? 0.6 : 1,
+                                  }}
+                                >
+                                  ELIMINA
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
