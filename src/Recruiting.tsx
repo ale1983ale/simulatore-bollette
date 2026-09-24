@@ -1157,12 +1157,8 @@ export default function Recruiting({
   const [calendarSearchFilter, setCalendarSearchFilter] = useState("");
   const [calendarCandidateFilter, setCalendarCandidateFilter] = useState("");
   const [calendarTypeFilter, setCalendarTypeFilter] = useState<"" | EventType>("");
-  const [googlePanelOpen, setGooglePanelOpen] = useState(
-    () => typeof window !== "undefined" && window.innerWidth > 720
-  );
-  const [newActivityPanelOpen, setNewActivityPanelOpen] = useState(
-    () => typeof window !== "undefined" && window.innerWidth > 720
-  );
+  const [googlePanelOpen, setGooglePanelOpen] = useState(false);
+  const [newActivityPanelOpen, setNewActivityPanelOpen] = useState(false);
   type CalendarOrigin = "APP" | "CRM" | "EXTERNAL" | "GOOGLE";
   const [calendarOriginFilters, setCalendarOriginFilters] = useState<
     CalendarOrigin[]
@@ -4353,7 +4349,13 @@ export default function Recruiting({
             <button
               key={key}
               type="button"
-              onClick={() => setSection(key as RecruitingSection)}
+              onClick={() => {
+                if (key === "calendar") {
+                  setGooglePanelOpen(false);
+                  setNewActivityPanelOpen(false);
+                }
+                setSection(key as RecruitingSection);
+              }}
               style={{
                 ...buttonStyle,
                 background: section === key ? "#0f172a" : "white",
