@@ -7701,7 +7701,7 @@ export default function App() {
   useEffect(() => {
     if (tab === "adminMenu") {
       setTab("dashboard");
-      setAdminMenuOpen(true);
+      setAdminMenuOpen(false);
     }
   }, [tab]);
 
