@@ -403,6 +403,32 @@
 }
 
 @media (max-width: 720px) {
+  .ge-main-nav {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px !important;
+    align-items: stretch !important;
+  }
+
+  .ge-main-nav__primary,
+  .ge-main-nav__actions {
+    display: contents !important;
+  }
+
+  .ge-main-nav button {
+    width: 100%;
+    min-width: 0;
+    margin: 0 !important;
+    padding: 10px 6px !important;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .ge-main-nav__actions button:last-child {
+    font-size: 20px !important;
+    line-height: 1 !important;
+  }
+
   .ge-brand {
     border-radius: 14px;
     padding: 13px 17px;
