@@ -5110,8 +5110,24 @@ export default function Recruiting({
           display: grid;
           grid-template-columns: minmax(290px, 38%) minmax(0, 1fr);
           gap: 14px;
-          align-items: start;
+          align-items: stretch;
           min-width: 0;
+        }
+
+        .recruiting-contact-list-card {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          min-height: 0;
+        }
+
+        .recruiting-contact-list-scroll {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: auto;
+          display: grid;
+          align-content: start;
+          gap: 7px;
         }
 
         .recruiting-candidate-card {
@@ -5176,6 +5192,15 @@ export default function Recruiting({
           .recruiting-contact-layout,
           .recruiting-detail-bottom-layout {
             grid-template-columns: minmax(0, 1fr);
+          }
+
+          .recruiting-contact-list-card {
+            height: auto;
+          }
+
+          .recruiting-contact-list-scroll {
+            flex: none;
+            max-height: 720px;
           }
 
           .recruiting-candidate-card {
@@ -6129,7 +6154,10 @@ export default function Recruiting({
           )}
 
           <div className="recruiting-contact-layout">
-            <div style={cardStyle}>
+            <div
+              className="recruiting-contact-list-card"
+              style={cardStyle}
+            >
               <div
                 style={{
                   display: "flex",
@@ -6207,7 +6235,7 @@ export default function Recruiting({
                   </select>
                 </label>
               </div>
-              <div style={{ maxHeight: 720, overflow: "auto", display: "grid", gap: 7 }}>
+              <div className="recruiting-contact-list-scroll">
                 {filteredCandidates.map((candidate) => {
                   const active = candidate.id === selectedCandidateId;
                   const statusStyle =
