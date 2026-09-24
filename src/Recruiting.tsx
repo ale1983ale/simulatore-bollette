@@ -9350,7 +9350,7 @@ export default function Recruiting({
           >
             <div>
               <h3 style={{ margin: 0 }}>
-                NOTE DA SINCRONIZZARE SU HR SPECIALIST
+                SINCRONIZZAZIONE HR SPECIALIST
               </h3>
               <div
                 style={{
@@ -9359,19 +9359,293 @@ export default function Recruiting({
                   fontSize: 13,
                 }}
               >
-                {hrSyncPendingCount} elementi in attesa · {hrSyncNotes.length} note ·{" "}
-                {hrStatusSyncItems.length} stati
+                {hrIncomingCandidates.length} in arrivo ·{" "}
+                {hrOutgoingPendingCount} in uscita
               </div>
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gap: 10,
-              marginTop: 14,
-            }}
-          >
+          <div className="hr-sync-columns">
+            <div
+              style={{
+                display: "grid",
+                gap: 10,
+                alignContent: "start",
+              }}
+            >
+              <div
+                style={{
+                  padding: "11px 12px",
+                  borderRadius: 10,
+                  background: "#ecfeff",
+                  border: "1px solid #a5f3fc",
+                  color: "#0f766e",
+                  fontSize: 13,
+                  fontWeight: 900,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span>
+                  IN ARRIVO ({hrIncomingCandidates.length})
+                </span>
+
+                {incomingNotificationPermission !== "granted" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void enableIncomingNotifications()
+                    }
+                    style={{
+                      ...buttonStyle,
+                      padding: "6px 9px",
+                      background: "#0f766e",
+                      color: "white",
+                    }}
+                  >
+                    ATTIVA NOTIFICHE
+                  </button>
+                )}
+              </div>
+
+              {hrIncomingCandidates.map((incoming) => (
+                <div
+                  key={incoming.id}
+                  style={{
+                    border: "3px solid #2dd4bf",
+                    borderRadius: 11,
+                    padding: 13,
+                    background: "white",
+                    boxShadow:
+                      "0 2px 8px rgba(15,23,42,.06)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "flex-start",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          color: "#0f766e",
+                          fontSize: 11,
+                          fontWeight: 900,
+                          marginBottom: 4,
+                        }}
+                      >
+                        NUOVO NOMINATIVO · {incoming.sourceSystem}
+                      </div>
+                      <strong style={{ fontSize: 16 }}>
+                        {incoming.fullName}
+                      </strong>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        Arrivato{" "}
+                        {incoming.receivedAt
+                          ? new Date(
+                              incoming.receivedAt
+                            ).toLocaleString("it-IT", {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })
+                          : "—"}
+                      </div>
+                    </div>
+
+                    {incoming.sourceStatus && (
+                      <span
+                        style={{
+                          padding: "6px 9px",
+                          borderRadius: 8,
+                          background: "#f0fdfa",
+                          color: "#0f766e",
+                          border: "1px solid #99f6e4",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {incoming.sourceStatus}
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit,minmax(150px,1fr))",
+                      gap: 8,
+                      marginTop: 11,
+                      fontSize: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={labelStyle}>Cellulare</div>
+                      <strong>{incoming.phone || "—"}</strong>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Città / zona</div>
+                      <strong>
+                        {incoming.operationalZone || "—"}
+                      </strong>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Email</div>
+                      <strong
+                        style={{ overflowWrap: "anywhere" }}
+                      >
+                        {incoming.email || "—"}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {incoming.notes.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        display: "grid",
+                        gap: 7,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: "#0f766e",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        NOTE IMPORTATE ({incoming.notes.length})
+                      </div>
+
+                      {incoming.notes.map((note) => (
+                        <div
+                          key={note.id}
+                          style={{
+                            padding: "9px 10px",
+                            borderRadius: 8,
+                            background: "#f8fafc",
+                            border: "1px solid #e2e8f0",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 900,
+                              color: "#475569",
+                            }}
+                          >
+                            {formatDate(note.noteDate)}
+                          </div>
+                          <div
+                            style={{
+                              marginTop: 4,
+                              whiteSpace: "pre-wrap",
+                              fontSize: 12,
+                            }}
+                          >
+                            {note.noteText}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      flexWrap: "wrap",
+                      justifyContent: "flex-end",
+                      marginTop: 12,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void rejectIncomingCandidate(incoming)
+                      }
+                      style={{
+                        ...buttonStyle,
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        border: "1px solid #fecaca",
+                        opacity: busy ? 0.6 : 1,
+                      }}
+                    >
+                      SCARTA
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void acceptIncomingCandidate(incoming)
+                      }
+                      style={{
+                        ...buttonStyle,
+                        background: "#16a34a",
+                        color: "white",
+                        border: "1px solid #16a34a",
+                        opacity: busy ? 0.6 : 1,
+                      }}
+                    >
+                      ACCETTA NOMINATIVO
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {!hrIncomingCandidates.length && (
+                <div
+                  style={{
+                    padding: 18,
+                    borderRadius: 10,
+                    background: "#f8fafc",
+                    color: "#64748b",
+                    textAlign: "center",
+                    fontWeight: 800,
+                  }}
+                >
+                  Nessun nuovo nominativo in arrivo da HR.
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: 10,
+                alignContent: "start",
+              }}
+            >
+              <div
+                style={{
+                  padding: "11px 12px",
+                  borderRadius: 10,
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  color: "#1d4ed8",
+                  fontSize: 13,
+                  fontWeight: 900,
+                }}
+              >
+                IN USCITA ({hrOutgoingPendingCount})
+              </div>
             {hrStatusSyncItems.length > 0 && (
               <div
                 style={{
@@ -9794,6 +10068,7 @@ export default function Recruiting({
                 Nessuna nota o stato da sincronizzare su HR Specialist.
               </div>
             )}
+            </div>
           </div>
         </div>
       )}
