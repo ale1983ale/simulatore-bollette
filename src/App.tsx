@@ -6892,6 +6892,8 @@ function DashboardCard({
   compact = false,
   spanMobile = false,
   notificationCount,
+  incomingCount,
+  outgoingCount,
 }: {
   title: string;
   description: string;
@@ -6901,6 +6903,8 @@ function DashboardCard({
   compact?: boolean;
   spanMobile?: boolean;
   notificationCount?: number;
+  incomingCount?: number;
+  outgoingCount?: number;
 }) {
   return (
     <button
@@ -6930,6 +6934,47 @@ function DashboardCard({
           {notificationCount}
         </div>
       )}
+
+      {(typeof incomingCount === "number" ||
+        typeof outgoingCount === "number") && (
+        <div className="ge-waiting-badges">
+          <div
+            className={[
+              "ge-waiting-badge",
+              "ge-waiting-badge--incoming",
+              Number(incomingCount || 0) > 0
+                ? "ge-waiting-badge--has-value"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-label={`${Number(
+              incomingCount || 0
+            )} attività in entrata`}
+            title="IN ENTRATA"
+          >
+            {Number(incomingCount || 0)}
+          </div>
+          <div
+            className={[
+              "ge-waiting-badge",
+              "ge-waiting-badge--outgoing",
+              Number(outgoingCount || 0) > 0
+                ? "ge-waiting-badge--has-value"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-label={`${Number(
+              outgoingCount || 0
+            )} attività in uscita`}
+            title="IN USCITA"
+          >
+            {Number(outgoingCount || 0)}
+          </div>
+        </div>
+      )}
+
       <div className="ge-dashboard-card__icon">{icon}</div>
       <div className="ge-dashboard-card__body">
         <div className="ge-dashboard-card__title">{title}</div>
@@ -6974,11 +7019,13 @@ function SectionHero({
 function AdminDashboard({
   navigate,
   openEmail,
-  waitingCount,
+  waitingIncomingCount,
+  waitingOutgoingCount,
 }: {
   navigate: DashboardNavigate;
   openEmail: () => void;
-  waitingCount: number;
+  waitingIncomingCount: number;
+  waitingOutgoingCount: number;
 }) {
   return (
     <div className="ge-dashboard">
@@ -7030,7 +7077,8 @@ function AdminDashboard({
           icon="⌛"
           className="ge-card-waiting"
           compact
-          notificationCount={waitingCount}
+          incomingCount={waitingIncomingCount}
+          outgoingCount={waitingOutgoingCount}
           onClick={() => navigate("recruitingWaiting")}
         />
         <DashboardCard
@@ -7155,7 +7203,10 @@ export default function App() {
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [agentSession, setAgentSession] = useState<any>(null);
-  const [waitingRoomCount, setWaitingRoomCount] = useState(0);
+  const [waitingRoomIncomingCount, setWaitingRoomIncomingCount] =
+    useState(0);
+  const [waitingRoomOutgoingCount, setWaitingRoomOutgoingCount] =
+    useState(0);
 
   const [punPsvRows, setPunPsvRows] = useState<PunPsvRow[]>(INITIAL_PUN_PSV_ROWS);
   const [selectedPunPsvMonth, setSelectedPunPsvMonth] = useState<string>("DICEMBRE 2026");
@@ -7257,7 +7308,8 @@ export default function App() {
 
   useEffect(() => {
     if (!adminSession || !adminProfile) {
-      setWaitingRoomCount(0);
+      setWaitingRoomIncomingCount(0);
+      setWaitingRoomOutgoingCount(0);
       return;
     }
 
@@ -7292,13 +7344,16 @@ export default function App() {
 
         if (firstError) throw firstError;
 
-        const total =
-          Number(incomingResult.count || 0) +
+        const incomingCount = Number(
+          incomingResult.count || 0
+        );
+        const outgoingCount =
           Number(notesResult.count || 0) +
           Number(statusResult.count || 0);
 
         if (!cancelled) {
-          setWaitingRoomCount(total);
+          setWaitingRoomIncomingCount(incomingCount);
+          setWaitingRoomOutgoingCount(outgoingCount);
         }
       } catch (error) {
         console.error("WAITING ROOM COUNT ERROR:", error);
@@ -8164,7 +8219,8 @@ const renderAdminContent = () => {
         <AdminDashboard
           navigate={navigateTo}
           openEmail={openOutlookEmail}
-          waitingCount={waitingRoomCount}
+          waitingIncomingCount={waitingRoomIncomingCount}
+          waitingOutgoingCount={waitingRoomOutgoingCount}
         />
       )}
 
