@@ -8,6 +8,7 @@ export type GoogleCalendarStatus = {
   configured: boolean;
   connected: boolean;
   calendar_management_ready?: boolean;
+  email_notifications_ready?: boolean;
   needs_reconnect?: boolean;
   activity_calendars?: string[];
   expires_at?: string | null;
