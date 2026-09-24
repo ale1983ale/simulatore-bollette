@@ -480,6 +480,7 @@ function clearAllSimulationDrafts() {
 type SavedSimulation = {
   id: string;
   name: string;
+  agent_name?: string | null;
   state: Record<string, any>;
   created_at: string;
 };
@@ -545,6 +546,178 @@ function simulationArchiveHeaders(
   };
 }
 
+const SIMULATION_CUSTOM_AGENT_MEMORY_PREFIX =
+  "simulation_custom_agents_v1_";
+
+async function getEmailRecipientOwnerKeyForSimulation() {
+  try {
+    const raw = localStorage.getItem("admin_session");
+    if (!raw) return null;
+
+    const admin = JSON.parse(raw);
+    if (!admin?.id || !admin?.username) return null;
+
+    const seed = `${admin.id}|${String(admin.username)
+      .trim()
+      .toLowerCase()}|email-recipient-sync-v2`;
+
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(seed)
+    );
+
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    return null;
+  }
+}
+
+function emailRecipientSimulationHeaders(
+  ownerKey: string
+) {
+  return {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${supabaseAnonKey}`,
+    "x-client-info": `email-recipient-sync-${ownerKey}`,
+  };
+}
+
+function normalizeAgentOption(value: string) {
+  return String(value || "").trim();
+}
+
+function uniqueAgentOptions(values: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  values.forEach((value) => {
+    const clean = normalizeAgentOption(value);
+    const key = clean.toLocaleLowerCase("it-IT");
+
+    if (
+      !clean ||
+      key === "non assegnati" ||
+      key === "altro" ||
+      seen.has(key)
+    ) {
+      return;
+    }
+
+    seen.add(key);
+    out.push(clean);
+  });
+
+  return out.sort((a, b) =>
+    a.localeCompare(b, "it", { sensitivity: "base" })
+  );
+}
+
+async function getSimulationAgentMemoryKey() {
+  const ownerKey = await getSimulationOwnerKey();
+  return SIMULATION_CUSTOM_AGENT_MEMORY_PREFIX + ownerKey;
+}
+
+async function readRememberedSimulationAgents() {
+  try {
+    const key = await getSimulationAgentMemoryKey();
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? uniqueAgentOptions(
+          parsed.map((value) => String(value || ""))
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function rememberSimulationAgent(name: string) {
+  const clean = normalizeAgentOption(name);
+  if (!clean) return;
+
+  try {
+    const key = await getSimulationAgentMemoryKey();
+    const current = await readRememberedSimulationAgents();
+    const next = uniqueAgentOptions([clean, ...current]).slice(
+      0,
+      100
+    );
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    // Il nome resta comunque associato alla simulazione online.
+  }
+}
+
+async function loadSimulationAgentOptions() {
+  const remembered = await readRememberedSimulationAgents();
+  const values = [...remembered];
+
+  // Recupera i nominativi della scheda "4. Controllo abbinamenti"
+  // dell'area Invio Email, quando è disponibile una sessione Admin.
+  const emailOwnerKey =
+    await getEmailRecipientOwnerKeyForSimulation();
+
+  if (emailOwnerKey) {
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/email_recipient_lists?owner_key=eq.${emailOwnerKey}&select=recipients&limit=1`,
+        {
+          headers:
+            emailRecipientSimulationHeaders(emailOwnerKey),
+        }
+      );
+
+      if (response.ok) {
+        const rows = await response.json();
+        const recipients = Array.isArray(rows?.[0]?.recipients)
+          ? rows[0].recipients
+          : [];
+
+        recipients.forEach((item: any) => {
+          values.push(String(item?.agenzia || ""));
+        });
+      }
+    } catch {
+      // L'eventuale indisponibilità dell'elenco email non blocca il salvataggio.
+    }
+  }
+
+  // Recupera anche eventuali nomi agente già usati in precedenti
+  // simulazioni, così rimangono disponibili anche su un altro dispositivo.
+  try {
+    const ownerKey = await getSimulationOwnerKey();
+    const params = new URLSearchParams({
+      owner_key: `eq.${ownerKey}`,
+      agent_name: "not.is.null",
+      select: "agent_name",
+      limit: "100",
+    });
+
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/saved_simulations?${params.toString()}`,
+      {
+        headers: simulationArchiveHeaders(ownerKey),
+      }
+    );
+
+    if (response.ok) {
+      const rows = await response.json();
+      if (Array.isArray(rows)) {
+        rows.forEach((row: any) => {
+          values.push(String(row?.agent_name || ""));
+        });
+      }
+    }
+  } catch {
+    // Nessun blocco: l'associazione agente è facoltativa.
+  }
+
+  return uniqueAgentOptions(values);
+}
+
 async function listSavedSimulations(
   type: SavedSimulationType
 ): Promise<SavedSimulation[]> {
@@ -552,7 +725,7 @@ async function listSavedSimulations(
   const params = new URLSearchParams({
     owner_key: `eq.${ownerKey}`,
     simulation_type: `eq.${type}`,
-    select: "id,name,state,created_at",
+    select: "id,name,agent_name,state,created_at",
     order: "created_at.desc",
     limit: "100",
   });
@@ -579,7 +752,8 @@ async function listSavedSimulations(
 async function saveSimulationArchive(
   type: SavedSimulationType,
   name: string,
-  state: Record<string, any>
+  state: Record<string, any>,
+  agentName = ""
 ) {
   const ownerKey = await getSimulationOwnerKey();
 
@@ -595,6 +769,7 @@ async function saveSimulationArchive(
         owner_key: ownerKey,
         simulation_type: type,
         name: name.trim(),
+        agent_name: agentName.trim() || null,
         state,
       }),
     }
@@ -661,6 +836,312 @@ async function deleteAllSavedSimulations(
       "Impossibile eliminare le simulazioni."
     );
   }
+}
+
+function SaveSimulationModal({
+  open,
+  type,
+  initialName,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  type: SavedSimulationType;
+  initialName: string;
+  onClose: () => void;
+  onConfirm: (
+    customerName: string,
+    agentName: string
+  ) => Promise<void>;
+}) {
+  const [customerName, setCustomerName] = useState("");
+  const [agentChoice, setAgentChoice] = useState("");
+  const [customAgent, setCustomAgent] = useState("");
+  const [agentOptions, setAgentOptions] = useState<string[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    setCustomerName(initialName || "");
+    setAgentChoice("");
+    setCustomAgent("");
+    setError("");
+    setLoadingAgents(true);
+
+    let cancelled = false;
+
+    void loadSimulationAgentOptions()
+      .then((items) => {
+        if (!cancelled) setAgentOptions(items);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAgents(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialName, type]);
+
+  if (!open) return null;
+
+  const handleConfirm = async () => {
+    const cleanName = customerName.trim();
+
+    if (!cleanName) {
+      setError(
+        "Inserisci il nome del cliente per salvare la simulazione."
+      );
+      return;
+    }
+
+    const cleanAgent =
+      agentChoice === "__ALTRO__"
+        ? customAgent.trim()
+        : agentChoice.trim();
+
+    if (
+      agentChoice === "__ALTRO__" &&
+      !cleanAgent
+    ) {
+      setError(
+        "Hai scelto ALTRO: inserisci il nome dell'agente."
+      );
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await onConfirm(cleanName, cleanAgent);
+
+      if (cleanAgent) {
+        await rememberSimulationAgent(cleanAgent);
+      }
+
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Errore durante il salvataggio."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100100,
+        background: "rgba(15,23,42,.55)",
+        display: "grid",
+        placeItems: "center",
+        padding: 16,
+      }}
+      onClick={() => {
+        if (!saving) onClose();
+      }}
+    >
+      <div
+        style={{
+          width: "min(520px, 100%)",
+          background: "white",
+          borderRadius: 18,
+          boxShadow: "0 24px 70px rgba(15,23,42,.28)",
+          padding: 20,
+          display: "grid",
+          gap: 14,
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div>
+          <div
+            style={{
+              fontWeight: 950,
+              fontSize: 22,
+              color: "#0f172a",
+            }}
+          >
+            Salva simulazione{" "}
+            {type === "energy" ? "Energia" : "Gas"}
+          </div>
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 12,
+              color: "#64748b",
+            }}
+          >
+            Il nome cliente è obbligatorio. L'agente associato è facoltativo.
+          </div>
+        </div>
+
+        <label
+          style={{
+            display: "grid",
+            gap: 5,
+            fontWeight: 800,
+            color: "#334155",
+          }}
+        >
+          Nome cliente *
+          <input
+            value={customerName}
+            onChange={(event) =>
+              setCustomerName(event.target.value)
+            }
+            autoFocus
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: "1px solid #cbd5e1",
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 15,
+              background: "white",
+            }}
+          />
+        </label>
+
+        <label
+          style={{
+            display: "grid",
+            gap: 5,
+            fontWeight: 800,
+            color: "#334155",
+          }}
+        >
+          Agente associato
+          <select
+            value={agentChoice}
+            disabled={loadingAgents}
+            onChange={(event) => {
+              setAgentChoice(event.target.value);
+              if (event.target.value !== "__ALTRO__") {
+                setCustomAgent("");
+              }
+            }}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: "1px solid #cbd5e1",
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 15,
+              background: "white",
+            }}
+          >
+            <option value="">
+              {loadingAgents
+                ? "Carico nominativi..."
+                : "Nessun agente associato"}
+            </option>
+            {agentOptions.map((agent) => (
+              <option key={agent} value={agent}>
+                {agent}
+              </option>
+            ))}
+            <option value="__ALTRO__">ALTRO</option>
+          </select>
+        </label>
+
+        {agentChoice === "__ALTRO__" && (
+          <label
+            style={{
+              display: "grid",
+              gap: 5,
+              fontWeight: 800,
+              color: "#334155",
+            }}
+          >
+            Nome agente
+            <input
+              value={customAgent}
+              onChange={(event) =>
+                setCustomAgent(event.target.value)
+              }
+              placeholder="Scrivi il nome..."
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                border: "1px solid #cbd5e1",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 15,
+                background: "white",
+              }}
+            />
+          </label>
+        )}
+
+        {error && (
+          <div
+            style={{
+              borderRadius: 10,
+              background: "#fef2f2",
+              color: "#b91c1c",
+              padding: "10px 12px",
+              fontWeight: 800,
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onClose}
+            style={{
+              border: "1px solid #cbd5e1",
+              background: "white",
+              color: "#334155",
+              borderRadius: 9,
+              padding: "9px 13px",
+              fontWeight: 900,
+              cursor: saving ? "default" : "pointer",
+            }}
+          >
+            ANNULLA
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void handleConfirm()}
+            style={{
+              border: "1px solid #16a34a",
+              background: "#16a34a",
+              color: "white",
+              borderRadius: 9,
+              padding: "9px 14px",
+              fontWeight: 900,
+              cursor: saving ? "wait" : "pointer",
+              opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? "SALVATAGGIO..." : "OK, SALVA"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SavedSimulationsModal({
@@ -936,6 +1417,18 @@ function SavedSimulationsModal({
                       "it-IT"
                     )}
                   </div>
+                  {item.agent_name && (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#475569",
+                        marginTop: 3,
+                        fontWeight: 800,
+                      }}
+                    >
+                      Agente: {item.agent_name}
+                    </div>
+                  )}
                 </div>
 
                 <div
@@ -1864,24 +2357,13 @@ function Energia({
 
   const [energySavedOpen, setEnergySavedOpen] =
     useState(false);
-  const [energySaving, setEnergySaving] =
+  const [energySaveConfirmOpen, setEnergySaveConfirmOpen] =
     useState(false);
 
-  const saveEnergySimulation = async () => {
-    let customerName = String(s.nome || "").trim();
-
-    if (!customerName) {
-      const entered = window.prompt(
-        "Per salvare la simulazione devi inserire il nome del cliente."
-      );
-
-      customerName = String(entered || "").trim();
-      if (!customerName) {
-        alert("Il campo Nome è obbligatorio.");
-        return;
-      }
-    }
-
+  const confirmEnergySimulationSave = async (
+    customerName: string,
+    agentName: string
+  ) => {
     const stateToSave = {
       ...s,
       nome: customerName,
@@ -1889,24 +2371,13 @@ function Energia({
 
     setS(stateToSave);
     setLastEnergyInputAt(Date.now());
-    setEnergySaving(true);
 
-    try {
-      await saveSimulationArchive(
-        "energy",
-        customerName,
-        stateToSave
-      );
-      alert("Simulazione Energia salvata.");
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Errore durante il salvataggio."
-      );
-    } finally {
-      setEnergySaving(false);
-    }
+    await saveSimulationArchive(
+      "energy",
+      customerName,
+      stateToSave,
+      agentName
+    );
   };
 
   const openSavedEnergySimulation = (
@@ -2572,8 +3043,7 @@ return (
         </button>
         <button
           type="button"
-          disabled={energySaving}
-          onClick={() => void saveEnergySimulation()}
+          onClick={() => setEnergySaveConfirmOpen(true)}
           style={{
             border: "1px solid #16a34a",
             background: "#16a34a",
@@ -2591,13 +3061,10 @@ return (
             alignItems: "center",
             justifyContent: "center",
             textAlign: "center",
-            cursor: energySaving ? "wait" : "pointer",
-            opacity: energySaving ? 0.7 : 1,
+            cursor: "pointer",
           }}
         >
-          {energySaving ? (
-            "SALVATAGGIO..."
-          ) : isMobile ? (
+          {isMobile ? (
             <>
               SALVA
               <br />
@@ -3131,6 +3598,14 @@ Base suggerito
       )}
     </div>
 
+    <SaveSimulationModal
+      open={energySaveConfirmOpen}
+      type="energy"
+      initialName={s.nome}
+      onClose={() => setEnergySaveConfirmOpen(false)}
+      onConfirm={confirmEnergySimulationSave}
+    />
+
     <SavedSimulationsModal
       open={energySavedOpen}
       type="energy"
@@ -3246,24 +3721,13 @@ function Gas({
 
   const [gasSavedOpen, setGasSavedOpen] =
     useState(false);
-  const [gasSaving, setGasSaving] =
+  const [gasSaveConfirmOpen, setGasSaveConfirmOpen] =
     useState(false);
 
-  const saveGasSimulation = async () => {
-    let customerName = String(s.nome || "").trim();
-
-    if (!customerName) {
-      const entered = window.prompt(
-        "Per salvare la simulazione devi inserire il nome del cliente."
-      );
-
-      customerName = String(entered || "").trim();
-      if (!customerName) {
-        alert("Il campo Nome è obbligatorio.");
-        return;
-      }
-    }
-
+  const confirmGasSimulationSave = async (
+    customerName: string,
+    agentName: string
+  ) => {
     const stateToSave = {
       ...s,
       nome: customerName,
@@ -3271,24 +3735,13 @@ function Gas({
 
     setS(stateToSave);
     setLastGasInputAt(Date.now());
-    setGasSaving(true);
 
-    try {
-      await saveSimulationArchive(
-        "gas",
-        customerName,
-        stateToSave
-      );
-      alert("Simulazione Gas salvata.");
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Errore durante il salvataggio."
-      );
-    } finally {
-      setGasSaving(false);
-    }
+    await saveSimulationArchive(
+      "gas",
+      customerName,
+      stateToSave,
+      agentName
+    );
   };
 
   const openSavedGasSimulation = (
@@ -3855,8 +4308,7 @@ function Gas({
         </button>
         <button
           type="button"
-          disabled={gasSaving}
-          onClick={() => void saveGasSimulation()}
+          onClick={() => setGasSaveConfirmOpen(true)}
           style={{
             border: "1px solid #16a34a",
             background: "#16a34a",
@@ -3874,13 +4326,10 @@ function Gas({
             alignItems: "center",
             justifyContent: "center",
             textAlign: "center",
-            cursor: gasSaving ? "wait" : "pointer",
-            opacity: gasSaving ? 0.7 : 1,
+            cursor: "pointer",
           }}
         >
-          {gasSaving ? (
-            "SALVATAGGIO..."
-          ) : isMobile ? (
+          {isMobile ? (
             <>
               SALVA
               <br />
@@ -4257,6 +4706,14 @@ border: "1px solid #bfd8f6",
           </>
         )}
       </div>
+
+      <SaveSimulationModal
+        open={gasSaveConfirmOpen}
+        type="gas"
+        initialName={s.nome}
+        onClose={() => setGasSaveConfirmOpen(false)}
+        onConfirm={confirmGasSimulationSave}
+      />
 
       <SavedSimulationsModal
         open={gasSavedOpen}
