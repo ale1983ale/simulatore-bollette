@@ -8237,6 +8237,15 @@ useEffect(() => {
 }, [adminSession, tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingManagement", "recruitingCrm"];
+
+  useEffect(() => {
+    if (
+      databaseAdminTabs.includes(tab) &&
+      adminMenuOpen
+    ) {
+      setAdminMenuOpen(false);
+    }
+  }, [tab, adminMenuOpen]);
   const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
@@ -8527,7 +8536,7 @@ const renderAdminContent = () => {
         minWidth: 0,
       }}
     >
-      {adminMenuOpen && (
+      {adminMenuOpen && !databaseAdminTabs.includes(tab) && (
       <div
         className="ge-admin-nav"
         style={{
