@@ -955,7 +955,9 @@ table {
   }
 
   .ge-brand {
-    padding-right: 106px;
+    min-height: 118px;
+    padding: 13px 17px 58px;
+    align-items: flex-start;
   }
 
   .ge-brand__title {
@@ -971,8 +973,11 @@ table {
   }
 
   .ge-brand-waiting {
-    right: 10px;
-    gap: 5px;
+    top: auto;
+    right: 12px;
+    bottom: 10px;
+    transform: none;
+    gap: 6px;
   }
 
   .ge-brand-waiting__incoming {
