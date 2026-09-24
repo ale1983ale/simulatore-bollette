@@ -1265,6 +1265,8 @@ export default function Recruiting({
 
   const [googleImportEvent, setGoogleImportEvent] =
     useState<GoogleCalendarExternalEvent | null>(null);
+  const [googleDetailEvent, setGoogleDetailEvent] =
+    useState<GoogleCalendarExternalEvent | null>(null);
   const [googleImportCandidateId, setGoogleImportCandidateId] =
     useState("");
   const [googleImportType, setGoogleImportType] =
@@ -8581,6 +8583,20 @@ export default function Recruiting({
                           return (
                             <div
                               key={`crm-${event.crmEventId}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() =>
+                                setCrmDetailEventId(event.id)
+                              }
+                              onKeyDown={(keyEvent) => {
+                                if (
+                                  keyEvent.key === "Enter" ||
+                                  keyEvent.key === " "
+                                ) {
+                                  setCrmDetailEventId(event.id);
+                                }
+                              }}
+                              title="Apri dettaglio attività CRM"
                               style={{
                                 borderRadius: 7,
                                 padding: 7,
@@ -8591,6 +8607,7 @@ export default function Recruiting({
                                 fontSize: 11,
                                 boxShadow:
                                   "0 1px 2px rgba(124,45,18,.18)",
+                                cursor: "pointer",
                               }}
                             >
                               <div
@@ -8712,35 +8729,20 @@ export default function Recruiting({
                         return (
                           <div
                             key={`google-${event.calendar_id}-${event.id}`}
-                            role={event.html_link ? "button" : undefined}
-                            tabIndex={event.html_link ? 0 : undefined}
-                            onClick={() => {
-                              if (event.html_link) {
-                                window.open(
-                                  event.html_link,
-                                  "_blank",
-                                  "noopener,noreferrer"
-                                );
-                              }
-                            }}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() =>
+                              setGoogleDetailEvent(event)
+                            }
                             onKeyDown={(keyEvent) => {
                               if (
-                                event.html_link &&
-                                (keyEvent.key === "Enter" ||
-                                  keyEvent.key === " ")
+                                keyEvent.key === "Enter" ||
+                                keyEvent.key === " "
                               ) {
-                                window.open(
-                                  event.html_link,
-                                  "_blank",
-                                  "noopener,noreferrer"
-                                );
+                                setGoogleDetailEvent(event);
                               }
                             }}
-                            title={
-                              event.html_link
-                                ? "Apri in Google Calendar"
-                                : undefined
-                            }
+                            title="Apri dettaglio evento Google"
                             style={{
                               borderRadius: 7,
                               padding: 6,
@@ -8748,9 +8750,7 @@ export default function Recruiting({
                               border: `1px solid ${event.background_color}`,
                               borderLeft: `5px solid ${event.background_color}`,
                               fontSize: 11,
-                              cursor: event.html_link
-                                ? "pointer"
-                                : "default",
+                              cursor: "pointer",
                             }}
                           >
                             <div style={{ fontWeight: 900 }}>
@@ -9397,6 +9397,198 @@ export default function Recruiting({
         </>
       )}
 
+      {googleDetailEvent && (
+        <div
+          className="recruiting-modal-backdrop"
+          onClick={() => setGoogleDetailEvent(null)}
+        >
+          <div
+            className="recruiting-modal"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(1100px, 96vw)",
+              maxHeight: "92vh",
+              padding: 24,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    color: googleDetailEvent.background_color,
+                    fontSize: 12,
+                    fontWeight: 900,
+                    marginBottom: 5,
+                  }}
+                >
+                  GOOGLE CALENDAR · {googleDetailEvent.calendar_name}
+                </div>
+                <h3 style={{ margin: 0, fontSize: 22 }}>
+                  {googleDetailEvent.summary || "Evento Google"}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setGoogleDetailEvent(null)}
+                style={{
+                  ...buttonStyle,
+                  background: "#e2e8f0",
+                }}
+              >
+                Chiudi
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(210px,1fr))",
+                gap: 12,
+                marginTop: 18,
+              }}
+            >
+              <div>
+                <div style={labelStyle}>Inizio</div>
+                <strong>
+                  {formatDate(googleDetailEvent.start_date)}
+                  {!googleDetailEvent.all_day &&
+                  googleDetailEvent.start_time
+                    ? ` · ${googleDetailEvent.start_time}`
+                    : ""}
+                </strong>
+              </div>
+
+              <div>
+                <div style={labelStyle}>Fine</div>
+                <strong>
+                  {formatDate(
+                    googleDetailEvent.end_date ||
+                      googleDetailEvent.start_date
+                  )}
+                  {!googleDetailEvent.all_day &&
+                  googleDetailEvent.end_time
+                    ? ` · ${googleDetailEvent.end_time}`
+                    : ""}
+                </strong>
+              </div>
+
+              <div>
+                <div style={labelStyle}>Calendario</div>
+                <strong>{googleDetailEvent.calendar_name}</strong>
+              </div>
+
+              <div>
+                <div style={labelStyle}>Tipo</div>
+                <strong>
+                  {googleDetailEvent.all_day
+                    ? "GIORNATA INTERA"
+                    : "CON ORARIO"}
+                </strong>
+              </div>
+
+              {googleDetailEvent.location && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={labelStyle}>Luogo</div>
+                  <strong>{googleDetailEvent.location}</strong>
+                </div>
+              )}
+            </div>
+
+            {googleDetailEvent.description && (
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: 14,
+                  borderRadius: 10,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.5,
+                }}
+              >
+                {googleDetailEvent.description}
+              </div>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                marginTop: 18,
+              }}
+            >
+              {googleDetailEvent.html_link && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.open(
+                      googleDetailEvent.html_link,
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
+                  style={{
+                    ...buttonStyle,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "#ffffff",
+                    color: "#1f2937",
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-grid",
+                      placeItems: "center",
+                      width: 25,
+                      height: 25,
+                      borderRadius: 7,
+                      background:
+                        "linear-gradient(135deg,#4285f4 0 25%,#34a853 25% 50%,#fbbc05 50% 75%,#ea4335 75%)",
+                      color: "white",
+                      fontWeight: 950,
+                      fontSize: 15,
+                    }}
+                  >
+                    G
+                  </span>
+                  APRI IN GOOGLE
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const event = googleDetailEvent;
+                  setGoogleDetailEvent(null);
+                  openGoogleImport(event);
+                }}
+                style={{
+                  ...buttonStyle,
+                  background: "#0f766e",
+                  color: "white",
+                }}
+              >
+                IMPORTA NEL CALENDARIO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {googleImportEvent && (
         <div
           className="recruiting-modal-backdrop"
@@ -9609,6 +9801,11 @@ export default function Recruiting({
           <div
             className="recruiting-modal"
             onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(1100px, 96vw)",
+              maxHeight: "92vh",
+              padding: 24,
+            }}
           >
             {(() => {
               const cleanTitle = crmPlainText(crmDetailEvent.title);
