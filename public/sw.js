@@ -1,4 +1,4 @@
-const CACHE_NAME = "simulatore-bollette-pwa-v3";
+const CACHE_NAME = "simulatore-bollette-pwa-v4";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest?v=3",
@@ -33,24 +33,27 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
+  const url = new URL(request.url);
 
   if (
     request.method !== "GET" ||
-    new URL(request.url).origin !== self.location.origin
+    url.origin !== self.location.origin
   ) {
     return;
   }
 
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(() => caches.match("/"))
-    );
-    return;
-  }
+  // HTML, JS e CSS devono privilegiare sempre la rete:
+  // evita che mobile/PWA continui a mostrare una build precedente.
+  const isAppAsset =
+    request.mode === "navigate" ||
+    request.destination === "script" ||
+    request.destination === "style" ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css");
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
+  if (isAppAsset) {
+    event.respondWith(
+      fetch(request, { cache: "no-store" })
         .then((response) => {
           if (response && response.ok) {
             const copy = response.clone();
@@ -60,9 +63,32 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => cached);
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          if (request.mode === "navigate") {
+            return caches.match("/");
+          }
+          throw new Error("Risorsa non disponibile offline");
+        })
+    );
+    return;
+  }
 
-      return cached || network;
+  // Immagini e risorse statiche non critiche: cache-first.
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+
+      return fetch(request).then((response) => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, copy);
+          });
+        }
+        return response;
+      });
     })
   );
 });
