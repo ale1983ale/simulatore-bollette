@@ -7589,7 +7589,7 @@ function AdminDashboard({
           onClick={() => navigate("reportAdmin")}
         />
         <DashboardCard
-          title="SALA D'ATTESA"
+          title="SALA D'ATTESA HR"
           description="Gestisci nominativi in arrivo e sincronizzazioni HR."
           icon="⌛"
           className="ge-card-waiting"
@@ -8245,7 +8245,7 @@ useEffect(() => {
   );
 }, [adminSession, tab]);
 
-  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
+  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement", "recruitingCrm"];
   const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
@@ -8271,7 +8271,7 @@ useEffect(() => {
       variant: "recruiting",
     },
     recruitingWaiting: {
-      title: "SALA D'ATTESA",
+      title: "SALA D'ATTESA HR",
       subtitle: "Gestisci le attività HR in arrivo e in uscita.",
       icon: "⌛",
       variant: "waiting",
@@ -8310,6 +8310,12 @@ useEffect(() => {
       title: "GESTIONE RECRUITING",
       subtitle: "Configura stati, colori e impostazioni del recruiting.",
       icon: "⚙",
+      variant: "database",
+    },
+    recruitingCrm: {
+      title: "GESTIONE CRM",
+      subtitle: "Configura e sincronizza il CRM aziendale.",
+      icon: "↻",
       variant: "database",
     },
     adminUsers: {
@@ -8710,6 +8716,17 @@ const renderAdminContent = () => {
           >
             GESTIONE RECRUITING
           </button>
+
+          <button
+            onClick={() => setTab("recruitingCrm")}
+            style={{
+              ...baseBtn,
+              padding: "9px 14px",
+              ...(tab === "recruitingCrm" ? activeBtn : {}),
+            }}
+          >
+            GESTIONE CRM
+          </button>
         </div>
       )}
 
@@ -8733,7 +8750,7 @@ const renderAdminContent = () => {
 
       {tab === "calendarAdmin" && (
         <div style={{ width: "100%", minWidth: 0 }}>
-          <Recruiting initialSection="calendar" />
+          <Recruiting initialSection="calendar" hideNavigation />
         </div>
       )}
 
@@ -8775,6 +8792,12 @@ const renderAdminContent = () => {
       {tab === "recruitingManagement" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <RecruitingManagement />
+        </div>
+      )}
+
+      {tab === "recruitingCrm" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Recruiting initialSection="crm_management" hideNavigation />
         </div>
       )}
 
