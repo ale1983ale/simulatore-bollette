@@ -52,6 +52,7 @@ type Candidate = {
   region: string;
   latitude: number | null;
   longitude: number | null;
+  waitingRoomNew: boolean;
 };
 
 type ContactNote = {
@@ -787,6 +788,7 @@ function candidateFromRow(row: any): Candidate {
       row.longitude === null || row.longitude === undefined
         ? null
         : Number(row.longitude),
+    waitingRoomNew: Boolean(row.waiting_room_new),
   };
 }
 
@@ -1411,7 +1413,7 @@ export default function Recruiting({
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude")
+        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -2359,6 +2361,20 @@ export default function Recruiting({
 
       return true;
     }).sort((a, b) => {
+      // I nominativi appena accettati dalla SALA D'ATTESA restano
+      // sempre in cima finché non vengono realmente lavorati/modificati.
+      if (a.waitingRoomNew !== b.waitingRoomNew) {
+        return a.waitingRoomNew ? -1 : 1;
+      }
+
+      if (a.waitingRoomNew && b.waitingRoomNew) {
+        const aCreated = a.createdAt || "";
+        const bCreated = b.createdAt || "";
+        if (aCreated !== bCreated) {
+          return bCreated.localeCompare(aCreated);
+        }
+      }
+
       const aFirstCall = a.status === "DA_CHIAMARE";
       const bFirstCall = b.status === "DA_CHIAMARE";
 
@@ -2686,6 +2702,46 @@ export default function Recruiting({
     }
   };
 
+  const clearWaitingRoomNew = async (candidateId: string) => {
+    if (!ctx) return false;
+
+    const candidate =
+      candidates.find((item) => item.id === candidateId) ||
+      allCandidates.find((item) => item.id === candidateId);
+
+    if (!candidate?.waitingRoomNew) return true;
+
+    const { error } = await ctx.client
+      .from("recruiting_candidates")
+      .update({ waiting_room_new: false })
+      .eq("id", candidateId);
+
+    if (error) {
+      setMessage(
+        "La modifica è stata salvata, ma non sono riuscito a togliere l'evidenza NUOVO: " +
+          error.message
+      );
+      return false;
+    }
+
+    setCandidates((current) =>
+      current.map((item) =>
+        item.id === candidateId
+          ? { ...item, waitingRoomNew: false }
+          : item
+      )
+    );
+    setAllCandidates((current) =>
+      current.map((item) =>
+        item.id === candidateId
+          ? { ...item, waitingRoomNew: false }
+          : item
+      )
+    );
+
+    return true;
+  };
+
   const updateCandidateStatus = async (
     candidate: Candidate,
     status: CandidateStatus
@@ -2694,9 +2750,20 @@ export default function Recruiting({
     if (candidate.status === status) return true;
 
     const previousStatus = candidate.status;
+    const previousWaitingRoomNew = candidate.waitingRoomNew;
+
     setCandidates((current) =>
       current.map((item) =>
-        item.id === candidate.id ? { ...item, status } : item
+        item.id === candidate.id
+          ? { ...item, status, waitingRoomNew: false }
+          : item
+      )
+    );
+    setAllCandidates((current) =>
+      current.map((item) =>
+        item.id === candidate.id
+          ? { ...item, status, waitingRoomNew: false }
+          : item
       )
     );
 
@@ -2705,6 +2772,7 @@ export default function Recruiting({
         .from("recruiting_candidates")
         .update({
           contact_status: status,
+          waiting_room_new: false,
           updated_at: new Date().toISOString(),
         })
         .eq("id", candidate.id);
@@ -2714,7 +2782,24 @@ export default function Recruiting({
     } catch (error: any) {
       setCandidates((current) =>
         current.map((item) =>
-          item.id === candidate.id ? { ...item, status: previousStatus } : item
+          item.id === candidate.id
+            ? {
+                ...item,
+                status: previousStatus,
+                waitingRoomNew: previousWaitingRoomNew,
+              }
+            : item
+        )
+      );
+      setAllCandidates((current) =>
+        current.map((item) =>
+          item.id === candidate.id
+            ? {
+                ...item,
+                status: previousStatus,
+                waitingRoomNew: previousWaitingRoomNew,
+              }
+            : item
         )
       );
       setMessage(
@@ -2807,11 +2892,29 @@ export default function Recruiting({
 
     const nextValue = forwardedTo.trim();
     const previousValue = candidate.forwardedTo;
+    const previousWaitingRoomNew = candidate.waitingRoomNew;
+
+    if (nextValue === previousValue) return;
 
     setCandidates((current) =>
       current.map((item) =>
         item.id === candidate.id
-          ? { ...item, forwardedTo: nextValue }
+          ? {
+              ...item,
+              forwardedTo: nextValue,
+              waitingRoomNew: false,
+            }
+          : item
+      )
+    );
+    setAllCandidates((current) =>
+      current.map((item) =>
+        item.id === candidate.id
+          ? {
+              ...item,
+              forwardedTo: nextValue,
+              waitingRoomNew: false,
+            }
           : item
       )
     );
@@ -2821,6 +2924,7 @@ export default function Recruiting({
         .from("recruiting_candidates")
         .update({
           forwarded_to: nextValue,
+          waiting_room_new: false,
           updated_at: new Date().toISOString(),
         })
         .eq("id", candidate.id);
@@ -2830,7 +2934,22 @@ export default function Recruiting({
       setCandidates((current) =>
         current.map((item) =>
           item.id === candidate.id
-            ? { ...item, forwardedTo: previousValue }
+            ? {
+                ...item,
+                forwardedTo: previousValue,
+                waitingRoomNew: previousWaitingRoomNew,
+              }
+            : item
+        )
+      );
+      setAllCandidates((current) =>
+        current.map((item) =>
+          item.id === candidate.id
+            ? {
+                ...item,
+                forwardedTo: previousValue,
+                waitingRoomNew: previousWaitingRoomNew,
+              }
             : item
         )
       );
@@ -3021,6 +3140,26 @@ export default function Recruiting({
       return;
     }
 
+    const nextName = editName.trim().toLocaleUpperCase("it");
+    const nextZone = editZone.trim().toLocaleUpperCase("it");
+    const nextSectorOther = editSectorEnergy ? "" : editSectorOther.trim();
+    const nextPhone = editPhone.trim();
+    const nextEmail = editEmail.trim();
+
+    const hasMeaningfulChanges =
+      nextName !== selectedCandidate.fullName ||
+      nextZone !== selectedCandidate.operationalZone ||
+      normalizeProvinceCode(editProvinceCode) !==
+        selectedCandidate.provinceCode ||
+      normalizeItalianRegion(
+        editRegion || regionFromProvinceCode(editProvinceCode)
+      ) !== selectedCandidate.region ||
+      editSectorEnergy !== selectedCandidate.sectorEnergy ||
+      nextSectorOther !== selectedCandidate.sectorOther ||
+      resolvedEditCompany !== selectedCandidate.companyName ||
+      nextPhone !== selectedCandidate.phone ||
+      nextEmail !== selectedCandidate.email;
+
     setBusy(true);
     try {
       let nextLatitude = selectedCandidate.latitude;
@@ -3060,17 +3199,21 @@ export default function Recruiting({
       const { error } = await ctx.client
         .from("recruiting_candidates")
         .update({
-          full_name: editName.trim().toLocaleUpperCase("it"),
-          operational_zone: editZone.trim().toLocaleUpperCase("it"),
+          full_name: nextName,
+          operational_zone: nextZone,
           province_code: nextProvinceCode,
           region: nextRegion,
           latitude: nextLatitude,
           longitude: nextLongitude,
           sector_energy: editSectorEnergy,
-          sector_other: editSectorEnergy ? "" : editSectorOther.trim(),
+          sector_other: nextSectorOther,
           company_name: resolvedEditCompany,
-          phone: editPhone.trim(),
-          email: editEmail.trim(),
+          phone: nextPhone,
+          email: nextEmail,
+          waiting_room_new:
+            selectedCandidate.waitingRoomNew && hasMeaningfulChanges
+              ? false
+              : selectedCandidate.waitingRoomNew,
           updated_at: new Date().toISOString(),
         })
         .eq("id", selectedCandidate.id);
@@ -3126,6 +3269,8 @@ export default function Recruiting({
         hr_sync_pending: sendToHr,
       });
       if (error) throw error;
+
+      await clearWaitingRoomNew(selectedCandidate.id);
 
       setNoteText("");
       setNoteDate(localDateKey());
@@ -3222,6 +3367,8 @@ export default function Recruiting({
         return;
       }
 
+      await clearWaitingRoomNew(selectedCandidate.id);
+
       setNoteText("");
       setNoteDate(localDateKey());
       setNoteCalledByMe(false);
@@ -3299,6 +3446,7 @@ export default function Recruiting({
 
       if (error) throw error;
 
+      await clearWaitingRoomNew(note.candidateId);
       cancelEditNote();
       await loadAll(ctx);
       setMessage("Nota modificata.");
@@ -3318,6 +3466,7 @@ export default function Recruiting({
       setMessage("Errore nell'eliminazione della nota: " + error.message);
       return;
     }
+    await clearWaitingRoomNew(note.candidateId);
     if (editingNoteId === note.id) cancelEditNote();
     await loadAll(ctx);
   };
@@ -5763,9 +5912,14 @@ export default function Recruiting({
                       className="recruiting-candidate-card"
                       style={{
                         textAlign: "left",
-                        border: `6px solid ${statusStyle.border}`,
-                        background: active ? statusStyle.background : "#ffffff",
-                        boxShadow: active
+                        border: `${candidate.waitingRoomNew ? 8 : 6}px solid ${statusStyle.border}`,
+                        background:
+                          candidate.waitingRoomNew || active
+                            ? statusStyle.background
+                            : "#ffffff",
+                        boxShadow: candidate.waitingRoomNew
+                          ? `0 0 0 3px ${statusStyle.border}55, 0 8px 18px rgba(15,23,42,.14)`
+                          : active
                           ? "0 0 0 3px rgba(37,99,235,.22)"
                           : "0 2px 7px rgba(15,23,42,.06)",
                         borderRadius: 10,
