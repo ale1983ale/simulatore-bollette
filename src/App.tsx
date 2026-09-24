@@ -8,6 +8,7 @@ import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogo
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
+import { getRecruitingContext } from "./recruitingClient";
 import "./dashboard.css";
 
 
@@ -6890,6 +6891,7 @@ function DashboardCard({
   onClick,
   compact = false,
   spanMobile = false,
+  notificationCount,
 }: {
   title: string;
   description: string;
@@ -6898,6 +6900,7 @@ function DashboardCard({
   onClick: () => void;
   compact?: boolean;
   spanMobile?: boolean;
+  notificationCount?: number;
 }) {
   return (
     <button
@@ -6912,6 +6915,21 @@ function DashboardCard({
         .join(" ")}
       onClick={onClick}
     >
+      {typeof notificationCount === "number" && (
+        <div
+          className={[
+            "ge-dashboard-card__badge",
+            notificationCount > 0
+              ? "ge-dashboard-card__badge--active"
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label={`${notificationCount} notifiche da lavorare`}
+        >
+          {notificationCount}
+        </div>
+      )}
       <div className="ge-dashboard-card__icon">{icon}</div>
       <div className="ge-dashboard-card__body">
         <div className="ge-dashboard-card__title">{title}</div>
@@ -6956,9 +6974,11 @@ function SectionHero({
 function AdminDashboard({
   navigate,
   openEmail,
+  waitingCount,
 }: {
   navigate: DashboardNavigate;
   openEmail: () => void;
+  waitingCount: number;
 }) {
   return (
     <div className="ge-dashboard">
@@ -7000,9 +7020,18 @@ function AdminDashboard({
           title="CALENDARIO"
           description="Gestisci il tuo calendario e le attività."
           icon="▣"
-          className="ge-card-calendar"
+          className="ge-card-calendar ge-card-calendar--wide"
           compact
           onClick={() => navigate("calendarAdmin")}
+        />
+        <DashboardCard
+          title="SALA D'ATTESA"
+          description="Gestisci nominativi in arrivo e sincronizzazioni HR."
+          icon="⌛"
+          className="ge-card-waiting"
+          compact
+          notificationCount={waitingCount}
+          onClick={() => navigate("recruitingWaiting")}
         />
         <DashboardCard
           title="RECRUITING"
@@ -7126,6 +7155,7 @@ export default function App() {
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [agentSession, setAgentSession] = useState<any>(null);
+  const [waitingRoomCount, setWaitingRoomCount] = useState(0);
 
   const [punPsvRows, setPunPsvRows] = useState<PunPsvRow[]>(INITIAL_PUN_PSV_ROWS);
   const [selectedPunPsvMonth, setSelectedPunPsvMonth] = useState<string>("DICEMBRE 2026");
@@ -7224,6 +7254,72 @@ export default function App() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!adminSession || !adminProfile) {
+      setWaitingRoomCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadWaitingRoomCount = async () => {
+      try {
+        const ctx = await getRecruitingContext();
+
+        const [
+          incomingResult,
+          notesResult,
+          statusResult,
+        ] = await Promise.all([
+          ctx.client
+            .from("recruiting_hr_incoming_candidates")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "pending"),
+          ctx.client
+            .from("recruiting_notes")
+            .select("id", { count: "exact", head: true })
+            .eq("hr_sync_pending", true),
+          ctx.client
+            .from("recruiting_hr_status_sync_queue")
+            .select("id", { count: "exact", head: true }),
+        ]);
+
+        const firstError =
+          incomingResult.error ||
+          notesResult.error ||
+          statusResult.error;
+
+        if (firstError) throw firstError;
+
+        const total =
+          Number(incomingResult.count || 0) +
+          Number(notesResult.count || 0) +
+          Number(statusResult.count || 0);
+
+        if (!cancelled) {
+          setWaitingRoomCount(total);
+        }
+      } catch (error) {
+        console.error("WAITING ROOM COUNT ERROR:", error);
+      }
+    };
+
+    void loadWaitingRoomCount();
+    const timer = window.setInterval(
+      () => void loadWaitingRoomCount(),
+      60000
+    );
+
+    const onFocus = () => void loadWaitingRoomCount();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [adminSession, adminProfile]);
   
   const punPsvRef = useRef<HTMLDivElement>(null);
   const punChartRef = useRef<HTMLDivElement>(null);
@@ -7595,7 +7691,7 @@ useEffect(() => {
 }, [tab]);
 
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingManagement"];
-  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "appointments", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
     string,
@@ -7618,6 +7714,12 @@ useEffect(() => {
       subtitle: "Gestisci contatti, candidati e attività di recruiting.",
       icon: "●●",
       variant: "recruiting",
+    },
+    recruitingWaiting: {
+      title: "SALA D'ATTESA",
+      subtitle: "Gestisci le attività HR in arrivo e in uscita.",
+      icon: "⌛",
+      variant: "waiting",
     },
     appointments: {
       title: "APPUNTAMENTI",
@@ -8062,6 +8164,7 @@ const renderAdminContent = () => {
         <AdminDashboard
           navigate={navigateTo}
           openEmail={openOutlookEmail}
+          waitingCount={waitingRoomCount}
         />
       )}
 
@@ -8088,6 +8191,12 @@ const renderAdminContent = () => {
       {tab === "recruiting" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <Recruiting />
+        </div>
+      )}
+
+      {tab === "recruitingWaiting" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Recruiting initialSection="hr_notes" />
         </div>
       )}
 
