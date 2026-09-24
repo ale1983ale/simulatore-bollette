@@ -5110,20 +5110,16 @@ export default function Recruiting({
           display: grid;
           grid-template-columns: minmax(290px, 38%) minmax(0, 1fr);
           gap: 14px;
-          align-items: stretch;
+          align-items: start;
           min-width: 0;
         }
 
         .recruiting-contact-list-card {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
           min-height: 0;
         }
 
         .recruiting-contact-list-scroll {
-          flex: 1 1 auto;
-          min-height: 0;
+          max-height: 840px;
           overflow: auto;
           display: grid;
           align-content: start;
@@ -5194,13 +5190,8 @@ export default function Recruiting({
             grid-template-columns: minmax(0, 1fr);
           }
 
-          .recruiting-contact-list-card {
-            height: auto;
-          }
-
           .recruiting-contact-list-scroll {
-            flex: none;
-            max-height: 720px;
+            max-height: 760px;
           }
 
           .recruiting-candidate-card {
