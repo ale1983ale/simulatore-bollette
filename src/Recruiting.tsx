@@ -21,6 +21,14 @@ import {
   testRecruitingCrmConnection,
   type RecruitingCrmStatus,
 } from "./crmIntegration";
+import {
+  disconnectRecruitingPerforma,
+  getRecruitingPerformaStatus,
+  saveRecruitingPerformaPassword,
+  saveRecruitingPerformaTokens,
+  syncRecruitingPerformaNow,
+  type RecruitingPerformaStatus,
+} from "./performaIntegration";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
 
@@ -1116,6 +1124,22 @@ export default function Recruiting({
   const [crmShowPassword, setCrmShowPassword] = useState(false);
   const [crmBusy, setCrmBusy] = useState(false);
   const [crmMessage, setCrmMessage] = useState("");
+
+  const [performaStatus, setPerformaStatus] =
+    useState<RecruitingPerformaStatus | null>(null);
+  const [performaUsername, setPerformaUsername] = useState("");
+  const [performaPassword, setPerformaPassword] = useState("");
+  const [performaShowPassword, setPerformaShowPassword] =
+    useState(false);
+  const [performaTokenPayload, setPerformaTokenPayload] =
+    useState("");
+  const [performaSetupOpen, setPerformaSetupOpen] =
+    useState(false);
+  const [performaTokenSetupOpen, setPerformaTokenSetupOpen] =
+    useState(false);
+  const [performaBusy, setPerformaBusy] = useState(false);
+  const [performaMessage, setPerformaMessage] = useState("");
+
   const [macroareas, setMacroareas] = useState<Macroarea[]>([]);
   const [activeAgents, setActiveAgents] = useState<ActiveAgent[]>([]);
   const [statusRows, setStatusRows] = useState<RecruitingStatusRow[]>([]);
@@ -1671,6 +1695,173 @@ export default function Recruiting({
       setCrmBusy(false);
     }
   };
+
+  const refreshPerformaStatus = async () => {
+    try {
+      const status = await getRecruitingPerformaStatus();
+      setPerformaStatus(status);
+      return status;
+    } catch (error: any) {
+      setPerformaMessage(error?.message || String(error));
+      return null;
+    }
+  };
+
+  const connectPerformaWithPassword = async () => {
+    if (!performaUsername.trim() || !performaPassword) {
+      setPerformaMessage(
+        "Inserisci username e password Performa."
+      );
+      return;
+    }
+
+    setPerformaBusy(true);
+    setPerformaMessage("");
+
+    try {
+      const result = await saveRecruitingPerformaPassword({
+        username: performaUsername.trim(),
+        password: performaPassword,
+      });
+
+      setPerformaPassword("");
+      await refreshPerformaStatus();
+      await loadAll(ctx || undefined);
+      setPerformaSetupOpen(false);
+
+      setPerformaMessage(
+        result?.baseline_created
+          ? `Performa collegato. ${Number(
+              result?.candidate_count || 0
+            )} nominativi già presenti sono stati registrati come base: da ora entreranno in IN ARRIVO solo i nuovi.`
+          : `Performa collegato. Nuovi nominativi rilevati: ${Number(
+              result?.new_count || 0
+            )}.`
+      );
+    } catch (error: any) {
+      setPerformaMessage(
+        "Collegamento Performa non riuscito: " +
+          (error?.message || error)
+      );
+    } finally {
+      setPerformaBusy(false);
+    }
+  };
+
+  const connectPerformaWithTokens = async () => {
+    if (!performaTokenPayload.trim()) {
+      setPerformaMessage(
+        "Incolla il JSON della risposta token di Performa."
+      );
+      return;
+    }
+
+    setPerformaBusy(true);
+    setPerformaMessage("");
+
+    try {
+      const result = await saveRecruitingPerformaTokens(
+        performaTokenPayload.trim()
+      );
+
+      setPerformaTokenPayload("");
+      setPerformaTokenSetupOpen(false);
+      setPerformaSetupOpen(false);
+      await refreshPerformaStatus();
+      await loadAll(ctx || undefined);
+
+      setPerformaMessage(
+        result?.baseline_created
+          ? `Performa collegato. ${Number(
+              result?.candidate_count || 0
+            )} nominativi già presenti sono stati registrati come base: da ora entreranno in IN ARRIVO solo i nuovi.`
+          : `Performa collegato. Nuovi nominativi rilevati: ${Number(
+              result?.new_count || 0
+            )}.`
+      );
+    } catch (error: any) {
+      setPerformaMessage(
+        "Collegamento tramite token non riuscito: " +
+          (error?.message || error)
+      );
+    } finally {
+      setPerformaBusy(false);
+    }
+  };
+
+  const syncPerformaNow = async () => {
+    setPerformaBusy(true);
+    setPerformaMessage("");
+
+    try {
+      const result = await syncRecruitingPerformaNow();
+      await loadAll(ctx || undefined);
+      await refreshPerformaStatus();
+
+      setPerformaMessage(
+        result?.baseline_created
+          ? `Prima sincronizzazione completata: ${Number(
+              result?.candidate_count || 0
+            )} nominativi attuali registrati come base.`
+          : `Sincronizzazione Performa completata: ${Number(
+              result?.candidate_count || 0
+            )} nominativi letti · ${Number(
+              result?.new_count || 0
+            )} nuovi in IN ARRIVO${Number(
+              result?.matched_existing_count || 0
+            )
+              ? ` · ${Number(
+                  result.matched_existing_count
+                )} già presenti nei CONTATTI e non duplicati`
+              : ""}.`
+      );
+    } catch (error: any) {
+      await refreshPerformaStatus();
+      setPerformaMessage(
+        "Sincronizzazione Performa non riuscita: " +
+          (error?.message || error)
+      );
+    } finally {
+      setPerformaBusy(false);
+    }
+  };
+
+  const disconnectPerforma = async () => {
+    if (
+      !window.confirm(
+        "Scollegare Performa Recruit? I nominativi già accettati e la base degli ID già visti resteranno memorizzati."
+      )
+    ) {
+      return;
+    }
+
+    setPerformaBusy(true);
+    setPerformaMessage("");
+
+    try {
+      await disconnectRecruitingPerforma();
+      setPerformaUsername("");
+      setPerformaPassword("");
+      setPerformaTokenPayload("");
+      setPerformaSetupOpen(false);
+      setPerformaTokenSetupOpen(false);
+      await refreshPerformaStatus();
+      setPerformaMessage("Performa Recruit scollegato.");
+    } catch (error: any) {
+      setPerformaMessage(
+        "Errore durante lo scollegamento di Performa: " +
+          (error?.message || error)
+      );
+    } finally {
+      setPerformaBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (section === "hr_notes") {
+      void refreshPerformaStatus();
+    }
+  }, [section]);
 
   useEffect(() => {
     if (section === "crm_management") {
@@ -9363,6 +9554,409 @@ export default function Recruiting({
                 {hrOutgoingPendingCount} in uscita
               </div>
             </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              borderRadius: 12,
+              border: `2px solid ${
+                performaStatus?.connected
+                  ? "#22c55e"
+                  : performaStatus?.needs_reconnect
+                  ? "#f59e0b"
+                  : "#cbd5e1"
+              }`,
+              background: performaStatus?.connected
+                ? "#f0fdf4"
+                : performaStatus?.needs_reconnect
+                ? "#fffbeb"
+                : "#f8fafc",
+              padding: 12,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontWeight: 900,
+                    color: "#0f172a",
+                    fontSize: 14,
+                  }}
+                >
+                  PERFORMA RECRUIT
+                </div>
+                <div
+                  style={{
+                    marginTop: 3,
+                    color: performaStatus?.connected
+                      ? "#15803d"
+                      : performaStatus?.needs_reconnect
+                      ? "#b45309"
+                      : "#64748b",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  {performaStatus?.connected
+                    ? `● COLLEGATO · controllo automatico ogni ${Number(
+                        performaStatus.automatic_sync_minutes || 5
+                      )} minuti`
+                    : performaStatus?.needs_reconnect
+                    ? "● SESSIONE SCADUTA · ricollega Performa"
+                    : "● NON COLLEGATO"}
+                </div>
+                {performaStatus?.connected &&
+                  performaStatus?.last_sync_at && (
+                    <div
+                      style={{
+                        marginTop: 3,
+                        color: "#64748b",
+                        fontSize: 11,
+                      }}
+                    >
+                      Ultimo controllo{" "}
+                      {new Date(
+                        performaStatus.last_sync_at
+                      ).toLocaleString("it-IT", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                      {" · "}
+                      {Number(
+                        performaStatus.last_candidate_count || 0
+                      )}{" "}
+                      nominativi letti
+                    </div>
+                  )}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 7,
+                  flexWrap: "wrap",
+                }}
+              >
+                {performaStatus?.connected && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={performaBusy}
+                      onClick={() => void syncPerformaNow()}
+                      style={{
+                        ...buttonStyle,
+                        background: "#16a34a",
+                        color: "white",
+                        opacity: performaBusy ? 0.6 : 1,
+                      }}
+                    >
+                      {performaBusy
+                        ? "SINCRONIZZO..."
+                        : "SINCRONIZZA ORA"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={performaBusy}
+                      onClick={() => void disconnectPerforma()}
+                      style={{
+                        ...buttonStyle,
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        border: "1px solid #fecaca",
+                        opacity: performaBusy ? 0.6 : 1,
+                      }}
+                    >
+                      SCOLLEGA
+                    </button>
+                  </>
+                )}
+
+                {!performaStatus?.connected && (
+                  <button
+                    type="button"
+                    disabled={performaBusy}
+                    onClick={() =>
+                      setPerformaSetupOpen((current) => !current)
+                    }
+                    style={{
+                      ...buttonStyle,
+                      background: "#2563eb",
+                      color: "white",
+                      opacity: performaBusy ? 0.6 : 1,
+                    }}
+                  >
+                    {performaSetupOpen
+                      ? "CHIUDI"
+                      : "COLLEGA PERFORMA"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {performaStatus?.last_sync_error && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 9px",
+                  borderRadius: 8,
+                  background: "#fff7ed",
+                  border: "1px solid #fed7aa",
+                  color: "#9a3412",
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              >
+                {performaStatus.last_sync_error}
+              </div>
+            )}
+
+            {performaSetupOpen && !performaStatus?.connected && (
+              <div
+                style={{
+                  marginTop: 12,
+                  borderTop: "1px solid #e2e8f0",
+                  paddingTop: 12,
+                }}
+              >
+                <div
+                  style={{
+                    marginBottom: 10,
+                    color: "#475569",
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Al primo collegamento i nominativi già presenti su
+                  Performa vengono registrati come base e{" "}
+                  <strong>non vengono caricati in massa</strong>.
+                  Da quel momento, ogni nuovo ID Performa finirà in{" "}
+                  <strong>IN ARRIVO</strong> con dati e note già
+                  presenti nella scheda.
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit,minmax(210px,1fr))",
+                    gap: 9,
+                    alignItems: "end",
+                  }}
+                >
+                  <div>
+                    <label style={labelStyle}>
+                      Username Performa
+                    </label>
+                    <input
+                      value={performaUsername}
+                      onChange={(event) =>
+                        setPerformaUsername(event.target.value)
+                      }
+                      autoComplete="username"
+                      placeholder="Username / email"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>
+                      Password Performa
+                    </label>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 6,
+                      }}
+                    >
+                      <input
+                        type={
+                          performaShowPassword
+                            ? "text"
+                            : "password"
+                        }
+                        value={performaPassword}
+                        onChange={(event) =>
+                          setPerformaPassword(
+                            event.target.value
+                          )
+                        }
+                        autoComplete="current-password"
+                        placeholder="Password"
+                        style={{
+                          ...inputStyle,
+                          flex: 1,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPerformaShowPassword(
+                            (current) => !current
+                          )
+                        }
+                        style={{
+                          ...buttonStyle,
+                          padding: "7px 9px",
+                          background: "#e2e8f0",
+                        }}
+                      >
+                        {performaShowPassword ? "NASCONDI" : "MOSTRA"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={performaBusy}
+                    onClick={() =>
+                      void connectPerformaWithPassword()
+                    }
+                    style={{
+                      ...buttonStyle,
+                      minHeight: 42,
+                      background: "#2563eb",
+                      color: "white",
+                      opacity: performaBusy ? 0.6 : 1,
+                    }}
+                  >
+                    {performaBusy
+                      ? "COLLEGAMENTO..."
+                      : "COLLEGA CON LOGIN"}
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPerformaTokenSetupOpen(
+                        (current) => !current
+                      )
+                    }
+                    style={{
+                      ...buttonStyle,
+                      background: "#f1f5f9",
+                      color: "#334155",
+                    }}
+                  >
+                    {performaTokenSetupOpen
+                      ? "NASCONDI COLLEGAMENTO TOKEN"
+                      : "LOGIN MICROSOFT / COLLEGAMENTO TOKEN"}
+                  </button>
+                  <span
+                    style={{
+                      color: "#64748b",
+                      fontSize: 11,
+                    }}
+                  >
+                    Usa questa modalità solo se il login diretto non
+                    viene accettato.
+                  </span>
+                </div>
+
+                {performaTokenSetupOpen && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: 10,
+                      borderRadius: 9,
+                      background: "#fff",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "#475569",
+                        fontSize: 11,
+                        lineHeight: 1.45,
+                        marginBottom: 7,
+                      }}
+                    >
+                      Apri Performa → F12 → Network → cerca{" "}
+                      <strong>token</strong> → clicca la richiesta
+                      verso <strong>openid-connect/token</strong> →
+                      Response. Copia l'intero JSON e incollalo{" "}
+                      <strong>qui dentro</strong>. Non inviarlo in
+                      chat: access token e refresh token sono
+                      credenziali sensibili e vengono cifrati prima
+                      di essere conservati.
+                    </div>
+
+                    <textarea
+                      rows={5}
+                      value={performaTokenPayload}
+                      onChange={(event) =>
+                        setPerformaTokenPayload(
+                          event.target.value
+                        )
+                      }
+                      placeholder='{"access_token":"...","refresh_token":"...","expires_in":...}'
+                      style={{
+                        ...inputStyle,
+                        resize: "vertical",
+                        fontFamily:
+                          "ui-monospace,SFMono-Regular,Menlo,monospace",
+                        fontSize: 11,
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      disabled={performaBusy}
+                      onClick={() =>
+                        void connectPerformaWithTokens()
+                      }
+                      style={{
+                        ...buttonStyle,
+                        marginTop: 8,
+                        background: "#0f766e",
+                        color: "white",
+                        opacity: performaBusy ? 0.6 : 1,
+                      }}
+                    >
+                      {performaBusy
+                        ? "COLLEGAMENTO..."
+                        : "SALVA TOKEN E COLLEGA"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {performaMessage && (
+              <div
+                style={{
+                  marginTop: 9,
+                  padding: "8px 9px",
+                  borderRadius: 8,
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  color: "#334155",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {performaMessage}
+              </div>
+            )}
           </div>
 
           <div className="hr-sync-columns">
