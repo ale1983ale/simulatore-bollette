@@ -7589,7 +7589,7 @@ function AgentDashboard({
         <DashboardCard
           title="GAS"
           description="Simula una fattura di gas metano."
-          icon="◆"
+          icon="🔥"
           className="ge-card-gas"
           spanMobile
           onClick={() => navigate("gas")}
@@ -7600,7 +7600,7 @@ function AgentDashboard({
         <DashboardCard
           title="PUN"
           description="Analizza i dati del mercato PUN."
-          icon="▥"
+          icon="📈"
           className="ge-card-pun"
           compact
           onClick={() => navigate("punpsvPublic")}
@@ -7608,7 +7608,7 @@ function AgentDashboard({
         <DashboardCard
           title="ATECO"
           description="Analizza i dati ATECO."
-          icon="▦"
+          icon="🧾"
           className="ge-card-ateco"
           compact
           onClick={() => navigate("ateco")}
