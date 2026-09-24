@@ -1012,7 +1012,22 @@ export default function Recruiting({
   const [statusFilter, setStatusFilter] = useState<"" | CandidateStatus>("");
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
-  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const selectedCandidateStorageKey =
+    `recruiting_selected_candidate_${contactScope}`;
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(
+    () => {
+      try {
+        return window.localStorage.getItem(
+          `recruiting_selected_candidate_${contactScope}`
+        );
+      } catch {
+        return null;
+      }
+    }
+  );
+  const selectedCandidateIdRef = useRef<string | null>(
+    selectedCandidateId
+  );
   const [contactEditMode, setContactEditMode] = useState(false);
   const [showStatusManager, setShowStatusManager] = useState(false);
   const [newStatusLabel, setNewStatusLabel] = useState("");
@@ -1242,8 +1257,41 @@ export default function Recruiting({
     }));
     setMacroareas(nextMacroareas);
 
-    if (!selectedCandidateId && nextCandidates.length) {
-      setSelectedCandidateId(nextCandidates[0].id);
+    const rememberedCandidateId =
+      selectedCandidateIdRef.current;
+    const rememberedCandidateStillExists =
+      Boolean(rememberedCandidateId) &&
+      nextCandidates.some(
+        (candidate) => candidate.id === rememberedCandidateId
+      );
+
+    if (!rememberedCandidateId && nextCandidates.length) {
+      const firstCandidateId = nextCandidates[0].id;
+      selectedCandidateIdRef.current = firstCandidateId;
+      setSelectedCandidateId(firstCandidateId);
+      try {
+        window.localStorage.setItem(
+          selectedCandidateStorageKey,
+          firstCandidateId
+        );
+      } catch {
+        // localStorage non disponibile: lo stato React resta comunque valido.
+      }
+    } else if (
+      rememberedCandidateId &&
+      !rememberedCandidateStillExists
+    ) {
+      // Solo se il nominativo non esiste più (es. è stato eliminato)
+      // azzera la selezione; non saltare automaticamente su un altro contatto.
+      selectedCandidateIdRef.current = null;
+      setSelectedCandidateId(null);
+      try {
+        window.localStorage.removeItem(
+          selectedCandidateStorageKey
+        );
+      } catch {
+        // Nessuna azione necessaria.
+      }
     }
     if (!mapMacroareaId && nextMacroareas.length) {
       setMapMacroareaId(nextMacroareas[0].id);
@@ -1548,6 +1596,25 @@ export default function Recruiting({
 
   const selectedCandidate =
     candidates.find((candidate) => candidate.id === selectedCandidateId) || null;
+
+  useEffect(() => {
+    selectedCandidateIdRef.current = selectedCandidateId;
+
+    try {
+      if (selectedCandidateId) {
+        window.localStorage.setItem(
+          selectedCandidateStorageKey,
+          selectedCandidateId
+        );
+      } else {
+        window.localStorage.removeItem(
+          selectedCandidateStorageKey
+        );
+      }
+    } catch {
+      // localStorage non disponibile: la selezione resta comunque in memoria.
+    }
+  }, [selectedCandidateId, selectedCandidateStorageKey]);
 
   useEffect(() => {
     if (!selectedCandidate) return;
