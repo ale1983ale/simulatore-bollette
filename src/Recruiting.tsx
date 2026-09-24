@@ -37,6 +37,7 @@ type Candidate = {
   email: string;
   companyName: string;
   createdAt: string;
+  updatedAt: string;
   status: CandidateStatus;
   forwardedTo: string;
   provinceCode: string;
@@ -736,6 +737,7 @@ function candidateFromRow(row: any): Candidate {
     email: String(row.email || ""),
     companyName: String(row.company_name || ""),
     createdAt: String(row.created_at || ""),
+    updatedAt: String(row.updated_at || row.created_at || ""),
     status: (String(row.contact_status || "DA_CHIAMARE") as CandidateStatus),
     forwardedTo: String(row.forwarded_to || ""),
     provinceCode: normalizeProvinceCode(String(row.province_code || "")),
@@ -1226,7 +1228,7 @@ export default function Recruiting({
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,contact_status,forwarded_to,province_code,region,latitude,longitude")
+        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -1944,29 +1946,51 @@ export default function Recruiting({
 
       return true;
     }).sort((a, b) => {
-      const aPriority = a.status === "DA_CHIAMARE" ? 0 : 1;
-      const bPriority = b.status === "DA_CHIAMARE" ? 0 : 1;
+      const aFirstCall = a.status === "DA_CHIAMARE";
+      const bFirstCall = b.status === "DA_CHIAMARE";
 
-      if (aPriority !== bPriority) {
-        return aPriority - bPriority;
+      // I "DA CHIAMARE PER LA PRIMA VOLTA" restano sempre in testa.
+      if (aFirstCall !== bFirstCall) {
+        return aFirstCall ? -1 : 1;
       }
 
-      const aCreatedKey = a.createdAt
-        ? `${a.createdAt.slice(0, 10)}|${a.createdAt}`
-        : "";
-      const bCreatedKey = b.createdAt
-        ? `${b.createdAt.slice(0, 10)}|${b.createdAt}`
-        : "";
+      // Tra i nominativi già lavorati, ordina dal più recente in base
+      // all'ultima nota O all'ultimo aggiornamento della scheda/stato.
+      if (!aFirstCall && !bFirstCall) {
+        const aLastNote =
+          lastNoteSortKeyByCandidateId.get(a.id) || "";
+        const bLastNote =
+          lastNoteSortKeyByCandidateId.get(b.id) || "";
 
-      const aLast =
-        lastNoteSortKeyByCandidateId.get(a.id) || aCreatedKey;
-      const bLast =
-        lastNoteSortKeyByCandidateId.get(b.id) || bCreatedKey;
+        const aUpdated = a.updatedAt
+          ? `${a.updatedAt.slice(0, 10)}|${a.updatedAt}`
+          : "";
+        const bUpdated = b.updatedAt
+          ? `${b.updatedAt.slice(0, 10)}|${b.updatedAt}`
+          : "";
 
-      if (aLast !== bLast) {
-        return bLast.localeCompare(aLast);
+        const aCreated = a.createdAt
+          ? `${a.createdAt.slice(0, 10)}|${a.createdAt}`
+          : "";
+        const bCreated = b.createdAt
+          ? `${b.createdAt.slice(0, 10)}|${b.createdAt}`
+          : "";
+
+        const aLast = [aLastNote, aUpdated, aCreated]
+          .filter(Boolean)
+          .sort()
+          .at(-1) || "";
+        const bLast = [bLastNote, bUpdated, bCreated]
+          .filter(Boolean)
+          .sort()
+          .at(-1) || "";
+
+        if (aLast !== bLast) {
+          return bLast.localeCompare(aLast);
+        }
       }
 
+      // A parità di priorità/data, ordine alfabetico stabile.
       return a.fullName.localeCompare(b.fullName, "it");
     });
   }, [
