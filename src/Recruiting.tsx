@@ -1275,6 +1275,12 @@ export default function Recruiting({
 
   const [forwardedNewCandidateId, setForwardedNewCandidateId] = useState<string | null>(null);
   const [forwardedNewName, setForwardedNewName] = useState("");
+  const [forwardedManagerCandidateId, setForwardedManagerCandidateId] =
+    useState<string | null>(null);
+  const [forwardedEditingOriginalName, setForwardedEditingOriginalName] =
+    useState("");
+  const [forwardedEditingName, setForwardedEditingName] =
+    useState("");
 
   const [eventModalId, setEventModalId] = useState<string | null>(null);
   const [eventModalMode, setEventModalMode] = useState<"view" | "edit">("view");
@@ -2849,16 +2855,11 @@ export default function Recruiting({
   const clearWaitingRoomNew = async (candidateId: string) => {
     if (!ctx) return false;
 
-    const candidate =
-      candidates.find((item) => item.id === candidateId) ||
-      allCandidates.find((item) => item.id === candidateId);
-
-    if (!candidate?.waitingRoomNew) return true;
-
     const { error } = await ctx.client
       .from("recruiting_candidates")
       .update({ waiting_room_new: false })
-      .eq("id", candidateId);
+      .eq("id", candidateId)
+      .eq("owner_key", ctx.ownerKey);
 
     if (error) {
       setMessage(
@@ -3119,6 +3120,117 @@ export default function Recruiting({
     await updateCandidateForwardedTo(candidate, value);
     setForwardedNewCandidateId(null);
     setForwardedNewName("");
+  };
+
+  const openForwardedRecipientManager = (candidateId: string) => {
+    setForwardedNewCandidateId(null);
+    setForwardedNewName("");
+    setForwardedEditingOriginalName("");
+    setForwardedEditingName("");
+    setForwardedManagerCandidateId(candidateId);
+  };
+
+  const closeForwardedRecipientManager = () => {
+    setForwardedManagerCandidateId(null);
+    setForwardedEditingOriginalName("");
+    setForwardedEditingName("");
+  };
+
+  const renameForwardedRecipient = async () => {
+    if (!ctx) return;
+
+    const previousName = forwardedEditingOriginalName.trim();
+    const nextName = forwardedEditingName.trim();
+
+    if (!previousName || !nextName) {
+      setMessage("Scrivi il nuovo nome.");
+      return;
+    }
+
+    if (previousName === nextName) {
+      setForwardedEditingOriginalName("");
+      setForwardedEditingName("");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_candidates")
+        .update({ forwarded_to: nextName })
+        .eq("owner_key", ctx.ownerKey)
+        .eq("contact_scope", contactScope)
+        .eq("forwarded_to", previousName);
+
+      if (error) throw error;
+
+      setForwardedEditingOriginalName("");
+      setForwardedEditingName("");
+      await loadAll(ctx);
+      setMessage(
+        `Suggerimento modificato: ${previousName} → ${nextName}.`
+      );
+    } catch (error: any) {
+      setMessage(
+        "Errore nella modifica del suggerimento: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteForwardedRecipient = async (name: string) => {
+    if (!ctx) return;
+
+    if (
+      !window.confirm(
+        `Eliminare "${name}" dai suggerimenti INOLTRATO A? Verrà rimosso anche dalle schede che lo utilizzano.`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_candidates")
+        .update({ forwarded_to: "" })
+        .eq("owner_key", ctx.ownerKey)
+        .eq("contact_scope", contactScope)
+        .eq("forwarded_to", name);
+
+      if (error) throw error;
+
+      if (forwardedEditingOriginalName === name) {
+        setForwardedEditingOriginalName("");
+        setForwardedEditingName("");
+      }
+
+      await loadAll(ctx);
+      setMessage(`Suggerimento "${name}" eliminato.`);
+    } catch (error: any) {
+      setMessage(
+        "Errore nell'eliminazione del suggerimento: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openCandidateFullDetails = (candidateId: string) => {
+    setContactEditMode(false);
+    setSelectedCandidateId(candidateId);
+
+    window.setTimeout(() => {
+      document
+        .getElementById("recruiting-contact-detail")
+        ?.scrollIntoView({
+          behavior: "auto",
+          block: "start",
+        });
+    }, 0);
   };
 
   const autofillEditGeography = async (zoneValue: string) => {
@@ -6118,24 +6230,21 @@ export default function Recruiting({
                       key={candidate.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => {
-                        setContactEditMode(false);
-                        setSelectedCandidateId(candidate.id);
-                      }}
+                      onClick={() =>
+                        openCandidateFullDetails(candidate.id)
+                      }
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
-                          setContactEditMode(false);
-                          setSelectedCandidateId(candidate.id);
+                          openCandidateFullDetails(candidate.id);
                         }
                       }}
                       className="recruiting-candidate-card"
                       style={{
                         textAlign: "left",
                         border: `${candidate.waitingRoomNew ? 8 : 6}px solid ${statusStyle.border}`,
-                        background:
-                          candidate.waitingRoomNew || active
-                            ? statusStyle.background
-                            : "#ffffff",
+                        background: candidate.waitingRoomNew
+                          ? statusStyle.background
+                          : "#ffffff",
                         boxShadow: candidate.waitingRoomNew
                           ? `0 0 0 3px ${statusStyle.border}55, 0 8px 18px rgba(15,23,42,.14)`
                           : active
@@ -6144,10 +6253,18 @@ export default function Recruiting({
                         borderRadius: 10,
                         padding: 11,
                         cursor: "pointer",
+                        fontFamily: "inherit",
+                        fontSize: 12,
+                        lineHeight: 1.35,
                       }}
                     >
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 900 }}>
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            fontSize: 16,
+                          }}
+                        >
                           {candidate.fullName}
                         </div>
 
@@ -6155,7 +6272,7 @@ export default function Recruiting({
                           style={{
                             marginTop: 5,
                             color: "#dc2626",
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: 900,
                           }}
                         >
@@ -6197,7 +6314,7 @@ export default function Recruiting({
                                 style={{
                                   color: "#111827",
                                   textDecoration: "underline",
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   fontWeight: 800,
                                 }}
                               >
@@ -6226,7 +6343,7 @@ export default function Recruiting({
                               </a>
                             </>
                           ) : (
-                            <span style={{ color: "#64748b", fontSize: 13 }}>
+                            <span style={{ color: "#64748b", fontSize: 12 }}>
                               Telefono non indicato
                             </span>
                           )}
@@ -6373,6 +6490,8 @@ export default function Recruiting({
                               value={
                                 forwardedNewCandidateId === candidate.id
                                   ? "__NEW__"
+                                  : forwardedManagerCandidateId === candidate.id
+                                  ? "__MANAGE__"
                                   : candidate.forwardedTo
                               }
                               onChange={(event) => {
@@ -6380,10 +6499,17 @@ export default function Recruiting({
                                 const value = event.target.value;
 
                                 if (value === "__NEW__") {
+                                  closeForwardedRecipientManager();
                                   beginNewForwardedRecipient(candidate.id);
                                   return;
                                 }
 
+                                if (value === "__MANAGE__") {
+                                  openForwardedRecipientManager(candidate.id);
+                                  return;
+                                }
+
+                                closeForwardedRecipientManager();
                                 setForwardedNewCandidateId(null);
                                 setForwardedNewName("");
                                 void updateCandidateForwardedTo(
@@ -6405,6 +6531,9 @@ export default function Recruiting({
                               ))}
                               <option value="__NEW__">
                                 + Aggiungi nuovo nome
+                              </option>
+                              <option value="__MANAGE__">
+                                ✏ Modifica / elimina suggerimenti
                               </option>
                             </select>
 
@@ -6449,6 +6578,151 @@ export default function Recruiting({
                                 </button>
                               </div>
                             )}
+
+                            {forwardedManagerCandidateId === candidate.id && (
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gap: 7,
+                                  marginTop: 7,
+                                  padding: 7,
+                                  borderRadius: 8,
+                                  background: "white",
+                                  border: "1px solid #c7d2fe",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    gap: 6,
+                                  }}
+                                >
+                                  <strong style={{ fontSize: 11 }}>
+                                    GESTISCI SUGGERIMENTI
+                                  </strong>
+                                  <button
+                                    type="button"
+                                    onClick={closeForwardedRecipientManager}
+                                    style={{
+                                      ...buttonStyle,
+                                      padding: "4px 7px",
+                                      background: "#e2e8f0",
+                                      fontSize: 10,
+                                    }}
+                                  >
+                                    CHIUDI
+                                  </button>
+                                </div>
+
+                                {existingForwardedRecipients.map((name) => (
+                                  <div
+                                    key={name}
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns: "minmax(0,1fr) auto auto",
+                                      gap: 5,
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    {forwardedEditingOriginalName === name ? (
+                                      <input
+                                        value={forwardedEditingName}
+                                        onChange={(event) =>
+                                          setForwardedEditingName(
+                                            event.target.value
+                                          )
+                                        }
+                                        style={{
+                                          ...inputStyle,
+                                          padding: "6px 7px",
+                                          fontSize: 11,
+                                        }}
+                                      />
+                                    ) : (
+                                      <div
+                                        style={{
+                                          minWidth: 0,
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          fontSize: 11,
+                                          fontWeight: 800,
+                                        }}
+                                      >
+                                        {name}
+                                      </div>
+                                    )}
+
+                                    {forwardedEditingOriginalName === name ? (
+                                      <button
+                                        type="button"
+                                        disabled={busy}
+                                        onClick={() =>
+                                          void renameForwardedRecipient()
+                                        }
+                                        style={{
+                                          ...buttonStyle,
+                                          padding: "5px 7px",
+                                          background: "#16a34a",
+                                          color: "white",
+                                          fontSize: 10,
+                                        }}
+                                      >
+                                        SALVA
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setForwardedEditingOriginalName(
+                                            name
+                                          );
+                                          setForwardedEditingName(name);
+                                        }}
+                                        style={{
+                                          ...buttonStyle,
+                                          padding: "5px 7px",
+                                          background: "#dbeafe",
+                                          color: "#1d4ed8",
+                                          fontSize: 10,
+                                        }}
+                                      >
+                                        MODIFICA
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        void deleteForwardedRecipient(name)
+                                      }
+                                      style={{
+                                        ...buttonStyle,
+                                        padding: "5px 7px",
+                                        background: "#fee2e2",
+                                        color: "#b91c1c",
+                                        fontSize: 10,
+                                      }}
+                                    >
+                                      ELIMINA
+                                    </button>
+                                  </div>
+                                ))}
+
+                                {!existingForwardedRecipients.length && (
+                                  <div
+                                    style={{
+                                      color: "#64748b",
+                                      fontSize: 11,
+                                    }}
+                                  >
+                                    Nessun suggerimento salvato.
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -6462,7 +6736,10 @@ export default function Recruiting({
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div
+              id="recruiting-contact-detail"
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
               {!selectedCandidate ? (
                 <div style={cardStyle}>Seleziona un contatto per aprire la scheda.</div>
               ) : (
