@@ -7711,8 +7711,11 @@ export default function App() {
 
   const openDatabaseSettings = () => {
     setAdminMenuOpen(false);
-    setTab("agents");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    window.requestAnimationFrame(() => {
+      setTab("agents");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   const toggleAdminMenu = () => {
@@ -8258,10 +8261,9 @@ useEffect(() => {
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingManagement", "recruitingCrm"];
 
   useEffect(() => {
-    if (
-      databaseAdminTabs.includes(tab) &&
-      adminMenuOpen
-    ) {
+    // La barra Area Admin può esistere esclusivamente
+    // sulla DASHBOARD. Qualunque altra scheda la chiude.
+    if (tab !== "dashboard" && adminMenuOpen) {
       setAdminMenuOpen(false);
     }
   }, [tab, adminMenuOpen]);
@@ -9002,6 +9004,7 @@ if (!agentSession && !adminSession) {
         }}
       >
         <div
+          className="ge-main-nav__primary"
           style={{
             display: "flex",
             gap: 8,
