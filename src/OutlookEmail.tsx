@@ -8,6 +8,7 @@ type AgentRow = {
   agenzia: string;
   email: string;
   allegato: string;
+  dm: string;
 };
 
 type PreparedRow = AgentRow & {
@@ -459,8 +460,12 @@ export default function OutlookEmail() {
           agenzia: String(item?.agenzia || ""),
           email: String(item?.email || ""),
           allegato: String(item?.allegato || ""),
+          dm: String(item?.dm || ""),
         }))
-        .filter((item) => item.agenzia || item.email || item.allegato);
+        .filter(
+          (item) =>
+            item.agenzia || item.email || item.allegato || item.dm
+        );
       setAgents(cleaned);
       setRemovedRows(new Set());
       setDirty(false);
@@ -481,6 +486,7 @@ export default function OutlookEmail() {
         agenzia: agent.agenzia.trim(),
         email: agent.email.trim(),
         allegato: agent.allegato.trim(),
+        dm: agent.dm.trim(),
       }));
       const now = new Date().toISOString();
       const response = await fetch(`${supabaseUrl}/rest/v1/email_recipient_lists?on_conflict=owner_key`, {
@@ -602,6 +608,18 @@ export default function OutlookEmail() {
     [agents, assignment]
   );
 
+  const dmSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          agents
+            .map((agent) => agent.dm.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [agents]
+  );
+
   const probableSourceMatches = useMemo(() => {
     return sourceAgencies
       .map((source, sourceIndex) => {
@@ -630,8 +648,11 @@ export default function OutlookEmail() {
           agenzia: String(row.AGENZIA ?? row.Agenzia ?? row.agenzia ?? "").trim(),
           email: String(row.EMAIL ?? row.Email ?? row.email ?? "").trim(),
           allegato: String(row.ALLEGATO ?? row.Allegato ?? row.allegato ?? "").trim(),
+          dm: String(row.DM ?? row.Dm ?? row.dm ?? "").trim(),
         }))
-        .filter((row) => row.agenzia || row.email || row.allegato);
+        .filter(
+          (row) => row.agenzia || row.email || row.allegato || row.dm
+        );
       if (!parsed.length) throw new Error("Il file deve avere le colonne AGENZIA, EMAIL e ALLEGATO.");
       setAgents(parsed);
       setRemovedRows(new Set());
@@ -774,7 +795,10 @@ export default function OutlookEmail() {
   };
 
   const addAgent = () => {
-    setAgents((current) => [...current, { agenzia: "", email: "", allegato: "" }]);
+    setAgents((current) => [
+      ...current,
+      { agenzia: "", email: "", allegato: "", dm: "" },
+    ]);
     setEditingRecipients(true);
     setDirty(true);
   };
@@ -972,8 +996,30 @@ export default function OutlookEmail() {
                 {renderRecipientEditButtons()}
               </div>
 
+              <datalist id="outlook-email-dm-options">
+                {dmSuggestions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+
               <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: 14 }}>
-                <thead><tr style={{ textAlign: "left", borderBottom: "1px solid #e2e8f0" }}><th style={{ padding: 8 }}>Agenzia</th><th style={{ padding: 8 }}>Email</th><th style={{ padding: 8 }}>Allegato previsto</th><th style={{ padding: 8 }}>File associato / Stato</th>{editingRecipients && <th style={{ padding: 8 }}>Azioni</th>}</tr></thead>
+                <thead>
+                  <tr
+                    style={{
+                      textAlign: "left",
+                      borderBottom: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <th style={{ padding: 8 }}>Agenzia</th>
+                    <th style={{ padding: 8 }}>Email</th>
+                    <th style={{ padding: 8 }}>Allegato previsto</th>
+                    <th style={{ padding: 8 }}>File associato / Stato</th>
+                    {editingRecipients && (
+                      <th style={{ padding: 8 }}>Azioni</th>
+                    )}
+                    <th style={{ padding: 8, minWidth: 170 }}>DM</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {matched.map((row, index) => (
                     <tr key={index} data-email-row-index={index} data-email-removed={removedRows.has(index) ? "true" : "false"} data-email-file-name={row.file?.name || ""} style={{ borderBottom: "1px solid #f1f5f9", opacity: removedRows.has(index) ? 0.62 : 1 }}>
@@ -983,10 +1029,42 @@ export default function OutlookEmail() {
                       <td style={{ padding: 8, fontWeight: 700, color: removedRows.has(index) ? "#b91c1c" : row.file && row.email ? "#15803d" : row.file && !row.email ? "#b91c1c" : "#64748b", whiteSpace: "nowrap" }}>
                         {removedRows.has(index) ? "Rimosso manualmente — non inviata" : row.file && row.email ? `✓ ${row.file.name}` : row.file && !row.email ? `Email mancante — ${row.file.name}` : fileMode === "single" && sourceAgencies.length ? "Nessun dato nel file — non inviata" : files.length ? "Nessun file associato — non inviata" : "File non caricati"}
                       </td>
-                      {editingRecipients && <td style={{ padding: 8 }}><button onClick={() => deleteAgent(index)} style={{ ...button, background: "#fee2e2", color: "#991b1b", padding: "7px 10px" }}>Elimina</button></td>}
+                      {editingRecipients && (
+                        <td style={{ padding: 8 }}>
+                          <button
+                            onClick={() => deleteAgent(index)}
+                            style={{
+                              ...button,
+                              background: "#fee2e2",
+                              color: "#991b1b",
+                              padding: "7px 10px",
+                            }}
+                          >
+                            Elimina
+                          </button>
+                        </td>
+                      )}
+                      <td style={{ padding: 8 }}>
+                        {editingRecipients ? (
+                          <input
+                            list="outlook-email-dm-options"
+                            value={agents[index]?.dm ?? ""}
+                            onChange={(e) =>
+                              updateAgent(index, "dm", e.target.value)
+                            }
+                            placeholder="Scrivi o scegli DM"
+                            style={{
+                              ...smallField,
+                              minWidth: 170,
+                            }}
+                          />
+                        ) : (
+                          row.dm || "—"
+                        )}
+                      </td>
                     </tr>
                   ))}
-                  {!matched.length && <tr><td colSpan={editingRecipients ? 5 : 4} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>Nessun nominativo presente.</td></tr>}
+                  {!matched.length && <tr><td colSpan={editingRecipients ? 6 : 5} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>Nessun nominativo presente.</td></tr>}
                 </tbody>
               </table>
 
