@@ -944,7 +944,19 @@ table {
   }
 
   .ge-brand {
-    padding-right: 80px;
+    padding-right: 106px;
+  }
+
+  .ge-brand__title {
+    font-size: 20px;
+    line-height: 1.02;
+    white-space: nowrap;
+  }
+
+  .ge-brand__subtitle {
+    font-size: 7px;
+    letter-spacing: .22em;
+    white-space: nowrap;
   }
 
   .ge-brand-waiting {
