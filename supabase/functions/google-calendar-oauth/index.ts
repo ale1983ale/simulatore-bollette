@@ -2,8 +2,41 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const APP_ORIGIN = "https://simulatore-bollette.vercel.app";
-const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+const GOOGLE_AUTH_SCOPE = `${CALENDAR_SCOPE} ${GMAIL_SEND_SCOPE}`;
 const TIME_ZONE = "Europe/Rome";
+
+const ACTIVITY_CALENDARS: Record<
+  string,
+  { name: string; backgroundColor: string; foregroundColor: string }
+> = {
+  CHIAMARE: {
+    name: "CHIAMARE HR",
+    backgroundColor: "#2563eb",
+    foregroundColor: "#ffffff",
+  },
+  APPUNTAMENTO_ZONA: {
+    name: "APPUNTAMENTO IN ZONA HR",
+    backgroundColor: "#f97316",
+    foregroundColor: "#ffffff",
+  },
+  APPUNTAMENTO_SEDE: {
+    name: "APPUNTAMENTO IN SEDE HR",
+    backgroundColor: "#7c3aed",
+    foregroundColor: "#ffffff",
+  },
+  VIDEOCALL: {
+    name: "VIDEOCALL HR",
+    backgroundColor: "#16a34a",
+    foregroundColor: "#ffffff",
+  },
+  ALTRO: {
+    name: "ALTRO HR",
+    backgroundColor: "#64748b",
+    foregroundColor: "#ffffff",
+  },
+};
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -103,6 +136,20 @@ async function getConnection(adminId: number) {
   return data;
 }
 
+function hasCalendarManagementScope(scope: unknown) {
+  return String(scope || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .includes(CALENDAR_SCOPE);
+}
+
+function hasGmailSendScope(scope: unknown) {
+  return String(scope || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .includes(GMAIL_SEND_SCOPE);
+}
+
 async function refreshGoogleToken(adminId: number, force = false) {
   assertGoogleConfig();
 
@@ -156,7 +203,7 @@ async function refreshGoogleToken(adminId: number, force = false) {
     .update({
       access_token: tokenData.access_token,
       token_type: tokenData.token_type || "Bearer",
-      scope: tokenData.scope || connection.scope || CALENDAR_SCOPE,
+      scope: tokenData.scope || connection.scope || GOOGLE_AUTH_SCOPE,
       expires_at: nextExpiry,
       updated_at: new Date().toISOString(),
     })
@@ -201,6 +248,388 @@ async function googleRequest(
   return response;
 }
 
+async function patchCalendarColor(
+  adminId: number,
+  calendarId: string,
+  config: { backgroundColor: string; foregroundColor: string }
+) {
+  const response = await googleRequest(
+    adminId,
+    `https://www.googleapis.com/calendar/v3/users/me/calendarList/${encodeURIComponent(calendarId)}?colorRgbFormat=true`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        backgroundColor: config.backgroundColor,
+        foregroundColor: config.foregroundColor,
+        selected: true,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(
+      payload?.error?.message ||
+        "Impossibile impostare il colore del calendario Google."
+    );
+  }
+}
+
+async function ensureActivityCalendar(
+  adminId: number,
+  eventType: string
+) {
+  const type = ACTIVITY_CALENDARS[eventType] ? eventType : "ALTRO";
+  const config = ACTIVITY_CALENDARS[type];
+
+  const connection = await getConnection(adminId);
+  if (!connection) {
+    throw new Error("Google Calendar non è collegato.");
+  }
+
+  if (!hasCalendarManagementScope(connection.scope)) {
+    throw new Error(
+      "Google Calendar deve essere ricollegato per autorizzare la creazione dei calendari separati HR."
+    );
+  }
+
+  const { data: existingRow, error: rowError } = await db
+    .from("google_calendar_activity_calendars")
+    .select("*")
+    .eq("admin_id", adminId)
+    .eq("event_type", type)
+    .maybeSingle();
+
+  if (rowError) throw rowError;
+
+  let calendarId = existingRow?.calendar_id
+    ? String(existingRow.calendar_id)
+    : "";
+
+  if (calendarId) {
+    const verifyResponse = await googleRequest(
+      adminId,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`,
+      { method: "GET" }
+    );
+
+    if (verifyResponse.ok) {
+      await patchCalendarColor(adminId, calendarId, config);
+      return calendarId;
+    }
+
+    if (verifyResponse.status !== 404 && verifyResponse.status !== 410) {
+      const payload = await verifyResponse.json().catch(() => ({}));
+      throw new Error(
+        payload?.error?.message ||
+          "Impossibile verificare il calendario Google."
+      );
+    }
+
+    calendarId = "";
+  }
+
+  const listResponse = await googleRequest(
+    adminId,
+    "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250&showHidden=true",
+    { method: "GET" }
+  );
+  const listData = await listResponse.json().catch(() => ({}));
+
+  if (!listResponse.ok) {
+    throw new Error(
+      listData?.error?.message ||
+        "Impossibile leggere l'elenco dei calendari Google."
+    );
+  }
+
+  const existingCalendar = Array.isArray(listData?.items)
+    ? listData.items.find(
+        (item: any) =>
+          String(item?.summary || item?.summaryOverride || "").trim() ===
+            config.name &&
+          String(item?.accessRole || "") === "owner"
+      )
+    : null;
+
+  if (existingCalendar?.id) {
+    calendarId = String(existingCalendar.id);
+  } else {
+    const createResponse = await googleRequest(
+      adminId,
+      "https://www.googleapis.com/calendar/v3/calendars",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          summary: config.name,
+          timeZone: TIME_ZONE,
+        }),
+      }
+    );
+    const created = await createResponse.json().catch(() => ({}));
+
+    if (!createResponse.ok || !created?.id) {
+      throw new Error(
+        created?.error?.message ||
+          `Impossibile creare il calendario ${config.name}.`
+      );
+    }
+
+    calendarId = String(created.id);
+  }
+
+  await patchCalendarColor(adminId, calendarId, config);
+
+  const { error: upsertError } = await db
+    .from("google_calendar_activity_calendars")
+    .upsert(
+      {
+        admin_id: adminId,
+        event_type: type,
+        calendar_id: calendarId,
+        calendar_name: config.name,
+        background_color: config.backgroundColor,
+        foreground_color: config.foregroundColor,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "admin_id,event_type" }
+    );
+
+  if (upsertError) throw upsertError;
+
+  return calendarId;
+}
+
+async function ensureAllActivityCalendars(adminId: number) {
+  const created: Record<string, string> = {};
+  for (const eventType of Object.keys(ACTIVITY_CALENDARS)) {
+    created[eventType] = await ensureActivityCalendar(
+      adminId,
+      eventType
+    );
+  }
+  return created;
+}
+
+function localRomeDateTime(value: string) {
+  const date = new Date(value);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const pick = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "";
+
+  return {
+    date: `${pick("year")}-${pick("month")}-${pick("day")}`,
+    time: `${pick("hour")}:${pick("minute")}`,
+  };
+}
+
+function dateKeysBetween(
+  startDate: string,
+  endDateExclusive: string
+) {
+  const keys: string[] = [];
+  const current = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDateExclusive}T00:00:00Z`);
+
+  while (current < end && keys.length < 370) {
+    keys.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return keys;
+}
+
+async function listExternalGoogleEvents(
+  adminId: number,
+  timeMin: string,
+  timeMax: string
+) {
+  const connection = await getConnection(adminId);
+  if (!connection) {
+    return { connected: false, events: [] };
+  }
+
+  if (!hasCalendarManagementScope(connection.scope)) {
+    throw new Error(
+      "Google Calendar deve essere ricollegato prima di mostrare il calendario completo."
+    );
+  }
+
+  const calendarListResponse = await googleRequest(
+    adminId,
+    "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250&showHidden=false",
+    { method: "GET" }
+  );
+  const calendarList = await calendarListResponse
+    .json()
+    .catch(() => ({}));
+
+  if (!calendarListResponse.ok) {
+    throw new Error(
+      calendarList?.error?.message ||
+        "Impossibile leggere i calendari Google."
+    );
+  }
+
+  const calendars = Array.isArray(calendarList?.items)
+    ? calendarList.items.filter(
+        (item: any) =>
+          item?.deleted !== true &&
+          item?.hidden !== true &&
+          item?.selected !== false &&
+          String(item?.accessRole || "") !== "freeBusyReader"
+      )
+    : [];
+
+  const externalEvents: any[] = [];
+
+  for (const calendar of calendars) {
+    const calendarId = String(calendar?.id || "");
+    if (!calendarId) continue;
+
+    let pageToken = "";
+
+    do {
+      const url = new URL(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`
+      );
+      url.searchParams.set("timeMin", timeMin);
+      url.searchParams.set("timeMax", timeMax);
+      url.searchParams.set("singleEvents", "true");
+      url.searchParams.set("orderBy", "startTime");
+      url.searchParams.set("showDeleted", "false");
+      url.searchParams.set("maxResults", "2500");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+      const response = await googleRequest(
+        adminId,
+        url.toString(),
+        { method: "GET" }
+      );
+
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        console.warn(
+          "GOOGLE CALENDAR LIST EVENTS SKIPPED:",
+          calendarId,
+          payload?.error?.message || response.status
+        );
+        break;
+      }
+
+      const items = Array.isArray(payload?.items)
+        ? payload.items
+        : [];
+
+      for (const event of items) {
+        if (
+          event?.status === "cancelled" ||
+          event?.extendedProperties?.private?.recruiting_event_id ||
+          event?.extendedProperties?.private?.crm_event_id ||
+          event?.extendedProperties?.private?.source === "crm_piuenergia"
+        ) {
+          continue;
+        }
+
+        const allDay = Boolean(event?.start?.date);
+        let startDate = "";
+        let startTime = "";
+        let endDate = "";
+        let endTime = "";
+        let dateKeys: string[] = [];
+
+        if (allDay) {
+          startDate = String(event?.start?.date || "");
+          const endExclusive = String(
+            event?.end?.date || addDays(startDate, 1)
+          );
+          endDate = addDays(endExclusive, -1);
+          dateKeys = dateKeysBetween(
+            startDate,
+            endExclusive
+          );
+        } else if (event?.start?.dateTime) {
+          const start = localRomeDateTime(
+            String(event.start.dateTime)
+          );
+          const end = event?.end?.dateTime
+            ? localRomeDateTime(String(event.end.dateTime))
+            : start;
+
+          startDate = start.date;
+          startTime = start.time;
+          endDate = end.date;
+          endTime = end.time;
+
+          if (startDate && endDate && startDate !== endDate) {
+            const exclusiveEnd =
+              endTime === "00:00"
+                ? endDate
+                : addDays(endDate, 1);
+            dateKeys = dateKeysBetween(
+              startDate,
+              exclusiveEnd
+            );
+          } else {
+            dateKeys = startDate ? [startDate] : [];
+          }
+        }
+
+        if (!dateKeys.length) continue;
+
+        externalEvents.push({
+          id: String(event?.id || ""),
+          calendar_id: calendarId,
+          calendar_name: String(
+            calendar?.summaryOverride ||
+              calendar?.summary ||
+              "Google Calendar"
+          ),
+          summary: String(event?.summary || "SENZA TITOLO"),
+          description: String(event?.description || ""),
+          location: String(event?.location || ""),
+          start_date: startDate,
+          start_time: startTime,
+          end_date: endDate,
+          end_time: endTime,
+          all_day: allDay,
+          date_keys: dateKeys,
+          html_link: String(event?.htmlLink || ""),
+          background_color: String(
+            calendar?.backgroundColor || "#4285f4"
+          ),
+          foreground_color: String(
+            calendar?.foregroundColor || "#ffffff"
+          ),
+        });
+      }
+
+      pageToken = String(payload?.nextPageToken || "");
+    } while (pageToken);
+  }
+
+  externalEvents.sort((a, b) =>
+    `${a.start_date}|${a.start_time}|${a.summary}`.localeCompare(
+      `${b.start_date}|${b.start_time}|${b.summary}`
+    )
+  );
+
+  return {
+    connected: true,
+    events: externalEvents,
+  };
+}
+
 function addDays(dateString: string, days: number) {
   const [year, month, day] = dateString.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
@@ -233,8 +662,8 @@ function addMinutesLocal(dateString: string, timeString: string, minutes: number
 function eventTypeLabel(event: any) {
   const labels: Record<string, string> = {
     CHIAMARE: "CHIAMARE",
-    APPUNTAMENTO_ZONA: "APPUNTAMENTO IN ZONA",
-    APPUNTAMENTO_SEDE: "APPUNTAMENTO IN SEDE",
+    APPUNTAMENTO_ZONA: "APP. IN ZONA",
+    APPUNTAMENTO_SEDE: "APP. IN SEDE",
     VIDEOCALL: "VIDEOCALL",
     ALTRO: "ALTRO",
   };
@@ -263,7 +692,7 @@ async function loadRecruitingEvent(eventId: string, ownerKey: string) {
     const { data, error: candidateError } = await db
       .from("recruiting_candidates")
       .select(
-        "id,full_name,phone,email,operational_zone,province_code,region"
+        "id,contact_scope,full_name,phone,email,operational_zone,province_code,region"
       )
       .eq("id", event.candidate_id)
       .eq("owner_key", ownerKey)
@@ -282,12 +711,19 @@ function buildGoogleEvent(event: any, candidate: any) {
     ? String(candidate.full_name)
     : "";
 
-  const summary = candidateName
-    ? `${typeLabel} - ${candidateName}`
+  const isExternalContact =
+    String(candidate?.contact_scope || "internal") === "external";
+  const displayName = candidateName
+    ? `${isExternalContact ? "[ESTERNO] " : ""}${candidateName}`
+    : "";
+
+  const summary = displayName
+    ? `${typeLabel} - ${displayName}`
     : typeLabel;
 
   const descriptionParts = [
     event.completed ? "ATTIVITÀ COMPLETATA" : "",
+    isExternalContact ? "Origine: CONTATTI ESTERNI" : "",
     event.notes ? String(event.notes) : "",
     candidate?.phone ? `Telefono: ${candidate.phone}` : "",
     candidate?.email ? `Email: ${candidate.email}` : "",
@@ -352,14 +788,62 @@ async function syncOneEvent(
   }
 
   const { event, candidate } = await loadRecruitingEvent(eventId, ownerKey);
-  const calendarId = String(event.google_calendar_id || connection.calendar_id || "primary");
+
+  // Gli eventi importati da un calendario Google esterno restano collegati
+  // solo al calendario interno della webapp: non devono essere ricreati,
+  // spostati o duplicati nei calendari HR di Google.
+  if (String(event.source_type || "") === "GOOGLE") {
+    return {
+      synced: false,
+      connected: true,
+      skipped: true,
+      reason: "external_google_import",
+    };
+  }
+
   const body = buildGoogleEvent(event, candidate);
 
   try {
-    let response: Response;
+    const calendarId = await ensureActivityCalendar(
+      adminId,
+      String(event.event_type || "ALTRO")
+    );
+
+    const previousCalendarId = String(
+      event.google_calendar_id || connection.calendar_id || "primary"
+    );
+
     let googleEventId = event.google_event_id
       ? String(event.google_event_id)
       : "";
+
+    if (
+      googleEventId &&
+      previousCalendarId &&
+      previousCalendarId !== calendarId
+    ) {
+      const deleteOldResponse = await googleRequest(
+        adminId,
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(previousCalendarId)}/events/${encodeURIComponent(googleEventId)}`,
+        { method: "DELETE" }
+      );
+
+      if (
+        !deleteOldResponse.ok &&
+        deleteOldResponse.status !== 404 &&
+        deleteOldResponse.status !== 410
+      ) {
+        const payload = await deleteOldResponse.json().catch(() => ({}));
+        throw new Error(
+          payload?.error?.message ||
+            "Errore durante lo spostamento dell'evento nel nuovo calendario."
+        );
+      }
+
+      googleEventId = "";
+    }
+
+    let response: Response;
 
     if (googleEventId) {
       response = await googleRequest(
@@ -375,7 +859,9 @@ async function syncOneEvent(
         googleEventId = "";
       } else if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || "Errore aggiornamento evento Google.");
+        throw new Error(
+          errorText || "Errore aggiornamento evento Google."
+        );
       }
     }
 
@@ -419,6 +905,7 @@ async function syncOneEvent(
       synced: true,
       connected: true,
       google_event_id: googleEventId,
+      google_calendar_id: calendarId,
     };
   } catch (error: any) {
     const message = error?.message || String(error);
@@ -563,7 +1050,7 @@ async function handleCallback(req: Request) {
         access_token: tokenData.access_token,
         refresh_token: refreshToken,
         token_type: tokenData.token_type || "Bearer",
-        scope: tokenData.scope || CALENDAR_SCOPE,
+        scope: tokenData.scope || GOOGLE_AUTH_SCOPE,
         expires_at: expiresAt,
         calendar_id: "primary",
         connected_at: new Date().toISOString(),
@@ -575,6 +1062,23 @@ async function handleCallback(req: Request) {
 
   if (connectionError) {
     return new Response(connectionError.message, { status: 500 });
+  }
+
+  await db
+    .from("google_calendar_activity_calendars")
+    .delete()
+    .eq("admin_id", Number(stateRow.admin_id));
+
+  try {
+    await ensureAllActivityCalendars(Number(stateRow.admin_id));
+  } catch (calendarError: any) {
+    returnUrl.searchParams.set("google_calendar", "error");
+    returnUrl.searchParams.set(
+      "google_calendar_message",
+      calendarError?.message ||
+        "Errore nella creazione dei calendari attività HR."
+    );
+    return Response.redirect(returnUrl.toString(), 302);
   }
 
   await db
@@ -610,14 +1114,27 @@ Deno.serve(async (req: Request) => {
 
     if (action === "status") {
       const connection = await getConnection(admin.id);
+      const connected = Boolean(connection?.refresh_token);
+      const calendarManagementReady =
+        connected && hasCalendarManagementScope(connection?.scope);
+      const gmailSendReady =
+        connected && hasGmailSendScope(connection?.scope);
+
       return json({
         configured: Boolean(
           GOOGLE_CLIENT_ID &&
             GOOGLE_CLIENT_SECRET &&
             GOOGLE_REDIRECT_URI
         ),
-        connected: Boolean(connection?.refresh_token),
+        connected,
+        calendar_management_ready: calendarManagementReady,
+        email_notifications_ready: gmailSendReady,
+        needs_reconnect:
+          connected && (!calendarManagementReady || !gmailSendReady),
         expires_at: connection?.expires_at || null,
+        activity_calendars: Object.values(ACTIVITY_CALENDARS).map(
+          (config) => config.name
+        ),
       });
     }
 
@@ -649,7 +1166,7 @@ Deno.serve(async (req: Request) => {
       authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
       authUrl.searchParams.set("redirect_uri", GOOGLE_REDIRECT_URI);
       authUrl.searchParams.set("response_type", "code");
-      authUrl.searchParams.set("scope", CALENDAR_SCOPE);
+      authUrl.searchParams.set("scope", GOOGLE_AUTH_SCOPE);
       authUrl.searchParams.set("access_type", "offline");
       authUrl.searchParams.set("prompt", "consent");
       authUrl.searchParams.set("include_granted_scopes", "true");
@@ -687,9 +1204,36 @@ Deno.serve(async (req: Request) => {
           .from("google_calendar_connections")
           .delete()
           .eq("admin_id", admin.id);
+
+        await db
+          .from("google_calendar_activity_calendars")
+          .delete()
+          .eq("admin_id", admin.id);
       }
 
       return json({ connected: false });
+    }
+
+    if (action === "list_events") {
+      const timeMin = String(body?.time_min || "");
+      const timeMax = String(body?.time_max || "");
+
+      if (
+        !timeMin ||
+        !timeMax ||
+        !Number.isFinite(new Date(timeMin).getTime()) ||
+        !Number.isFinite(new Date(timeMax).getTime())
+      ) {
+        throw new Error("Intervallo calendario non valido.");
+      }
+
+      return json(
+        await listExternalGoogleEvents(
+          admin.id,
+          timeMin,
+          timeMax
+        )
+      );
     }
 
     if (action === "sync_event") {
@@ -732,16 +1276,21 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
 
       let synced = 0;
+      let skipped = 0;
       let errors = 0;
 
       for (const row of rows || []) {
         try {
-          await syncOneEvent(
+          const result = await syncOneEvent(
             admin.id,
             admin.ownerKey,
             String(row.id)
           );
-          synced += 1;
+          if (result?.skipped) {
+            skipped += 1;
+          } else if (result?.synced) {
+            synced += 1;
+          }
         } catch {
           errors += 1;
         }
@@ -750,6 +1299,7 @@ Deno.serve(async (req: Request) => {
       return json({
         connected: true,
         synced,
+        skipped,
         errors,
       });
     }
