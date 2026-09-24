@@ -7705,6 +7705,7 @@ export default function App() {
   }, [tab]);
 
   const openOutlookEmail = () => {
+    setAdminMenuOpen(true);
     window.dispatchEvent(new CustomEvent("open-outlook-email"));
   };
 
