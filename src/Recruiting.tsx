@@ -1149,6 +1149,12 @@ export default function Recruiting({
   const [calendarSearchFilter, setCalendarSearchFilter] = useState("");
   const [calendarCandidateFilter, setCalendarCandidateFilter] = useState("");
   const [calendarTypeFilter, setCalendarTypeFilter] = useState<"" | EventType>("");
+  const [googlePanelOpen, setGooglePanelOpen] = useState(
+    () => typeof window !== "undefined" && window.innerWidth > 720
+  );
+  const [newActivityPanelOpen, setNewActivityPanelOpen] = useState(
+    () => typeof window !== "undefined" && window.innerWidth > 720
+  );
   type CalendarOrigin = "APP" | "CRM" | "EXTERNAL" | "GOOGLE";
   const [calendarOriginFilters, setCalendarOriginFilters] = useState<
     CalendarOrigin[]
@@ -6451,17 +6457,34 @@ export default function Recruiting({
                 : "#eff6ff",
             }}
           >
+            <button
+              type="button"
+              className="recruiting-collapsible-title"
+              onClick={() =>
+                setGooglePanelOpen((current) => !current)
+              }
+              aria-expanded={googlePanelOpen}
+            >
+              <span>Google Calendar</span>
+              <span
+                className="recruiting-collapsible-symbol"
+                aria-hidden="true"
+              >
+                {googlePanelOpen ? "−" : "+"}
+              </span>
+            </button>
+
             <div
               style={{
-                display: "flex",
+                display: googlePanelOpen ? "flex" : "none",
                 justifyContent: "space-between",
                 alignItems: "center",
                 gap: 12,
                 flexWrap: "wrap",
+                marginTop: googlePanelOpen ? 10 : 0,
               }}
             >
-              <div>
-                <h3 style={{ margin: 0 }}>Google Calendar</h3>
+              <div style={{ flex: "1 1 420px" }}>
                 <div
                   style={{
                     marginTop: 5,
@@ -6578,19 +6601,11 @@ export default function Recruiting({
               </div>
             </div>
 
-            {googleCalendarConnected && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                  flexWrap: "wrap",
-                  marginTop: 14,
-                }}
-              >
+            {googlePanelOpen && googleCalendarConnected && (
+              <div className="calendar-filter-actions">
                 <button
                   type="button"
+                  className="calendar-full-button"
                   disabled={googleCalendarBusy}
                   onClick={() => {
                     setGoogleExternalError("");
@@ -6632,14 +6647,7 @@ export default function Recruiting({
                     : "MOSTRA CALENDARIO COMPLETO"}
                 </button>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
+                <div className="calendar-origin-grid">
                   {[
                     {
                       key: "APP" as const,
@@ -6681,6 +6689,7 @@ export default function Recruiting({
                       <button
                         key={origin.key}
                         type="button"
+                        className="calendar-origin-button"
                         disabled={googleCalendarBusy}
                         onClick={() => {
                           const isCurrentlyActive =
@@ -6743,11 +6752,11 @@ export default function Recruiting({
 
                 <button
                   type="button"
+                  className="calendar-action-button"
                   disabled={googleCalendarBusy}
                   onClick={() => void syncAllGoogle()}
                   style={{
                     ...buttonStyle,
-                    marginLeft: "auto",
                     background: "#16a34a",
                     color: "white",
                     opacity: googleCalendarBusy ? 0.6 : 1,
@@ -6760,6 +6769,7 @@ export default function Recruiting({
 
                 <button
                   type="button"
+                  className="calendar-action-button"
                   onClick={resetCalendarFilters}
                   style={{
                     ...buttonStyle,
@@ -6774,7 +6784,7 @@ export default function Recruiting({
               </div>
             )}
 
-            {showFullGoogleCalendar && (
+            {googlePanelOpen && showFullGoogleCalendar && (
               <div
                 style={{
                   marginTop: 10,
@@ -6803,8 +6813,32 @@ export default function Recruiting({
           </div>
 
           <div style={cardStyle}>
-            <h3 style={{ marginTop: 0 }}>Nuova attività</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, alignItems: "end" }}>
+            <button
+              type="button"
+              className="recruiting-collapsible-title"
+              onClick={() =>
+                setNewActivityPanelOpen((current) => !current)
+              }
+              aria-expanded={newActivityPanelOpen}
+            >
+              <span>Nuova attività</span>
+              <span
+                className="recruiting-collapsible-symbol"
+                aria-hidden="true"
+              >
+                {newActivityPanelOpen ? "−" : "+"}
+              </span>
+            </button>
+            <div
+              style={{
+                display: newActivityPanelOpen ? "grid" : "none",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(180px,1fr))",
+                gap: 10,
+                alignItems: "end",
+                marginTop: newActivityPanelOpen ? 12 : 0,
+              }}
+            >
               <div>
                 <label style={labelStyle}>Contatto</label>
                 <select value={calendarCandidateId} onChange={(e) => setCalendarCandidateId(e.target.value)} style={inputStyle}>
