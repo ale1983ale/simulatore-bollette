@@ -75,6 +75,9 @@ type RecruitingEvent = {
   customType: string;
   notes: string;
   completed: boolean;
+  sourceType: string;
+  sourceExternalId: string;
+  sourceExternalCalendarId: string;
 };
 
 type CrmCalendarEvent = {
@@ -775,6 +778,11 @@ function eventFromRow(row: any): RecruitingEvent {
     customType: String(row.custom_type || ""),
     notes: String(row.notes || ""),
     completed: Boolean(row.completed),
+    sourceType: String(row.source_type || ""),
+    sourceExternalId: String(row.source_external_id || ""),
+    sourceExternalCalendarId: String(
+      row.source_external_calendar_id || ""
+    ),
   };
 }
 
@@ -1166,6 +1174,18 @@ export default function Recruiting({
   const [calendarTime, setCalendarTime] = useState("");
   const [calendarNotes, setCalendarNotes] = useState("");
 
+  const [googleImportEvent, setGoogleImportEvent] =
+    useState<GoogleCalendarExternalEvent | null>(null);
+  const [googleImportCandidateId, setGoogleImportCandidateId] =
+    useState("");
+  const [googleImportType, setGoogleImportType] =
+    useState<EventType>("ALTRO");
+  const [googleImportCustom, setGoogleImportCustom] = useState("");
+  const [googleImportDate, setGoogleImportDate] =
+    useState(localDateKey());
+  const [googleImportTime, setGoogleImportTime] = useState("");
+  const [googleImportNotes, setGoogleImportNotes] = useState("");
+
   const [forwardedNewCandidateId, setForwardedNewCandidateId] = useState<string | null>(null);
   const [forwardedNewName, setForwardedNewName] = useState("");
 
@@ -1247,7 +1267,7 @@ export default function Recruiting({
         .order("created_at", { ascending: false }),
       active.client
         .from("recruiting_events")
-        .select("id,candidate_id,event_date,event_time,event_type,custom_type,notes,completed,google_sync_status,google_sync_error,google_synced_at")
+        .select("id,candidate_id,event_date,event_time,event_type,custom_type,notes,completed,google_sync_status,google_sync_error,google_synced_at,source_type,source_external_id,source_external_calendar_id")
         .order("event_date", { ascending: true })
         .order("event_time", { ascending: true }),
       active.client
@@ -3112,6 +3132,108 @@ export default function Recruiting({
     }
   };
 
+  const openGoogleImport = (
+    event: GoogleCalendarExternalEvent
+  ) => {
+    const summaryNeedle = normalizeFilterValue(event.summary);
+    const matchedCandidate = allCandidates.find((candidate) => {
+      const nameNeedle = normalizeFilterValue(candidate.fullName);
+      return (
+        nameNeedle.length >= 4 &&
+        summaryNeedle.includes(nameNeedle)
+      );
+    });
+
+    const noteParts = [
+      event.description,
+      event.location ? `Luogo: ${event.location}` : "",
+      `Importato da Google Calendar: ${event.calendar_name}`,
+    ].filter(Boolean);
+
+    setGoogleImportEvent(event);
+    setGoogleImportCandidateId(matchedCandidate?.id || "");
+    setGoogleImportType("ALTRO");
+    setGoogleImportCustom(event.summary || "EVENTO GOOGLE");
+    setGoogleImportDate(
+      event.start_date || event.date_keys?.[0] || localDateKey()
+    );
+    setGoogleImportTime(event.all_day ? "" : event.start_time || "");
+    setGoogleImportNotes(noteParts.join("\n"));
+  };
+
+  const importGoogleEventToInternal = async () => {
+    if (!ctx || !googleImportEvent) return;
+
+    if (!googleImportDate) {
+      setMessage("Seleziona la data dell'attività.");
+      return;
+    }
+
+    if (
+      googleImportType === "ALTRO" &&
+      !googleImportCustom.trim()
+    ) {
+      setMessage("Indica il tipo dell'attività.");
+      return;
+    }
+
+    const sourceKey =
+      `${googleImportEvent.calendar_id}|${googleImportEvent.id}`;
+
+    if (importedGoogleEventKeys.has(sourceKey)) {
+      setMessage(
+        "Questo evento Google è già stato importato nel calendario interno."
+      );
+      setGoogleImportEvent(null);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_events")
+        .insert({
+          owner_key: ctx.ownerKey,
+          candidate_id: googleImportCandidateId || null,
+          event_date: googleImportDate,
+          event_time: googleImportTime || null,
+          event_type: googleImportType,
+          custom_type:
+            googleImportType === "ALTRO"
+              ? googleImportCustom.trim()
+              : "",
+          notes: googleImportNotes.trim(),
+          source_type: "GOOGLE",
+          source_external_id: googleImportEvent.id,
+          source_external_calendar_id:
+            googleImportEvent.calendar_id,
+          google_sync_status: "external_import",
+        });
+
+      if (error) throw error;
+
+      setGoogleImportEvent(null);
+      setCalendarOriginFilters((current) =>
+        current.includes("APP")
+          ? current
+          : [...current, "APP"]
+      );
+      await loadAll(ctx);
+      setMessage(
+        googleImportCandidateId
+          ? "Evento Google importato nel calendario interno e associato al nominativo."
+          : "Evento Google importato nel calendario interno. Potrai associarlo a un nominativo anche in seguito."
+      );
+    } catch (error: any) {
+      setMessage(
+        "Errore durante l'importazione dell'evento Google: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleEventCompleted = async (event: RecruitingEvent) => {
     if (!ctx) return;
     const { error } = await ctx.client
@@ -3292,6 +3414,23 @@ export default function Recruiting({
       .filter((candidate) => ids.has(candidate.id))
       .sort((a, b) => a.fullName.localeCompare(b.fullName, "it"));
   }, [events, allCandidates]);
+
+  const importedGoogleEventKeys = useMemo(
+    () =>
+      new Set(
+        events
+          .filter(
+            (event) =>
+              event.sourceType === "GOOGLE" &&
+              event.sourceExternalId
+          )
+          .map(
+            (event) =>
+              `${event.sourceExternalCalendarId}|${event.sourceExternalId}`
+          )
+      ),
+    [events]
+  );
 
   const calendarCells = useMemo(
     () => getMonthCells(calendarMonth),
@@ -7044,6 +7183,14 @@ export default function Recruiting({
                   !calendarTypeFilter
                     ? googleExternalEvents
                         .filter((event) => {
+                          const sourceKey =
+                            `${event.calendar_id}|${event.id}`;
+                          if (
+                            importedGoogleEventKeys.has(sourceKey)
+                          ) {
+                            return false;
+                          }
+
                           if (
                             !event.date_keys.includes(cell.dateKey)
                           ) {
@@ -7511,6 +7658,38 @@ export default function Recruiting({
                                 {event.location}
                               </div>
                             )}
+
+                            <div
+                              style={{
+                                marginTop: 6,
+                                display: "flex",
+                                gap: 6,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={(clickEvent) => {
+                                  clickEvent.stopPropagation();
+                                  openGoogleImport(event);
+                                }}
+                                onKeyDown={(keyEvent) =>
+                                  keyEvent.stopPropagation()
+                                }
+                                style={{
+                                  border: 0,
+                                  borderRadius: 6,
+                                  padding: "4px 7px",
+                                  background: "#0f766e",
+                                  color: "white",
+                                  fontSize: 10,
+                                  fontWeight: 900,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                IMPORTA
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -8093,6 +8272,210 @@ export default function Recruiting({
             </>
           )}
         </>
+      )}
+
+      {googleImportEvent && (
+        <div
+          className="recruiting-modal-backdrop"
+          onClick={() => setGoogleImportEvent(null)}
+        >
+          <div
+            className="recruiting-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 10,
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0 }}>
+                  Importa evento Google
+                </h3>
+                <div
+                  style={{
+                    marginTop: 4,
+                    color: "#64748b",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  {googleImportEvent.calendar_name}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setGoogleImportEvent(null)}
+                style={{
+                  ...buttonStyle,
+                  background: "#e2e8f0",
+                }}
+              >
+                Chiudi
+              </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                padding: 10,
+                borderRadius: 9,
+                background: "#f0fdfa",
+                border: "1px solid #99f6e4",
+              }}
+            >
+              <strong>{googleImportEvent.summary}</strong>
+              {googleImportEvent.location && (
+                <div style={{ marginTop: 4, color: "#475569" }}>
+                  {googleImportEvent.location}
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(190px,1fr))",
+                gap: 10,
+                marginTop: 14,
+              }}
+            >
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>
+                  Associa a nominativo
+                </label>
+                <select
+                  value={googleImportCandidateId}
+                  onChange={(e) =>
+                    setGoogleImportCandidateId(e.target.value)
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Senza nominativo</option>
+                  {[...allCandidates]
+                    .sort((a, b) =>
+                      a.fullName.localeCompare(b.fullName, "it")
+                    )
+                    .map((candidate) => (
+                      <option
+                        key={candidate.id}
+                        value={candidate.id}
+                      >
+                        {candidate.contactScope === "external"
+                          ? "[ESTERNO] "
+                          : ""}
+                        {candidate.fullName}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Tipo</label>
+                <select
+                  value={googleImportType}
+                  onChange={(e) =>
+                    setGoogleImportType(
+                      e.target.value as EventType
+                    )
+                  }
+                  style={inputStyle}
+                >
+                  {Object.entries(EVENT_LABELS).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              {googleImportType === "ALTRO" && (
+                <div>
+                  <label style={labelStyle}>Descrizione tipo</label>
+                  <input
+                    value={googleImportCustom}
+                    onChange={(e) =>
+                      setGoogleImportCustom(e.target.value)
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+              )}
+
+              <div>
+                <label style={labelStyle}>Data</label>
+                <input
+                  type="date"
+                  value={googleImportDate}
+                  onChange={(e) =>
+                    setGoogleImportDate(e.target.value)
+                  }
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Ora</label>
+                <input
+                  type="time"
+                  value={googleImportTime}
+                  onChange={(e) =>
+                    setGoogleImportTime(e.target.value)
+                  }
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>Note</label>
+                <textarea
+                  rows={4}
+                  value={googleImportNotes}
+                  onChange={(e) =>
+                    setGoogleImportNotes(e.target.value)
+                  }
+                  style={{
+                    ...inputStyle,
+                    resize: "vertical",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                flexWrap: "wrap",
+                marginTop: 14,
+              }}
+            >
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void importGoogleEventToInternal()
+                }
+                style={{
+                  ...buttonStyle,
+                  background: "#0f766e",
+                  color: "white",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                {busy ? "IMPORTAZIONE..." : "IMPORTA NEL CALENDARIO"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {crmDetailEvent && (
