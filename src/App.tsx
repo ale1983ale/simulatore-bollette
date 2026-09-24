@@ -7692,8 +7692,6 @@ export default function App() {
     return "dashboard";
   });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
-  const [openAdminMenuAfterDashboard, setOpenAdminMenuAfterDashboard] =
-    useState(false);
 
   useEffect(() => {
     const requestedTab =
@@ -7706,41 +7704,27 @@ export default function App() {
   }, []);
 
   const navigateTo = (nextTab: string) => {
-    setOpenAdminMenuAfterDashboard(false);
     setAdminMenuOpen(false);
     setTab(nextTab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const openDatabaseSettings = () => {
-    setOpenAdminMenuAfterDashboard(false);
     setAdminMenuOpen(false);
     setTab("agents");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const toggleAdminMenu = () => {
-    if (tab === "dashboard") {
-      setOpenAdminMenuAfterDashboard(false);
-      setAdminMenuOpen((current) => !current);
+    if (tab !== "dashboard") {
+      setAdminMenuOpen(true);
+      setTab("dashboard");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
-    setAdminMenuOpen(false);
-    setOpenAdminMenuAfterDashboard(true);
-    setTab("dashboard");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setAdminMenuOpen((current) => !current);
   };
-
-  useEffect(() => {
-    if (
-      openAdminMenuAfterDashboard &&
-      tab === "dashboard"
-    ) {
-      setAdminMenuOpen(true);
-      setOpenAdminMenuAfterDashboard(false);
-    }
-  }, [tab, openAdminMenuAfterDashboard]);
 
   useEffect(() => {
     if (tab === "adminMenu") {
@@ -8274,19 +8258,13 @@ useEffect(() => {
   const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingManagement", "recruitingCrm"];
 
   useEffect(() => {
-    if (!databaseAdminTabs.includes(tab)) return;
-
-    if (adminMenuOpen) {
+    if (
+      databaseAdminTabs.includes(tab) &&
+      adminMenuOpen
+    ) {
       setAdminMenuOpen(false);
     }
-    if (openAdminMenuAfterDashboard) {
-      setOpenAdminMenuAfterDashboard(false);
-    }
-  }, [
-    tab,
-    adminMenuOpen,
-    openAdminMenuAfterDashboard,
-  ]);
+  }, [tab, adminMenuOpen]);
   const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
@@ -9081,6 +9059,18 @@ if (!agentSession && !adminSession) {
             ATECO
           </button>
 
+        </div>
+
+        <div
+          className="ge-main-nav__actions"
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginLeft: "auto",
+            flexWrap: "nowrap",
+          }}
+        >
           {adminSession && (
             <button
               type="button"
@@ -9096,17 +9086,7 @@ if (!agentSession && !adminSession) {
               Area Admin
             </button>
           )}
-        </div>
 
-        <div
-          className="ge-main-nav__actions"
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            marginLeft: "auto",
-          }}
-        >
           {(agentSession || adminSession) && (
             <button
               type="button"
@@ -9116,7 +9096,6 @@ if (!agentSession && !adminSession) {
                 setAdminSession(null);
                 setAdminProfile(null);
                 setAgentSession(null);
-                setOpenAdminMenuAfterDashboard(false);
                 setAdminMenuOpen(false);
                 setTab("energia");
                 localStorage.removeItem("app_tab");
