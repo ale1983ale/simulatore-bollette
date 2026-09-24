@@ -2037,6 +2037,7 @@ export default function Recruiting({
     setCalendarCandidateFilter("");
     setCalendarTypeFilter("");
     setCalendarOriginFilters([]);
+    setShowFullGoogleCalendar(false);
   };
 
   const selectedNotes = useMemo(
@@ -6593,9 +6594,17 @@ export default function Recruiting({
                   disabled={googleCalendarBusy}
                   onClick={() => {
                     setGoogleExternalError("");
-                    setShowFullGoogleCalendar(
-                      (current) => !current
-                    );
+
+                    if (!showFullGoogleCalendar) {
+                      // "Calendario completo" deve significare davvero tutte
+                      // le origini: APP HR + CONTATTI ESTERNI + CRM + GOOGLE.
+                      setCalendarOriginFilters([]);
+                      setCalendarCandidateFilter("");
+                      setCalendarTypeFilter("");
+                      setShowFullGoogleCalendar(true);
+                    } else {
+                      setShowFullGoogleCalendar(false);
+                    }
                   }}
                   style={{
                     ...buttonStyle,
@@ -6667,18 +6676,40 @@ export default function Recruiting({
                         type="button"
                         disabled={googleCalendarBusy}
                         onClick={() => {
-                          setCalendarOriginFilters((current) => {
-                            if (current.includes(origin.key)) {
-                              return current.filter(
-                                (item) => item !== origin.key
-                              );
-                            }
+                          const alreadyOnlyThisOrigin =
+                            calendarOriginFilters.length === 1 &&
+                            calendarOriginFilters.includes(
+                              origin.key
+                            );
 
-                            return [...current, origin.key];
-                          });
+                          // I pulsanti origine funzionano come viste esclusive:
+                          // CRM mostra solo CRM, GOOGLE solo Google, ecc.
+                          // Questo evita che più sorgenti selezionate insieme
+                          // facciano sembrare il filtro inefficace.
+                          setCalendarOriginFilters(
+                            alreadyOnlyThisOrigin
+                              ? []
+                              : [origin.key]
+                          );
 
-                          if (origin.key === "GOOGLE") {
+                          // I filtri nominativo/tipologia non sono applicabili
+                          // a CRM e Google esterni e potevano nascondere tutto.
+                          if (
+                            origin.key === "CRM" ||
+                            origin.key === "GOOGLE"
+                          ) {
+                            setCalendarCandidateFilter("");
+                            setCalendarTypeFilter("");
+                          }
+
+                          if (
+                            origin.key === "GOOGLE" &&
+                            !alreadyOnlyThisOrigin
+                          ) {
+                            setGoogleExternalError("");
                             setShowFullGoogleCalendar(true);
+                          } else {
+                            setShowFullGoogleCalendar(false);
                           }
                         }}
                         style={{
