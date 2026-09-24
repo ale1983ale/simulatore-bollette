@@ -1760,26 +1760,26 @@ export default function Recruiting({
     () =>
       Array.from(
         new Set(
-          candidates
+          allCandidates
             .filter((candidate) => !candidate.sectorEnergy)
             .map((candidate) => candidate.sectorOther.trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b, "it")),
-    [candidates]
+    [allCandidates]
   );
 
   const existingCompanies = useMemo(
     () =>
       Array.from(
         new Set(
-          candidates
+          allCandidates
             .filter((candidate) => candidate.sectorEnergy)
             .map((candidate) => candidate.companyName.trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b, "it")),
-    [candidates]
+    [allCandidates]
   );
 
   const existingZones = useMemo(
@@ -2533,12 +2533,20 @@ export default function Recruiting({
       : "";
 
     if (newSectorEnergy && !resolvedNewCompany) {
-      setMessage("Seleziona un'azienda oppure aggiungine una nuova.");
+      setMessage(
+        contactScope === "external"
+          ? "Per salvare il contatto esterno seleziona un'azienda energia oppure aggiungine una nuova."
+          : "Seleziona un'azienda oppure aggiungine una nuova."
+      );
       return;
     }
 
     if (!newSectorEnergy && !resolvedNewSector) {
-      setMessage("Seleziona un settore oppure aggiungine uno nuovo.");
+      setMessage(
+        contactScope === "external"
+          ? "Per salvare il contatto esterno seleziona un settore oppure aggiungine uno nuovo."
+          : "Seleziona un settore oppure aggiungine uno nuovo."
+      );
       return;
     }
 
