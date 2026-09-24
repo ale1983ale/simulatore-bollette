@@ -1607,7 +1607,15 @@ export default function Recruiting({
 
       setGoogleCalendarConnected(true);
       setMessage(
-        `Google Calendar sincronizzato: ${Number(result.synced || 0)} attività${Number(result.errors || 0) ? ` · ${Number(result.errors || 0)} errori` : ""}.`
+        `Google Calendar sincronizzato: ${Number(
+          result.synced || 0
+        )} attività${Number(result.skipped || 0)
+          ? ` · ${Number(
+              result.skipped || 0
+            )} importate da Google lasciate solo nel calendario interno`
+          : ""}${Number(result.errors || 0)
+          ? ` · ${Number(result.errors || 0)} errori`
+          : ""}.`
       );
       await loadAll(ctx || undefined);
     } catch (error: any) {
@@ -3245,14 +3253,19 @@ export default function Recruiting({
       return;
     }
 
-    await syncEventToGoogleIfConnected(event.id);
+    if (event.sourceType !== "GOOGLE") {
+      await syncEventToGoogleIfConnected(event.id);
+    }
     await loadAll(ctx);
   };
 
   const deleteEvent = async (event: RecruitingEvent) => {
     if (!ctx || !window.confirm("Eliminare questa attività dal calendario?")) return;
 
-    if (googleCalendarConnected) {
+    if (
+      googleCalendarConnected &&
+      event.sourceType !== "GOOGLE"
+    ) {
       try {
         await deleteGoogleCalendarEvent(event.id);
       } catch (error: any) {
@@ -3317,11 +3330,19 @@ export default function Recruiting({
 
       if (error) throw error;
 
-      await syncEventToGoogleIfConnected(eventModalId);
+      const importedFromGoogle =
+        eventModalEvent?.sourceType === "GOOGLE";
+
+      if (!importedFromGoogle) {
+        await syncEventToGoogleIfConnected(eventModalId);
+      }
+
       await loadAll(ctx);
       setEventModalMode("view");
       setMessage(
-        googleCalendarConnected
+        importedFromGoogle
+          ? "Attività importata aggiornata nel calendario interno."
+          : googleCalendarConnected
           ? "Attività aggiornata e sincronizzata con Google Calendar."
           : "Attività aggiornata."
       );
