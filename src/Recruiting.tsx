@@ -6703,8 +6703,15 @@ export default function Recruiting({
               </div>
             </div>
 
-            {googlePanelOpen && googleCalendarConnected && (
-              <div className="calendar-filter-actions">
+            {googleCalendarConnected && (
+              <div
+                className="calendar-filter-actions"
+                style={{
+                  marginTop: 14,
+                  paddingTop: 14,
+                  borderTop: "1px solid #bbf7d0",
+                }}
+              >
                 <button
                   type="button"
                   className="calendar-full-button"
@@ -6886,7 +6893,7 @@ export default function Recruiting({
               </div>
             )}
 
-            {googlePanelOpen && showFullGoogleCalendar && (
+            {showFullGoogleCalendar && (
               <div
                 style={{
                   marginTop: 10,
