@@ -6930,60 +6930,71 @@ export default function Recruiting({
                 const calendarSearchNeedle =
                   normalizeFilterValue(calendarSearchFilter);
 
-                const dayEvents = events
-                  .filter((event) => {
-                    if (event.eventDate !== cell.dateKey) return false;
+                const internalOriginsRequested =
+                  calendarOriginFilters.length === 0 ||
+                  calendarOriginFilters.includes("APP") ||
+                  calendarOriginFilters.includes("EXTERNAL");
 
-                    const eventOrigin =
-                      recruitingEventOrigin(event);
+                const dayEvents = internalOriginsRequested
+                  ? events
+                      .filter((event) => {
+                        if (event.eventDate !== cell.dateKey) return false;
 
-                    if (
-                      calendarOriginFilters.length > 0 &&
-                      !calendarOriginFilters.includes(eventOrigin)
-                    ) {
-                      return false;
-                    }
+                        const eventOrigin =
+                          recruitingEventOrigin(event);
 
-                    if (
-                      calendarCandidateFilter &&
-                      event.candidateId !== calendarCandidateFilter
-                    ) {
-                      return false;
-                    }
+                        if (
+                          calendarOriginFilters.length > 0 &&
+                          !calendarOriginFilters.includes(eventOrigin)
+                        ) {
+                          return false;
+                        }
 
-                    if (
-                      calendarTypeFilter &&
-                      event.eventType !== calendarTypeFilter
-                    ) {
-                      return false;
-                    }
+                        if (
+                          calendarCandidateFilter &&
+                          event.candidateId !==
+                            calendarCandidateFilter
+                        ) {
+                          return false;
+                        }
 
-                    if (calendarSearchNeedle) {
-                      const searchableText = normalizeFilterValue(
-                        [
-                          candidateName(event.candidateId),
-                          eventDisplayLabel(event),
-                          event.customType,
-                          event.notes,
-                        ]
-                          .filter(Boolean)
-                          .join(" ")
-                      );
+                        if (
+                          calendarTypeFilter &&
+                          event.eventType !== calendarTypeFilter
+                        ) {
+                          return false;
+                        }
 
-                      if (
-                        !searchableText.includes(calendarSearchNeedle)
-                      ) {
-                        return false;
-                      }
-                    }
+                        if (calendarSearchNeedle) {
+                          const searchableText =
+                            normalizeFilterValue(
+                              [
+                                candidateName(event.candidateId),
+                                eventDisplayLabel(event),
+                                event.customType,
+                                event.notes,
+                              ]
+                                .filter(Boolean)
+                                .join(" ")
+                            );
 
-                    return true;
-                  })
-                  .sort((a, b) =>
-                    (a.eventTime || "").localeCompare(
-                      b.eventTime || ""
-                    )
-                  );
+                          if (
+                            !searchableText.includes(
+                              calendarSearchNeedle
+                            )
+                          ) {
+                            return false;
+                          }
+                        }
+
+                        return true;
+                      })
+                      .sort((a, b) =>
+                        (a.eventTime || "").localeCompare(
+                          b.eventTime || ""
+                        )
+                      )
+                  : [];
 
                 const dayGoogleEvents =
                   ((calendarOriginFilters.length > 0 &&
