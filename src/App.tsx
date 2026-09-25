@@ -8411,6 +8411,15 @@ const [dispCpMeta, setDispCpMeta] = useState<DispCapacityMeta>({
   warnings: [],
 });
 const [dispCpRefreshing, setDispCpRefreshing] = useState(false);
+const [networkTariffRows, setNetworkTariffRows] = useState<NetworkTariffRow[]>(
+  INITIAL_NETWORK_TARIFF_ROWS
+);
+const [networkTariffMeta, setNetworkTariffMeta] = useState<NetworkTariffMeta>({
+  checkedAt: "",
+  sourceStatus: "STORICO LOCALE",
+  warnings: [],
+});
+const [networkTariffRefreshing, setNetworkTariffRefreshing] = useState(false);
 const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
 
 const updateMonthlyRow = (
