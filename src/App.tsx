@@ -9461,6 +9461,7 @@ if (!agentSession && !adminSession) {
       punPsvRows={punPsvRows}
       energyOffers={energyOffers}
       dispCpRows={dispCpRows}
+      networkTariffRows={networkTariffRows}
       showAgentAssociation={Boolean(adminSession)}
     />
   </>
