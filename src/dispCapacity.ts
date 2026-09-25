@@ -112,10 +112,14 @@ export async function fetchDispCapacityRows(force = false): Promise<{
   rows: DispCpRow[];
   meta: DispCapacityMeta;
 }> {
-  const suffix = force ? `?force=1&t=${Date.now()}` : "";
-  const response = await fetch(`/api/disp-capacity${suffix}`, {
+  const params = new URLSearchParams();
+  params.set("v", "3");
+  params.set("t", String(Date.now()));
+  if (force) params.set("force", "1");
+
+  const response = await fetch(`/api/disp-capacity?${params.toString()}`, {
     headers: { Accept: "application/json" },
-    cache: force ? "no-store" : "default",
+    cache: "no-store",
   });
 
   if (!response.ok) {
