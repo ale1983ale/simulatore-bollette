@@ -5067,6 +5067,10 @@ function Listini({
   dispCpMeta,
   dispCpRefreshing,
   onRefreshDispCapacity,
+  networkTariffRows,
+  networkTariffMeta,
+  networkTariffRefreshing,
+  onRefreshNetworkTariffs,
   energyOffers,
   setEnergyOffers,
   gasOffers,
@@ -5078,6 +5082,10 @@ function Listini({
   dispCpMeta: DispCapacityMeta;
   dispCpRefreshing: boolean;
   onRefreshDispCapacity: () => Promise<void>;
+  networkTariffRows: NetworkTariffRow[];
+  networkTariffMeta: NetworkTariffMeta;
+  networkTariffRefreshing: boolean;
+  onRefreshNetworkTariffs: () => Promise<void>;
   energyOffers: EnergyOffer[];
   setEnergyOffers: React.Dispatch<React.SetStateAction<EnergyOffer[]>>;
   gasOffers: GasOffer[];
@@ -5089,6 +5097,8 @@ function Listini({
   const cloneGasOffers = (rows: GasOffer[]) => rows.map((row) => ({ ...row }));
 
   const [dispHistoryYear, setDispHistoryYear] = useState(2026);
+  const [networkHistoryYear, setNetworkHistoryYear] = useState(2026);
+  const [networkHistoryType, setNetworkHistoryType] = useState("BTA2");
   const [draftEnergyOffers, setDraftEnergyOffers] = useState<EnergyOffer[]>(() => cloneEnergyOffers(energyOffers));
   const [draftGasOffers, setDraftGasOffers] = useState<GasOffer[]>(() => cloneGasOffers(gasOffers));
   const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
@@ -9322,6 +9332,10 @@ const renderAdminContent = () => {
           dispCpMeta={dispCpMeta}
           dispCpRefreshing={dispCpRefreshing}
           onRefreshDispCapacity={() => refreshDispCapacity(true)}
+          networkTariffRows={networkTariffRows}
+          networkTariffMeta={networkTariffMeta}
+          networkTariffRefreshing={networkTariffRefreshing}
+          onRefreshNetworkTariffs={() => refreshNetworkTariffs(true)}
           energyOffers={energyOffers}
           setEnergyOffers={setEnergyOffers}
           gasOffers={gasOffers}
