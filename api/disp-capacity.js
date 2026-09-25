@@ -21,19 +21,34 @@ const MONTH_ALIASES = {
 };
 
 const SEED = [
-  [2025,1,0.005241,0.011677],[2025,2,0.005241,0.010304],[2025,3,0.005241,0.004000],
-  [2025,4,0.008948,0.003654],[2025,5,0.008948,0.003654],[2025,6,0.008948,0.007587],
-  [2025,7,0.009800,0.021655],[2025,8,0.009800,0.006258],[2025,9,0.009800,0.003631],
-  [2025,10,0.009800,0.004275],[2025,11,0.009800,0.004275],[2025,12,0.009800,0.008189],
-  [2026,1,0.006966,0.012345],[2026,2,0.006966,0.010583],[2026,3,0.006966,0.004349],
-  [2026,4,0.010500,0.003619],[2026,5,0.010500,0.003619],[2026,6,0.010500,0.007593],
-  [2026,7,0.010501,0.024466],[2026,8,0.010501,0.006288],[2026,9,0.010501,0.003197],
-].map(([anno,meseNumero,tide,cpMarket]) => makeRow({
-  anno, meseNumero, tide, cpMarket,
+  // anno, mese, TIDE (netto perdite), Capacity (netto perdite), C_DISPD domestico (lordo perdite)
+  [2025,1,0.008985,0.011677,0.022728],
+  [2025,2,0.008985,0.010304,0.021218],
+  [2025,3,0.008985,0.004000,0.014284],
+  [2025,4,0.008948,0.003654,0.013862],
+  [2025,5,0.008948,0.003654,0.013862],
+  [2025,6,0.008948,0.007587,0.018189],
+  [2025,7,0.009800,0.021655,0.034601],
+  [2025,8,0.009800,0.006258,0.017664],
+  [2025,9,0.009800,0.003631,0.014774],
+  [2025,10,0.009800,0.004275,0.015483],
+  [2025,11,0.009800,0.004275,0.015483],
+  [2025,12,0.009800,0.008189,0.019788],
+  [2026,1,0.010659,0.012345,0.025304],
+  [2026,2,0.010659,0.010583,0.023366],
+  [2026,3,0.010659,0.004349,0.016509],
+  [2026,4,0.010500,0.003619,0.015531],
+  [2026,5,0.010500,0.003619,0.015531],
+  [2026,6,0.010500,0.007593,0.019902],
+  [2026,7,0.010501,0.024466,0.038464],
+  [2026,8,0.010501,0.006288,0.018468],
+  [2026,9,0.010501,0.003197,0.015068],
+].map(([anno,meseNumero,tide,cpMarket,cdispDomestico]) => makeRow({
+  anno, meseNumero, tide, cpMarket, cdispDomestico,
   status: "STORICO VERIFICATO",
   sourceTide: "TERNA",
   sourceCapacity: "ARERA",
-  sourceDomestic: "ARERA / derivazione regolatoria",
+  sourceDomestic: "ARERA",
 }));
 
 const DOMESTIC_URL = (year) =>
@@ -57,9 +72,7 @@ function makeRow({
   const domestic =
     Number.isFinite(Number(cdispDomestico))
       ? round6(cdispDomestico)
-      : businessTotale !== null
-        ? round6(businessTotale * 1.1)
-        : null;
+      : null;
   return {
     mese: `${MONTHS[meseNumero - 1]} ${anno}`,
     anno,
@@ -210,7 +223,13 @@ function extractDomesticCdisp(sheets, fallbackYear) {
         if (!periods.length) continue;
 
         const value = normalizeRate(row[cdispCol], headerText);
-        if (value === null) continue;
+        if (
+          value === null ||
+          value <= 0.001 ||
+          value >= 0.1
+        ) {
+          continue;
+        }
         periods.forEach(({ year, month }) => {
           found.set(`${year}-${month}`, value);
         });
@@ -330,9 +349,7 @@ function mergeOfficial(seedRows, domesticMaps, businessMaps) {
         cdispDomestico:
           Number.isFinite(Number(row.cdispDomestico))
             ? round6(row.cdispDomestico)
-            : businessTotale !== null
-              ? round6(businessTotale * 1.1)
-              : null,
+            : null,
       };
     })
     .filter((row) =>
