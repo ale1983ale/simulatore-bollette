@@ -18,6 +18,16 @@ import {
   type DispCapacityMeta,
   type DispCpRow,
 } from "./dispCapacity";
+import {
+  INITIAL_NETWORK_TARIFF_ROWS,
+  fetchNetworkTariffRows,
+  findNetworkTariff,
+  isEDistributionPod,
+  isNonEnergivoreDefaultType,
+  monthProration,
+  type NetworkTariffMeta,
+  type NetworkTariffRow,
+} from "./networkTariffs";
 import "./dashboard.css";
 
 
@@ -2010,7 +2020,8 @@ function calcEnergia(
   d: any,
   punPsvRows: PunPsvRow[],
   energyOffers: EnergyOffer[],
-  dispCpRows: DispCpRow[]
+  dispCpRows: DispCpRow[],
+  networkTariffRows: NetworkTariffRow[]
 ) {
   const off = energyOffers.find((x) => x.nome === d.offerta) || energyOffers[0];
 
@@ -2120,10 +2131,76 @@ function calcEnergia(
 
   const H22 = H22_base + perditeEnergia + dispCpTotale;
   const H24 = n(d.reattivaImmessa) + n(d.reattivaPrelevata);
-  const H25 = n(d.quotaConsumiRete);
+
+  const networkRow1 = findNetworkTariff(
+    networkTariffRows,
+    d.tipo,
+    meseTabella1
+  );
+  const networkRow2 =
+    sLikeBimestrale(d.fatturazione) && d.mese2
+      ? findNetworkTariff(networkTariffRows, d.tipo, meseTabella2)
+      : undefined;
+
+  const networkAutoAvailable =
+    Boolean(networkRow1) &&
+    (!sLikeBimestrale(d.fatturazione) || !d.mese2 || Boolean(networkRow2));
+
+  const podCount = Math.max(1, n(d.numeroPod) || 1);
+  const potenzaImpegnata = Math.max(0, n(d.potenzaImpegnata));
+
+  const networkRowsForCalculation = [
+    networkRow1
+      ? { row: networkRow1, consumo: consumiMese1 }
+      : null,
+    networkRow2
+      ? { row: networkRow2, consumo: consumiMese2 }
+      : null,
+  ].filter(Boolean) as Array<{
+    row: NetworkTariffRow;
+    consumo: number;
+  }>;
+
+  const autoQuotaConsumiRete = networkAutoAvailable
+    ? networkRowsForCalculation.reduce(
+        (sum, item) => sum + item.consumo * n(item.row.quotaEnergia),
+        0
+      )
+    : 0;
+
+  const autoQuotaFissaRete = networkAutoAvailable
+    ? networkRowsForCalculation.reduce(
+        (sum, item) =>
+          sum +
+          podCount *
+            n(item.row.quotaFissaAnnua) *
+            monthProration(item.row),
+        0
+      )
+    : 0;
+
+  const autoQuotaPotenzaRete = networkAutoAvailable
+    ? networkRowsForCalculation.reduce(
+        (sum, item) =>
+          sum +
+          potenzaImpegnata *
+            n(item.row.quotaPotenzaAnnua) *
+            monthProration(item.row),
+        0
+      )
+    : 0;
+
+  const networkAutoMode = String(d.reteMode || "AUTO") !== "MANUALE";
+  const H25 = networkAutoMode
+    ? autoQuotaConsumiRete
+    : n(d.quotaConsumiRete);
   const H28 = n(d.numeroPod) * quotaFissaEff * mesi;
-  const H29 = n(d.quotaFissaRete);
-  const H30 = n(d.quotaPotenzaRete);
+  const H29 = networkAutoMode
+    ? autoQuotaFissaRete
+    : n(d.quotaFissaRete);
+  const H30 = networkAutoMode
+    ? autoQuotaPotenzaRete
+    : n(d.quotaPotenzaRete);
 
   const H35 = isSi(d.acciseManualiFlag) ? n(d.acciseManualiValore) : consumiTot * 0.0125;
   const H38 = isSi(d.ricalcoloFlag) ? n(d.ricalcoloValore) : 0;
@@ -2165,6 +2242,15 @@ function calcEnergia(
     dispCpBase,
     perditaPercentuale,
     perditeEnergia,
+    networkAutoAvailable,
+    networkAutoMode,
+    autoQuotaConsumiRete,
+    autoQuotaFissaRete,
+    autoQuotaPotenzaRete,
+    networkRow1,
+    networkRow2,
+    networkMonth1: meseTabella1,
+    networkMonth2: meseTabella2,
   };
 }
 
@@ -2255,11 +2341,13 @@ function Energia({
   punPsvRows,
   energyOffers,
   dispCpRows,
+  networkTariffRows,
   showAgentAssociation,
 }: {
   punPsvRows: PunPsvRow[];
   energyOffers: EnergyOffer[];
   dispCpRows: DispCpRow[];
+  networkTariffRows: NetworkTariffRow[];
   showAgentAssociation: boolean;
 }) {
   const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
@@ -2288,6 +2376,8 @@ function Energia({
     dedicataSpread: "",
     dedicataCapacityMarket: "",
     dedicataQuotaFissa: "",
+    reteMode: "AUTO",
+    potenzaImpegnata: "",
     quotaConsumiRete: "",
     quotaFissaRete: "",
     quotaPotenzaRete: "",
@@ -2628,8 +2718,15 @@ function Energia({
   }, [dispCpRows]);
 
   const r = useMemo(
-    () => calcEnergia(s, punPsvRows, energyOffers, dispCpRows),
-    [s, punPsvRows, energyOffers, dispCpRows]
+    () =>
+      calcEnergia(
+        s,
+        punPsvRows,
+        energyOffers,
+        dispCpRows,
+        networkTariffRows
+      ),
+    [s, punPsvRows, energyOffers, dispCpRows, networkTariffRows]
   );
 
   const energyReferenceRows = useMemo(() => {
