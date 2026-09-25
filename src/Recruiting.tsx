@@ -5346,16 +5346,81 @@ export default function Recruiting({
           offset: [0, -15],
         });
 
-        marker.bindPopup(
-          `<div style="min-width:220px">
-            <div style="font-size:11px;font-weight:900;color:${statusStyle.color};margin-bottom:4px">NOMINATIVO IN LAVORAZIONE</div>
-            <div style="font-weight:900;font-size:15px;margin-bottom:7px">${escapeHtml(candidate.fullName)}</div>
-            <div><strong>Stato:</strong> ${escapeHtml(statusStyle.label)}</div>
-            <div><strong>Cellulare:</strong> ${escapeHtml(candidate.phone || "—")}</div>
-            <div><strong>Email:</strong> ${escapeHtml(candidate.email || "—")}</div>
-            <div><strong>Zona:</strong> ${escapeHtml(candidate.operationalZone || "—")}</div>
-          </div>`
+        const candidatePopup = document.createElement("div");
+        candidatePopup.style.minWidth = "230px";
+
+        const candidateHeader = document.createElement("div");
+        candidateHeader.style.fontSize = "11px";
+        candidateHeader.style.fontWeight = "900";
+        candidateHeader.style.color = statusStyle.color;
+        candidateHeader.style.marginBottom = "4px";
+        candidateHeader.textContent = "NOMINATIVO IN LAVORAZIONE";
+        candidatePopup.appendChild(candidateHeader);
+
+        const candidateTitle = document.createElement("div");
+        candidateTitle.style.fontWeight = "900";
+        candidateTitle.style.fontSize = "15px";
+        candidateTitle.style.marginBottom = "7px";
+        candidateTitle.textContent = candidate.fullName;
+        candidatePopup.appendChild(candidateTitle);
+
+        const candidateDetails = document.createElement("div");
+        candidateDetails.innerHTML =
+          `<div><strong>Stato:</strong> ${escapeHtml(statusStyle.label)}</div>` +
+          `<div><strong>Cellulare:</strong> ${escapeHtml(candidate.phone || "—")}</div>` +
+          `<div><strong>Email:</strong> ${escapeHtml(candidate.email || "—")}</div>` +
+          `<div><strong>Zona:</strong> ${escapeHtml(candidate.operationalZone || "—")}</div>`;
+        candidatePopup.appendChild(candidateDetails);
+
+        const candidateActions = document.createElement("div");
+        candidateActions.style.display = "flex";
+        candidateActions.style.gap = "6px";
+        candidateActions.style.flexWrap = "wrap";
+        candidateActions.style.marginTop = "10px";
+
+        const candidateActionStyle =
+          "display:inline-flex;align-items:center;justify-content:center;padding:7px 9px;border-radius:8px;font-size:11px;font-weight:900;text-decoration:none;cursor:pointer;";
+
+        const candidateSheetButton = document.createElement("button");
+        candidateSheetButton.type = "button";
+        candidateSheetButton.textContent = "SCHEDA";
+        candidateSheetButton.setAttribute(
+          "style",
+          candidateActionStyle +
+            "border:1px solid #93c5fd;background:#dbeafe;color:#1d4ed8;"
         );
+        candidateSheetButton.onclick = () => {
+          map.closePopup();
+          openContactForEditing(candidate.id);
+        };
+        candidateActions.appendChild(candidateSheetButton);
+
+        if (candidate.phone) {
+          const candidatePhoneLink = document.createElement("a");
+          candidatePhoneLink.href = phoneHref(candidate.phone);
+          candidatePhoneLink.textContent = "☎ TEL";
+          candidatePhoneLink.setAttribute(
+            "style",
+            candidateActionStyle +
+              "border:1px solid #86efac;background:#dcfce7;color:#166534;"
+          );
+          candidateActions.appendChild(candidatePhoneLink);
+        }
+
+        if (candidate.email) {
+          const candidateEmailLink = document.createElement("a");
+          candidateEmailLink.href = emailHref(candidate.email);
+          candidateEmailLink.textContent = "✉ MAIL";
+          candidateEmailLink.setAttribute(
+            "style",
+            candidateActionStyle +
+              "border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;"
+          );
+          candidateActions.appendChild(candidateEmailLink);
+        }
+
+        candidatePopup.appendChild(candidateActions);
+        marker.bindPopup(candidatePopup);
 
         marker.addTo(markerLayer!);
       });
@@ -5392,16 +5457,81 @@ export default function Recruiting({
         }
       );
 
-      candidateMarker.bindPopup(
-        `<div style="min-width:210px">
-          <div style="font-size:11px;font-weight:900;color:#2563eb;margin-bottom:4px">CONTATTO RECRUITING</div>
-          <div style="font-weight:900;font-size:15px;margin-bottom:7px">${escapeHtml(focusedCandidateMap.fullName)}</div>
-          <div><strong>Stato:</strong> ${escapeHtml(getStatusDefinition(focusedCandidateMap.status).label)}</div>
-          <div><strong>Cellulare:</strong> ${escapeHtml(focusedCandidateMap.phone || "—")}</div>
-          <div><strong>Email:</strong> ${escapeHtml(focusedCandidateMap.email || "—")}</div>
-          <div><strong>Zona:</strong> ${escapeHtml(focusedCandidateMap.zone || "—")}</div>
-        </div>`
+      const focusedPopup = document.createElement("div");
+      focusedPopup.style.minWidth = "230px";
+
+      const focusedHeader = document.createElement("div");
+      focusedHeader.style.fontSize = "11px";
+      focusedHeader.style.fontWeight = "900";
+      focusedHeader.style.color = "#2563eb";
+      focusedHeader.style.marginBottom = "4px";
+      focusedHeader.textContent = "CONTATTO RECRUITING";
+      focusedPopup.appendChild(focusedHeader);
+
+      const focusedTitle = document.createElement("div");
+      focusedTitle.style.fontWeight = "900";
+      focusedTitle.style.fontSize = "15px";
+      focusedTitle.style.marginBottom = "7px";
+      focusedTitle.textContent = focusedCandidateMap.fullName;
+      focusedPopup.appendChild(focusedTitle);
+
+      const focusedDetails = document.createElement("div");
+      focusedDetails.innerHTML =
+        `<div><strong>Stato:</strong> ${escapeHtml(getStatusDefinition(focusedCandidateMap.status).label)}</div>` +
+        `<div><strong>Cellulare:</strong> ${escapeHtml(focusedCandidateMap.phone || "—")}</div>` +
+        `<div><strong>Email:</strong> ${escapeHtml(focusedCandidateMap.email || "—")}</div>` +
+        `<div><strong>Zona:</strong> ${escapeHtml(focusedCandidateMap.zone || "—")}</div>`;
+      focusedPopup.appendChild(focusedDetails);
+
+      const focusedActions = document.createElement("div");
+      focusedActions.style.display = "flex";
+      focusedActions.style.gap = "6px";
+      focusedActions.style.flexWrap = "wrap";
+      focusedActions.style.marginTop = "10px";
+
+      const focusedActionStyle =
+        "display:inline-flex;align-items:center;justify-content:center;padding:7px 9px;border-radius:8px;font-size:11px;font-weight:900;text-decoration:none;cursor:pointer;";
+
+      const focusedSheetButton = document.createElement("button");
+      focusedSheetButton.type = "button";
+      focusedSheetButton.textContent = "SCHEDA";
+      focusedSheetButton.setAttribute(
+        "style",
+        focusedActionStyle +
+          "border:1px solid #93c5fd;background:#dbeafe;color:#1d4ed8;"
       );
+      focusedSheetButton.onclick = () => {
+        map.closePopup();
+        openContactForEditing(focusedCandidateMap.candidateId);
+      };
+      focusedActions.appendChild(focusedSheetButton);
+
+      if (focusedCandidateMap.phone) {
+        const focusedPhoneLink = document.createElement("a");
+        focusedPhoneLink.href = phoneHref(focusedCandidateMap.phone);
+        focusedPhoneLink.textContent = "☎ TEL";
+        focusedPhoneLink.setAttribute(
+          "style",
+          focusedActionStyle +
+            "border:1px solid #86efac;background:#dcfce7;color:#166534;"
+        );
+        focusedActions.appendChild(focusedPhoneLink);
+      }
+
+      if (focusedCandidateMap.email) {
+        const focusedEmailLink = document.createElement("a");
+        focusedEmailLink.href = emailHref(focusedCandidateMap.email);
+        focusedEmailLink.textContent = "✉ MAIL";
+        focusedEmailLink.setAttribute(
+          "style",
+          focusedActionStyle +
+            "border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;"
+        );
+        focusedActions.appendChild(focusedEmailLink);
+      }
+
+      focusedPopup.appendChild(focusedActions);
+      candidateMarker.bindPopup(focusedPopup);
 
       candidateMarker.addTo(markerLayer!);
     }
