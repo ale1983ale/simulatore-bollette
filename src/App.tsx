@@ -8666,6 +8666,29 @@ useEffect(() => {
   return () => window.clearInterval(timer);
 }, []);
 
+const refreshNetworkTariffs = async (force = false) => {
+  setNetworkTariffRefreshing(true);
+  try {
+    const result = await fetchNetworkTariffRows(force);
+    setNetworkTariffRows(result.rows);
+    setNetworkTariffMeta(result.meta);
+  } catch (error) {
+    console.error("NETWORK TARIFF UPDATE ERROR:", error);
+  } finally {
+    setNetworkTariffRefreshing(false);
+  }
+};
+
+useEffect(() => {
+  void refreshNetworkTariffs(false);
+
+  const timer = window.setInterval(() => {
+    void refreshNetworkTariffs(false);
+  }, 6 * 60 * 60 * 1000);
+
+  return () => window.clearInterval(timer);
+}, []);
+
 useEffect(() => {
   const loadSettings = async () => {
     setLoadingSettings(true);
