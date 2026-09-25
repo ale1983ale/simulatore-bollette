@@ -5517,6 +5517,35 @@ function Listini({
     markDirty();
   };
 
+  const updateGasOfferCustomerGroup = (
+    index: number,
+    group: GasCustomerGroup,
+    checked: boolean
+  ) => {
+    setDraftGasOffers((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+
+        const current = normalizedGasOfferGroups(row);
+        if (!checked && current.length === 1 && current.includes(group)) {
+          return row;
+        }
+
+        const next = checked
+          ? Array.from(new Set([...current, group]))
+          : current.filter((item) => item !== group);
+
+        return {
+          ...row,
+          allowedCustomerGroups: ALL_GAS_CUSTOMER_GROUPS.filter((item) =>
+            next.includes(item)
+          ),
+        };
+      })
+    );
+    markDirty();
+  };
+
   const updateGasOffer = (index: number, key: keyof GasOffer, value: string) => {
     setDraftGasOffers((prev) =>
       prev.map((row, i) =>
@@ -6265,7 +6294,7 @@ function Listini({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Ordina", "Visibile", "Nome offerta", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
+                {["Ordina", "Visibile", "Nome offerta", "Tipologie CTE", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -6330,6 +6359,104 @@ function Listini({
                       value={row.nome}
                       onChange={(e) => updateGasOffer(i, "nome", e.target.value)}
                     />
+                  </td>
+                  <td style={{ ...tdStyle, minWidth: 180, verticalAlign: "top" }}>
+                    <details
+                      style={{
+                        position: "relative",
+                        width: 170,
+                      }}
+                    >
+                      <summary
+                        style={{
+                          listStyle: "none",
+                          cursor: "pointer",
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                          background: "#ffffff",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: "#334155",
+                          userSelect: "none",
+                        }}
+                      >
+                        {normalizedGasOfferGroups(row)
+                          .map(
+                            (group) =>
+                              GAS_CUSTOMER_GROUPS.find(
+                                (item) => item.key === group
+                              )?.label
+                          )
+                          .filter(Boolean)
+                          .join(", ")}
+                        <span style={{ float: "right" }}>▾</span>
+                      </summary>
+
+                      <div
+                        style={{
+                          position: "absolute",
+                          zIndex: 30,
+                          top: "calc(100% + 4px)",
+                          left: 0,
+                          minWidth: 170,
+                          background: "white",
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 8,
+                          boxShadow: "0 10px 25px rgba(15,23,42,.16)",
+                          padding: 8,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {GAS_CUSTOMER_GROUPS.map((item) => {
+                          const checked = normalizedGasOfferGroups(row).includes(
+                            item.key
+                          );
+                          const isLastChecked =
+                            checked &&
+                            normalizedGasOfferGroups(row).length === 1;
+
+                          return (
+                            <label
+                              key={item.key}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "7px 6px",
+                                borderRadius: 6,
+                                cursor: isLastChecked
+                                  ? "not-allowed"
+                                  : "pointer",
+                                fontSize: 13,
+                                fontWeight: 700,
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={isLastChecked}
+                                onChange={(e) =>
+                                  updateGasOfferCustomerGroup(
+                                    i,
+                                    item.key,
+                                    e.target.checked
+                                  )
+                                }
+                                style={{
+                                  width: 17,
+                                  height: 17,
+                                  cursor: isLastChecked
+                                    ? "not-allowed"
+                                    : "pointer",
+                                }}
+                              />
+                              {item.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </details>
                   </td>
                   <td style={tdStyle}>
                     <input
