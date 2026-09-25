@@ -41,12 +41,15 @@ type MonthlyRow = {
   psv: number;
 };
 
+type EnergyCustomerGroup = "DOMESTICI" | "BTA" | "MT";
+
 type EnergyOffer = {
   nome: string;
   canone: number;
   spread: number;
   maggiorazioneCapacityMarket: number;
   visibile?: boolean;
+  allowedCustomerGroups?: EnergyCustomerGroup[];
 };
 
 type GasOffer = {
@@ -299,9 +302,30 @@ const INITIAL_MONTHLY: MonthlyRow[] = [
 ];
 
 const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
-  { nome: "DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
-  { nome: "+SICURA DEDICATA", canone: 0, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
-  { nome: "BILANCIATA", canone: 18.5, spread: 0, maggiorazioneCapacityMarket: 0, visibile: true },
+  {
+    nome: "DEDICATA",
+    canone: 0,
+    spread: 0,
+    maggiorazioneCapacityMarket: 0,
+    visibile: true,
+    allowedCustomerGroups: [...ALL_ENERGY_CUSTOMER_GROUPS],
+  },
+  {
+    nome: "+SICURA DEDICATA",
+    canone: 0,
+    spread: 0,
+    maggiorazioneCapacityMarket: 0,
+    visibile: true,
+    allowedCustomerGroups: [...ALL_ENERGY_CUSTOMER_GROUPS],
+  },
+  {
+    nome: "BILANCIATA",
+    canone: 18.5,
+    spread: 0,
+    maggiorazioneCapacityMarket: 0,
+    visibile: true,
+    allowedCustomerGroups: [...ALL_ENERGY_CUSTOMER_GROUPS],
+  },
 ];
 
 const INITIAL_GAS_OFFERS: GasOffer[] = [
@@ -323,6 +347,48 @@ const energyTypes = [
   "MTA2",
   "MTA3",
 ];
+
+const ENERGY_CUSTOMER_GROUPS: Array<{
+  key: EnergyCustomerGroup;
+  label: string;
+}> = [
+  { key: "DOMESTICI", label: "Domestici" },
+  { key: "BTA", label: "BTA1/6" },
+  { key: "MT", label: "MT1/3" },
+];
+
+const ALL_ENERGY_CUSTOMER_GROUPS: EnergyCustomerGroup[] =
+  ENERGY_CUSTOMER_GROUPS.map((item) => item.key);
+
+function energyTypeToGroup(tipo: string): EnergyCustomerGroup | null {
+  const value = String(tipo || "").toUpperCase();
+  if (
+    ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(value)
+  ) {
+    return "DOMESTICI";
+  }
+  if (/^BTA[1-6]$/.test(value)) return "BTA";
+  if (/^MTA[1-3]$/.test(value)) return "MT";
+  return null;
+}
+
+function normalizedEnergyOfferGroups(
+  offer: EnergyOffer
+): EnergyCustomerGroup[] {
+  const groups = Array.isArray(offer.allowedCustomerGroups)
+    ? offer.allowedCustomerGroups.filter((group) =>
+        ALL_ENERGY_CUSTOMER_GROUPS.includes(group)
+      )
+    : [];
+
+  return groups.length ? groups : ALL_ENERGY_CUSTOMER_GROUPS;
+}
+
+function energyOfferAllowsType(offer: EnergyOffer, tipo: string) {
+  const group = energyTypeToGroup(tipo);
+  if (!group) return true;
+  return normalizedEnergyOfferGroups(offer).includes(group);
+}
 
 const energyBilling = [
   "MENSILE",
@@ -9180,7 +9246,19 @@ useEffect(() => {
       if (Array.isArray(map.energyOffers)) {
         const obsoleteEnergyOfferNames = new Set(["CASA", "CASASPECIAL", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESASPECIAL", "IMPRESAUNICA", "SCELTA", "SCELTASPECIAL", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALORESPECIAL", "VALOREUNICA"]);
         const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
-          .map((offer) => ({ ...offer, visibile: offer.visibile !== false }))
+          .map((offer) => ({
+            ...offer,
+            visibile: offer.visibile !== false,
+            allowedCustomerGroups:
+              Array.isArray(offer.allowedCustomerGroups) &&
+              offer.allowedCustomerGroups.some((group) =>
+                ALL_ENERGY_CUSTOMER_GROUPS.includes(group)
+              )
+                ? offer.allowedCustomerGroups.filter((group) =>
+                    ALL_ENERGY_CUSTOMER_GROUPS.includes(group)
+                  )
+                : [...ALL_ENERGY_CUSTOMER_GROUPS],
+          }))
           .map((offer) =>
             ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURA DEDICATA" }
