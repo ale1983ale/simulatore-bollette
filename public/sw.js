@@ -1,4 +1,4 @@
-const CACHE_NAME = "simulatore-bollette-pwa-v4";
+const CACHE_NAME = "simulatore-bollette-pwa-v5";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest?v=3",
@@ -39,6 +39,25 @@ self.addEventListener("fetch", (event) => {
     request.method !== "GET" ||
     url.origin !== self.location.origin
   ) {
+    return;
+  }
+
+  // Le API non devono mai essere servite dalla cache PWA:
+  // i dati di mercato devono arrivare sempre dalla rete.
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(
+      fetch(request, { cache: "no-store" })
+        .then((response) => response)
+        .catch(() =>
+          new Response(
+            JSON.stringify({ error: "API non disponibile" }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            }
+          )
+        )
+    );
     return;
   }
 
