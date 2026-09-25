@@ -6954,6 +6954,26 @@ export default function Recruiting({
                           )}
                         </div>
 
+                        <div style={{ minWidth: 0 }}>
+                          <label style={labelStyle}>Email</label>
+                          {selectedCandidate.email ? (
+                            <a
+                              href={emailHref(selectedCandidate.email)}
+                              style={{
+                                color: "#1d4ed8",
+                                textDecoration: "underline",
+                                fontWeight: 800,
+                                overflowWrap: "anywhere",
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {selectedCandidate.email}
+                            </a>
+                          ) : (
+                            <div>—</div>
+                          )}
+                        </div>
+
                         <div>
                           <label style={labelStyle}>Chiamato da me</label>
                           <div style={{ fontWeight: 900 }}>
@@ -6993,30 +7013,6 @@ export default function Recruiting({
                           </div>
                         )}
 
-                        <div
-                          style={{
-                            minWidth: 0,
-                            gridColumn: "span 2",
-                          }}
-                        >
-                          <label style={labelStyle}>Email</label>
-                          {selectedCandidate.email ? (
-                            <a
-                              href={emailHref(selectedCandidate.email)}
-                              style={{
-                                color: "#1d4ed8",
-                                textDecoration: "underline",
-                                fontWeight: 800,
-                                overflowWrap: "anywhere",
-                                wordBreak: "break-word",
-                              }}
-                            >
-                              {selectedCandidate.email}
-                            </a>
-                          ) : (
-                            <div>—</div>
-                          )}
-                        </div>
                       </div>
                     ) : (
                       <>
@@ -10375,7 +10371,39 @@ export default function Recruiting({
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {calendarContactPreview.phone && (
+                  <a
+                    href={phoneHref(calendarContactPreview.phone)}
+                    style={{
+                      ...buttonStyle,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      textDecoration: "none",
+                      background: "#dcfce7",
+                      color: "#166534",
+                      border: "1px solid #86efac",
+                    }}
+                  >
+                    ☎ TEL
+                  </a>
+                )}
+                {calendarContactPreview.email && (
+                  <a
+                    href={emailHref(calendarContactPreview.email)}
+                    style={{
+                      ...buttonStyle,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      textDecoration: "none",
+                      background: "#dbeafe",
+                      color: "#1d4ed8",
+                      border: "1px solid #93c5fd",
+                    }}
+                  >
+                    ✉ MAIL
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() =>
