@@ -31,6 +31,43 @@ import {
 } from "./performaIntegration";
 
 const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
+const ITALY_PROVINCES_GEOJSON_URL =
+  "https://raw.githubusercontent.com/GeoGuess/GeoGuess-Maps/main/public/geojson/areas/italy_provinces.geojson";
+
+const PROVINCE_FILL_COLORS = [
+  "#bfdbfe",
+  "#bbf7d0",
+  "#fde68a",
+  "#fecaca",
+  "#ddd6fe",
+  "#bae6fd",
+  "#fed7aa",
+  "#fbcfe8",
+  "#ccfbf1",
+  "#d9f99d",
+  "#e9d5ff",
+  "#c7d2fe",
+];
+
+function provinceFillColor(feature: any) {
+  const numericCode = Number(
+    feature?.properties?.prov_istat_code_num ||
+      feature?.properties?.prov_istat_code ||
+      0
+  );
+  const name = String(feature?.properties?.prov_name || "");
+  const fallbackHash = name
+    .split("")
+    .reduce(
+      (acc: number, char: string) =>
+        ((acc << 5) - acc + char.charCodeAt(0)) | 0,
+      0
+    );
+  const index = Number.isFinite(numericCode) && numericCode > 0
+    ? numericCode
+    : Math.abs(fallbackHash);
+  return PROVINCE_FILL_COLORS[index % PROVINCE_FILL_COLORS.length];
+}
 
 type CandidateStatus = string;
 
@@ -1355,6 +1392,7 @@ export default function Recruiting({
     macroareaId: string;
   } | null>(null);
   const [regionsGeoJson, setRegionsGeoJson] = useState<any>(null);
+  const [provincesGeoJson, setProvincesGeoJson] = useState<any>(null);
   const [mapBoundariesLoading, setMapBoundariesLoading] = useState(false);
   const [mapBoundariesError, setMapBoundariesError] = useState("");
   const [focusedCandidateMap, setFocusedCandidateMap] =
@@ -1365,6 +1403,7 @@ export default function Recruiting({
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
   const regionsLayerRef = useRef<L.GeoJSON | null>(null);
+  const provincesLayerRef = useRef<L.GeoJSON | null>(null);
   const candidateMapGeocodingRef = useRef(false);
   const candidateMapFailedZonesRef = useRef<Set<string>>(new Set());
 
@@ -4491,6 +4530,7 @@ export default function Recruiting({
     }
     markersRef.current = null;
     regionsLayerRef.current = null;
+    provincesLayerRef.current = null;
   };
 
   const refreshRecruitingMap = async () => {
@@ -4828,24 +4868,67 @@ export default function Recruiting({
   ]);
 
   useEffect(() => {
-    if (section !== "map" || regionsGeoJson) return;
+    if (
+      section !== "map" ||
+      (regionsGeoJson && provincesGeoJson)
+    ) {
+      return;
+    }
 
     let cancelled = false;
     setMapBoundariesLoading(true);
     setMapBoundariesError("");
 
-    fetch(ITALY_REGIONS_GEOJSON_URL)
-      .then((response) => {
-        if (!response.ok) throw new Error("Confini regionali non disponibili");
-        return response.json();
-      })
-      .then((data) => {
-        if (!cancelled) setRegionsGeoJson(data);
-      })
-      .catch((error) => {
-        console.error("ITALY REGIONS MAP ERROR:", error);
-        if (!cancelled) {
-          setMapBoundariesError("Non riesco a caricare i confini regionali italiani.");
+    const loadRegions = regionsGeoJson
+      ? Promise.resolve(regionsGeoJson)
+      : fetch(ITALY_REGIONS_GEOJSON_URL).then((response) => {
+          if (!response.ok) {
+            throw new Error("Confini regionali non disponibili");
+          }
+          return response.json();
+        });
+
+    const loadProvinces = provincesGeoJson
+      ? Promise.resolve(provincesGeoJson)
+      : fetch(ITALY_PROVINCES_GEOJSON_URL).then((response) => {
+          if (!response.ok) {
+            throw new Error("Confini provinciali non disponibili");
+          }
+          return response.json();
+        });
+
+    Promise.allSettled([loadRegions, loadProvinces])
+      .then(([regionResult, provinceResult]) => {
+        if (cancelled) return;
+
+        if (regionResult.status === "fulfilled") {
+          setRegionsGeoJson(regionResult.value);
+        }
+
+        if (provinceResult.status === "fulfilled") {
+          setProvincesGeoJson(provinceResult.value);
+        }
+
+        const errors: string[] = [];
+        if (regionResult.status === "rejected") {
+          console.error(
+            "ITALY REGIONS MAP ERROR:",
+            regionResult.reason
+          );
+          errors.push("confini regionali");
+        }
+        if (provinceResult.status === "rejected") {
+          console.error(
+            "ITALY PROVINCES MAP ERROR:",
+            provinceResult.reason
+          );
+          errors.push("confini provinciali");
+        }
+
+        if (errors.length) {
+          setMapBoundariesError(
+            `Non riesco a caricare: ${errors.join(" e ")}.`
+          );
         }
       })
       .finally(() => {
@@ -4855,7 +4938,7 @@ export default function Recruiting({
     return () => {
       cancelled = true;
     };
-  }, [section, regionsGeoJson]);
+  }, [section, regionsGeoJson, provincesGeoJson]);
 
   useEffect(() => {
     if (section !== "map") return;
@@ -4872,7 +4955,7 @@ export default function Recruiting({
         minZoom: 4,
         maxZoom: 10,
         zoomControl: true,
-        attributionControl: false,
+        attributionControl: true,
         maxBounds: [
           [34.5, 5.2],
           [48.5, 20.2],
@@ -4880,6 +4963,11 @@ export default function Recruiting({
         maxBoundsViscosity: 1,
       });
       mapRef.current.getContainer().style.background = "#f8fafc";
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(mapRef.current);
       markersRef.current = L.layerGroup().addTo(mapRef.current);
     }
 
@@ -4890,6 +4978,11 @@ export default function Recruiting({
     if (regionsLayerRef.current) {
       regionsLayerRef.current.removeFrom(map);
       regionsLayerRef.current = null;
+    }
+
+    if (provincesLayerRef.current) {
+      provincesLayerRef.current.removeFrom(map);
+      provincesLayerRef.current = null;
     }
 
     const selectedRegions =
@@ -4907,13 +5000,75 @@ export default function Recruiting({
       features: filteredFeatures,
     };
 
+    if (provincesGeoJson) {
+      const provinceFeatures = (
+        provincesGeoJson.features || []
+      ).filter((feature: any) => {
+        const regionName = normalizeItalianRegion(
+          String(feature?.properties?.reg_name || "")
+        );
+        return selectedRegions.includes(regionName as any);
+      });
+
+      const provinceLayer = L.geoJSON(
+        {
+          ...provincesGeoJson,
+          features: provinceFeatures,
+        },
+        {
+          style: (feature: any) => ({
+            color: "#ffffff",
+            weight: mapMode === "region" ? 2 : 1,
+            opacity: 0.95,
+            fillColor: provinceFillColor(feature),
+            fillOpacity: mapMode === "region" ? 0.34 : 0.25,
+          }),
+          onEachFeature: (feature: any, layer: any) => {
+            const provinceName = String(
+              feature?.properties?.prov_name || ""
+            );
+            const provinceCode = String(
+              feature?.properties?.prov_acr || ""
+            );
+            const provinceLabel = provinceCode
+              ? `${provinceName} (${provinceCode})`
+              : provinceName;
+
+            layer.bindTooltip(provinceLabel, {
+              permanent: mapMode === "region",
+              direction: "center",
+              opacity: mapMode === "region" ? 0.9 : 0.98,
+              interactive: false,
+            });
+
+            layer.on("mouseover", () => {
+              layer.setStyle({
+                fillOpacity: 0.48,
+                weight: 2,
+              });
+            });
+
+            layer.on("mouseout", () => {
+              layer.setStyle({
+                fillOpacity:
+                  mapMode === "region" ? 0.34 : 0.25,
+                weight: mapMode === "region" ? 2 : 1,
+              });
+            });
+          },
+        }
+      ).addTo(map);
+
+      provincesLayerRef.current = provinceLayer;
+    }
+
     const regionLayer = L.geoJSON(selectedGeoJson, {
       style: () => ({
         color: "#475569",
         weight: 2,
         opacity: 1,
-        fillColor: "#e2e8f0",
-        fillOpacity: 0.92,
+        fillColor: "#ffffff",
+        fillOpacity: 0.04,
       }),
       onEachFeature: (feature: any, layer: any) => {
         const regionName = normalizeItalianRegion(
@@ -4939,15 +5094,15 @@ export default function Recruiting({
 
           layer.on("mouseover", () => {
             layer.setStyle({
-              fillColor: "#bfdbfe",
-              fillOpacity: 0.98,
+              fillColor: "#dbeafe",
+              fillOpacity: 0.18,
             });
           });
 
           layer.on("mouseout", () => {
             layer.setStyle({
-              fillColor: "#e2e8f0",
-              fillOpacity: 0.92,
+              fillColor: "#ffffff",
+              fillOpacity: 0.04,
             });
           });
         }
@@ -5154,6 +5309,7 @@ export default function Recruiting({
     visibleMapRegions,
     focusedCandidateMap,
     regionsGeoJson,
+    provincesGeoJson,
   ]);
 
   useEffect(() => {
@@ -9309,7 +9465,7 @@ export default function Recruiting({
           <div style={{ ...cardStyle, padding: 10, position: "relative" }}>
             {mapBoundariesLoading && (
               <div style={{ padding: "12px 6px", fontWeight: 800, color: "#475569" }}>
-                Caricamento confini regionali italiani...
+                Caricamento confini regionali e provinciali italiani...
               </div>
             )}
             {mapBoundariesError && (
@@ -9317,6 +9473,18 @@ export default function Recruiting({
                 {mapBoundariesError}
               </div>
             )}
+            <div
+              style={{
+                padding: "0 4px 9px",
+                color: "#475569",
+                fontSize: 12,
+                lineHeight: 1.4,
+              }}
+            >
+              Le province sono evidenziate con colori diversi. I nomi delle regioni
+              restano sempre visibili; la base cartografica mostra le principali
+              città e località della zona visualizzata.
+            </div>
             <div
               ref={mapElementRef}
               style={{
