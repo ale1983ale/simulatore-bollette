@@ -487,15 +487,9 @@ function phoneHref(value: string) {
   return clean ? `tel:${clean}` : "";
 }
 
-const OUTLOOK_SENDER_ACCOUNT = "alessio.cedroni@piuenergia.it";
-
 function emailHref(value: string) {
   const clean = String(value || "").trim();
-  if (!clean) return "";
-
-  return `https://outlook.office.com/mail/${encodeURIComponent(
-    OUTLOOK_SENDER_ACCOUNT
-  )}/deeplink/compose?to=${encodeURIComponent(clean)}`;
+  return clean ? `mailto:${clean}` : "";
 }
 
 async function copyPlainText(value: string) {
@@ -6643,8 +6637,6 @@ export default function Recruiting({
                           {candidate.email && (
                             <a
                               href={emailHref(candidate.email)}
-                              target="_blank"
-                              rel="noreferrer"
                               aria-label={`Invia email a ${candidate.fullName}`}
                               title={`Invia email a ${candidate.email}`}
                               onClick={(event) => event.stopPropagation()}
@@ -7182,8 +7174,6 @@ export default function Recruiting({
                           {selectedCandidate.email ? (
                             <a
                               href={emailHref(selectedCandidate.email)}
-                              target="_blank"
-                              rel="noreferrer"
                               style={{
                                 color: "#1d4ed8",
                                 textDecoration: "underline",
@@ -10628,8 +10618,6 @@ export default function Recruiting({
                 {calendarContactPreview.email && (
                   <a
                     href={emailHref(calendarContactPreview.email)}
-                    target="_blank"
-                    rel="noreferrer"
                     style={{
                       ...buttonStyle,
                       display: "inline-flex",
