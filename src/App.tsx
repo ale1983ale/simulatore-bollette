@@ -52,12 +52,15 @@ type EnergyOffer = {
   allowedCustomerGroups?: EnergyCustomerGroup[];
 };
 
+type GasCustomerGroup = "DOMESTICO" | "BUSINESS";
+
 type GasOffer = {
   nome: string;
   canone: number;
   spread: number;
   quotaVariabile: number;
   visibile?: boolean;
+  allowedCustomerGroups?: GasCustomerGroup[];
 };
 
 type GasAcciseSettings = {
@@ -329,8 +332,22 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
 ];
 
 const INITIAL_GAS_OFFERS: GasOffer[] = [
-  { nome: "DEDICATA", canone: 0, spread: 0, quotaVariabile: 0, visibile: true },
-  { nome: "+SICURA DEDICATA", canone: 0, spread: 0, quotaVariabile: 0, visibile: true },
+  {
+    nome: "DEDICATA",
+    canone: 0,
+    spread: 0,
+    quotaVariabile: 0,
+    visibile: true,
+    allowedCustomerGroups: ["DOMESTICO", "BUSINESS"],
+  },
+  {
+    nome: "+SICURA DEDICATA",
+    canone: 0,
+    spread: 0,
+    quotaVariabile: 0,
+    visibile: true,
+    allowedCustomerGroups: ["DOMESTICO", "BUSINESS"],
+  },
 ];
 
 const energyTypes = [
@@ -388,6 +405,37 @@ function energyOfferAllowsType(offer: EnergyOffer, tipo: string) {
   const group = energyTypeToGroup(tipo);
   if (!group) return true;
   return normalizedEnergyOfferGroups(offer).includes(group);
+}
+
+const GAS_CUSTOMER_GROUPS: Array<{
+  key: GasCustomerGroup;
+  label: string;
+}> = [
+  { key: "DOMESTICO", label: "Domestico" },
+  { key: "BUSINESS", label: "Business" },
+];
+
+const ALL_GAS_CUSTOMER_GROUPS: GasCustomerGroup[] = [
+  "DOMESTICO",
+  "BUSINESS",
+];
+
+function normalizedGasOfferGroups(
+  offer: GasOffer
+): GasCustomerGroup[] {
+  const groups = Array.isArray(offer.allowedCustomerGroups)
+    ? offer.allowedCustomerGroups.filter((group) =>
+        ALL_GAS_CUSTOMER_GROUPS.includes(group)
+      )
+    : [];
+
+  return groups.length ? groups : ALL_GAS_CUSTOMER_GROUPS;
+}
+
+function gasOfferAllowsUse(offer: GasOffer, uso: string) {
+  const normalizedUse = String(uso || "").toUpperCase() as GasCustomerGroup;
+  if (!ALL_GAS_CUSTOMER_GROUPS.includes(normalizedUse)) return true;
+  return normalizedGasOfferGroups(offer).includes(normalizedUse);
 }
 
 const energyBilling = [
@@ -9517,7 +9565,19 @@ useEffect(() => {
       if (Array.isArray(map.gasOffers)) {
         const obsoleteGasOfferNames = new Set(["CASA", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESAUNICA", "SCELTA", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALOREUNICA"]);
         const savedGasOffers = (map.gasOffers as GasOffer[])
-          .map((offer) => ({ ...offer, visibile: offer.visibile !== false }))
+          .map((offer) => ({
+            ...offer,
+            visibile: offer.visibile !== false,
+            allowedCustomerGroups:
+              Array.isArray(offer.allowedCustomerGroups) &&
+              offer.allowedCustomerGroups.some((group) =>
+                ALL_GAS_CUSTOMER_GROUPS.includes(group)
+              )
+                ? offer.allowedCustomerGroups.filter((group) =>
+                    ALL_GAS_CUSTOMER_GROUPS.includes(group)
+                  )
+                : ["DOMESTICO", "BUSINESS"],
+          }))
           .map((offer) =>
             ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURA DEDICATA" }
