@@ -5449,6 +5449,222 @@ function Listini({
           border: "1px solid #e2e8f0",
           borderRadius: 12,
           padding: 16,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0 }}>
+              Rete + Oneri Energia · automatico
+            </h2>
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 13,
+                color: "#64748b",
+                lineHeight: 1.45,
+              }}
+            >
+              Quota fissa, quota potenza e quota consumi utilizzate dal
+              simulatore Energia. Storico 2025 e 2026.
+              <br />
+              Per BTA/MTA il riferimento automatico è ASOS classe 0
+              (cliente non energivoro).
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={networkTariffRefreshing}
+            onClick={() => void onRefreshNetworkTariffs()}
+            style={{
+              padding: "10px 15px",
+              borderRadius: 9,
+              border: "1px solid #ea580c",
+              background: networkTariffRefreshing ? "#ffedd5" : "#ea580c",
+              color: networkTariffRefreshing ? "#c2410c" : "white",
+              fontWeight: 900,
+              cursor: networkTariffRefreshing ? "wait" : "pointer",
+            }}
+          >
+            {networkTariffRefreshing
+              ? "↻ AGGIORNAMENTO..."
+              : "↻ AGGIORNA ORA"}
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginTop: 12,
+          }}
+        >
+          {[2026, 2025].map((year) => (
+            <button
+              key={year}
+              type="button"
+              onClick={() => setNetworkHistoryYear(year)}
+              style={{
+                padding: "7px 13px",
+                borderRadius: 999,
+                border:
+                  networkHistoryYear === year
+                    ? "2px solid #0f172a"
+                    : "1px solid #cbd5e1",
+                background:
+                  networkHistoryYear === year ? "#0f172a" : "#f8fafc",
+                color:
+                  networkHistoryYear === year ? "white" : "#334155",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              {year}
+            </button>
+          ))}
+
+          <select
+            value={networkHistoryType}
+            onChange={(e) => setNetworkHistoryType(e.target.value)}
+            style={{
+              padding: "8px 11px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: "white",
+              fontWeight: 800,
+            }}
+          >
+            {[
+              "RESIDENTE",
+              "NON RESIDENTE",
+              "RESIDENTE CANONE ESENTE",
+              "BTA1","BTA2","BTA3","BTA4","BTA5","BTA6",
+              "MTA1","MTA2","MTA3",
+            ].map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {tipo}
+              </option>
+            ))}
+          </select>
+
+          <span
+            style={{
+              marginLeft: "auto",
+              fontSize: 12,
+              color: "#64748b",
+            }}
+          >
+            Ultimo controllo:{" "}
+            <strong>
+              {networkTariffMeta.checkedAt
+                ? new Date(networkTariffMeta.checkedAt).toLocaleString("it-IT")
+                : "—"}
+            </strong>
+          </span>
+        </div>
+
+        {networkTariffMeta.warnings.length > 0 && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "9px 11px",
+              borderRadius: 8,
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            Una fonte ufficiale non ha risposto: restano in uso gli ultimi
+            valori validi presenti nello storico.
+          </div>
+        )}
+
+        <div style={{ overflowX: "auto", marginTop: 12 }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              minWidth: 760,
+            }}
+          >
+            <thead>
+              <tr>
+                {[
+                  "Mese",
+                  "Quota fissa €/POD/anno",
+                  "Quota potenza €/kW/anno",
+                  "Quota consumi €/kWh",
+                  "Stato",
+                ].map((h) => (
+                  <th key={h} style={thStyle}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {networkTariffRows
+                .filter(
+                  (row) =>
+                    row.anno === networkHistoryYear &&
+                    row.tipo === networkHistoryType
+                )
+                .sort((a, b) => a.meseNumero - b.meseNumero)
+                .map((row) => (
+                  <tr key={row.tipo + row.mese}>
+                    <td style={{ ...tdStyle, fontWeight: 900 }}>
+                      {row.mese}
+                    </td>
+                    <td style={tdStyle}>
+                      {Number(row.quotaFissaAnnua).toFixed(4)}
+                    </td>
+                    <td style={tdStyle}>
+                      {Number(row.quotaPotenzaAnnua).toFixed(4)}
+                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 900 }}>
+                      {Number(row.quotaEnergia).toFixed(6)}
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "4px 7px",
+                          borderRadius: 999,
+                          background: "#dcfce7",
+                          color: "#166534",
+                          fontSize: 11,
+                          fontWeight: 900,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {row.status || "DISPONIBILE"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
           display: "grid",
           gridTemplateColumns: "repeat(2,minmax(0,1fr))",
           gap: 16,
