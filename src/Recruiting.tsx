@@ -450,9 +450,15 @@ function phoneHref(value: string) {
   return clean ? `tel:${clean}` : "";
 }
 
+const OUTLOOK_SENDER_ACCOUNT = "alessio.cedroni@piuenergia.it";
+
 function emailHref(value: string) {
   const clean = String(value || "").trim();
-  return clean ? `mailto:${clean}` : "";
+  if (!clean) return "";
+
+  return `https://outlook.office.com/mail/${encodeURIComponent(
+    OUTLOOK_SENDER_ACCOUNT
+  )}/deeplink/compose?to=${encodeURIComponent(clean)}`;
 }
 
 async function copyPlainText(value: string) {
@@ -497,7 +503,11 @@ function normalizePlaceName(value: string) {
     .trim();
 }
 
-async function geocodeRecruitingCandidateZone(zone: string) {
+async function geocodeRecruitingCandidateZone(
+  zone: string,
+  provinceHint = "",
+  regionHint = ""
+) {
   const query = String(zone || "").trim();
   if (!query) {
     return {
@@ -510,8 +520,48 @@ async function geocodeRecruitingCandidateZone(zone: string) {
   }
 
   const exactNeedle = normalizePlaceName(query);
+  const normalizedProvinceHint = normalizeProvinceCode(provinceHint);
+  const normalizedRegionHint = normalizeItalianRegion(regionHint);
 
-  const fetchRows = async (url: URL) => {
+  const fetchRowsFromAppApi = async () => {
+    if (typeof window === "undefined") return [];
+
+    const url = new URL("/api/geocode", window.location.origin);
+    url.searchParams.set("query", query);
+    if (normalizedProvinceHint) {
+      url.searchParams.set("province", normalizedProvinceHint);
+    }
+    if (normalizedRegionHint) {
+      url.searchParams.set("region", normalizedRegionHint);
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error("Proxy geolocalizzazione non disponibile");
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload?.results) ? payload.results : [];
+  };
+
+  const fetchRowsDirectly = async () => {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("countrycodes", "it");
+    url.searchParams.set("limit", "20");
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("namedetails", "1");
+    url.searchParams.set("extratags", "1");
+    url.searchParams.set(
+      "q",
+      [query, normalizedProvinceHint, normalizedRegionHint, "Italia"]
+        .filter(Boolean)
+        .join(", ")
+    );
+
     const response = await fetch(url.toString(), {
       headers: { "Accept-Language": "it" },
     });
@@ -524,40 +574,14 @@ async function geocodeRecruitingCandidateZone(zone: string) {
     return Array.isArray(rows) ? rows : [];
   };
 
-  const addCommonParams = (url: URL) => {
-    url.searchParams.set("format", "jsonv2");
-    url.searchParams.set("countrycodes", "it");
-    url.searchParams.set("limit", "20");
-    url.searchParams.set("addressdetails", "1");
-    url.searchParams.set("namedetails", "1");
-    url.searchParams.set("extratags", "1");
-  };
+  let rows: any[] = [];
 
-  // Prima prova: ricerca strutturata come città/comune italiano.
-  const structuredUrl = new URL("https://nominatim.openstreetmap.org/search");
-  addCommonParams(structuredUrl);
-  structuredUrl.searchParams.set("city", query);
-  structuredUrl.searchParams.set("country", "Italia");
-
-  let rows = await fetchRows(structuredUrl);
-
-  // Aggiunge anche una ricerca libera: alcuni comuni italiani vengono
-  // classificati da OpenStreetMap come municipality/boundary e non come city.
-  const fallbackUrl = new URL("https://nominatim.openstreetmap.org/search");
-  addCommonParams(fallbackUrl);
-  fallbackUrl.searchParams.set("q", `${query}, Italia`);
-  const fallbackRows = await fetchRows(fallbackUrl);
-
-  // Unisce i risultati eliminando i duplicati.
-  const byPlaceId = new Map<string, any>();
-  [...rows, ...fallbackRows].forEach((row: any) => {
-    const key = String(
-      row?.place_id ||
-        `${row?.lat || ""}|${row?.lon || ""}|${row?.display_name || ""}`
-    );
-    if (!byPlaceId.has(key)) byPlaceId.set(key, row);
-  });
-  rows = Array.from(byPlaceId.values());
+  try {
+    rows = await fetchRowsFromAppApi();
+  } catch (apiError) {
+    console.warn("GEOCODE APP API FALLBACK:", apiError);
+    rows = await fetchRowsDirectly();
+  }
 
   if (!rows.length) {
     return {
@@ -604,11 +628,15 @@ async function geocodeRecruitingCandidateZone(zone: string) {
           0
       );
 
+      const rowProvince = provinceCodeFromAddress(address);
+      const rowRegion =
+        regionFromProvinceCode(rowProvince) ||
+        normalizeItalianRegion(
+          address.state || address.region || address.state_district || ""
+        );
+
       let score = 0;
 
-      // Il nome deve corrispondere soprattutto alla città/comune, non a una
-      // frazione omonima. Questo evita casi come PRATO -> località in provincia
-      // di Udine invece del Comune di Prato (PO).
       if (mainLocalityNames.some((name: string) => name === exactNeedle)) {
         score += 220;
       } else if (
@@ -642,8 +670,6 @@ async function geocodeRecruitingCandidateZone(zone: string) {
         row?.class === "boundary" &&
         addressType === "administrative"
       ) {
-        // Un confine amministrativo può essere il Comune corretto: non va
-        // scartato, ma deve avere il nome esatto per competere con una città.
         if (
           mainLocalityNames.some(
             (name: string) => name === exactNeedle
@@ -655,8 +681,15 @@ async function geocodeRecruitingCandidateZone(zone: string) {
         }
       }
 
-      // Nominatim assegna "importance" maggiore ai centri principali.
-      // Serve come spareggio robusto fra località omonime.
+      if (normalizedProvinceHint) {
+        score +=
+          rowProvince === normalizedProvinceHint ? 180 : -90;
+      }
+
+      if (normalizedRegionHint) {
+        score += rowRegion === normalizedRegionHint ? 70 : -35;
+      }
+
       if (Number.isFinite(importance)) {
         score += importance * 120;
       }
@@ -665,7 +698,6 @@ async function geocodeRecruitingCandidateZone(zone: string) {
         score += Math.min(55, Math.log10(population + 1) * 8);
       }
 
-      // I centri urbani/comuni hanno in genere rank più forte delle frazioni.
       if (placeRank > 0 && placeRank <= 16) score += 25;
       else if (placeRank >= 21) score -= 10;
 
@@ -3441,7 +3473,11 @@ export default function Recruiting({
           nextLongitude === null)
       ) {
         try {
-          const geo = await geocodeRecruitingCandidateZone(editZone.trim());
+          const geo = await geocodeRecruitingCandidateZone(
+            editZone.trim(),
+            editProvinceCode,
+            editRegion
+          );
           if (
             geo.latitude !== null &&
             geo.longitude !== null &&
@@ -4494,7 +4530,27 @@ export default function Recruiting({
     setMessage("Posiziono il nominativo sulla mappa...");
 
     try {
-      const geo = await geocodeRecruitingCandidateZone(zone);
+      const storedCoordinatesAreValid =
+        normalizePlaceName(zone) ===
+          normalizePlaceName(candidate.operationalZone) &&
+        candidate.latitude !== null &&
+        candidate.longitude !== null &&
+        Number.isFinite(candidate.latitude) &&
+        Number.isFinite(candidate.longitude);
+
+      const geo = storedCoordinatesAreValid
+        ? {
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+            region: candidate.region,
+            provinceCode: candidate.provinceCode,
+            displayName: zone,
+          }
+        : await geocodeRecruitingCandidateZone(
+            zone,
+            candidate.provinceCode,
+            candidate.region
+          );
 
       if (
         geo.latitude === null ||
@@ -4649,7 +4705,11 @@ export default function Recruiting({
 
     const groups = new Map<string, Candidate[]>();
     pending.forEach((candidate) => {
-      const key = normalizePlaceName(candidate.operationalZone);
+      const key = [
+        normalizePlaceName(candidate.operationalZone),
+        normalizeProvinceCode(candidate.provinceCode),
+        normalizePlaceName(candidate.region),
+      ].join("|");
       if (!key || candidateMapFailedZonesRef.current.has(key)) return;
       const current = groups.get(key) || [];
       current.push(candidate);
@@ -4673,7 +4733,12 @@ export default function Recruiting({
         if (!zone) continue;
 
         try {
-          const geo = await geocodeRecruitingCandidateZone(zone);
+          const referenceCandidate = groupedCandidates[0];
+          const geo = await geocodeRecruitingCandidateZone(
+            zone,
+            referenceCandidate?.provinceCode || "",
+            referenceCandidate?.region || ""
+          );
 
           if (
             geo.latitude === null ||
@@ -6422,6 +6487,8 @@ export default function Recruiting({
                           {candidate.email && (
                             <a
                               href={emailHref(candidate.email)}
+                              target="_blank"
+                              rel="noreferrer"
                               aria-label={`Invia email a ${candidate.fullName}`}
                               title={`Invia email a ${candidate.email}`}
                               onClick={(event) => event.stopPropagation()}
@@ -6959,6 +7026,8 @@ export default function Recruiting({
                           {selectedCandidate.email ? (
                             <a
                               href={emailHref(selectedCandidate.email)}
+                              target="_blank"
+                              rel="noreferrer"
                               style={{
                                 color: "#1d4ed8",
                                 textDecoration: "underline",
@@ -10391,6 +10460,8 @@ export default function Recruiting({
                 {calendarContactPreview.email && (
                   <a
                     href={emailHref(calendarContactPreview.email)}
+                    target="_blank"
+                    rel="noreferrer"
                     style={{
                       ...buttonStyle,
                       display: "inline-flex",
