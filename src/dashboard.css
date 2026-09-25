@@ -1059,3 +1059,18 @@ table {
   }
 
 }
+
+
+/* Recruiting: su mobile amplia il campo note mentre si scrive */
+@media (max-width: 700px) {
+  .recruiting-note-textarea {
+    min-height: 128px;
+    transition: min-height 0.16s ease, height 0.16s ease;
+  }
+
+  .recruiting-note-textarea:focus {
+    min-height: 300px;
+    height: min(42dvh, 360px);
+    max-height: 360px;
+  }
+}
