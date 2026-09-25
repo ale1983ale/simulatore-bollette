@@ -131,7 +131,7 @@ const Q3_2026: Record<string, Triple> = {
   "BTA3":[17.7024,19.2372,0.036327],
   "BTA4":[17.9988,19.2372,0.036327],
   "BTA5":[17.9988,19.2372,0.036327],
-  "BTA6":[17.7024,18.2688,0.036319],
+  "BTA6":[17.7024,18.2688,0.036327],
   "MTA1":[578.6331,19.9656,0.034547],
   "MTA2":[550.4943,17.9280,0.034519],
   "MTA3":[541.9287,15.7284,0.034498],
@@ -201,10 +201,9 @@ export function findNetworkTariff(
 
 export function monthProration(row: NetworkTariffRow | undefined) {
   if (!row) return 0;
-  const daysInMonth = new Date(row.anno, row.meseNumero, 0).getDate();
-  const daysInYear =
-    new Date(row.anno, 1, 29).getMonth() === 1 ? 366 : 365;
-  return daysInMonth / daysInYear;
+  // Le quote annue di rete/potenza vengono fatturate per mese:
+  // un mese di competenza = 1/12 dell'importo annuo.
+  return 1 / 12;
 }
 
 export function isNonEnergivoreDefaultType(tipo: string) {
