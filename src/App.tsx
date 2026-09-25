@@ -4237,6 +4237,8 @@ function Gas({
   const [s, setS] = useState(
     () => gasDraftRef.current!.state
   );
+  const [gasCompatibilityDriver, setGasCompatibilityDriver] =
+    useState<"uso" | "offerta">("uso");
   const [lastGasInputAt, setLastGasInputAt] =
     useState(() => gasDraftRef.current!.updatedAt);
 
@@ -4321,28 +4323,69 @@ function Gas({
   const gasFixedMode =
     isFixedCompetenceMonth(s.periodo1);
 
-  const compatibleGasOffers = visibleGasOffers.filter(
+  const fixedModeGasOffers = visibleGasOffers.filter(
     (offer) => isSicuraOffer(offer.nome) === gasFixedMode
   );
 
+  const selectedGasOffer =
+    fixedModeGasOffers.find((offer) => offer.nome === s.offerta) ||
+    visibleGasOffers.find((offer) => offer.nome === s.offerta);
+
+  const compatibleGasUseOptions =
+    gasCompatibilityDriver === "offerta" && selectedGasOffer
+      ? ["DOMESTICO", "BUSINESS"].filter((uso) =>
+          gasOfferAllowsUse(selectedGasOffer, uso)
+        )
+      : ["DOMESTICO", "BUSINESS"];
+
+  const compatibleGasOfferOptions =
+    gasCompatibilityDriver === "uso"
+      ? fixedModeGasOffers.filter((offer) =>
+          gasOfferAllowsUse(offer, s.uso)
+        )
+      : fixedModeGasOffers;
+
   useEffect(() => {
     if (!s.periodo1) return;
+
+    const currentOffer = fixedModeGasOffers.find(
+      (offer) => offer.nome === s.offerta
+    );
+
     if (
-      compatibleGasOffers.some(
-        (offer) => offer.nome === s.offerta
-      )
+      currentOffer &&
+      gasOfferAllowsUse(currentOffer, s.uso)
     ) {
       return;
     }
 
+    const nextOffer =
+      fixedModeGasOffers.find((offer) =>
+        gasOfferAllowsUse(offer, s.uso)
+      ) || fixedModeGasOffers[0];
+
+    if (!nextOffer) {
+      setS((prev) => ({ ...prev, offerta: "" }));
+      return;
+    }
+
+    const nextUso = gasOfferAllowsUse(nextOffer, s.uso)
+      ? s.uso
+      : ["DOMESTICO", "BUSINESS"].find((uso) =>
+          gasOfferAllowsUse(nextOffer, uso)
+        ) || s.uso;
+
     setS((prev) => ({
       ...prev,
-      offerta: compatibleGasOffers[0]?.nome || "",
+      offerta: nextOffer.nome,
+      uso: nextUso,
+      iva: nextUso === "DOMESTICO" ? "10" : "22",
     }));
   }, [
     gasOffers,
     s.periodo1,
     s.offerta,
+    s.uso,
     gasFixedMode,
   ]);
 
@@ -4593,6 +4636,55 @@ function Gas({
 
       return newState;
     });
+  };
+
+  const handleGasUseChange = (uso: string) => {
+    setGasCompatibilityDriver("uso");
+    setLastGasInputAt(Date.now());
+
+    const currentOffer = fixedModeGasOffers.find(
+      (offer) => offer.nome === s.offerta
+    );
+    const nextOffer =
+      currentOffer && gasOfferAllowsUse(currentOffer, uso)
+        ? currentOffer
+        : fixedModeGasOffers.find((offer) =>
+            gasOfferAllowsUse(offer, uso)
+          );
+
+    setS((prev) => ({
+      ...prev,
+      uso,
+      iva: uso === "DOMESTICO" ? "10" : "22",
+      offerta: nextOffer?.nome || "",
+    }));
+  };
+
+  const handleGasOfferChange = (offerName: string) => {
+    setGasCompatibilityDriver("offerta");
+    setLastGasInputAt(Date.now());
+
+    const nextOffer = fixedModeGasOffers.find(
+      (offer) => offer.nome === offerName
+    );
+
+    if (!nextOffer) {
+      setS((prev) => ({ ...prev, offerta: offerName }));
+      return;
+    }
+
+    const nextUso = gasOfferAllowsUse(nextOffer, s.uso)
+      ? s.uso
+      : ["DOMESTICO", "BUSINESS"].find((uso) =>
+          gasOfferAllowsUse(nextOffer, uso)
+        ) || s.uso;
+
+    setS((prev) => ({
+      ...prev,
+      offerta: offerName,
+      uso: nextUso,
+      iva: nextUso === "DOMESTICO" ? "10" : "22",
+    }));
   };
 
   const consumoAnnuoGas =
@@ -4950,14 +5042,19 @@ function Gas({
             >
               {field("Nome", s.nome, (v) => set("nome", v))}
               {field("PDR", s.pdr, (v) => set("pdr", v))}
-              {selectField("Uso", s.uso, (v) => set("uso", v), ["DOMESTICO", "BUSINESS"])}
+              {selectField(
+                "Uso",
+                s.uso,
+                handleGasUseChange,
+                compatibleGasUseOptions
+              )}
               {field("IVA %", s.iva, (v) => set("iva", v), "number")}
               {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), gasBilling)}
               {selectField(
                 "Offerta",
                 s.offerta,
-                (v) => set("offerta", v),
-                compatibleGasOffers.map((x) => x.nome)
+                handleGasOfferChange,
+                compatibleGasOfferOptions.map((x) => x.nome)
               )}
               {selectField("Accisa agevolata", s.accisaAgevolata, (v) => set("accisaAgevolata", v), ["NO", "SI"])}
               {field("Valore accisa", s.accisaValore, (v) => set("accisaValore", v), "number")}
