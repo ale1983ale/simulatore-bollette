@@ -7839,6 +7839,7 @@ export default function Recruiting({
                         <div>
                           <label style={labelStyle}>Nuova nota</label>
                           <textarea
+                            className="recruiting-note-textarea"
                             value={noteText}
                             onChange={(e) => setNoteText(e.target.value)}
                             rows={4}
@@ -7988,6 +7989,7 @@ export default function Recruiting({
                                   <div>
                                     <label style={labelStyle}>Nota</label>
                                     <textarea
+                                      className="recruiting-note-textarea"
                                       value={editingNoteText}
                                       onChange={(e) =>
                                         setEditingNoteText(e.target.value)
