@@ -2475,6 +2475,8 @@ function Energia({
   const [s, setS] = useState(
     () => energyDraftRef.current!.state
   );
+  const [energyCompatibilityDriver, setEnergyCompatibilityDriver] =
+    useState<"tipo" | "offerta">("tipo");
   const [lastEnergyInputAt, setLastEnergyInputAt] =
     useState(() => energyDraftRef.current!.updatedAt);
 
@@ -2558,28 +2560,75 @@ function Energia({
 
   const energyFixedMode = isFixedCompetenceMonth(s.mese1);
 
-  const compatibleEnergyOffers = visibleEnergyOffers.filter(
+  const fixedModeEnergyOffers = visibleEnergyOffers.filter(
     (offer) => isSicuraOffer(offer.nome) === energyFixedMode
   );
 
+  const selectedEnergyOffer =
+    fixedModeEnergyOffers.find((offer) => offer.nome === s.offerta) ||
+    visibleEnergyOffers.find((offer) => offer.nome === s.offerta);
+
+  const compatibleEnergyTypeOptions =
+    energyCompatibilityDriver === "offerta" && selectedEnergyOffer
+      ? energyTypes.filter((tipo) =>
+          energyOfferAllowsType(selectedEnergyOffer, tipo)
+        )
+      : energyTypes;
+
+  const compatibleEnergyOfferOptions =
+    energyCompatibilityDriver === "tipo"
+      ? fixedModeEnergyOffers.filter((offer) =>
+          energyOfferAllowsType(offer, s.tipo)
+        )
+      : fixedModeEnergyOffers;
+
   useEffect(() => {
     if (!s.mese1) return;
+
+    const currentOffer = fixedModeEnergyOffers.find(
+      (offer) => offer.nome === s.offerta
+    );
+
     if (
-      compatibleEnergyOffers.some(
-        (offer) => offer.nome === s.offerta
-      )
+      currentOffer &&
+      energyOfferAllowsType(currentOffer, s.tipo)
     ) {
       return;
     }
 
+    const nextOffer =
+      fixedModeEnergyOffers.find((offer) =>
+        energyOfferAllowsType(offer, s.tipo)
+      ) || fixedModeEnergyOffers[0];
+
+    if (!nextOffer) {
+      setS((prev) => ({ ...prev, offerta: "" }));
+      return;
+    }
+
+    let nextType = s.tipo;
+    if (!energyOfferAllowsType(nextOffer, nextType)) {
+      nextType =
+        energyTypes.find((tipo) =>
+          energyOfferAllowsType(nextOffer, tipo)
+        ) || nextType;
+    }
+
     setS((prev) => ({
       ...prev,
-      offerta: compatibleEnergyOffers[0]?.nome || "",
+      offerta: nextOffer.nome,
+      tipo: nextType,
+      iva: ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(
+        nextType
+      )
+        ? "10"
+        : "22",
     }));
   }, [
     energyOffers,
     s.mese1,
     s.offerta,
+    s.tipo,
     energyFixedMode,
   ]);
 
@@ -2882,6 +2931,64 @@ function Energia({
 
       return newState;
     });
+  };
+
+  const handleEnergyTypeChange = (tipo: string) => {
+    setEnergyCompatibilityDriver("tipo");
+    setLastEnergyInputAt(Date.now());
+    setDispCpAutoMode(true);
+
+    const currentOffer = fixedModeEnergyOffers.find(
+      (offer) => offer.nome === s.offerta
+    );
+    const nextOffer =
+      currentOffer && energyOfferAllowsType(currentOffer, tipo)
+        ? currentOffer
+        : fixedModeEnergyOffers.find((offer) =>
+            energyOfferAllowsType(offer, tipo)
+          );
+
+    setS((prev) => ({
+      ...prev,
+      tipo,
+      iva: ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(
+        tipo
+      )
+        ? "10"
+        : "22",
+      offerta: nextOffer?.nome || "",
+    }));
+  };
+
+  const handleEnergyOfferChange = (offerName: string) => {
+    setEnergyCompatibilityDriver("offerta");
+    setLastEnergyInputAt(Date.now());
+
+    const nextOffer = fixedModeEnergyOffers.find(
+      (offer) => offer.nome === offerName
+    );
+
+    if (!nextOffer) {
+      setS((prev) => ({ ...prev, offerta: offerName }));
+      return;
+    }
+
+    const nextType = energyOfferAllowsType(nextOffer, s.tipo)
+      ? s.tipo
+      : energyTypes.find((tipo) =>
+          energyOfferAllowsType(nextOffer, tipo)
+        ) || s.tipo;
+
+    setS((prev) => ({
+      ...prev,
+      offerta: offerName,
+      tipo: nextType,
+      iva: ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(
+        nextType
+      )
+        ? "10"
+        : "22",
+    }));
   };
 
   const consumoAnnuoEnergia =
@@ -3310,12 +3417,17 @@ return (
             {field("IVA %", s.iva, (v) => set("iva", v), "number")}
             {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
             {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
-            {selectField("Tipo", s.tipo, (v) => set("tipo", v), energyTypes)}
+            {selectField(
+              "Tipo",
+              s.tipo,
+              handleEnergyTypeChange,
+              compatibleEnergyTypeOptions
+            )}
             {selectField(
               "Offerta",
               s.offerta,
-              (v) => set("offerta", v),
-              compatibleEnergyOffers.map((x) => x.nome)
+              handleEnergyOfferChange,
+              compatibleEnergyOfferOptions.map((x) => x.nome)
             )}
             {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
           </div>
