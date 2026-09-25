@@ -3531,15 +3531,228 @@ Base suggerito
         <>
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "repeat(3,minmax(0,1fr))",
-              gap: 12,
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              alignItems: "center",
+              marginBottom: 12,
             }}
           >
-            {field("Quota consumi rete", s.quotaConsumiRete, (v) => set("quotaConsumiRete", v), "number")}
-            {field("Quota fissa rete", s.quotaFissaRete, (v) => set("quotaFissaRete", v), "number")}
-            {field("Quota potenza rete", s.quotaPotenzaRete, (v) => set("quotaPotenzaRete", v), "number")}
+            <button
+              type="button"
+              onClick={() => set("reteMode", "AUTO")}
+              style={{
+                padding: "9px 15px",
+                borderRadius: 999,
+                border:
+                  String(s.reteMode || "AUTO") === "AUTO"
+                    ? "2px solid #ea580c"
+                    : "1px solid #cbd5e1",
+                background:
+                  String(s.reteMode || "AUTO") === "AUTO"
+                    ? "#fff7ed"
+                    : "#ffffff",
+                color:
+                  String(s.reteMode || "AUTO") === "AUTO"
+                    ? "#c2410c"
+                    : "#475569",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              ⚡ AUTOMATICO
+            </button>
+
+            <button
+              type="button"
+              onClick={() => set("reteMode", "MANUALE")}
+              style={{
+                padding: "9px 15px",
+                borderRadius: 999,
+                border:
+                  String(s.reteMode || "AUTO") === "MANUALE"
+                    ? "2px solid #0f172a"
+                    : "1px solid #cbd5e1",
+                background:
+                  String(s.reteMode || "AUTO") === "MANUALE"
+                    ? "#0f172a"
+                    : "#ffffff",
+                color:
+                  String(s.reteMode || "AUTO") === "MANUALE"
+                    ? "#ffffff"
+                    : "#475569",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              ✎ MANUALE
+            </button>
+
+            <span
+              style={{
+                fontSize: 12,
+                color: "#64748b",
+                fontWeight: 700,
+              }}
+            >
+              I valori manuali restano memorizzati quando passi ad Automatico.
+            </span>
           </div>
+
+          {String(s.reteMode || "AUTO") === "AUTO" ? (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile
+                    ? "1fr"
+                    : "minmax(0,0.8fr) repeat(3,minmax(0,1fr))",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  {field(
+                    s.fatturazione === "MULTI POD MENSILE" ||
+                    s.fatturazione === "MULTI POD BIMESTRALE"
+                      ? "Potenza totale impegnata (kW)"
+                      : "Potenza impegnata (kW)",
+                    s.potenzaImpegnata || "",
+                    (v) => set("potenzaImpegnata", v),
+                    "number"
+                  )}
+                </div>
+
+                {[
+                  ["Quota consumi rete", r.H25],
+                  ["Quota fissa rete", r.H29],
+                  ["Quota potenza rete", r.H30],
+                ].map(([label, value]) => (
+                  <div
+                    key={String(label)}
+                    style={{
+                      border: "1px solid #fdba74",
+                      borderRadius: 10,
+                      padding: 12,
+                      background: "#fffaf5",
+                      minHeight: 66,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: "#7c2d12",
+                        marginBottom: 6,
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 900,
+                        color: "#0f172a",
+                      }}
+                    >
+                      {money(Number(value || 0))}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 11,
+                        color: "#64748b",
+                      }}
+                    >
+                      calcolo automatico
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "9px 11px",
+                  borderRadius: 8,
+                  background: r.networkAutoAvailable ? "#f8fafc" : "#fff7ed",
+                  border: r.networkAutoAvailable
+                    ? "1px solid #e2e8f0"
+                    : "1px solid #fdba74",
+                  color: r.networkAutoAvailable ? "#475569" : "#9a3412",
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                  fontWeight: 700,
+                }}
+              >
+                {r.networkAutoAvailable ? (
+                  <>
+                    Tariffe rete e oneri automatici · {s.tipo} · {r.networkMonth1}
+                    {sLikeBimestrale(s.fatturazione) && s.mese2
+                      ? ` + ${r.networkMonth2}`
+                      : ""}.
+                    {isNonEnergivoreDefaultType(s.tipo)
+                      ? " ASOS classe 0 / non energivoro."
+                      : ""}
+                    {!s.potenzaImpegnata
+                      ? " Inserisci la potenza in kW per calcolare anche la quota potenza."
+                      : ""}
+                  </>
+                ) : (
+                  <>
+                    Tariffa automatica non disponibile per il periodo selezionato.
+                    Usa MANUALE oppure scegli un mese presente nello storico.
+                  </>
+                )}
+              </div>
+
+              {!isEDistributionPod(s.pod) && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    background: "#fffbeb",
+                    border: "1px solid #fde68a",
+                    color: "#92400e",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  POD non riconosciuto come E-Distribuzione: verifica la tariffa
+                  del distributore locale oppure usa la modalità MANUALE.
+                </div>
+              )}
+            </>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile
+                  ? "1fr"
+                  : "repeat(3,minmax(0,1fr))",
+                gap: 12,
+              }}
+            >
+              {field(
+                "Quota consumi rete",
+                s.quotaConsumiRete,
+                (v) => set("quotaConsumiRete", v),
+                "number"
+              )}
+              {field(
+                "Quota fissa rete",
+                s.quotaFissaRete,
+                (v) => set("quotaFissaRete", v),
+                "number"
+              )}
+              {field(
+                "Quota potenza rete",
+                s.quotaPotenzaRete,
+                (v) => set("quotaPotenzaRete", v),
+                "number"
+              )}
+            </div>
+          )}
 
           <div style={{ height: 12 }} />
 
