@@ -4807,7 +4807,7 @@ export default function Recruiting({
 
         if (index < entries.length - 1) {
           await new Promise((resolve) =>
-            window.setTimeout(resolve, 450)
+            window.setTimeout(resolve, 1100)
           );
         }
       }
