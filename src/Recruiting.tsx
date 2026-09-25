@@ -34,21 +34,6 @@ const ITALY_REGIONS_GEOJSON_URL = "/italy-regions.geojson";
 const ITALY_PROVINCES_GEOJSON_URL =
   "https://raw.githubusercontent.com/GeoGuess/GeoGuess-Maps/main/public/geojson/areas/italy_provinces.geojson";
 
-const PROVINCE_FILL_COLORS = [
-  "#bfdbfe",
-  "#bbf7d0",
-  "#fde68a",
-  "#fecaca",
-  "#ddd6fe",
-  "#bae6fd",
-  "#fed7aa",
-  "#fbcfe8",
-  "#ccfbf1",
-  "#d9f99d",
-  "#e9d5ff",
-  "#c7d2fe",
-];
-
 function provinceFillColor(feature: any) {
   const numericCode = Number(
     feature?.properties?.prov_istat_code_num ||
@@ -56,18 +41,79 @@ function provinceFillColor(feature: any) {
       0
   );
   const name = String(feature?.properties?.prov_name || "");
-  const fallbackHash = name
-    .split("")
-    .reduce(
-      (acc: number, char: string) =>
-        ((acc << 5) - acc + char.charCodeAt(0)) | 0,
-      0
-    );
-  const index = Number.isFinite(numericCode) && numericCode > 0
-    ? numericCode
-    : Math.abs(fallbackHash);
-  return PROVINCE_FILL_COLORS[index % PROVINCE_FILL_COLORS.length];
+  const fallbackHash = Math.abs(
+    name
+      .split("")
+      .reduce(
+        (acc: number, char: string) =>
+          ((acc << 5) - acc + char.charCodeAt(0)) | 0,
+        0
+      )
+  );
+  const seed =
+    Number.isFinite(numericCode) && numericCode > 0
+      ? numericCode
+      : fallbackHash;
+  const hue = (seed * 47) % 360;
+  return `hsl(${hue} 72% 79%)`;
 }
+
+const ITALY_MAJOR_CITIES: Array<{
+  name: string;
+  region: string;
+  lat: number;
+  lng: number;
+  primary?: boolean;
+}> = [
+  { name: "Torino", region: "Piemonte", lat: 45.0703, lng: 7.6869, primary: true },
+  { name: "Novara", region: "Piemonte", lat: 45.4469, lng: 8.6212 },
+  { name: "Cuneo", region: "Piemonte", lat: 44.3845, lng: 7.5427 },
+  { name: "Aosta", region: "Valle d'Aosta", lat: 45.737, lng: 7.3201, primary: true },
+  { name: "Milano", region: "Lombardia", lat: 45.4642, lng: 9.19, primary: true },
+  { name: "Brescia", region: "Lombardia", lat: 45.5416, lng: 10.2118, primary: true },
+  { name: "Bergamo", region: "Lombardia", lat: 45.6983, lng: 9.6773 },
+  { name: "Monza", region: "Lombardia", lat: 45.5845, lng: 9.2744 },
+  { name: "Trento", region: "Trentino-Alto Adige", lat: 46.0748, lng: 11.1217, primary: true },
+  { name: "Bolzano", region: "Trentino-Alto Adige", lat: 46.4983, lng: 11.3548, primary: true },
+  { name: "Venezia", region: "Veneto", lat: 45.4408, lng: 12.3155, primary: true },
+  { name: "Verona", region: "Veneto", lat: 45.4384, lng: 10.9916, primary: true },
+  { name: "Padova", region: "Veneto", lat: 45.4064, lng: 11.8768 },
+  { name: "Trieste", region: "Friuli-Venezia Giulia", lat: 45.6495, lng: 13.7768, primary: true },
+  { name: "Udine", region: "Friuli-Venezia Giulia", lat: 46.0711, lng: 13.2346, primary: true },
+  { name: "Genova", region: "Liguria", lat: 44.4056, lng: 8.9463, primary: true },
+  { name: "La Spezia", region: "Liguria", lat: 44.1025, lng: 9.8241, primary: true },
+  { name: "Bologna", region: "Emilia-Romagna", lat: 44.4949, lng: 11.3426, primary: true },
+  { name: "Parma", region: "Emilia-Romagna", lat: 44.8015, lng: 10.3279, primary: true },
+  { name: "Rimini", region: "Emilia-Romagna", lat: 44.0678, lng: 12.5695 },
+  { name: "Firenze", region: "Toscana", lat: 43.7696, lng: 11.2558, primary: true },
+  { name: "Pisa", region: "Toscana", lat: 43.7228, lng: 10.4017, primary: true },
+  { name: "Siena", region: "Toscana", lat: 43.3188, lng: 11.3308 },
+  { name: "Perugia", region: "Umbria", lat: 43.1107, lng: 12.3908, primary: true },
+  { name: "Terni", region: "Umbria", lat: 42.5636, lng: 12.6427, primary: true },
+  { name: "Foligno", region: "Umbria", lat: 42.9547, lng: 12.7022 },
+  { name: "Ancona", region: "Marche", lat: 43.6158, lng: 13.5189, primary: true },
+  { name: "Pesaro", region: "Marche", lat: 43.9125, lng: 12.9155, primary: true },
+  { name: "Roma", region: "Lazio", lat: 41.9028, lng: 12.4964, primary: true },
+  { name: "Latina", region: "Lazio", lat: 41.4676, lng: 12.9037, primary: true },
+  { name: "L'Aquila", region: "Abruzzo", lat: 42.3498, lng: 13.3995, primary: true },
+  { name: "Pescara", region: "Abruzzo", lat: 42.4618, lng: 14.2161, primary: true },
+  { name: "Campobasso", region: "Molise", lat: 41.5603, lng: 14.6627, primary: true },
+  { name: "Isernia", region: "Molise", lat: 41.596, lng: 14.2332, primary: true },
+  { name: "Napoli", region: "Campania", lat: 40.8518, lng: 14.2681, primary: true },
+  { name: "Salerno", region: "Campania", lat: 40.6824, lng: 14.7681, primary: true },
+  { name: "Bari", region: "Puglia", lat: 41.1171, lng: 16.8719, primary: true },
+  { name: "Lecce", region: "Puglia", lat: 40.3515, lng: 18.175, primary: true },
+  { name: "Taranto", region: "Puglia", lat: 40.4644, lng: 17.247, primary: true },
+  { name: "Potenza", region: "Basilicata", lat: 40.6404, lng: 15.8056, primary: true },
+  { name: "Matera", region: "Basilicata", lat: 40.6664, lng: 16.6043, primary: true },
+  { name: "Catanzaro", region: "Calabria", lat: 38.9098, lng: 16.5877, primary: true },
+  { name: "Reggio Calabria", region: "Calabria", lat: 38.1113, lng: 15.6473, primary: true },
+  { name: "Palermo", region: "Sicilia", lat: 38.1157, lng: 13.3615, primary: true },
+  { name: "Catania", region: "Sicilia", lat: 37.5079, lng: 15.083, primary: true },
+  { name: "Messina", region: "Sicilia", lat: 38.1938, lng: 15.554, primary: true },
+  { name: "Cagliari", region: "Sardegna", lat: 39.2238, lng: 9.1217, primary: true },
+  { name: "Sassari", region: "Sardegna", lat: 40.7259, lng: 8.5557, primary: true },
+];
 
 type CandidateStatus = string;
 
@@ -4946,22 +4992,17 @@ export default function Recruiting({
       mapRef.current = L.map(mapElementRef.current, {
         center: [42.6, 12.5],
         zoom: 5,
-        minZoom: 4,
+        minZoom: 5,
         maxZoom: 10,
         zoomControl: true,
-        attributionControl: true,
+        attributionControl: false,
         maxBounds: [
-          [34.5, 5.2],
-          [48.5, 20.2],
+          [35.0, 6.0],
+          [47.5, 19.0],
         ],
         maxBoundsViscosity: 1,
       });
-      mapRef.current.getContainer().style.background = "#f8fafc";
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(mapRef.current);
+      mapRef.current.getContainer().style.background = "#dff4fb";
       markersRef.current = L.layerGroup().addTo(mapRef.current);
     }
 
@@ -5012,10 +5053,10 @@ export default function Recruiting({
         {
           style: (feature: any) => ({
             color: "#ffffff",
-            weight: mapMode === "region" ? 2 : 1,
-            opacity: 0.95,
+            weight: mapMode === "region" ? 2.2 : 1.25,
+            opacity: 1,
             fillColor: provinceFillColor(feature),
-            fillOpacity: mapMode === "region" ? 0.34 : 0.25,
+            fillOpacity: mapMode === "region" ? 0.78 : 0.68,
           }),
           onEachFeature: (feature: any, layer: any) => {
             const provinceName = String(
@@ -5037,16 +5078,16 @@ export default function Recruiting({
 
             layer.on("mouseover", () => {
               layer.setStyle({
-                fillOpacity: 0.48,
-                weight: 2,
+                fillOpacity: 0.92,
+                weight: 2.4,
               });
             });
 
             layer.on("mouseout", () => {
               layer.setStyle({
                 fillOpacity:
-                  mapMode === "region" ? 0.34 : 0.25,
-                weight: mapMode === "region" ? 2 : 1,
+                  mapMode === "region" ? 0.78 : 0.68,
+                weight: mapMode === "region" ? 2.2 : 1.25,
               });
             });
           },
@@ -5062,7 +5103,7 @@ export default function Recruiting({
         weight: 2,
         opacity: 1,
         fillColor: "#ffffff",
-        fillOpacity: 0.04,
+        fillOpacity: 0,
       }),
       onEachFeature: (feature: any, layer: any) => {
         const regionName = normalizeItalianRegion(
@@ -5088,15 +5129,15 @@ export default function Recruiting({
 
           layer.on("mouseover", () => {
             layer.setStyle({
-              fillColor: "#dbeafe",
-              fillOpacity: 0.18,
+              fillColor: "#ffffff",
+              fillOpacity: 0.08,
             });
           });
 
           layer.on("mouseout", () => {
             layer.setStyle({
               fillColor: "#ffffff",
-              fillOpacity: 0.04,
+              fillOpacity: 0,
             });
           });
         }
@@ -5104,6 +5145,35 @@ export default function Recruiting({
     }).addTo(map);
 
     regionsLayerRef.current = regionLayer;
+
+    const cityRegions =
+      mapMode === "italy"
+        ? [...ITALIAN_REGIONS]
+        : selectedRegions;
+    ITALY_MAJOR_CITIES
+      .filter((city) => {
+        const normalizedCityRegion = normalizeItalianRegion(city.region);
+        if (!cityRegions.includes(normalizedCityRegion as any)) return false;
+        return mapMode === "region" ? true : Boolean(city.primary);
+      })
+      .forEach((city) => {
+        const cityIcon = L.divIcon({
+          className: "",
+          html: `<div style="white-space:nowrap;font-size:${
+            mapMode === "region" ? 11 : 9
+          }px;font-weight:${city.primary ? 900 : 700};color:#0f172a;text-shadow:0 1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff,0 -1px 0 #fff;">• ${escapeHtml(
+            city.name
+          )}</div>`,
+          iconSize: [90, 18],
+          iconAnchor: [0, 9],
+        });
+        L.marker([city.lat, city.lng], {
+          icon: cityIcon,
+          interactive: false,
+          keyboard: false,
+          zIndexOffset: -50,
+        }).addTo(markerLayer!);
+      });
 
     mapAgentsToRender.forEach((agent) => {
       if (agent.latitude === null || agent.longitude === null) return;
@@ -5120,15 +5190,108 @@ export default function Recruiting({
         direction: "top",
         offset: [0, -14],
       });
-      marker.bindPopup(
-        `<div style="min-width:190px">
-          <div style="font-weight:900;font-size:15px;margin-bottom:7px">${escapeHtml(agent.firstName)} ${escapeHtml(agent.lastName)}</div>
-          <div><strong>Nome:</strong> ${escapeHtml(agent.firstName)}</div>
-          <div><strong>Cognome:</strong> ${escapeHtml(agent.lastName)}</div>
-          <div><strong>Cellulare:</strong> ${escapeHtml(agent.phone || "—")}</div>
-          <div><strong>Zona:</strong> ${escapeHtml(agent.zone || "—")}</div>
-        </div>`
+      const normalizedAgentPhone = String(agent.phone || "").replace(/\D/g, "");
+      const normalizedAgentName = normalizePlaceName(
+        `${agent.firstName} ${agent.lastName}`
       );
+      const linkedCandidate =
+        allCandidates.find((candidate) => {
+          const candidatePhone = String(candidate.phone || "").replace(/\D/g, "");
+          if (
+            normalizedAgentPhone &&
+            candidatePhone &&
+            normalizedAgentPhone === candidatePhone
+          ) {
+            return true;
+          }
+          return (
+            normalizePlaceName(candidate.fullName) === normalizedAgentName
+          );
+        }) || null;
+
+      const agentEmail = linkedCandidate?.email || "";
+      const popup = document.createElement("div");
+      popup.style.minWidth = "220px";
+
+      const title = document.createElement("div");
+      title.style.fontWeight = "900";
+      title.style.fontSize = "15px";
+      title.style.marginBottom = "7px";
+      title.textContent = `${agent.firstName} ${agent.lastName}`;
+      popup.appendChild(title);
+
+      const details = document.createElement("div");
+      details.innerHTML =
+        `<div><strong>Cellulare:</strong> ${escapeHtml(agent.phone || "—")}</div>` +
+        `<div><strong>Email:</strong> ${escapeHtml(agentEmail || "—")}</div>` +
+        `<div><strong>Zona:</strong> ${escapeHtml(agent.zone || "—")}</div>`;
+      popup.appendChild(details);
+
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.gap = "6px";
+      actions.style.flexWrap = "wrap";
+      actions.style.marginTop = "10px";
+
+      const popupButtonStyle =
+        "display:inline-flex;align-items:center;justify-content:center;padding:7px 9px;border-radius:8px;font-size:11px;font-weight:900;text-decoration:none;cursor:pointer;";
+
+      const sheetButton = document.createElement("button");
+      sheetButton.type = "button";
+      sheetButton.textContent = "SCHEDA";
+      sheetButton.setAttribute(
+        "style",
+        popupButtonStyle +
+          "border:1px solid #93c5fd;background:#dbeafe;color:#1d4ed8;"
+      );
+      sheetButton.onclick = () => {
+        map.closePopup();
+        if (linkedCandidate) {
+          openContactForEditing(linkedCandidate.id);
+        } else {
+          setMessage(
+            `Non trovo una scheda contatto collegata a ${agent.firstName} ${agent.lastName}.`
+          );
+        }
+      };
+      actions.appendChild(sheetButton);
+
+      if (agent.phone) {
+        const phoneLink = document.createElement("a");
+        phoneLink.href = phoneHref(agent.phone);
+        phoneLink.textContent = "☎ TEL";
+        phoneLink.setAttribute(
+          "style",
+          popupButtonStyle +
+            "border:1px solid #86efac;background:#dcfce7;color:#166534;"
+        );
+        actions.appendChild(phoneLink);
+      }
+
+      if (agentEmail) {
+        const emailLink = document.createElement("a");
+        emailLink.href = emailHref(agentEmail);
+        emailLink.textContent = "✉ MAIL";
+        emailLink.setAttribute(
+          "style",
+          popupButtonStyle +
+            "border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;"
+        );
+        actions.appendChild(emailLink);
+      } else {
+        const emailDisabled = document.createElement("span");
+        emailDisabled.textContent = "✉ MAIL";
+        emailDisabled.setAttribute(
+          "style",
+          popupButtonStyle +
+            "border:1px solid #e2e8f0;background:#f8fafc;color:#94a3b8;cursor:not-allowed;"
+        );
+        emailDisabled.title = "Email non disponibile nella scheda collegata";
+        actions.appendChild(emailDisabled);
+      }
+
+      popup.appendChild(actions);
+      marker.bindPopup(popup);
       marker.addTo(markerLayer!);
     });
 
@@ -5304,6 +5467,7 @@ export default function Recruiting({
     focusedCandidateMap,
     regionsGeoJson,
     provincesGeoJson,
+    allCandidates,
   ]);
 
   useEffect(() => {
@@ -9471,9 +9635,9 @@ export default function Recruiting({
                 lineHeight: 1.4,
               }}
             >
-              Le province sono evidenziate con colori diversi. I nomi delle regioni
-              restano sempre visibili; la base cartografica mostra le principali
-              città e località della zona visualizzata.
+              Cartina dedicata all'Italia: regioni sempre riconoscibili, province
+              colorate in modo diverso e principali città indicate direttamente
+              sulla mappa.
             </div>
             <div
               ref={mapElementRef}
