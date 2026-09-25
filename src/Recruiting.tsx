@@ -7841,7 +7841,13 @@ export default function Recruiting({
                           <textarea
                             className="recruiting-note-textarea"
                             value={noteText}
-                            onChange={(e) => setNoteText(e.target.value)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setNoteText(value);
+                              if (value.trim()) {
+                                setNoteCalledByMe(true);
+                              }
+                            }}
                             rows={4}
                             placeholder="Scrivi qui l'esito del contatto..."
                             style={{ ...inputStyle, resize: "vertical" }}
