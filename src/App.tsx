@@ -9,6 +9,15 @@ import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
 import { getRecruitingContext } from "./recruitingClient";
+import {
+  INITIAL_AUTO_DISP_CP_ROWS,
+  dispCapacityRate,
+  fetchDispCapacityRows,
+  isDomesticEnergyType,
+  normalizeDispMonthLabel,
+  type DispCapacityMeta,
+  type DispCpRow,
+} from "./dispCapacity";
 import "./dashboard.css";
 
 
@@ -20,12 +29,6 @@ type MonthlyRow = {
   f2: number;
   f3: number;
   psv: number;
-};
-
-type DispCpRow = {
-  mese: string;
-  dispacciamento: number;
-  cpMarket: number;
 };
 
 type EnergyOffer = {
@@ -283,21 +286,6 @@ const INITIAL_MONTHLY: MonthlyRow[] = [
       psv: 0,
     }))
   ),
-];
-
-const INITIAL_DISP_CP_ROWS: DispCpRow[] = [
-  { mese: "GENNAIO", dispacciamento: 0, cpMarket: 0 },
-  { mese: "FEBBRAIO", dispacciamento: 0, cpMarket: 0 },
-  { mese: "MARZO", dispacciamento: 0, cpMarket: 0 },
-  { mese: "APRILE", dispacciamento: 0, cpMarket: 0 },
-  { mese: "MAGGIO", dispacciamento: 0, cpMarket: 0 },
-  { mese: "GIUGNO", dispacciamento: 0, cpMarket: 0 },
-  { mese: "LUGLIO", dispacciamento: 0, cpMarket: 0 },
-  { mese: "AGOSTO", dispacciamento: 0, cpMarket: 0 },
-  { mese: "SETTEMBRE", dispacciamento: 0, cpMarket: 0 },
-  { mese: "OTTOBRE", dispacciamento: 0, cpMarket: 0 },
-  { mese: "NOVEMBRE", dispacciamento: 0, cpMarket: 0 },
-  { mese: "DICEMBRE", dispacciamento: 0, cpMarket: 0 },
 ];
 
 const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
@@ -2041,18 +2029,18 @@ function calcEnergia(
   const mese1UsaMeseDisp = mese1IsFisso || d.mese1 === "FISSO AD HOC";
   const mese2UsaMeseDisp = mese2IsFisso || d.mese2 === "FISSO AD HOC";
 
-  const meseTabella1 = mese1UsaMeseDisp
-    ? d.meseRifTabella1
-    : String(d.mese1 || "").split(" ")[0];
+  const meseTabella1 = normalizeDispMonthLabel(
+    mese1UsaMeseDisp ? d.meseRifTabella1 : d.mese1
+  );
 
-  const meseTabella2 = mese2UsaMeseDisp
-    ? d.meseRifTabella2
-    : String(d.mese2 || "").split(" ")[0];
+  const meseTabella2 = normalizeDispMonthLabel(
+    mese2UsaMeseDisp ? d.meseRifTabella2 : d.mese2
+  );
 
   const dispRow1 = dispCpRows.find((x) => x.mese === meseTabella1);
   const dispRow2 = dispCpRows.find((x) => x.mese === meseTabella2);
 
-  const isDomestico = ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(d.tipo);
+  const isDomestico = isDomesticEnergyType(d.tipo);
   const fissoRow = isDomestico ? fissoDomesticoRow : fissoBusinessRow;
 
   const mesi = energyMonths(d.fatturazione);
@@ -2106,8 +2094,8 @@ function calcEnergia(
     n(d.monoMese1) * perditaPercentuale * (prezzoMono1 + spreadEff) +
     n(d.monoMese2) * perditaPercentuale * (prezzoMono2 + spreadEff);
 
-  const totDispCp1 = n(dispRow1?.dispacciamento) + n(dispRow1?.cpMarket);
-  const totDispCp2 = n(dispRow2?.dispacciamento) + n(dispRow2?.cpMarket);
+  const totDispCp1 = dispCapacityRate(dispRow1, d.tipo);
+  const totDispCp2 = dispCapacityRate(dispRow2, d.tipo);
 
   let dispCpBase = 0;
   if (sLikeBimestrale(d.fatturazione) && d.mese2) {
@@ -2125,8 +2113,10 @@ function calcEnergia(
   }
 
   const consumiTotConPerdite = consumiTot * (1 + perditaPercentuale);
+  const dispCpQuantity = isDomestico ? consumiTot : consumiTotConPerdite;
   const dispCpTotale =
-    consumiTotConPerdite * (n(d.dispacciamentoCapacityMarket) + cmEff);
+    dispCpQuantity * n(d.dispacciamentoCapacityMarket) +
+    consumiTotConPerdite * cmEff;
 
   const H22 = H22_base + perditeEnergia + dispCpTotale;
   const H24 = n(d.reattivaImmessa) + n(d.reattivaPrelevata);
@@ -2284,8 +2274,8 @@ function Energia({
     offerta: visibleEnergyOffers[0]?.nome || "",
     mese1: "",
     mese2: "",
-    meseRifTabella1: "GENNAIO",
-    meseRifTabella2: "GENNAIO",
+    meseRifTabella1: "SETTEMBRE 2026",
+    meseRifTabella2: "SETTEMBRE 2026",
     f1Mese1: "",
     f2Mese1: "",
     f3Mese1: "",
@@ -2491,7 +2481,12 @@ function Energia({
   }, [punPsvRows, s.mese1]);
   
   
-  const dispCpMonthOptions = dispCpRows.map((row) => row.mese);
+  const dispCpMonthOptions = [...dispCpRows]
+    .sort(
+      (a, b) =>
+        b.anno - a.anno || b.meseNumero - a.meseNumero
+    )
+    .map((row) => row.mese);
 
   const mesiOrdinati = [...punPsvRows]
   .filter((m) => {
@@ -2677,19 +2672,26 @@ function Energia({
     return result.filter(Boolean) as Array<{ label: string; value: string }>;
   }, [s.mese1, s.mese2, s.fatturazione, s.tipo, punPsvRows, r.spreadEff]);
 
-    useEffect(() => {
-    if (!s.dispacciamentoCapacityMarket || s.dispacciamentoCapacityMarket === "0") {
-      setS((prev) => ({
-        ...prev,
-        dispacciamentoCapacityMarket: String(r.dispCpBase),
-      }));
-    }
-  }, [r.dispCpBase]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [dispCpAutoMode, setDispCpAutoMode] = useState(true);
+
+  useEffect(() => {
+    if (!dispCpAutoMode) return;
+    setS((prev) => ({
+      ...prev,
+      dispacciamentoCapacityMarket: String(r.dispCpBase || 0),
+    }));
+  }, [r.dispCpBase, dispCpAutoMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k: string, v: string) => {
     setLastEnergyInputAt(Date.now());
     setS((prev) => {
       const newState = { ...prev, [k]: v };
+
+      if (
+        ["tipo", "mese1", "mese2", "meseRifTabella1", "meseRifTabella2"].includes(k)
+      ) {
+        setDispCpAutoMode(true);
+      }
 
       if (k === "tipo") {
         if (["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(v)) {
@@ -3349,6 +3351,7 @@ return (
   String(s.dispacciamentoCapacityMarket ?? "").replace(".", ","),
   (v) => {
     const pulito = v.replace(",", ".");
+    setDispCpAutoMode(false);
     set("dispacciamentoCapacityMarket", pulito);
   },
   "text"
@@ -3395,12 +3398,13 @@ Base suggerito
 
   <button
  type="button"
- onClick={() =>
+ onClick={() => {
+   setDispCpAutoMode(true);
    set(
      "dispacciamentoCapacityMarket",
      String(r.dispCpBase)
-   )
- }
+   );
+ }}
  style={{
    padding:"6px 10px",
    borderRadius:20,
@@ -4749,7 +4753,9 @@ border: "1px solid #bfd8f6",
 
 function Listini({
   dispCpRows,
-  setDispCpRows,
+  dispCpMeta,
+  dispCpRefreshing,
+  onRefreshDispCapacity,
   energyOffers,
   setEnergyOffers,
   gasOffers,
@@ -4758,7 +4764,9 @@ function Listini({
   setGasAcciseSettings,
 }: {
   dispCpRows: DispCpRow[];
-  setDispCpRows: React.Dispatch<React.SetStateAction<DispCpRow[]>>;
+  dispCpMeta: DispCapacityMeta;
+  dispCpRefreshing: boolean;
+  onRefreshDispCapacity: () => Promise<void>;
   energyOffers: EnergyOffer[];
   setEnergyOffers: React.Dispatch<React.SetStateAction<EnergyOffer[]>>;
   gasOffers: GasOffer[];
@@ -4766,11 +4774,10 @@ function Listini({
   gasAcciseSettings: GasAcciseSettings;
   setGasAcciseSettings: React.Dispatch<React.SetStateAction<GasAcciseSettings>>;
 }) {
-  const cloneDispCpRows = (rows: DispCpRow[]) => rows.map((row) => ({ ...row }));
   const cloneEnergyOffers = (rows: EnergyOffer[]) => rows.map((row) => ({ ...row }));
   const cloneGasOffers = (rows: GasOffer[]) => rows.map((row) => ({ ...row }));
 
-  const [draftDispCpRows, setDraftDispCpRows] = useState<DispCpRow[]>(() => cloneDispCpRows(dispCpRows));
+  const [dispHistoryYear, setDispHistoryYear] = useState(2026);
   const [draftEnergyOffers, setDraftEnergyOffers] = useState<EnergyOffer[]>(() => cloneEnergyOffers(energyOffers));
   const [draftGasOffers, setDraftGasOffers] = useState<GasOffer[]>(() => cloneGasOffers(gasOffers));
   const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
@@ -4781,11 +4788,10 @@ function Listini({
 
   useEffect(() => {
     if (dirty) return;
-    setDraftDispCpRows(cloneDispCpRows(dispCpRows));
     setDraftEnergyOffers(cloneEnergyOffers(energyOffers));
     setDraftGasOffers(cloneGasOffers(gasOffers));
     setDraftGasAcciseSettings({ ...gasAcciseSettings });
-  }, [dispCpRows, energyOffers, gasOffers, gasAcciseSettings, dirty]);
+  }, [energyOffers, gasOffers, gasAcciseSettings, dirty]);
 
   const markDirty = () => setDirty(true);
 
@@ -4812,15 +4818,6 @@ function Listini({
       return next;
     });
 
-    markDirty();
-  };
-
-  const updateDispCp = (index: number, key: keyof DispCpRow, value: string) => {
-    setDraftDispCpRows((prev) =>
-      prev.map((row, i) =>
-        i === index ? { ...row, [key]: key === "mese" ? value : n(value) } : row
-      )
-    );
     markDirty();
   };
 
@@ -4860,7 +4857,6 @@ function Listini({
     setSaving(true);
 
     const payload = [
-      { key: "dispCpRows", value_json: draftDispCpRows },
       { key: "energyOffers", value_json: draftEnergyOffers },
       { key: "gasOffers", value_json: draftGasOffers },
       { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
@@ -4876,7 +4872,6 @@ function Listini({
     }
     setSaving(false);
 
-    setDispCpRows(cloneDispCpRows(draftDispCpRows));
     setEnergyOffers(cloneEnergyOffers(draftEnergyOffers));
     setGasOffers(cloneGasOffers(draftGasOffers));
     setGasAcciseSettings({ ...draftGasAcciseSettings });
@@ -4937,53 +4932,191 @@ function Listini({
         </button>
       </div>
 
-      <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Dispacciamento + CP Market Energia</h2>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0 }}>
+              Dispacciamento + Capacity Market · automatico
+            </h2>
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 13,
+                color: "#64748b",
+                lineHeight: 1.45,
+              }}
+            >
+              DOMESTICI: C_DISPD ARERA · BUSINESS BT/MT: TIDE + Capacity Market.
+              <br />
+              Controllo automatico all'apertura e ogni 6 ore. In caso di errore
+              rimangono in uso gli ultimi valori validi.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={dispCpRefreshing}
+            onClick={() => void onRefreshDispCapacity()}
+            style={{
+              padding: "10px 15px",
+              borderRadius: 9,
+              border: "1px solid #2563eb",
+              background: dispCpRefreshing ? "#dbeafe" : "#2563eb",
+              color: dispCpRefreshing ? "#1d4ed8" : "white",
+              fontWeight: 900,
+              cursor: dispCpRefreshing ? "wait" : "pointer",
+            }}
+          >
+            {dispCpRefreshing ? "↻ AGGIORNAMENTO..." : "↻ AGGIORNA ORA"}
+          </button>
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          {[2026, 2025].map((year) => (
+            <button
+              key={year}
+              type="button"
+              onClick={() => setDispHistoryYear(year)}
+              style={{
+                padding: "7px 13px",
+                borderRadius: 999,
+                border:
+                  dispHistoryYear === year
+                    ? "2px solid #0f172a"
+                    : "1px solid #cbd5e1",
+                background:
+                  dispHistoryYear === year ? "#0f172a" : "#f8fafc",
+                color: dispHistoryYear === year ? "white" : "#334155",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              {year}
+            </button>
+          ))}
+
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>
+            Ultimo controllo:{" "}
+            <strong>
+              {dispCpMeta.checkedAt
+                ? new Date(dispCpMeta.checkedAt).toLocaleString("it-IT")
+                : "—"}
+            </strong>
+          </span>
+        </div>
+
+        {dispCpMeta.warnings.length > 0 && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "9px 11px",
+              borderRadius: 8,
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            Una fonte non ha risposto correttamente: la webapp mantiene i valori
+            storici validi già disponibili.
+          </div>
+        )}
+
+        <div style={{ overflowX: "auto", marginTop: 12 }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              minWidth: 820,
+            }}
+          >
             <thead>
               <tr>
-                {["Mese", "Dispacciam", "CP Market", "Tot"].map((h) => (
-                  <th key={h} style={thStyle}>{h}</th>
+                {[
+                  "Mese",
+                  "C_DISPD Domestico €/kWh",
+                  "TIDE Business €/kWh",
+                  "Capacity Market €/kWh",
+                  "Totale Business €/kWh",
+                  "Stato",
+                ].map((h) => (
+                  <th key={h} style={thStyle}>
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {draftDispCpRows.map((row, i) => {
-                const tot = n(row.dispacciamento) + n(row.cpMarket);
-                return (
+              {dispCpRows
+                .filter((row) => row.anno === dispHistoryYear)
+                .sort((a, b) => a.meseNumero - b.meseNumero)
+                .map((row) => (
                   <tr key={row.mese}>
-                    <td style={tdStyle}>{row.mese}</td>
+                    <td style={{ ...tdStyle, fontWeight: 900 }}>{row.mese}</td>
                     <td style={tdStyle}>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        style={inputStyle}
-                        value={row.dispacciamento}
-                        onChange={(e) => updateDispCp(i, "dispacciamento", e.target.value)}
-                      />
+                      {row.cdispDomestico == null
+                        ? "—"
+                        : Number(row.cdispDomestico).toFixed(6)}
                     </td>
                     <td style={tdStyle}>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        style={inputStyle}
-                        value={row.cpMarket}
-                        onChange={(e) => updateDispCp(i, "cpMarket", e.target.value)}
-                      />
+                      {row.tide == null ? "—" : Number(row.tide).toFixed(6)}
                     </td>
                     <td style={tdStyle}>
-                      <input
-                        type="number"
-                        step="0.000001"
-                        style={{ ...inputStyle, background: "#f8fafc" }}
-                        value={tot}
-                        readOnly
-                      />
+                      {row.cpMarket == null
+                        ? "—"
+                        : Number(row.cpMarket).toFixed(6)}
+                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 900 }}>
+                      {row.businessTotale == null
+                        ? "—"
+                        : Number(row.businessTotale).toFixed(6)}
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "4px 7px",
+                          borderRadius: 999,
+                          background: row.status.includes("UFFICIALE")
+                            ? "#dcfce7"
+                            : "#eff6ff",
+                          color: row.status.includes("UFFICIALE")
+                            ? "#166534"
+                            : "#1d4ed8",
+                          fontSize: 11,
+                          fontWeight: 900,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {row.status || "DISPONIBILE"}
+                      </span>
                     </td>
                   </tr>
-                );
-              })}
+                ))}
             </tbody>
           </table>
         </div>
@@ -8171,7 +8304,15 @@ useEffect(() => {
 
 
 const [monthlyRows, setMonthlyRows] = useState<MonthlyRow[]>(INITIAL_MONTHLY);
-const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(INITIAL_DISP_CP_ROWS);
+const [dispCpRows, setDispCpRows] = useState<DispCpRow[]>(
+  INITIAL_AUTO_DISP_CP_ROWS
+);
+const [dispCpMeta, setDispCpMeta] = useState<DispCapacityMeta>({
+  checkedAt: "",
+  sourceStatus: "STORICO LOCALE",
+  warnings: [],
+});
+const [dispCpRefreshing, setDispCpRefreshing] = useState(false);
 const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
 
 const updateMonthlyRow = (
@@ -8383,6 +8524,41 @@ useEffect(() => {
   const punPolylinePoints = getSvgPoints(punValues, 760, 220);
 const psvPolylinePoints = getSvgPoints(psvValues, 760, 220);
 
+const refreshDispCapacity = async (force = false) => {
+  setDispCpRefreshing(true);
+  try {
+    const result = await fetchDispCapacityRows(force);
+    setDispCpRows(result.rows);
+    setDispCpMeta(result.meta);
+    if (force) {
+      const warning = result.meta.warnings.length
+        ? "\n\n" + result.meta.warnings.join("\n")
+        : "";
+      alert("Dispacciamento / Capacity aggiornati." + warning);
+    }
+  } catch (error: any) {
+    console.error("DISP CAPACITY UPDATE ERROR:", error);
+    if (force) {
+      alert(
+        "Aggiornamento non riuscito. Rimangono in uso gli ultimi valori validi.\n\n" +
+          (error?.message || error)
+      );
+    }
+  } finally {
+    setDispCpRefreshing(false);
+  }
+};
+
+useEffect(() => {
+  void refreshDispCapacity(false);
+
+  const timer = window.setInterval(() => {
+    void refreshDispCapacity(false);
+  }, 6 * 60 * 60 * 1000);
+
+  return () => window.clearInterval(timer);
+}, []);
+
 useEffect(() => {
   const loadSettings = async () => {
     setLoadingSettings(true);
@@ -8430,10 +8606,6 @@ useEffect(() => {
         });
       
         setMonthlyRows(mergedMonthlyRows);
-      }
-
-      if (Array.isArray(map.dispCpRows)) {
-        setDispCpRows(map.dispCpRows);
       }
 
       if (Array.isArray(map.energyOffers)) {
@@ -8503,7 +8675,6 @@ const saveSettings = async () => {
 
   const payload = [
     { key: "monthlyRows", value_json: monthlyRows },
-    { key: "dispCpRows", value_json: dispCpRows },
     { key: "energyOffers", value_json: energyOffers },
     { key: "gasOffers", value_json: gasOffers },
     { key: "gasAcciseSettings", value_json: gasAcciseSettings },
@@ -8805,7 +8976,9 @@ const renderAdminContent = () => {
       {tab === "listini" && (
         <Listini
           dispCpRows={dispCpRows}
-          setDispCpRows={setDispCpRows}
+          dispCpMeta={dispCpMeta}
+          dispCpRefreshing={dispCpRefreshing}
+          onRefreshDispCapacity={() => refreshDispCapacity(true)}
           energyOffers={energyOffers}
           setEnergyOffers={setEnergyOffers}
           gasOffers={gasOffers}
