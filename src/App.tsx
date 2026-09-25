@@ -308,7 +308,7 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     spread: 0,
     maggiorazioneCapacityMarket: 0,
     visibile: true,
-    allowedCustomerGroups: [...ALL_ENERGY_CUSTOMER_GROUPS],
+    allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
   },
   {
     nome: "+SICURA DEDICATA",
@@ -316,7 +316,7 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     spread: 0,
     maggiorazioneCapacityMarket: 0,
     visibile: true,
-    allowedCustomerGroups: [...ALL_ENERGY_CUSTOMER_GROUPS],
+    allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
   },
   {
     nome: "BILANCIATA",
@@ -324,7 +324,7 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     spread: 0,
     maggiorazioneCapacityMarket: 0,
     visibile: true,
-    allowedCustomerGroups: [...ALL_ENERGY_CUSTOMER_GROUPS],
+    allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
   },
 ];
 
