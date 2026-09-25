@@ -2684,14 +2684,15 @@ function Energia({
 
   const set = (k: string, v: string) => {
     setLastEnergyInputAt(Date.now());
+
+    if (
+      ["tipo", "mese1", "mese2", "meseRifTabella1", "meseRifTabella2"].includes(k)
+    ) {
+      setDispCpAutoMode(true);
+    }
+
     setS((prev) => {
       const newState = { ...prev, [k]: v };
-
-      if (
-        ["tipo", "mese1", "mese2", "meseRifTabella1", "meseRifTabella2"].includes(k)
-      ) {
-        setDispCpAutoMode(true);
-      }
 
       if (k === "tipo") {
         if (["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(v)) {
