@@ -1428,113 +1428,6 @@ Deno.serve(async (req: Request) => {
     const action = String(body?.action || "");
     const sessionToken = String(body?.session_token || "");
 
-    if (action === "status") {
-      const connection = await getConnection(admin.id);
-      const connected = Boolean(connection?.refresh_token);
-      const calendarManagementReady =
-        connected && hasCalendarManagementScope(connection?.scope);
-      const gmailSendReady =
-        connected && hasGmailSendScope(connection?.scope);
-      const driveArchiveReady =
-        connected && hasDriveReadonlyScope(connection?.scope);
-
-      return json({
-        configured: Boolean(
-          GOOGLE_CLIENT_ID &&
-            GOOGLE_CLIENT_SECRET &&
-            GOOGLE_REDIRECT_URI
-        ),
-        connected,
-        calendar_management_ready: calendarManagementReady,
-        email_notifications_ready: gmailSendReady,
-        drive_archive_ready: driveArchiveReady,
-        drive_folder_id: connection?.drive_folder_id || null,
-        drive_folder_name: connection?.drive_folder_name || null,
-        needs_reconnect:
-          connected && (!calendarManagementReady || !gmailSendReady),
-        expires_at: connection?.expires_at || null,
-        activity_calendars: Object.values(ACTIVITY_CALENDARS).map(
-          (config) => config.name
-        ),
-      });
-    }
-
-    if (action === "start") {
-      assertGoogleConfig();
-
-      const returnUrl = validateReturnUrl(body?.return_url);
-      const state = randomToken(32);
-      const stateHash = await sha256Hex(state);
-
-      await db
-        .from("google_calendar_oauth_states")
-        .delete()
-        .lt("expires_at", new Date().toISOString());
-
-      const { error } = await db
-        .from("google_calendar_oauth_states")
-        .insert({
-          state_hash: stateHash,
-          admin_id: admin.id,
-          return_url: returnUrl,
-        });
-
-      if (error) throw error;
-
-      const authUrl = new URL(
-        "https://accounts.google.com/o/oauth2/v2/auth"
-      );
-      authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
-      authUrl.searchParams.set("redirect_uri", GOOGLE_REDIRECT_URI);
-      authUrl.searchParams.set("response_type", "code");
-      authUrl.searchParams.set("scope", GOOGLE_AUTH_SCOPE);
-      authUrl.searchParams.set("access_type", "offline");
-      authUrl.searchParams.set("prompt", "consent");
-      authUrl.searchParams.set("include_granted_scopes", "true");
-      authUrl.searchParams.set("state", state);
-
-      return json({ auth_url: authUrl.toString() });
-    }
-
-    if (action === "disconnect") {
-      const connection = await getConnection(admin.id);
-
-      if (connection) {
-        const token = String(
-          connection.refresh_token || connection.access_token || ""
-        );
-
-        if (token) {
-          try {
-            await fetch(
-              `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type":
-                    "application/x-www-form-urlencoded",
-                },
-              }
-            );
-          } catch {
-            // Revocation best effort. Local credentials are still removed.
-          }
-        }
-
-        await db
-          .from("google_calendar_connections")
-          .delete()
-          .eq("admin_id", admin.id);
-
-        await db
-          .from("google_calendar_activity_calendars")
-          .delete()
-          .eq("admin_id", admin.id);
-      }
-
-      return json({ connected: false });
-    }
-
     if (action.startsWith("drive_")) {
       const viewer = await validateDriveViewer(body);
       const archiveOwnerAdminId =
@@ -1708,6 +1601,113 @@ Deno.serve(async (req: Request) => {
     }
 
     const admin = await validateAdmin(sessionToken);
+
+    if (action === "status") {
+      const connection = await getConnection(admin.id);
+      const connected = Boolean(connection?.refresh_token);
+      const calendarManagementReady =
+        connected && hasCalendarManagementScope(connection?.scope);
+      const gmailSendReady =
+        connected && hasGmailSendScope(connection?.scope);
+      const driveArchiveReady =
+        connected && hasDriveReadonlyScope(connection?.scope);
+
+      return json({
+        configured: Boolean(
+          GOOGLE_CLIENT_ID &&
+            GOOGLE_CLIENT_SECRET &&
+            GOOGLE_REDIRECT_URI
+        ),
+        connected,
+        calendar_management_ready: calendarManagementReady,
+        email_notifications_ready: gmailSendReady,
+        drive_archive_ready: driveArchiveReady,
+        drive_folder_id: connection?.drive_folder_id || null,
+        drive_folder_name: connection?.drive_folder_name || null,
+        needs_reconnect:
+          connected && (!calendarManagementReady || !gmailSendReady),
+        expires_at: connection?.expires_at || null,
+        activity_calendars: Object.values(ACTIVITY_CALENDARS).map(
+          (config) => config.name
+        ),
+      });
+    }
+
+    if (action === "start") {
+      assertGoogleConfig();
+
+      const returnUrl = validateReturnUrl(body?.return_url);
+      const state = randomToken(32);
+      const stateHash = await sha256Hex(state);
+
+      await db
+        .from("google_calendar_oauth_states")
+        .delete()
+        .lt("expires_at", new Date().toISOString());
+
+      const { error } = await db
+        .from("google_calendar_oauth_states")
+        .insert({
+          state_hash: stateHash,
+          admin_id: admin.id,
+          return_url: returnUrl,
+        });
+
+      if (error) throw error;
+
+      const authUrl = new URL(
+        "https://accounts.google.com/o/oauth2/v2/auth"
+      );
+      authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
+      authUrl.searchParams.set("redirect_uri", GOOGLE_REDIRECT_URI);
+      authUrl.searchParams.set("response_type", "code");
+      authUrl.searchParams.set("scope", GOOGLE_AUTH_SCOPE);
+      authUrl.searchParams.set("access_type", "offline");
+      authUrl.searchParams.set("prompt", "consent");
+      authUrl.searchParams.set("include_granted_scopes", "true");
+      authUrl.searchParams.set("state", state);
+
+      return json({ auth_url: authUrl.toString() });
+    }
+
+    if (action === "disconnect") {
+      const connection = await getConnection(admin.id);
+
+      if (connection) {
+        const token = String(
+          connection.refresh_token || connection.access_token || ""
+        );
+
+        if (token) {
+          try {
+            await fetch(
+              `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type":
+                    "application/x-www-form-urlencoded",
+                },
+              }
+            );
+          } catch {
+            // Revocation best effort. Local credentials are still removed.
+          }
+        }
+
+        await db
+          .from("google_calendar_connections")
+          .delete()
+          .eq("admin_id", admin.id);
+
+        await db
+          .from("google_calendar_activity_calendars")
+          .delete()
+          .eq("admin_id", admin.id);
+      }
+
+      return json({ connected: false });
+    }
 
     if (action === "list_events") {
       const timeMin = String(body?.time_min || "");
