@@ -121,6 +121,7 @@ async function validateAdmin(sessionToken: string) {
   return {
     id: Number(data.id),
     username: String(data.username),
+    role: String(data.role || "admin"),
     ownerKey,
   };
 }
@@ -135,6 +136,74 @@ async function getConnection(adminId: number) {
 
   if (error) throw error;
   return data;
+}
+
+type DriveViewer = {
+  kind: "admin" | "agent";
+  id: number;
+  role: string;
+  username: string;
+};
+
+async function validateDriveViewer(body: any): Promise<DriveViewer> {
+  const sessionToken = String(body?.session_token || "");
+
+  if (sessionToken) {
+    const admin = await validateAdmin(sessionToken);
+    return {
+      kind: "admin",
+      id: admin.id,
+      role: admin.role,
+      username: admin.username,
+    };
+  }
+
+  const agentId = Number(body?.agent_id || 0);
+  const agentUsername = String(body?.agent_username || "").trim();
+  const agentPassword = String(body?.agent_password || "");
+
+  if (!agentId || !agentUsername || !agentPassword) {
+    throw new Error("Sessione utente mancante.");
+  }
+
+  const { data, error } = await db
+    .from("agents")
+    .select("id,username,owner_admin_id")
+    .eq("id", agentId)
+    .ilike("username", agentUsername)
+    .eq("password", agentPassword)
+    .maybeSingle();
+
+  if (error || !data?.id) {
+    throw new Error("Sessione agente non valida.");
+  }
+
+  return {
+    kind: "agent",
+    id: Number(data.id),
+    role: "agent",
+    username: String(data.username || ""),
+  };
+}
+
+async function getDriveArchiveOwnerAdminId() {
+  const { data, error } = await db
+    .from("admin_users")
+    .select("id")
+    .eq("role", "super_admin")
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data?.id) {
+    throw new Error("Superadmin non configurato.");
+  }
+
+  return Number(data.id);
+}
+
+function isDriveManager(viewer: DriveViewer) {
+  return viewer.kind === "admin" && viewer.role === "super_admin";
 }
 
 function hasCalendarManagementScope(scope: unknown) {
@@ -388,6 +457,60 @@ async function setConfiguredDriveFolder(
     folder_id: String(folder?.id || targetId),
     folder_name: folderName,
   };
+}
+
+async function isDriveItemInsideRoot(
+  adminId: number,
+  itemId: string,
+  rootFolderId: string
+) {
+  const rootId = String(rootFolderId || "");
+  if (!rootId) return false;
+  if (rootId === "root" || itemId === rootId) return true;
+
+  const visited = new Set<string>();
+  let pending = [String(itemId || "")];
+
+  for (let depth = 0; depth < 30 && pending.length; depth += 1) {
+    const currentId = pending.shift() || "";
+    if (!currentId || visited.has(currentId)) continue;
+    visited.add(currentId);
+
+    const item = await getDriveItem(
+      adminId,
+      currentId,
+      "id,parents"
+    );
+
+    const parents = Array.isArray(item?.parents)
+      ? item.parents.map(String)
+      : [];
+
+    if (parents.includes(rootId)) return true;
+    pending.push(
+      ...parents.filter((parentId: string) => !visited.has(parentId))
+    );
+  }
+
+  return false;
+}
+
+async function assertDriveItemInsideRoot(
+  adminId: number,
+  itemId: string,
+  rootFolderId: string
+) {
+  const allowed = await isDriveItemInsideRoot(
+    adminId,
+    itemId,
+    rootFolderId
+  );
+
+  if (!allowed) {
+    throw new Error(
+      "Questo elemento non appartiene alla cartella Archivio Drive autorizzata."
+    );
+  }
 }
 
 async function downloadDriveFile(adminId: number, fileId: string) {
@@ -1305,8 +1428,6 @@ Deno.serve(async (req: Request) => {
     const action = String(body?.action || "");
     const sessionToken = String(body?.session_token || "");
 
-    const admin = await validateAdmin(sessionToken);
-
     if (action === "status") {
       const connection = await getConnection(admin.id);
       const connected = Boolean(connection?.refresh_token);
@@ -1414,68 +1535,179 @@ Deno.serve(async (req: Request) => {
       return json({ connected: false });
     }
 
-    if (action === "drive_config") {
-      const connection = await getConnection(admin.id);
-      const connected = Boolean(connection?.refresh_token);
-      const driveReady = connected && hasDriveReadonlyScope(connection?.scope);
+    if (action.startsWith("drive_")) {
+      const viewer = await validateDriveViewer(body);
+      const archiveOwnerAdminId =
+        await getDriveArchiveOwnerAdminId();
+      const manager = isDriveManager(viewer);
 
-      return json({
-        configured: Boolean(
-          GOOGLE_CLIENT_ID &&
-            GOOGLE_CLIENT_SECRET &&
-            GOOGLE_REDIRECT_URI
-        ),
-        connected,
-        drive_ready: driveReady,
-        folder_id: driveReady ? connection?.drive_folder_id || null : null,
-        folder_name: driveReady ? connection?.drive_folder_name || null : null,
-      });
-    }
+      if (action === "drive_config") {
+        const connection = await getConnection(
+          archiveOwnerAdminId
+        );
+        const connected = Boolean(connection?.refresh_token);
+        const driveReady =
+          connected &&
+          hasDriveReadonlyScope(connection?.scope);
 
-    if (action === "drive_list_folder") {
-      const requestedFolderId = String(body?.folder_id || "");
-      const config = await getConfiguredDriveFolder(admin.id);
-      const folderId =
-        requestedFolderId || config.folder_id || "root";
-      const folder = await getDriveItem(
-        admin.id,
-        folderId,
-        "id,name,mimeType,parents,webViewLink"
-      );
-
-      if (String(folder?.mimeType || "") !== DRIVE_FOLDER_MIME) {
-        throw new Error("La posizione selezionata non è una cartella.");
+        return json({
+          configured: Boolean(
+            GOOGLE_CLIENT_ID &&
+              GOOGLE_CLIENT_SECRET &&
+              GOOGLE_REDIRECT_URI
+          ),
+          connected,
+          drive_ready: driveReady,
+          can_manage: manager,
+          folder_id:
+            driveReady
+              ? connection?.drive_folder_id || null
+              : null,
+          folder_name:
+            driveReady
+              ? connection?.drive_folder_name || null
+              : null,
+        });
       }
 
-      const items = await listDriveFolderItems(admin.id, String(folder?.id || folderId));
+      if (action === "drive_list_folder") {
+        const connection = await getConnection(
+          archiveOwnerAdminId
+        );
+        if (
+          !connection?.refresh_token ||
+          !hasDriveReadonlyScope(connection?.scope)
+        ) {
+          throw new Error(
+            "Archivio Drive non ancora autorizzato dal superadmin."
+          );
+        }
 
-      return json({
-        folder: {
-          id: String(folder?.id || folderId),
-          name:
-            folderId === "root"
-              ? "Il mio Drive"
-              : String(folder?.name || "Cartella Drive"),
-          parents: Array.isArray(folder?.parents)
-            ? folder.parents.map(String)
-            : [],
-          web_view_link: String(folder?.webViewLink || ""),
-        },
-        configured_folder: config,
-        items,
-      });
+        const config = await getConfiguredDriveFolder(
+          archiveOwnerAdminId
+        );
+        const requestedFolderId = String(
+          body?.folder_id || ""
+        );
+
+        if (!config.folder_id && !manager) {
+          throw new Error(
+            "Il superadmin non ha ancora scelto la cartella Archivio Drive."
+          );
+        }
+
+        const folderId =
+          requestedFolderId ||
+          config.folder_id ||
+          "root";
+
+        if (!manager && config.folder_id) {
+          await assertDriveItemInsideRoot(
+            archiveOwnerAdminId,
+            folderId,
+            config.folder_id
+          );
+        }
+
+        const folder = await getDriveItem(
+          archiveOwnerAdminId,
+          folderId,
+          "id,name,mimeType,parents,webViewLink"
+        );
+
+        if (
+          String(folder?.mimeType || "") !==
+          DRIVE_FOLDER_MIME
+        ) {
+          throw new Error(
+            "La posizione selezionata non è una cartella."
+          );
+        }
+
+        const items = await listDriveFolderItems(
+          archiveOwnerAdminId,
+          String(folder?.id || folderId)
+        );
+
+        return json({
+          folder: {
+            id: String(folder?.id || folderId),
+            name:
+              folderId === "root"
+                ? "Il mio Drive"
+                : String(
+                    folder?.name || "Cartella Drive"
+                  ),
+            parents: Array.isArray(folder?.parents)
+              ? folder.parents.map(String)
+              : [],
+            web_view_link: String(
+              folder?.webViewLink || ""
+            ),
+          },
+          configured_folder: config,
+          can_manage: manager,
+          items,
+        });
+      }
+
+      if (action === "drive_set_folder") {
+        if (!manager) {
+          throw new Error(
+            "Solo il superadmin può cambiare la cartella Archivio Drive."
+          );
+        }
+
+        const folderId = String(
+          body?.folder_id || "root"
+        );
+
+        return json(
+          await setConfiguredDriveFolder(
+            archiveOwnerAdminId,
+            folderId
+          )
+        );
+      }
+
+      if (action === "drive_download") {
+        const fileId = String(body?.file_id || "");
+        if (!fileId) {
+          throw new Error(
+            "ID file Google Drive mancante."
+          );
+        }
+
+        if (!manager) {
+          const config = await getConfiguredDriveFolder(
+            archiveOwnerAdminId
+          );
+          if (!config.folder_id) {
+            throw new Error(
+              "Cartella Archivio Drive non configurata."
+            );
+          }
+
+          await assertDriveItemInsideRoot(
+            archiveOwnerAdminId,
+            fileId,
+            config.folder_id
+          );
+        }
+
+        return await downloadDriveFile(
+          archiveOwnerAdminId,
+          fileId
+        );
+      }
+
+      return json(
+        { error: "Azione Drive non riconosciuta." },
+        400
+      );
     }
 
-    if (action === "drive_set_folder") {
-      const folderId = String(body?.folder_id || "root");
-      return json(await setConfiguredDriveFolder(admin.id, folderId));
-    }
-
-    if (action === "drive_download") {
-      const fileId = String(body?.file_id || "");
-      if (!fileId) throw new Error("ID file Google Drive mancante.");
-      return await downloadDriveFile(admin.id, fileId);
-    }
+    const admin = await validateAdmin(sessionToken);
 
     if (action === "list_events") {
       const timeMin = String(body?.time_min || "");
