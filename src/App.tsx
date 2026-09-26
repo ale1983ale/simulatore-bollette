@@ -367,6 +367,25 @@ const energyTypes = [
   "MTA3",
 ];
 
+function energyTypeOptionLabel(tipo: string) {
+  const labels: Record<string, string> = {
+    "RESIDENTE": "RESIDENTE · domestico (potenza da contratto)",
+    "NON RESIDENTE": "NON RESIDENTE · domestico (potenza da contratto)",
+    "RESIDENTE CANONE ESENTE": "RESIDENTE CANONE ESENTE · domestico (potenza da contratto)",
+    "BTA1": "BTA1 · ≤ 1,5 kW",
+    "BTA2": "BTA2 · > 1,5 fino a 3 kW",
+    "BTA3": "BTA3 · > 3 fino a 6 kW",
+    "BTA4": "BTA4 · > 6 fino a 10 kW",
+    "BTA5": "BTA5 · > 10 kW (pot. disponibile ≤ 16,5 kW)",
+    "BTA6": "BTA6 · potenza disponibile > 16,5 kW",
+    "MTA1": "MTA1 · potenza disponibile ≤ 100 kW",
+    "MTA2": "MTA2 · > 100 fino a 500 kW",
+    "MTA3": "MTA3 · potenza disponibile > 500 kW",
+  };
+
+  return labels[tipo] || tipo;
+}
+
 const ENERGY_CUSTOMER_GROUPS: Array<{
   key: EnergyCustomerGroup;
   label: string;
@@ -2004,7 +2023,8 @@ function selectField(
   label: string,
   value: string,
   setValue: (v: string) => void,
-  options: string[]
+  options: string[],
+  optionLabel?: (option: string) => string
 ) {
   return (
     <div>
@@ -2035,7 +2055,7 @@ function selectField(
       >
         {options.map((o)=>(
           <option key={o} value={o}>
-            {o || "-"}
+            {optionLabel ? optionLabel(o) : (o || "-")}
           </option>
         ))}
       </select>
@@ -3471,7 +3491,8 @@ return (
               "Tipo",
               s.tipo,
               handleEnergyTypeChange,
-              compatibleEnergyTypeOptions
+              compatibleEnergyTypeOptions,
+              energyTypeOptionLabel
             )}
             {selectField(
               "Offerta",
@@ -6028,7 +6049,7 @@ function Listini({
               "MTA1","MTA2","MTA3",
             ].map((tipo) => (
               <option key={tipo} value={tipo}>
-                {tipo}
+                {energyTypeOptionLabel(tipo)}
               </option>
             ))}
           </select>
