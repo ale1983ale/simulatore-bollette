@@ -125,10 +125,11 @@ export default function DriveArchive() {
           String(next.folder_name || "Archivio Drive"),
           true
         );
-      } else if (next.drive_ready) {
+      } else if (next.drive_ready && next.can_manage) {
         setBrowseMode(true);
         await loadFolder("root", "Il mio Drive", true);
       } else {
+        setBrowseMode(false);
         setItems([]);
         setFolderStack([]);
       }
@@ -258,26 +259,47 @@ export default function DriveArchive() {
             ARCHIVIO GOOGLE DRIVE
           </div>
           <div style={{ marginTop: 6, color: "#64748b", lineHeight: 1.5 }}>
-            {config.connected
-              ? "Google è già collegato, ma manca l'autorizzazione in sola lettura a Drive."
-              : "Collega il tuo account Google per scegliere la cartella da usare come archivio."}
+            {config.can_manage
+              ? config.connected
+                ? "Google è già collegato, ma manca l'autorizzazione in sola lettura a Drive."
+                : "Collega il tuo account Google per scegliere la cartella da usare come archivio."
+              : "L'Archivio Drive deve essere prima autorizzato e configurato dal superadmin."}
           </div>
         </div>
-        <div>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void connectGoogle()}
-            style={{ ...buttonStyle, background: "#2563eb", color: "white", borderColor: "#2563eb" }}
-          >
-            {busy
-              ? "COLLEGAMENTO…"
-              : config.connected
-              ? "AUTORIZZA GOOGLE DRIVE"
-              : "COLLEGA GOOGLE"}
-          </button>
-        </div>
+        {config.can_manage && (
+          <div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void connectGoogle()}
+              style={{ ...buttonStyle, background: "#2563eb", color: "white", borderColor: "#2563eb" }}
+            >
+              {busy
+                ? "COLLEGAMENTO…"
+                : config.connected
+                ? "AUTORIZZA GOOGLE DRIVE"
+                : "COLLEGA GOOGLE"}
+            </button>
+          </div>
+        )}
         {error && <div style={{ color: "#b91c1c", fontWeight: 750 }}>{error}</div>}
+      </div>
+    );
+  }
+
+  if (!config.folder_id && !config.can_manage) {
+    return (
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e2e8f0",
+          borderRadius: 16,
+          padding: 22,
+          color: "#475569",
+          fontWeight: 750,
+        }}
+      >
+        Il superadmin non ha ancora scelto la cartella da usare come Archivio Drive.
       </div>
     );
   }
@@ -316,19 +338,21 @@ export default function DriveArchive() {
                 ← INDIETRO
               </button>
             )}
-            {browseMode ? (
-              <button
-                type="button"
-                onClick={() => void chooseFolder()}
-                disabled={busy || !currentFolder}
-                style={{ ...buttonStyle, background: "#16a34a", color: "white", borderColor: "#16a34a" }}
-              >
-                USA QUESTA CARTELLA
-              </button>
-            ) : (
-              <button type="button" onClick={() => void startChangeFolder()} disabled={busy} style={buttonStyle}>
-                CAMBIA CARTELLA
-              </button>
+            {config.can_manage && (
+              browseMode ? (
+                <button
+                  type="button"
+                  onClick={() => void chooseFolder()}
+                  disabled={busy || !currentFolder}
+                  style={{ ...buttonStyle, background: "#16a34a", color: "white", borderColor: "#16a34a" }}
+                >
+                  USA QUESTA CARTELLA
+                </button>
+              ) : (
+                <button type="button" onClick={() => void startChangeFolder()} disabled={busy} style={buttonStyle}>
+                  CAMBIA CARTELLA
+                </button>
+              )
             )}
             <button
               type="button"
