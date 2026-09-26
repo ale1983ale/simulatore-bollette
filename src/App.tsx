@@ -8919,9 +8919,9 @@ function AdminDashboard({
           <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />
           <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />
           <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
-          <DashboardCard title="ARCHIVIO DRIVE" description="Consulta i file della cartella Google Drive." icon="📁" className="ge-card-drive" compact onClick={() => navigate("driveArchive")} />
           <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
         </>}
+        <DashboardCard title="ARCHIVIO DRIVE" description="Consulta documenti e file condivisi." icon="📁" className="ge-card-drive" compact onClick={() => navigate("driveArchive")} />
         {superAdmin && <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />}
         <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />
         {fullAccess && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
@@ -9689,6 +9689,7 @@ useEffect(() => {
     "punpsvPublic",
     "ateco",
     "reportAdmin",
+    "driveArchive",
   ]);
 
   if (!allowedTabs.has(tab)) {
