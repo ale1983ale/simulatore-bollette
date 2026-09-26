@@ -4,7 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const APP_ORIGIN = "https://simulatore-bollette.vercel.app";
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
-const GOOGLE_AUTH_SCOPE = `${CALENDAR_SCOPE} ${GMAIL_SEND_SCOPE}`;
+const DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+const GOOGLE_AUTH_SCOPE = `${CALENDAR_SCOPE} ${GMAIL_SEND_SCOPE} ${DRIVE_READONLY_SCOPE}`;
 const TIME_ZONE = "Europe/Rome";
 
 const ACTIVITY_CALENDARS: Record<
@@ -150,6 +151,13 @@ function hasGmailSendScope(scope: unknown) {
     .includes(GMAIL_SEND_SCOPE);
 }
 
+function hasDriveReadonlyScope(scope: unknown) {
+  return String(scope || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .includes(DRIVE_READONLY_SCOPE);
+}
+
 async function refreshGoogleToken(adminId: number, force = false) {
   assertGoogleConfig();
 
@@ -246,6 +254,193 @@ async function googleRequest(
   }
 
   return response;
+}
+
+const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
+const GOOGLE_APPS_MIME_PREFIX = "application/vnd.google-apps.";
+
+async function assertDriveReady(adminId: number) {
+  const connection = await getConnection(adminId);
+  if (!connection?.refresh_token) {
+    throw new Error("Google non è collegato.");
+  }
+  if (!hasDriveReadonlyScope(connection.scope)) {
+    throw new Error(
+      "Ricollega Google una volta per autorizzare la lettura dell'Archivio Drive."
+    );
+  }
+  return connection;
+}
+
+async function getDriveItem(
+  adminId: number,
+  fileId: string,
+  fields = "id,name,mimeType,parents,modifiedTime,size,webViewLink,webContentLink,iconLink,thumbnailLink,capabilities(canDownload)"
+) {
+  await assertDriveReady(adminId);
+
+  const url = new URL(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId || "root")}`
+  );
+  url.searchParams.set("supportsAllDrives", "true");
+  url.searchParams.set("fields", fields);
+
+  const response = await googleRequest(adminId, url.toString(), { method: "GET" });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.error?.message ||
+        "Impossibile leggere l'elemento da Google Drive."
+    );
+  }
+
+  return payload;
+}
+
+async function listDriveFolderItems(adminId: number, folderId: string) {
+  await assertDriveReady(adminId);
+
+  const items: any[] = [];
+  let pageToken = "";
+
+  for (let page = 0; page < 10; page += 1) {
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set("q", `'${folderId.replace(/'/g, "\\'")}' in parents and trashed = false`);
+    url.searchParams.set("pageSize", "1000");
+    url.searchParams.set("orderBy", "folder,name_natural");
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("includeItemsFromAllDrives", "true");
+    url.searchParams.set(
+      "fields",
+      "nextPageToken,files(id,name,mimeType,parents,modifiedTime,size,webViewLink,webContentLink,iconLink,thumbnailLink,capabilities(canDownload))"
+    );
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const response = await googleRequest(adminId, url.toString(), { method: "GET" });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.error?.message ||
+          "Impossibile leggere i file della cartella Google Drive."
+      );
+    }
+
+    if (Array.isArray(payload?.files)) items.push(...payload.files);
+    pageToken = String(payload?.nextPageToken || "");
+    if (!pageToken) break;
+  }
+
+  return items.map((item: any) => ({
+    id: String(item?.id || ""),
+    name: String(item?.name || ""),
+    mime_type: String(item?.mimeType || ""),
+    is_folder: String(item?.mimeType || "") === DRIVE_FOLDER_MIME,
+    modified_time: String(item?.modifiedTime || ""),
+    size: item?.size ? Number(item.size) : null,
+    web_view_link: String(item?.webViewLink || ""),
+    web_content_link: String(item?.webContentLink || ""),
+    icon_link: String(item?.iconLink || ""),
+    thumbnail_link: String(item?.thumbnailLink || ""),
+    can_download: Boolean(item?.capabilities?.canDownload),
+    parents: Array.isArray(item?.parents) ? item.parents.map(String) : [],
+  }));
+}
+
+async function getConfiguredDriveFolder(adminId: number) {
+  const connection = await assertDriveReady(adminId);
+  const folderId = String(connection?.drive_folder_id || "");
+  const folderName = String(connection?.drive_folder_name || "");
+
+  return {
+    folder_id: folderId,
+    folder_name: folderName,
+  };
+}
+
+async function setConfiguredDriveFolder(
+  adminId: number,
+  folderId: string
+) {
+  const targetId = String(folderId || "root");
+  const folder = await getDriveItem(adminId, targetId, "id,name,mimeType,parents");
+
+  if (String(folder?.mimeType || "") !== DRIVE_FOLDER_MIME) {
+    throw new Error("L'elemento selezionato non è una cartella Google Drive.");
+  }
+
+  const folderName =
+    targetId === "root" ? "Il mio Drive" : String(folder?.name || "Cartella Drive");
+
+  const { error } = await db
+    .from("google_calendar_connections")
+    .update({
+      drive_folder_id: String(folder?.id || targetId),
+      drive_folder_name: folderName,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("admin_id", adminId);
+
+  if (error) throw error;
+
+  return {
+    folder_id: String(folder?.id || targetId),
+    folder_name: folderName,
+  };
+}
+
+async function downloadDriveFile(adminId: number, fileId: string) {
+  const file = await getDriveItem(
+    adminId,
+    fileId,
+    "id,name,mimeType,capabilities(canDownload)"
+  );
+
+  const mimeType = String(file?.mimeType || "");
+  if (!file?.capabilities?.canDownload) {
+    throw new Error("Il download di questo file non è consentito da Google Drive.");
+  }
+  if (mimeType.startsWith(GOOGLE_APPS_MIME_PREFIX)) {
+    throw new Error(
+      "I documenti Google nativi si aprono direttamente in Drive; usa APRI."
+    );
+  }
+
+  let { accessToken } = await refreshGoogleToken(adminId);
+  const mediaUrl =
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
+
+  const doFetch = (token: string) =>
+    fetch(mediaUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doFetch(accessToken);
+  if (response.status === 401) {
+    accessToken = (await refreshGoogleToken(adminId, true)).accessToken;
+    response = await doFetch(accessToken);
+  }
+
+  if (!response.ok || !response.body) {
+    const payload = await response.text().catch(() => "");
+    throw new Error(payload || "Download Google Drive non riuscito.");
+  }
+
+  const safeName = String(file?.name || "download")
+    .replace(/[\r\n"]/g, "_")
+    .slice(0, 220);
+
+  return new Response(response.body, {
+    status: 200,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": mimeType || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${safeName}"`,
+      "Cache-Control": "private, no-store",
+    },
+  });
 }
 
 async function patchCalendarColor(
@@ -1119,6 +1314,8 @@ Deno.serve(async (req: Request) => {
         connected && hasCalendarManagementScope(connection?.scope);
       const gmailSendReady =
         connected && hasGmailSendScope(connection?.scope);
+      const driveArchiveReady =
+        connected && hasDriveReadonlyScope(connection?.scope);
 
       return json({
         configured: Boolean(
@@ -1129,6 +1326,9 @@ Deno.serve(async (req: Request) => {
         connected,
         calendar_management_ready: calendarManagementReady,
         email_notifications_ready: gmailSendReady,
+        drive_archive_ready: driveArchiveReady,
+        drive_folder_id: connection?.drive_folder_id || null,
+        drive_folder_name: connection?.drive_folder_name || null,
         needs_reconnect:
           connected && (!calendarManagementReady || !gmailSendReady),
         expires_at: connection?.expires_at || null,
@@ -1212,6 +1412,69 @@ Deno.serve(async (req: Request) => {
       }
 
       return json({ connected: false });
+    }
+
+    if (action === "drive_config") {
+      const connection = await getConnection(admin.id);
+      const connected = Boolean(connection?.refresh_token);
+      const driveReady = connected && hasDriveReadonlyScope(connection?.scope);
+
+      return json({
+        configured: Boolean(
+          GOOGLE_CLIENT_ID &&
+            GOOGLE_CLIENT_SECRET &&
+            GOOGLE_REDIRECT_URI
+        ),
+        connected,
+        drive_ready: driveReady,
+        folder_id: driveReady ? connection?.drive_folder_id || null : null,
+        folder_name: driveReady ? connection?.drive_folder_name || null : null,
+      });
+    }
+
+    if (action === "drive_list_folder") {
+      const requestedFolderId = String(body?.folder_id || "");
+      const config = await getConfiguredDriveFolder(admin.id);
+      const folderId =
+        requestedFolderId || config.folder_id || "root";
+      const folder = await getDriveItem(
+        admin.id,
+        folderId,
+        "id,name,mimeType,parents,webViewLink"
+      );
+
+      if (String(folder?.mimeType || "") !== DRIVE_FOLDER_MIME) {
+        throw new Error("La posizione selezionata non è una cartella.");
+      }
+
+      const items = await listDriveFolderItems(admin.id, String(folder?.id || folderId));
+
+      return json({
+        folder: {
+          id: String(folder?.id || folderId),
+          name:
+            folderId === "root"
+              ? "Il mio Drive"
+              : String(folder?.name || "Cartella Drive"),
+          parents: Array.isArray(folder?.parents)
+            ? folder.parents.map(String)
+            : [],
+          web_view_link: String(folder?.webViewLink || ""),
+        },
+        configured_folder: config,
+        items,
+      });
+    }
+
+    if (action === "drive_set_folder") {
+      const folderId = String(body?.folder_id || "root");
+      return json(await setConfiguredDriveFolder(admin.id, folderId));
+    }
+
+    if (action === "drive_download") {
+      const fileId = String(body?.file_id || "");
+      if (!fileId) throw new Error("ID file Google Drive mancante.");
+      return await downloadDriveFile(admin.id, fileId);
     }
 
     if (action === "list_events") {
