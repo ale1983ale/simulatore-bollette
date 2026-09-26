@@ -9038,6 +9038,58 @@ export default function App() {
     return "dashboard";
   });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const browserHistoryReadyRef = useRef(false);
+  const browserHistoryPopRef = useRef(false);
+
+  useEffect(() => {
+    const currentUrl =
+      `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    window.history.replaceState(
+      { ...(window.history.state || {}), geTab: tab },
+      "",
+      currentUrl
+    );
+
+    browserHistoryReadyRef.current = true;
+
+    const handlePopState = (event: PopStateEvent) => {
+      const historyTab =
+        typeof event.state?.geTab === "string"
+          ? event.state.geTab
+          : "dashboard";
+
+      browserHistoryPopRef.current = true;
+      setAdminMenuOpen(false);
+      setTab(historyTab);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!browserHistoryReadyRef.current) return;
+
+    if (browserHistoryPopRef.current) {
+      browserHistoryPopRef.current = false;
+      return;
+    }
+
+    if (window.history.state?.geTab === tab) return;
+
+    const url = new URL(window.location.href);
+    if (tab !== "recruitingWaiting") {
+      url.searchParams.delete("tab");
+    }
+
+    window.history.pushState(
+      { ...(window.history.state || {}), geTab: tab },
+      "",
+      `${url.pathname}${url.search}${url.hash}`
+    );
+  }, [tab]);
 
   useEffect(() => {
     const requestedTab =
@@ -9616,7 +9668,7 @@ useEffect(() => {
 
   url.searchParams.delete("tab");
   window.history.replaceState(
-    {},
+    { ...(window.history.state || {}), geTab: tab },
     "",
     `${url.pathname}${url.search}${url.hash}`
   );
