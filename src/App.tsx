@@ -10520,7 +10520,7 @@ if (!agentSession && !adminSession) {
 }
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: 20 }}>
-      <div className="ge-brand-shell">
+      <div className="ge-brand-shell" style={{ position: "relative" }}>
         <button
           type="button"
           className="ge-brand"
@@ -10543,6 +10543,23 @@ if (!agentSession && !adminSession) {
           <button
             type="button"
             className="ge-brand-logout"
+            style={{
+              position: "absolute",
+              zIndex: 20,
+              top: 10,
+              right: 12,
+              minWidth: 54,
+              padding: "7px 10px",
+              borderRadius: 9,
+              border: "1px solid rgba(255,255,255,.9)",
+              background: "#ef4444",
+              color: "#fff",
+              fontSize: 11,
+              lineHeight: 1,
+              fontWeight: 900,
+              boxShadow: "0 4px 10px rgba(127,29,29,.22)",
+              cursor: "pointer",
+            }}
             onClick={() => {
               localStorage.removeItem("admin_session");
               localStorage.removeItem("agent_session");
@@ -10564,6 +10581,21 @@ if (!agentSession && !adminSession) {
           <button
             type="button"
             className="ge-brand-waiting"
+            style={{
+              position: "absolute",
+              zIndex: 19,
+              right: 12,
+              bottom: 10,
+              top: "auto",
+              transform: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              width: "auto",
+              padding: 0,
+              border: 0,
+              background: "transparent",
+            }}
             onClick={() => navigateTo("recruitingWaiting")}
             aria-label={`Apri Sala d'attesa: ${waitingRoomIncomingCount} in entrata, ${waitingRoomOutgoingCount} in uscita`}
             title="Apri Sala d'attesa"
