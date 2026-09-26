@@ -8872,6 +8872,7 @@ function AdminDashboard({
   waitingIncomingCount,
   waitingOutgoingCount,
   fullAccess,
+  superAdmin,
 }: {
   navigate: DashboardNavigate;
   openEmail: () => void;
@@ -8879,6 +8880,7 @@ function AdminDashboard({
   waitingIncomingCount: number;
   waitingOutgoingCount: number;
   fullAccess: boolean;
+  superAdmin: boolean;
 }) {
   return (
     <div className="ge-dashboard">
@@ -8897,7 +8899,7 @@ function AdminDashboard({
           <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
           <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
         </>}
-        <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />
+        {superAdmin && <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />}
         <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />
         {fullAccess && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
         {fullAccess && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
@@ -8950,14 +8952,6 @@ function AgentDashboard({
           className="ge-card-pun"
           compact
           onClick={() => navigate("punpsvPublic")}
-        />
-        <DashboardCard
-          title="PROVVIGIONI"
-          description="Consulta e calcola le provvigioni commerciali."
-          icon="💰"
-          className="ge-card-provvigioni"
-          compact
-          onClick={() => navigate("provvigioni")}
         />
         <DashboardCard
           title="ATECO"
@@ -9731,7 +9725,7 @@ useEffect(() => {
 
   const currentAdminSection = adminSectionMeta[tab];
   const isAdminTab = adminTabs.includes(tab);
-  const isSuperAdmin = true;
+  const isSuperAdmin = adminProfile?.role === "super_admin";
   const hasFullAdminAccess =
     adminProfile?.role === "super_admin" ||
     adminProfile?.full_access !== false;
@@ -10058,7 +10052,7 @@ const renderAdminContent = () => {
               <button onClick={() => setTab("archive")} style={{ ...baseBtn, ...(tab === "archive" ? activeBtn : {}) }}>DATI PRODUZIONE</button>
               <button onClick={() => setTab("recruiting")} style={{ ...baseBtn, ...(tab === "recruiting" ? activeBtn : {}) }}>RECRUITING</button>
               <button onClick={() => setTab("appointments")} style={{ ...baseBtn, ...(tab === "appointments" ? activeBtn : {}) }}>APPUNTAMENTI</button>
-              <button onClick={() => setTab("provvigioni")} style={{ ...baseBtn, ...(tab === "provvigioni" ? activeBtn : {}) }}>PROVVIGIONI</button>
+              {isSuperAdmin && <button onClick={() => setTab("provvigioni")} style={{ ...baseBtn, ...(tab === "provvigioni" ? activeBtn : {}) }}>PROVVIGIONI</button>}
               <button onClick={() => setTab("personale")} style={{ ...baseBtn, ...(tab === "personale" ? activeBtn : {}) }}>PERSONALE</button>
             </>
           )}
@@ -10194,6 +10188,7 @@ const renderAdminContent = () => {
           waitingIncomingCount={waitingRoomIncomingCount}
           waitingOutgoingCount={waitingRoomOutgoingCount}
           fullAccess={hasFullAdminAccess}
+          superAdmin={isSuperAdmin}
           openDatabase={openDatabaseSettings}
         />
       )}
@@ -10654,7 +10649,7 @@ if (!agentSession && !adminSession) {
     />
     <ReportAgent agentSession={agentSession} />
   </>
-        ) : tab === "provvigioni" ? (
+        ) : tab === "provvigioni" && isSuperAdmin ? (
           <>
             <SectionHero
               title="PROVVIGIONI"
