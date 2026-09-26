@@ -8,6 +8,7 @@ import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogo
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
+import Provvigioni from "./Provvigioni";
 import { getRecruitingContext } from "./recruitingClient";
 import {
   INITIAL_AUTO_DISP_CP_ROWS,
@@ -8895,6 +8896,7 @@ function AdminDashboard({
           <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
           <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
         </>}
+        <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="€" className="ge-card-energy" compact onClick={() => navigate("provvigioni")} />
         <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />
         {fullAccess && (
           <DashboardCard
@@ -8946,6 +8948,14 @@ function AgentDashboard({
           className="ge-card-pun"
           compact
           onClick={() => navigate("punpsvPublic")}
+        />
+        <DashboardCard
+          title="PROVVIGIONI"
+          description="Consulta e calcola le provvigioni commerciali."
+          icon="€"
+          className="ge-card-energy"
+          compact
+          onClick={() => navigate("provvigioni")}
         />
         <DashboardCard
           title="ATECO"
@@ -9590,6 +9600,7 @@ useEffect(() => {
     "energia",
     "gas",
     "report",
+    "provvigioni",
     "punpsvPublic",
     "ateco",
     "reportAdmin",
@@ -9624,7 +9635,7 @@ useEffect(() => {
       setAdminMenuOpen(false);
     }
   }, [tab, adminMenuOpen]);
-  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", "provvigioni", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
     string,
@@ -10039,6 +10050,7 @@ const renderAdminContent = () => {
               <button onClick={() => setTab("archive")} style={{ ...baseBtn, ...(tab === "archive" ? activeBtn : {}) }}>DATI PRODUZIONE</button>
               <button onClick={() => setTab("recruiting")} style={{ ...baseBtn, ...(tab === "recruiting" ? activeBtn : {}) }}>RECRUITING</button>
               <button onClick={() => setTab("appointments")} style={{ ...baseBtn, ...(tab === "appointments" ? activeBtn : {}) }}>APPUNTAMENTI</button>
+              <button onClick={() => setTab("provvigioni")} style={{ ...baseBtn, ...(tab === "provvigioni" ? activeBtn : {}) }}>PROVVIGIONI</button>
             </>
           )}
           <button onClick={() => setTab("reportAdmin")} style={{ ...baseBtn, ...(tab === "reportAdmin" ? activeBtn : {}) }}>REPORT ADMIN</button>
@@ -10627,6 +10639,16 @@ if (!agentSession && !adminSession) {
     />
     <ReportAgent agentSession={agentSession} />
   </>
+        ) : tab === "provvigioni" ? (
+          <>
+            <SectionHero
+              title="PROVVIGIONI"
+              subtitle="Consulta e calcola le provvigioni commerciali."
+              icon="€"
+              variant="energy"
+            />
+            <Provvigioni />
+          </>
         ) : tab === "ateco" ? (
           <>
             <SectionHero
