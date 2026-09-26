@@ -260,8 +260,9 @@
 }
 
 .ge-card-provvigioni {
-  color: #8a4700;
-  background: linear-gradient(135deg, #fff8e8 0%, #ffe1aa 55%, #ffc66f 100%);
+  color: #9a4b00 !important;
+  background: linear-gradient(135deg, #fff2cc 0%, #ffd18a 52%, #ffad45 100%) !important;
+  border-color: #ffc66f !important;
 }
 
 .ge-card-gas {
