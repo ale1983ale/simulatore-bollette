@@ -8892,12 +8892,12 @@ function AdminDashboard({
         {!fullAccess && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
         {fullAccess && <>
           <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />
-          <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="●●" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />
+          <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />
           <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />
           <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
           <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
         </>}
-        <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="€" className="ge-card-energy" compact onClick={() => navigate("provvigioni")} />
+        <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />
         <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />
         {fullAccess && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
         {fullAccess && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
@@ -8954,8 +8954,8 @@ function AgentDashboard({
         <DashboardCard
           title="PROVVIGIONI"
           description="Consulta e calcola le provvigioni commerciali."
-          icon="€"
-          className="ge-card-energy"
+          icon="💰"
+          className="ge-card-provvigioni"
           compact
           onClick={() => navigate("provvigioni")}
         />
@@ -9658,7 +9658,7 @@ useEffect(() => {
     recruiting: {
       title: "RECRUITING",
       subtitle: "Gestisci contatti, candidati e attività di recruiting.",
-      icon: "●●",
+      icon: "👥",
       variant: "recruiting",
     },
     recruitingWaiting: {
@@ -10659,7 +10659,7 @@ if (!agentSession && !adminSession) {
             <SectionHero
               title="PROVVIGIONI"
               subtitle="Consulta e calcola le provvigioni commerciali."
-              icon="€"
+              icon="💰"
               variant="energy"
             />
             <Provvigioni />
