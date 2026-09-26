@@ -50,12 +50,31 @@
   opacity: .92;
 }
 
+.ge-brand-logout {
+  position: absolute;
+  z-index: 6;
+  top: 10px;
+  right: 18px;
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 10px;
+  background: #ef4444;
+  color: #fff;
+  padding: 6px 11px;
+  min-width: 58px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(127, 29, 29, .22);
+}
+
 .ge-brand-waiting {
   position: absolute;
   z-index: 5;
-  top: 50%;
+  top: auto;
   right: 18px;
-  transform: translateY(-50%);
+  bottom: 10px;
+  transform: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -421,12 +440,6 @@
   }
 }
 
-.ge-main-nav__exit-settings {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-}
-
 @media (max-width: 720px) {
   .ge-main-nav {
     display: grid !important;
@@ -449,23 +462,7 @@
     white-space: nowrap;
   }
 
-  .ge-main-nav__exit-settings {
-    width: 100%;
-    min-width: 0;
-    display: flex !important;
-    gap: 5px !important;
-    align-items: stretch !important;
-  }
-
-  .ge-main-nav__exit-settings > button {
-    flex: 1 1 0 !important;
-    width: auto !important;
-    min-width: 0 !important;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
-  }
-
-  .ge-main-nav__settings {
+  .ge-main-nav__actions button:last-child {
     font-size: 20px !important;
     line-height: 1 !important;
   }
@@ -1043,6 +1040,15 @@ table {
     font-size: 7px;
     letter-spacing: .22em;
     white-space: nowrap;
+  }
+
+  .ge-brand-logout {
+    top: 10px;
+    right: 12px;
+    min-width: 54px;
+    padding: 6px 9px;
+    font-size: 11px;
+    border-radius: 9px;
   }
 
   .ge-brand-waiting {
