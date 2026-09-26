@@ -3717,7 +3717,7 @@ Base suggerito
       fontWeight:700
     }}
   >
-    {numFormat(r.dispCpBase,4 )}
+    {numFormat(r.dispCpBase,6)}
   </div>
 
   <button
@@ -4010,24 +4010,66 @@ Base suggerito
                 gap: 12,
               }}
             >
-              {field(
-                "Quota consumi rete",
-                s.quotaConsumiRete,
-                (v) => set("quotaConsumiRete", v),
-                "number"
-              )}
-              {field(
-                "Quota fissa rete",
-                s.quotaFissaRete,
-                (v) => set("quotaFissaRete", v),
-                "number"
-              )}
-              {field(
-                "Quota potenza rete",
-                s.quotaPotenzaRete,
-                (v) => set("quotaPotenzaRete", v),
-                "number"
-              )}
+              {[
+                {
+                  label: "Quota consumi rete",
+                  value: s.quotaConsumiRete,
+                  key: "quotaConsumiRete",
+                },
+                {
+                  label: "Quota fissa rete",
+                  value: s.quotaFissaRete,
+                  key: "quotaFissaRete",
+                },
+                {
+                  label: "Quota potenza rete",
+                  value: s.quotaPotenzaRete,
+                  key: "quotaPotenzaRete",
+                },
+              ].map((item) => (
+                <div
+                  key={item.key}
+                  style={{
+                    border: "1px solid #fdba74",
+                    borderRadius: 10,
+                    padding: 12,
+                    background: "#fffaf5",
+                    minHeight: 66,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: "#7c2d12",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {item.label}
+                  </div>
+
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={item.value || ""}
+                    onChange={(e) => set(item.key, e.target.value)}
+                    placeholder="0,00"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 8,
+                      background: "#ffffff",
+                      padding: "10px 11px",
+                      color: "#0f172a",
+                      fontSize: 20,
+                      fontWeight: 900,
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           )}
 
