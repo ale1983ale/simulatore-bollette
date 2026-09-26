@@ -8985,6 +8985,14 @@ function AgentDashboard({
           onClick={() => navigate("ateco")}
         />
         <DashboardCard
+          title="ARCHIVIO DRIVE"
+          description="Consulta documenti e file condivisi."
+          icon="📁"
+          className="ge-card-drive"
+          compact
+          onClick={() => navigate("driveArchive")}
+        />
+        <DashboardCard
           title="REPORT"
           description="Accedi ai tuoi report personali e alle tue attività."
           icon="▤"
@@ -10618,6 +10626,16 @@ if (!agentSession && !adminSession) {
             ATECO
           </button>
 
+          <button
+            onClick={() => navigateTo("driveArchive")}
+            style={{
+              ...baseBtn,
+              ...(tab === "driveArchive" ? activeBtn : {}),
+            }}
+          >
+            ARCHIVIO
+          </button>
+
         </div>
 
         <div
@@ -10732,6 +10750,16 @@ if (!agentSession && !adminSession) {
       gasAcciseSettings={gasAcciseSettings}
       showAgentAssociation={Boolean(adminSession)}
     />
+  </>
+) : tab === "driveArchive" ? (
+  <>
+    <SectionHero
+      title="ARCHIVIO DRIVE"
+      subtitle="Consulta documenti e file condivisi da Google Drive."
+      icon="📁"
+      variant="drive"
+    />
+    <DriveArchive />
   </>
 ) : tab === "report" ? (
   <>
