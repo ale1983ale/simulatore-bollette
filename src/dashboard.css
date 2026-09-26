@@ -354,6 +354,11 @@
   background: linear-gradient(135deg, #e6fff3 0%, #ccf6e3 100%);
 }
 
+.ge-card-personale {
+  color: #5b21b6;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 100%);
+}
+
 .ge-card-email {
   color: #d91f4b;
   background: linear-gradient(135deg, #fff0f3 0%, #ffd7df 100%);
@@ -385,6 +390,7 @@
 .ge-card-waiting .ge-dashboard-card__icon,
 .ge-card-appointments .ge-dashboard-card__icon,
 .ge-card-production .ge-dashboard-card__icon,
+.ge-card-personale .ge-dashboard-card__icon,
 .ge-card-email .ge-dashboard-card__icon,
 .ge-card-settings .ge-dashboard-card__icon,
 .ge-card-agent-report .ge-dashboard-card__icon,
@@ -645,6 +651,9 @@
 }
 .ge-section-hero--appointments {
   background: linear-gradient(105deg, #7c3aed 0%, #9333ea 52%, #c026d3 100%);
+}
+.ge-section-hero--personale {
+  background: linear-gradient(105deg, #4338ca 0%, #6d28d9 52%, #8b5cf6 100%);
 }
 .ge-section-hero--agent-report {
   background: linear-gradient(105deg, #9a6700 0%, #d69e1e 55%, #f59e0b 100%);

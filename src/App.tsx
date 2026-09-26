@@ -9,6 +9,7 @@ import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
 import Provvigioni from "./Provvigioni";
+import Personale from "./Personale";
 import { getRecruitingContext } from "./recruitingClient";
 import {
   INITIAL_AUTO_DISP_CP_ROWS,
@@ -8894,6 +8895,7 @@ function AdminDashboard({
           <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="●●" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />
           <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />
           <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
+          <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />
           <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
         </>}
         <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="€" className="ge-card-energy" compact onClick={() => navigate("provvigioni")} />
@@ -9635,7 +9637,7 @@ useEffect(() => {
       setAdminMenuOpen(false);
     }
   }, [tab, adminMenuOpen]);
-  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", "provvigioni", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", "provvigioni", "personale", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
     string,
@@ -9670,6 +9672,12 @@ useEffect(() => {
       subtitle: "Consulta e riprogramma gli appuntamenti in ordine cronologico.",
       icon: "✓",
       variant: "appointments",
+    },
+    personale: {
+      title: "PERSONALE",
+      subtitle: "Gestisci ferie, permessi ed ex festività.",
+      icon: "👤",
+      variant: "personale",
     },
     reportAdmin: {
       title: "REPORT AGENTI",
@@ -10051,6 +10059,7 @@ const renderAdminContent = () => {
               <button onClick={() => setTab("recruiting")} style={{ ...baseBtn, ...(tab === "recruiting" ? activeBtn : {}) }}>RECRUITING</button>
               <button onClick={() => setTab("appointments")} style={{ ...baseBtn, ...(tab === "appointments" ? activeBtn : {}) }}>APPUNTAMENTI</button>
               <button onClick={() => setTab("provvigioni")} style={{ ...baseBtn, ...(tab === "provvigioni" ? activeBtn : {}) }}>PROVVIGIONI</button>
+              <button onClick={() => setTab("personale")} style={{ ...baseBtn, ...(tab === "personale" ? activeBtn : {}) }}>PERSONALE</button>
             </>
           )}
           <button onClick={() => setTab("reportAdmin")} style={{ ...baseBtn, ...(tab === "reportAdmin" ? activeBtn : {}) }}>REPORT ADMIN</button>
@@ -10198,6 +10207,12 @@ const renderAdminContent = () => {
       {tab === "appointments" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <Appointments />
+        </div>
+      )}
+
+      {tab === "personale" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Personale ownerKey={adminProfile?.auth_id || adminProfile?.username || "personale"} />
         </div>
       )}
 
