@@ -369,9 +369,9 @@ const energyTypes = [
 
 function energyTypeOptionLabel(tipo: string) {
   const labels: Record<string, string> = {
-    "RESIDENTE": "RESIDENTE · domestico (potenza da contratto)",
-    "NON RESIDENTE": "NON RESIDENTE · domestico (potenza da contratto)",
-    "RESIDENTE CANONE ESENTE": "RESIDENTE CANONE ESENTE · domestico (potenza da contratto)",
+    "RESIDENTE": "RESIDENTE · domestico",
+    "NON RESIDENTE": "NON RESIDENTE · domestico",
+    "RESIDENTE CANONE ESENTE": "RESIDENTE CANONE ESENTE · domestico",
     "BTA1": "BTA1 · ≤ 1,5 kW",
     "BTA2": "BTA2 · > 1,5 fino a 3 kW",
     "BTA3": "BTA3 · > 3 fino a 6 kW",
