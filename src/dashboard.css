@@ -421,6 +421,12 @@
   }
 }
 
+.ge-main-nav__exit-settings {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
 @media (max-width: 720px) {
   .ge-main-nav {
     display: grid !important;
@@ -443,7 +449,23 @@
     white-space: nowrap;
   }
 
-  .ge-main-nav__actions button:last-child {
+  .ge-main-nav__exit-settings {
+    width: 100%;
+    min-width: 0;
+    display: flex !important;
+    gap: 5px !important;
+    align-items: stretch !important;
+  }
+
+  .ge-main-nav__exit-settings > button {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+
+  .ge-main-nav__settings {
     font-size: 20px !important;
     line-height: 1 !important;
   }
