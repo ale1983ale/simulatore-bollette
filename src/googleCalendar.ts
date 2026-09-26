@@ -67,11 +67,14 @@ export async function getGoogleCalendarStatus(): Promise<GoogleCalendarStatus> {
   return (await callGoogleCalendar("status")) as GoogleCalendarStatus;
 }
 
-export async function startGoogleCalendarConnection() {
+export async function startGoogleCalendarConnection(
+  customReturnUrl?: string
+) {
   const returnUrl =
-    typeof window !== "undefined"
+    customReturnUrl ||
+    (typeof window !== "undefined"
       ? `${window.location.origin}${window.location.pathname}`
-      : "";
+      : "");
 
   const data = await callGoogleCalendar("start", {
     return_url: returnUrl,
