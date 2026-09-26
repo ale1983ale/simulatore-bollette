@@ -21,6 +21,18 @@ const MONTHS = [
 const YEARS = [2026, 2027, 2028, 2029, 2030] as const;
 const HOURS_PER_DAY = 8;
 
+function getCurrentFeriePeriod() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const boundedYear = Math.min(Math.max(currentYear, YEARS[0]), YEARS[YEARS.length - 1]);
+  const monthIndex = currentYear === boundedYear ? now.getMonth() : boundedYear === YEARS[0] ? 0 : 11;
+
+  return {
+    year: boundedYear,
+    month: MONTHS[monthIndex] as MonthName,
+  };
+}
+
 type MonthName = (typeof MONTHS)[number];
 
 type FerieParams = {
@@ -238,9 +250,10 @@ export default function Personale({ ownerKey }: PersonaleProps) {
     [ownerKey]
   );
 
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const [selectedMonth, setSelectedMonth] = useState<MonthName>("Gennaio");
-  const [detailYear, setDetailYear] = useState<number>(2026);
+  const currentPeriod = useMemo(() => getCurrentFeriePeriod(), []);
+  const [selectedYear, setSelectedYear] = useState<number>(currentPeriod.year);
+  const [selectedMonth, setSelectedMonth] = useState<MonthName>(currentPeriod.month);
+  const [detailYear, setDetailYear] = useState<number>(currentPeriod.year);
   const [params, setParams] = useState<FerieParams>(DEFAULT_PARAMS);
   const [paramsEditable, setParamsEditable] = useState(false);
   const [rows, setRows] = useState<FerieRow[]>(makeDefaultRows);
@@ -262,15 +275,15 @@ export default function Personale({ ownerKey }: PersonaleProps) {
 
         if (saved) {
           const normalized = normalizeStoredState(saved);
-          setSelectedYear(normalized.selectedYear);
-          setSelectedMonth(normalized.selectedMonth);
-          setDetailYear(normalized.selectedYear);
+          setSelectedYear(currentPeriod.year);
+          setSelectedMonth(currentPeriod.month);
+          setDetailYear(currentPeriod.year);
           setParams(normalized.params);
           setRows(normalized.rows);
         } else {
-          setSelectedYear(2026);
-          setSelectedMonth("Gennaio");
-          setDetailYear(2026);
+          setSelectedYear(currentPeriod.year);
+          setSelectedMonth(currentPeriod.month);
+          setDetailYear(currentPeriod.year);
           setParams(DEFAULT_PARAMS);
           setRows(makeDefaultRows());
         }
@@ -290,7 +303,7 @@ export default function Personale({ ownerKey }: PersonaleProps) {
     return () => {
       cancelled = true;
     };
-  }, [storageKey]);
+  }, [storageKey, currentPeriod]);
 
   const computedRows = useMemo(() => computeRows(params, rows), [params, rows]);
 
