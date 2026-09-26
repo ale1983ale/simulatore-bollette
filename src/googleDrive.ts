@@ -9,6 +9,7 @@ export type GoogleDriveArchiveConfig = {
   configured: boolean;
   connected: boolean;
   drive_ready: boolean;
+  can_manage?: boolean;
   folder_id?: string | null;
   folder_name?: string | null;
 };
@@ -42,11 +43,51 @@ export type GoogleDriveFolderResult = {
   items: GoogleDriveItem[];
 };
 
+async function driveViewerPayload() {
+  const adminRaw = localStorage.getItem("admin_session");
+  if (adminRaw) {
+    try {
+      const admin = JSON.parse(adminRaw);
+      if (admin?.token) {
+        return {
+          session_token: await getAdminSessionToken(),
+        };
+      }
+    } catch {
+      // Fallback to agent session below.
+    }
+  }
+
+  const agentRaw = localStorage.getItem("agent_session");
+  if (agentRaw) {
+    try {
+      const agent = JSON.parse(agentRaw);
+      if (
+        agent?.id &&
+        agent?.username &&
+        agent?.password
+      ) {
+        return {
+          agent_id: Number(agent.id),
+          agent_username: String(agent.username),
+          agent_password: String(agent.password),
+        };
+      }
+    } catch {
+      // Error handled below.
+    }
+  }
+
+  throw new Error(
+    "Sessione utente non valida. Effettua nuovamente l'accesso."
+  );
+}
+
 async function callGoogleDrive(
   action: string,
   payload: Record<string, unknown> = {}
 ) {
-  const sessionToken = await getAdminSessionToken();
+  const viewer = await driveViewerPayload();
 
   const response = await fetch(GOOGLE_WORKSPACE_ENDPOINT, {
     method: "POST",
@@ -56,7 +97,7 @@ async function callGoogleDrive(
     },
     body: JSON.stringify({
       action,
-      session_token: sessionToken,
+      ...viewer,
       ...payload,
     }),
   });
@@ -104,7 +145,7 @@ export async function downloadGoogleDriveFile(
   fileId: string,
   fileName: string
 ) {
-  const sessionToken = await getAdminSessionToken();
+  const viewer = await driveViewerPayload();
 
   const response = await fetch(GOOGLE_WORKSPACE_ENDPOINT, {
     method: "POST",
@@ -114,7 +155,7 @@ export async function downloadGoogleDriveFile(
     },
     body: JSON.stringify({
       action: "drive_download",
-      session_token: sessionToken,
+      ...viewer,
       file_id: fileId,
     }),
   });
