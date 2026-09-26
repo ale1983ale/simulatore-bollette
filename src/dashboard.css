@@ -259,6 +259,11 @@
   background: linear-gradient(135deg, #ffb619 0%, #ff7a0a 62%, #f75c00 100%);
 }
 
+.ge-card-provvigioni {
+  color: #8a4700;
+  background: linear-gradient(135deg, #fff8e8 0%, #ffe1aa 55%, #ffc66f 100%);
+}
+
 .ge-card-gas {
   color: white;
   background: linear-gradient(135deg, #1dc4f1 0%, #1689ee 50%, #075fe4 100%);
@@ -387,6 +392,7 @@
 
 .ge-card-calendar .ge-dashboard-card__icon,
 .ge-card-recruiting .ge-dashboard-card__icon,
+.ge-card-provvigioni .ge-dashboard-card__icon,
 .ge-card-waiting .ge-dashboard-card__icon,
 .ge-card-appointments .ge-dashboard-card__icon,
 .ge-card-production .ge-dashboard-card__icon,
