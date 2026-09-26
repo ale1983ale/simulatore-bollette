@@ -10,6 +10,7 @@ import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
 import Provvigioni from "./Provvigioni";
 import Personale from "./Personale";
+import DriveArchive from "./DriveArchive";
 import { getRecruitingContext } from "./recruitingClient";
 import {
   INITIAL_AUTO_DISP_CP_ROWS,
@@ -8918,6 +8919,7 @@ function AdminDashboard({
           <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />
           <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />
           <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
+          <DashboardCard title="ARCHIVIO DRIVE" description="Consulta i file della cartella Google Drive." icon="📁" className="ge-card-drive" compact onClick={() => navigate("driveArchive")} />
           <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
         </>}
         {superAdmin && <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />}
@@ -9055,6 +9057,9 @@ export default function App() {
     if (requestedTab === "recruitingWaiting") {
       return "recruitingWaiting";
     }
+    if (requestedTab === "driveArchive") {
+      return "driveArchive";
+    }
 
     return "dashboard";
   });
@@ -9116,7 +9121,10 @@ export default function App() {
     const requestedTab =
       new URLSearchParams(window.location.search).get("tab");
 
-    if (requestedTab === "recruitingWaiting") return;
+    if (
+      requestedTab === "recruitingWaiting" ||
+      requestedTab === "driveArchive"
+    ) return;
 
     setAdminMenuOpen(false);
     localStorage.setItem("app_tab", "dashboard");
@@ -9704,7 +9712,7 @@ useEffect(() => {
       setAdminMenuOpen(false);
     }
   }, [tab, adminMenuOpen]);
-  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "recruiting", "recruitingWaiting", "appointments", "provvigioni", "personale", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "driveArchive", "recruiting", "recruitingWaiting", "appointments", "provvigioni", "personale", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
     string,
@@ -9721,6 +9729,12 @@ useEffect(() => {
       subtitle: "Consulta produzione, recessi e copertura territoriale.",
       icon: "🧮",
       variant: "production",
+    },
+    driveArchive: {
+      title: "ARCHIVIO DRIVE",
+      subtitle: "Consulta i file della cartella Google Drive collegata.",
+      icon: "📁",
+      variant: "drive",
     },
     recruiting: {
       title: "RECRUITING",
@@ -10123,6 +10137,7 @@ const renderAdminContent = () => {
             <>
               <button onClick={() => setTab("calendarAdmin")} style={{ ...baseBtn, ...(tab === "calendarAdmin" ? activeBtn : {}) }}>CALENDARIO</button>
               <button onClick={() => setTab("archive")} style={{ ...baseBtn, ...(tab === "archive" ? activeBtn : {}) }}>DATI PRODUZIONE</button>
+              <button onClick={() => setTab("driveArchive")} style={{ ...baseBtn, ...(tab === "driveArchive" ? activeBtn : {}) }}>ARCHIVIO DRIVE</button>
               <button onClick={() => setTab("recruiting")} style={{ ...baseBtn, ...(tab === "recruiting" ? activeBtn : {}) }}>RECRUITING</button>
               <button onClick={() => setTab("appointments")} style={{ ...baseBtn, ...(tab === "appointments" ? activeBtn : {}) }}>APPUNTAMENTI</button>
               {isSuperAdmin && <button onClick={() => setTab("provvigioni")} style={{ ...baseBtn, ...(tab === "provvigioni" ? activeBtn : {}) }}>PROVVIGIONI</button>}
@@ -10281,6 +10296,12 @@ const renderAdminContent = () => {
       {tab === "personale" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <Personale ownerKey={adminProfile?.auth_id || adminProfile?.username || "personale"} />
+        </div>
+      )}
+
+      {tab === "driveArchive" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <DriveArchive />
         </div>
       )}
 
