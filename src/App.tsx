@@ -10666,50 +10666,54 @@ if (!agentSession && !adminSession) {
           )}
 
           {(agentSession || adminSession) && (
-            <button
-              type="button"
-              onClick={() => {
-                localStorage.removeItem("admin_session");
-                localStorage.removeItem("agent_session");
-                setAdminSession(null);
-                setAdminProfile(null);
-                setAgentSession(null);
-                setAdminMenuOpen(false);
-                setTab("energia");
-                localStorage.removeItem("app_tab");
-              }}
-              style={{
-                ...baseBtn,
-                background: "#ef4444",
-                color: "white",
-                border: "1px solid #ef4444",
-              }}
-            >
-              ESCI
-            </button>
-          )}
+            <div className="ge-main-nav__exit-settings">
+              <button
+                type="button"
+                className="ge-main-nav__exit"
+                onClick={() => {
+                  localStorage.removeItem("admin_session");
+                  localStorage.removeItem("agent_session");
+                  setAdminSession(null);
+                  setAdminProfile(null);
+                  setAgentSession(null);
+                  setAdminMenuOpen(false);
+                  setTab("energia");
+                  localStorage.removeItem("app_tab");
+                }}
+                style={{
+                  ...baseBtn,
+                  background: "#ef4444",
+                  color: "white",
+                  border: "1px solid #ef4444",
+                }}
+              >
+                ESCI
+              </button>
 
-          {adminSession && hasFullAdminAccess && (
-            <button
-              type="button"
-              title="IMPOSTAZIONI E DATABASE"
-              aria-label="Apri Impostazioni e Database"
-              onClick={openDatabaseSettings}
-              style={{
-                ...baseBtn,
-                padding: "8px 12px",
-                fontSize: 22,
-                lineHeight: 1,
-                color: "#64748b",
-                background: "#e2e8f0",
-                border: "1px solid #cbd5e1",
-                fontFamily:
-                  "Arial, 'Segoe UI Symbol', sans-serif",
-                fontWeight: 900,
-              }}
-            >
-              ⚙
-            </button>
+              {adminSession && hasFullAdminAccess && (
+                <button
+                  type="button"
+                  className="ge-main-nav__settings"
+                  title="IMPOSTAZIONI E DATABASE"
+                  aria-label="Apri Impostazioni e Database"
+                  onClick={openDatabaseSettings}
+                  style={{
+                    ...baseBtn,
+                    padding: "8px 12px",
+                    fontSize: 22,
+                    lineHeight: 1,
+                    color: "#64748b",
+                    background: "#e2e8f0",
+                    border: "1px solid #cbd5e1",
+                    fontFamily:
+                      "Arial, 'Segoe UI Symbol', sans-serif",
+                    fontWeight: 900,
+                  }}
+                >
+                  ⚙
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
