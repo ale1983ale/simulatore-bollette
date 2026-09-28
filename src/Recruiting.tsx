@@ -2837,10 +2837,80 @@ export default function Recruiting({
     [notes]
   );
 
+  // Se un nominativo ha già almeno una nota in attesa, quella nota
+  // rappresenta anche lo stato corrente da sincronizzare. Non mostriamo
+  // quindi un secondo riquadro "STATO DA SINCRONIZZARE" per lo stesso
+  // nominativo.
+  const pendingHrNoteCandidateIds = useMemo(
+    () => new Set(hrSyncNotes.map((note) => note.candidateId)),
+    [hrSyncNotes]
+  );
+
+  const visibleHrStatusSyncItems = useMemo(
+    () =>
+      hrStatusSyncItems.filter(
+        (item) => !pendingHrNoteCandidateIds.has(item.candidateId)
+      ),
+    [hrStatusSyncItems, pendingHrNoteCandidateIds]
+  );
+
   const hrOutgoingPendingCount =
-    hrSyncNotes.length + hrStatusSyncItems.length;
+    hrSyncNotes.length + visibleHrStatusSyncItems.length;
   const hrSyncPendingCount =
     hrIncomingCandidates.length + hrOutgoingPendingCount;
+
+  // Pulisce anche i duplicati storici già presenti nel database:
+  // se esiste una nota HR in attesa per il nominativo, l'eventuale
+  // riga separata della coda stato è superflua e viene rimossa.
+  useEffect(() => {
+    if (!ctx || !hrSyncNotes.length || !hrStatusSyncItems.length) return;
+
+    const duplicateCandidateIds = Array.from(
+      new Set(
+        hrStatusSyncItems
+          .filter((item) => pendingHrNoteCandidateIds.has(item.candidateId))
+          .map((item) => item.candidateId)
+      )
+    );
+
+    if (!duplicateCandidateIds.length) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      const { error } = await ctx.client
+        .from("recruiting_hr_status_sync_queue")
+        .delete()
+        .eq("owner_key", ctx.ownerKey)
+        .in("candidate_id", duplicateCandidateIds);
+
+      if (error) {
+        console.error(
+          "Errore pulizia duplicati Sala d'attesa HR:",
+          error
+        );
+        return;
+      }
+
+      if (!cancelled) {
+        const duplicateSet = new Set(duplicateCandidateIds);
+        setHrStatusSyncItems((current) =>
+          current.filter(
+            (item) => !duplicateSet.has(item.candidateId)
+          )
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    ctx,
+    hrSyncNotes,
+    hrStatusSyncItems,
+    pendingHrNoteCandidateIds,
+  ]);
 
   const selectedFutureEvents = useMemo(
     () =>
@@ -4148,6 +4218,33 @@ export default function Recruiting({
             : item
         )
       );
+
+      const hasOtherPendingHrNote = notes.some(
+        (item) =>
+          item.id !== note.id &&
+          item.candidateId === note.candidateId &&
+          item.hrSyncPending
+      );
+
+      // Se questa era l'ultima nota HR in attesa del nominativo, elimina
+      // anche un'eventuale vecchia riga stato rimasta in coda: non deve
+      // ricomparire dopo aver premuto FATTO sulla nota.
+      if (!hasOtherPendingHrNote) {
+        const { error: queueError } = await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .delete()
+          .eq("owner_key", ctx.ownerKey)
+          .eq("candidate_id", note.candidateId);
+
+        if (queueError) throw queueError;
+
+        setHrStatusSyncItems((current) =>
+          current.filter(
+            (item) => item.candidateId !== note.candidateId
+          )
+        );
+      }
+
       setMessage(
         "Fatto: la nota è stata rimossa dalle NOTE DA SINCRONIZZARE. Rimane salvata nella scheda del contatto."
       );
@@ -12392,7 +12489,7 @@ export default function Recruiting({
               >
                 IN USCITA ({hrOutgoingPendingCount})
               </div>
-            {hrStatusSyncItems.length > 0 && (
+            {visibleHrStatusSyncItems.length > 0 && (
               <div
                 style={{
                   padding: "10px 12px",
@@ -12404,11 +12501,11 @@ export default function Recruiting({
                   fontWeight: 900,
                 }}
               >
-                STATI DA SINCRONIZZARE ({hrStatusSyncItems.length})
+                STATI DA SINCRONIZZARE ({visibleHrStatusSyncItems.length})
               </div>
             )}
 
-            {hrStatusSyncItems.map((item) => {
+            {visibleHrStatusSyncItems.map((item) => {
               const candidate = allCandidates.find(
                 (candidate) => candidate.id === item.candidateId
               );
@@ -12586,7 +12683,7 @@ export default function Recruiting({
             {hrSyncNotes.length > 0 && (
               <div
                 style={{
-                  marginTop: hrStatusSyncItems.length ? 6 : 0,
+                  marginTop: visibleHrStatusSyncItems.length ? 6 : 0,
                   padding: "10px 12px",
                   borderRadius: 9,
                   background: "#f5f3ff",
@@ -12800,7 +12897,7 @@ export default function Recruiting({
               );
             })}
 
-            {!hrSyncNotes.length && !hrStatusSyncItems.length && (
+            {!hrSyncNotes.length && !visibleHrStatusSyncItems.length && (
               <div
                 style={{
                   padding: 18,
