@@ -3150,6 +3150,132 @@ export default function Recruiting({
     }
   };
 
+  const updateCandidateStatusFromList = async (
+    candidate: Candidate,
+    status: CandidateStatus
+  ) => {
+    if (!ctx) return false;
+    if (candidate.status === status) return true;
+
+    const hasPendingHrNote = notes.some(
+      (note) =>
+        note.candidateId === candidate.id &&
+        note.hrSyncPending
+    );
+
+    const existingStatusItem = hrStatusSyncItems.find(
+      (item) => item.candidateId === candidate.id
+    );
+
+    let insertedQueueId = "";
+    let previousQueuedStatus = "";
+
+    if (!hasPendingHrNote) {
+      try {
+        if (existingStatusItem) {
+          previousQueuedStatus = existingStatusItem.newStatus;
+
+          const { error } = await ctx.client
+            .from("recruiting_hr_status_sync_queue")
+            .update({
+              new_status: status,
+            })
+            .eq("id", existingStatusItem.id)
+            .eq("owner_key", ctx.ownerKey);
+
+          if (error) throw error;
+
+          setHrStatusSyncItems((current) =>
+            current.map((item) =>
+              item.id === existingStatusItem.id
+                ? { ...item, newStatus: status }
+                : item
+            )
+          );
+        } else {
+          const { data, error } = await ctx.client
+            .from("recruiting_hr_status_sync_queue")
+            .insert({
+              owner_key: ctx.ownerKey,
+              candidate_id: candidate.id,
+              previous_status: candidate.status,
+              new_status: status,
+            })
+            .select("id,created_at")
+            .single();
+
+          if (error) throw error;
+
+          insertedQueueId = String(data.id);
+
+          setHrStatusSyncItems((current) => [
+            ...current,
+            {
+              id: insertedQueueId,
+              candidateId: candidate.id,
+              previousStatus: candidate.status,
+              newStatus: status,
+              createdAt: String(data.created_at || new Date().toISOString()),
+            },
+          ]);
+        }
+      } catch (error: any) {
+        setMessage(
+          "Errore nell'aggiunta dello stato alla Sala d'attesa HR: " +
+            (error?.message || error)
+        );
+        return false;
+      }
+    }
+
+    const updated = await updateCandidateStatus(
+      candidate,
+      status
+    );
+
+    if (!updated && !hasPendingHrNote) {
+      if (insertedQueueId) {
+        await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .delete()
+          .eq("id", insertedQueueId)
+          .eq("owner_key", ctx.ownerKey);
+
+        setHrStatusSyncItems((current) =>
+          current.filter((item) => item.id !== insertedQueueId)
+        );
+      } else if (existingStatusItem) {
+        await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .update({
+            new_status: previousQueuedStatus,
+          })
+          .eq("id", existingStatusItem.id)
+          .eq("owner_key", ctx.ownerKey);
+
+        setHrStatusSyncItems((current) =>
+          current.map((item) =>
+            item.id === existingStatusItem.id
+              ? {
+                  ...item,
+                  newStatus: previousQueuedStatus,
+                }
+              : item
+          )
+        );
+      }
+      return false;
+    }
+
+    if (!hasPendingHrNote) {
+      setMessage(
+        "Stato aggiornato e aggiunto agli STATI DA SINCRONIZZARE in Sala d'attesa HR."
+      );
+    }
+
+    return true;
+  };
+
   const confirmNoteStatus = async (sendToHr = false) => {
     if (!selectedCandidate || !ctx || !noteStatusDraft) return;
 
@@ -7445,7 +7571,7 @@ export default function Recruiting({
                                 className="recruiting-status-option"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  void updateCandidateStatus(
+                                  void updateCandidateStatusFromList(
                                     candidate,
                                     option.code
                                   );
