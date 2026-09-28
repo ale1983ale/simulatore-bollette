@@ -3564,6 +3564,7 @@ function Energia({
 
 return (
   <div
+    className="pun-psv-table-grid"
     style={{
       display: "grid",
       gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr",
@@ -9661,6 +9662,57 @@ export default function App() {
 
   
   const [punPsvView, setPunPsvView] = useState<"both" | "pun" | "psv">("both");
+  const [expandedMarketChart, setExpandedMarketChart] =
+    useState<null | "pun" | "psv">(null);
+  const [marketChartOffset, setMarketChartOffset] = useState({ x: 0, y: 0 });
+  const marketChartDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
+
+  const openExpandedMarketChart = (type: "pun" | "psv") => {
+    setMarketChartOffset({ x: 0, y: 0 });
+    setExpandedMarketChart(type);
+  };
+
+  const startMarketChartDrag = (
+    event: React.PointerEvent<HTMLDivElement>
+  ) => {
+    marketChartDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: marketChartOffset.x,
+      originY: marketChartOffset.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveMarketChartDrag = (
+    event: React.PointerEvent<HTMLDivElement>
+  ) => {
+    const drag = marketChartDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    setMarketChartOffset({
+      x: drag.originX + event.clientX - drag.startX,
+      y: drag.originY + event.clientY - drag.startY,
+    });
+  };
+
+  const stopMarketChartDrag = (
+    event: React.PointerEvent<HTMLDivElement>
+  ) => {
+    if (marketChartDragRef.current?.pointerId === event.pointerId) {
+      marketChartDragRef.current = null;
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {}
+    }
+  };
   
   function normalizeMonthLabel(value: string) {
     return String(value || "")
@@ -9726,9 +9778,15 @@ const tablePunPsvRows = getLast12PunPsvRows(
 
     return score(b.mese) - score(a.mese);
   });
-  // Nei grafici l'asse temporale deve procedere da sinistra a destra:
-  // mese più vecchio -> mese più recente.
-  const chartPunPsvRows = [...tablePunPsvRows].reverse();
+  // I grafici mostrano SEMPRE gli ultimi 12 mesi realmente disponibili,
+  // indipendentemente dal mese scelto nel selettore (che resta valido per le tabelle).
+  // Asse temporale: mese più vecchio a sinistra -> più recente a destra.
+  const latestAvailablePunPsvMonth =
+    validMonthOptions[0]?.mese || activePunPsvMonth;
+  const chartPunPsvRows = getLast12PunPsvRows(
+    punPsvRows,
+    latestAvailablePunPsvMonth
+  );
 
 const punValues = chartPunPsvRows.map(r => Number(r.mono || 0));
 const psvValues = chartPunPsvRows.map(r => Number(r.psv || 0));
@@ -9762,7 +9820,9 @@ const chartYearLabels = chartPunPsvRows.map(
 );
 
 const latestPunPsvRow =
-  tablePunPsvRows.length > 0 ? tablePunPsvRows[0] : null;
+  chartPunPsvRows.length > 0
+    ? chartPunPsvRows[chartPunPsvRows.length - 1]
+    : null;
 const latestPunPsvMonthLabel = latestPunPsvRow
   ? String(latestPunPsvRow.mese || "").trim().toUpperCase()
   : "-";
@@ -10694,11 +10754,27 @@ const renderAdminContent = () => {
     <thead>
       <tr>
         <th style={thStyle}>Mese</th>
-        <th style={thStyle}>Mono</th>
+        <th
+          style={{
+            ...thStyle,
+            background: "#ffedd5",
+            color: "#c2410c",
+          }}
+        >
+          F0
+        </th>
         <th style={thStyle}>F1</th>
         <th style={thStyle}>F2</th>
         <th style={thStyle}>F3</th>
-        <th style={thStyle}>PSV</th>
+        <th
+          style={{
+            ...thStyle,
+            background: "#e0f2fe",
+            color: "#0369a1",
+          }}
+        >
+          PSV
+        </th>
       </tr>
     </thead>
     <tbody>
@@ -10710,13 +10786,17 @@ const renderAdminContent = () => {
         .map((row) => (
           <tr key={row.mese}>
             <td style={tdStyle}>{row.mese}</td>
-            <td style={tdStyle}>
+            <td style={{ ...tdStyle, background: "#fff7ed" }}>
               <input
                 type="number"
                 step="0.000001"
                 value={row.mono}
                 onChange={(e) => updatePunPsvValue(row.mese, "mono", e.target.value)}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  background: "#fff7ed",
+                  borderColor: "#fdba74",
+                }}
               />
             </td>
             <td style={tdStyle}>
@@ -10746,13 +10826,17 @@ const renderAdminContent = () => {
                 style={inputStyle}
               />
             </td>
-            <td style={tdStyle}>
+            <td style={{ ...tdStyle, background: "#f0f9ff" }}>
               <input
                 type="number"
                 step="0.000001"
                 value={row.psv}
                 onChange={(e) => updatePunPsvValue(row.mese, "psv", e.target.value)}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  background: "#e0f2fe",
+                  borderColor: "#7dd3fc",
+                }}
               />
             </td>
           </tr>
@@ -11221,6 +11305,7 @@ if (!agentSession && !adminSession) {
   }}
 >
               <div
+                className="pun-psv-chart-grid"
                 style={{
                   display: "grid",
                   gridTemplateColumns: punPsvView === "both" ? "1fr 1fr" : "1fr",
@@ -11286,7 +11371,17 @@ if (!agentSession && !adminSession) {
                       </span>
                     </div>
         
-                    <svg viewBox="0 0 760 240" style={{ width: "100%", height: 280, display: "block" }}>
+                    <svg
+                      viewBox="0 0 760 240"
+                      onClick={() => openExpandedMarketChart("pun")}
+                      title="Apri grafico PUN"
+                      style={{
+                        width: "100%",
+                        height: 280,
+                        display: "block",
+                        cursor: "zoom-in",
+                      }}
+                    >
                       <defs>
                         <linearGradient id="punAreaGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
@@ -11449,7 +11544,17 @@ if (!agentSession && !adminSession) {
                       </span>
                     </div>
         
-                    <svg viewBox="0 0 760 240" style={{ width: "100%", height: 280, display: "block" }}>
+                    <svg
+                      viewBox="0 0 760 240"
+                      onClick={() => openExpandedMarketChart("psv")}
+                      title="Apri grafico PSV"
+                      style={{
+                        width: "100%",
+                        height: 280,
+                        display: "block",
+                        cursor: "zoom-in",
+                      }}
+                    >
                       <defs>
                         <linearGradient id="psvAreaGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
@@ -11672,6 +11777,8 @@ if (!agentSession && !adminSession) {
                       background:
                         index === 0
                           ? "rgba(249,115,22,.10)"
+                          : index === 1
+                          ? "#ffedd5"
                           : "rgba(251,146,60,.07)",
                       borderBottom: "1px solid rgba(249,115,22,.16)",
                       fontSize: 11,
@@ -11718,6 +11825,8 @@ if (!agentSession && !adminSession) {
                         textAlign: "right",
                         borderBottom: "1px solid rgba(226,232,240,.82)",
                         color: valueIndex === 0 ? "#ea580c" : "#475569",
+                        background:
+                          valueIndex === 0 ? "rgba(255,237,213,.72)" : "transparent",
                         fontWeight: valueIndex === 0 ? 850 : 650,
                         fontVariantNumeric: "tabular-nums",
                         whiteSpace: "nowrap",
@@ -11832,7 +11941,7 @@ if (!agentSession && !adminSession) {
                     padding: "9px 10px",
                     textAlign: "right",
                     color: "#0284c7",
-                    background: "rgba(56,189,248,.07)",
+                    background: "#e0f2fe",
                     borderBottom: "1px solid rgba(14,165,233,.16)",
                     fontSize: 11,
                     fontWeight: 900,
@@ -11874,6 +11983,7 @@ if (!agentSession && !adminSession) {
                       textAlign: "right",
                       borderBottom: "1px solid rgba(226,232,240,.82)",
                       color: "#0284c7",
+                      background: "rgba(224,242,254,.78)",
                       fontWeight: 850,
                       fontVariantNumeric: "tabular-nums",
                       whiteSpace: "nowrap",
@@ -11891,6 +12001,290 @@ if (!agentSession && !adminSession) {
   </div>
 
 </div>
+
+
+{expandedMarketChart && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 100000,
+      background: "rgba(15,23,42,.30)",
+      pointerEvents: "auto",
+    }}
+  >
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        width: "min(1120px, 94vw)",
+        maxHeight: "90vh",
+        transform: `translate(calc(-50% + ${marketChartOffset.x}px), calc(-50% + ${marketChartOffset.y}px))`,
+        background: "#ffffff",
+        border:
+          expandedMarketChart === "pun"
+            ? "2px solid rgba(249,115,22,.40)"
+            : "2px solid rgba(14,165,233,.40)",
+        borderRadius: 18,
+        boxShadow: "0 28px 70px rgba(15,23,42,.34)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        onPointerDown={startMarketChartDrag}
+        onPointerMove={moveMarketChartDrag}
+        onPointerUp={stopMarketChartDrag}
+        onPointerCancel={stopMarketChartDrag}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "12px 14px",
+          background:
+            expandedMarketChart === "pun"
+              ? "linear-gradient(90deg,#fff7ed,#ffffff)"
+              : "linear-gradient(90deg,#f0f9ff,#ffffff)",
+          borderBottom:
+            expandedMarketChart === "pun"
+              ? "1px solid rgba(249,115,22,.22)"
+              : "1px solid rgba(14,165,233,.22)",
+          cursor: "move",
+          touchAction: "none",
+          userSelect: "none",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 20,
+              fontWeight: 950,
+              color: "#0f172a",
+            }}
+          >
+            {expandedMarketChart === "pun"
+              ? "Andamento PUN"
+              : "Andamento PSV"}
+          </div>
+          <div style={{ marginTop: 2, fontSize: 11, color: "#64748b" }}>
+            Trascina questa barra per spostare la finestra
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => setExpandedMarketChart(null)}
+          style={{
+            border: 0,
+            borderRadius: 9,
+            padding: "9px 13px",
+            background: "#ef4444",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 950,
+            cursor: "pointer",
+          }}
+        >
+          CHIUDI
+        </button>
+      </div>
+
+      <div
+        style={{
+          padding: "14px 16px 18px",
+          overflow: "auto",
+          maxHeight: "calc(90vh - 70px)",
+          background:
+            expandedMarketChart === "pun"
+              ? "linear-gradient(180deg,#fffaf5,#ffffff)"
+              : "linear-gradient(180deg,#f5fbff,#ffffff)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            marginBottom: 8,
+          }}
+        >
+          <span
+            style={{
+              padding: "7px 10px",
+              borderRadius: 9,
+              background:
+                expandedMarketChart === "pun" ? "#ffedd5" : "#cffafe",
+              color:
+                expandedMarketChart === "pun" ? "#c2410c" : "#0369a1",
+              fontSize: 12,
+              fontWeight: 900,
+            }}
+          >
+            Ultimo mese: {latestPunPsvMonthLabel}
+          </span>
+          <span
+            style={{
+              padding: "7px 10px",
+              borderRadius: 9,
+              background:
+                expandedMarketChart === "pun" ? "#fb923c" : "#0ea5e9",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 950,
+            }}
+          >
+            {expandedMarketChart === "pun" ? latestPun : latestPsv}
+          </span>
+        </div>
+
+        <svg
+          viewBox="0 0 760 240"
+          style={{
+            width: "100%",
+            height: "min(620px, 64vh)",
+            minHeight: 360,
+            display: "block",
+          }}
+        >
+          <defs>
+            <linearGradient
+              id="expandedPunGradient"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop offset="0%" stopColor="#fb923c" stopOpacity="0.40" />
+              <stop offset="100%" stopColor="#fb923c" stopOpacity="0.03" />
+            </linearGradient>
+            <linearGradient
+              id="expandedPsvGradient"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.40" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.03" />
+            </linearGradient>
+          </defs>
+
+          {[40, 80, 120, 160].map((y) => (
+            <line
+              key={y}
+              x1="0"
+              x2="760"
+              y1={y}
+              y2={y}
+              stroke="#dbe3ea"
+            />
+          ))}
+
+          <polygon
+            points={`${
+              expandedMarketChart === "pun"
+                ? punPolyline
+                : psvPolyline
+            } 732,180 28,180`}
+            fill={
+              expandedMarketChart === "pun"
+                ? "url(#expandedPunGradient)"
+                : "url(#expandedPsvGradient)"
+            }
+          />
+
+          <polyline
+            fill="none"
+            stroke={
+              expandedMarketChart === "pun" ? "#f97316" : "#0ea5e9"
+            }
+            strokeWidth={expandedMarketChart === "pun" ? 6 : 5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            points={
+              expandedMarketChart === "pun"
+                ? punPolyline
+                : psvPolyline
+            }
+          />
+
+          {(expandedMarketChart === "pun"
+            ? punCoords
+            : psvCoords
+          ).map((p, i, arr) => {
+            const isLast = i === arr.length - 1;
+            const value =
+              expandedMarketChart === "pun"
+                ? punValues[i]
+                : psvValues[i];
+
+            return (
+              <g key={i}>
+                {isLast && (
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r="14"
+                    fill={
+                      expandedMarketChart === "pun"
+                        ? "rgba(249,115,22,.15)"
+                        : "rgba(14,165,233,.15)"
+                    }
+                    stroke={
+                      expandedMarketChart === "pun"
+                        ? "#fb923c"
+                        : "#38bdf8"
+                    }
+                    strokeWidth="2"
+                  />
+                )}
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={isLast ? 8 : 5.5}
+                  fill="#ffffff"
+                  stroke={
+                    expandedMarketChart === "pun"
+                      ? "#f97316"
+                      : "#0ea5e9"
+                  }
+                  strokeWidth={isLast ? 4 : 2.5}
+                />
+                <text
+                  x={p.x}
+                  y={p.y - 12}
+                  textAnchor="middle"
+                  fontSize="13"
+                  fill="#111111"
+                  fontWeight="700"
+                >
+                  {Number(value || 0).toFixed(3)}
+                </text>
+                <text
+                  x={p.x}
+                  y="205"
+                  textAnchor="middle"
+                  fontSize="13"
+                  fill="#64748b"
+                >
+                  <tspan x={p.x} dy="0">
+                    {(monthLabels[i] || "").toUpperCase()}
+                  </tspan>
+                  <tspan x={p.x} dy="15">
+                    {chartYearLabels[i]}
+                  </tspan>
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  </div>
+)}
 
 {/* LAYOUT DEDICATO EXPORT PDF A4 ORIZZONTALE */}
 <div
