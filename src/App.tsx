@@ -5966,6 +5966,18 @@ function Listini({
     markDirty();
   };
 
+  const updateEnergyOfferProvvigioneTipo = (
+    index: number,
+    provvigioneTipo: ProvvigioniOfferType
+  ) => {
+    setDraftEnergyOffers((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, provvigioneTipo } : row
+      )
+    );
+    markDirty();
+  };
+
   const updateEnergyOfferVisibility = (index: number, visibile: boolean) => {
     setDraftEnergyOffers((prev) =>
       prev.map((row, i) => (i === index ? { ...row, visibile } : row))
@@ -5998,6 +6010,18 @@ function Listini({
           ),
         };
       })
+    );
+    markDirty();
+  };
+
+  const updateGasOfferProvvigioneTipo = (
+    index: number,
+    provvigioneTipo: ProvvigioniOfferType
+  ) => {
+    setDraftGasOffers((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, provvigioneTipo } : row
+      )
     );
     markDirty();
   };
@@ -6585,7 +6609,7 @@ function Listini({
   >
             <thead>
               <tr>
-                {["Ordina", "Visibile", "Nome offerta", "Tipologie CTE", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
+                {["Ordina", "Visibile", "Nome offerta", "Tipo provvigione", "Tipologie CTE", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -6650,6 +6674,30 @@ function Listini({
                       value={row.nome}
                       onChange={(e) => updateEnergyOffer(i, "nome", e.target.value)}
                     />
+                  </td>
+                  <td style={{ ...tdStyle, minWidth: 150 }}>
+                    <select
+                      value={
+                        row.provvigioneTipo ||
+                        getProvvigioniOfferType(row.nome)
+                      }
+                      onChange={(e) =>
+                        updateEnergyOfferProvvigioneTipo(
+                          i,
+                          e.target.value as ProvvigioniOfferType
+                        )
+                      }
+                      style={{
+                        ...inputStyle,
+                        width: 140,
+                        background: "white",
+                        fontWeight: 800,
+                      }}
+                    >
+                      <option value="STANDARD">STANDARD</option>
+                      <option value="UNICA">UNICA</option>
+                      <option value="SPECIAL">SPECIAL</option>
+                    </select>
                   </td>
                   <td style={{ ...tdStyle, minWidth: 190, verticalAlign: "top" }}>
                     <details
@@ -6789,7 +6837,7 @@ function Listini({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                {["Ordina", "Visibile", "Nome offerta", "Tipologie CTE", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
+                {["Ordina", "Visibile", "Nome offerta", "Tipo provvigione", "Tipologie CTE", "Spread", "Quota variabile", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -6854,6 +6902,30 @@ function Listini({
                       value={row.nome}
                       onChange={(e) => updateGasOffer(i, "nome", e.target.value)}
                     />
+                  </td>
+                  <td style={{ ...tdStyle, minWidth: 150 }}>
+                    <select
+                      value={
+                        row.provvigioneTipo ||
+                        getProvvigioniOfferType(row.nome)
+                      }
+                      onChange={(e) =>
+                        updateGasOfferProvvigioneTipo(
+                          i,
+                          e.target.value as ProvvigioniOfferType
+                        )
+                      }
+                      style={{
+                        ...inputStyle,
+                        width: 140,
+                        background: "white",
+                        fontWeight: 800,
+                      }}
+                    >
+                      <option value="STANDARD">STANDARD</option>
+                      <option value="UNICA">UNICA</option>
+                      <option value="SPECIAL">SPECIAL</option>
+                    </select>
                   </td>
                   <td style={{ ...tdStyle, minWidth: 180, verticalAlign: "top" }}>
                     <details
