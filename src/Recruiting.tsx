@@ -6090,6 +6090,28 @@ export default function Recruiting({
           min-height: 0;
         }
 
+        .recruiting-contact-list-header {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
+          align-items: start;
+          gap: 10px;
+          margin-bottom: 8px;
+          min-width: 0;
+        }
+
+        .recruiting-contact-list-controls {
+          display: grid;
+          gap: 7px;
+          width: 100%;
+          min-width: 0;
+        }
+
+        .recruiting-contact-list-controls details,
+        .recruiting-contact-list-controls summary {
+          min-width: 0;
+          max-width: 100%;
+        }
+
         .recruiting-contact-list-scroll {
           max-height: 840px;
           overflow: auto;
@@ -6172,6 +6194,14 @@ export default function Recruiting({
         }
 
         @media (max-width: 820px) {
+          .recruiting-contact-list-header {
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .recruiting-contact-list-controls {
+            width: 100%;
+          }
+
           .recruiting-contact-filter-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
@@ -7365,16 +7395,7 @@ export default function Recruiting({
               className="recruiting-contact-list-card"
               style={cardStyle}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 10,
-                  flexWrap: "wrap",
-                  marginBottom: 8,
-                }}
-              >
+              <div className="recruiting-contact-list-header">
                 <div
                   style={{
                     display: "flex",
@@ -7399,13 +7420,7 @@ export default function Recruiting({
                   </span>
                 </div>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 7,
-                    minWidth: 0,
-                  }}
-                >
+                <div className="recruiting-contact-list-controls">
                   <label
                     style={{
                       display: "grid",
