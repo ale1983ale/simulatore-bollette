@@ -11963,7 +11963,7 @@ if (!agentSession && !adminSession) {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {Number(value || 0).toFixed(6)}
+                      {Number(value || 0).toFixed(3)}
                     </td>
                   ))}
                 </tr>
@@ -12586,7 +12586,7 @@ if (!agentSession && !adminSession) {
                         : undefined,
                   }}
                 >
-                  {Number(value || 0).toFixed(6)}
+                  {Number(value || 0).toFixed(3)}
                 </td>
               ))}
             </tr>
