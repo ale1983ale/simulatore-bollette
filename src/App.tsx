@@ -1151,7 +1151,7 @@ function SaveSimulationModal({
               boxSizing: "border-box",
               border: "1px solid #cbd5e1",
               borderRadius: 10,
-              padding: "10px 12px",
+              padding: "8px 10px",
               fontSize: 15,
               background: "white",
             }}
@@ -1182,7 +1182,7 @@ function SaveSimulationModal({
                 boxSizing: "border-box",
                 border: "1px solid #cbd5e1",
                 borderRadius: 10,
-                padding: "10px 12px",
+                padding: "8px 10px",
                 fontSize: 15,
                 background: "white",
               }}
@@ -1223,7 +1223,7 @@ function SaveSimulationModal({
                 boxSizing: "border-box",
                 border: "1px solid #cbd5e1",
                 borderRadius: 10,
-                padding: "10px 12px",
+                padding: "8px 10px",
                 fontSize: 15,
                 background: "white",
               }}
@@ -1237,7 +1237,7 @@ function SaveSimulationModal({
               borderRadius: 10,
               background: "#fef2f2",
               color: "#b91c1c",
-              padding: "10px 12px",
+              padding: "8px 10px",
               fontWeight: 800,
               fontSize: 13,
             }}
@@ -1539,7 +1539,7 @@ function SavedSimulationsModal({
                   alignItems: "center",
                   border: "1px solid #e2e8f0",
                   borderRadius: 12,
-                  padding: "11px 12px",
+                  padding: "9px 10px",
                   background: "#f8fafc",
                 }}
               >
@@ -7639,7 +7639,7 @@ function LoginView({
             }}
             style={{
               flex: 1,
-              padding: "10px 12px",
+              padding: "8px 10px",
               borderRadius: 10,
               border: mode === "agent" ? "1px solid #0f172a" : "1px solid #cbd5e1",
               background: mode === "agent" ? "#0f172a" : "white",
@@ -7659,7 +7659,7 @@ function LoginView({
             }}
             style={{
               flex: 1,
-              padding: "10px 12px",
+              padding: "8px 10px",
               borderRadius: 10,
               border: mode === "admin" ? "1px solid #0f172a" : "1px solid #cbd5e1",
               background: mode === "admin" ? "#0f172a" : "white",
@@ -9611,130 +9611,50 @@ export default function App() {
   const punChartRef = useRef<HTMLDivElement>(null);
   const psvChartRef = useRef<HTMLDivElement>(null);
   const punPsvTableRef = useRef<HTMLDivElement>(null);
+  const punPsvPdfLayoutRef = useRef<HTMLDivElement>(null);
+
   const exportPunPsvPdf = async () => {
-    if (!punPsvRef.current) return;
-  
+    const exportPage = punPsvPdfLayoutRef.current;
+    if (!exportPage) {
+      alert("Layout PDF PUN/PSV non disponibile");
+      return;
+    }
+
     try {
-      const root = punPsvRef.current;
-
-const punCard = punChartRef.current;
-const psvCard = psvChartRef.current;
-const tableWrap = punPsvTableRef.current;
-
-if (!punCard || !psvCard || !tableWrap) {
-  alert("Blocco PDF non trovato");
-  return;
-}
-  
-      
-  
-      const commonOptions = {
-        scale: 1.2,
+      const canvas = await html2canvas(exportPage, {
+        scale: 1.55,
         useCORS: true,
         backgroundColor: "#ffffff",
-        scrollY: -window.scrollY,
-      };
-  
-      const captureWideCard = async (
-        element: HTMLElement,
-        widthPx: number,
-        svgHeightPx: number
-      ) => {
-        const clone = element.cloneNode(true) as HTMLElement;
-        clone.style.position = "fixed";
-        clone.style.left = "-10000px";
-        clone.style.top = "0";
-        clone.style.width = `${widthPx}px`;
-        clone.style.maxWidth = `${widthPx}px`;
-        clone.style.display = "block";
-        clone.style.background = "#ffffff";
-        clone.style.boxSizing = "border-box";
-        clone.style.padding = "10px";
-        clone.style.margin = "0";
-      
-        const svg = clone.querySelector("svg") as SVGElement | null;
-if (svg) {
-  svg.setAttribute("viewBox", "0 0 760 220");
-  svg.setAttribute("preserveAspectRatio", "none");
-  (svg as unknown as HTMLElement).style.width = "100%";
-  (svg as unknown as HTMLElement).style.height = `${svgHeightPx}px`;
-  (svg as unknown as HTMLElement).style.display = "block";
-}
-      
-        document.body.appendChild(clone);
-        const canvas = await html2canvas(clone, commonOptions);
-        document.body.removeChild(clone);
-        return canvas;
-      };
-      const punCanvas = await captureWideCard(punCard, 1200, 280);
-      const tableCanvas = await captureWideCard(tableWrap, 1200, 0);
-const psvCanvas = await captureWideCard(psvCard, 1200, 280);
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 1400,
+        windowHeight: 990,
+      });
 
-  
-      const punImg = punCanvas.toDataURL("image/jpeg",1);
-      const tableImg = tableCanvas.toDataURL("image/jpeg",1);
-      const psvImg = psvCanvas.toDataURL("image/jpeg",1);
-
-  
       const pdf = new jsPDF({
-        orientation: "portrait",
+        orientation: "landscape",
         unit: "mm",
         format: "a4",
       });
-  
+
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-  
-      const margin = 8;
-      const usableWidth = pageWidth - margin * 2;
-  
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(16);
-      pdf.text("REPORT PUN / PSV TEST", pageWidth / 2, 12, { align: "center" });
-      pdf.setDrawColor(210);
-      pdf.line(margin, 17, pageWidth - margin, 17);
-  
-      let y = 21;
-  
-      const drawBlock = (
-        imgData: string,
-        canvas: HTMLCanvasElement,
-        targetHeight: number
-      ) => {
-        const ratio = canvas.width / canvas.height;
-        let w = usableWidth;
-        let h = w / ratio;
-  
-        if (h > targetHeight) {
-          h = targetHeight;
-          w = h * ratio;
-        }
-  
-        const x = (pageWidth - w) / 2;
-        pdf.addImage(imgData, "JPEG", x, y, w, h);
-        y += h + 5;
-      };
-  
-      // PUN grande quasi tutta larghezza
-      drawBlock(punImg, punCanvas, 53);
-  
-      // tabella leggibile
-      drawBlock(tableImg, tableCanvas, 175);
-  
-      // PSV sotto
-      drawBlock(psvImg, psvCanvas, 53);
-  
-      const meseNome = activePunPsvMonth.replace(/\s+/g,"-").toUpperCase();
+      const img = canvas.toDataURL("image/jpeg", 0.95);
+
+      pdf.addImage(img, "JPEG", 0, 0, pageWidth, pageHeight);
+
+      const meseNome = String(activePunPsvMonth || "PUN-PSV")
+        .replace(/\s+/g, "-")
+        .toUpperCase();
 
       pdf.save(`Report-PUN-PSV-${meseNome}.pdf`);
     } catch (error) {
-      console.error(error);
+      console.error("PUN PSV PDF ERROR:", error);
       alert("Errore esportazione PDF");
     }
   };
-  
-  
-  
+
+
   const [selectedMonthPUN, setSelectedMonthPUN] = useState("");
   const [appliedMonthPUN, setAppliedMonthPUN] = useState("");
   const activePunPsvMonth = appliedMonthPUN || selectedMonthPUN;
@@ -11651,10 +11571,11 @@ if (!agentSession && !adminSession) {
       display: "grid",
       gridTemplateColumns:
         punPsvView === "both"
-          ? "minmax(0,1fr) minmax(0,1fr)"
-          : "minmax(0,1fr)",
-      gap: 20,
+          ? "minmax(0, 840px) minmax(0, 520px)"
+          : "minmax(0, 1fr)",
+      gap: 18,
       alignItems: "start",
+      justifyContent: "center",
     }}
   >
     {(punPsvView === "both" || punPsvView === "pun") && (
@@ -11667,6 +11588,9 @@ if (!agentSession && !adminSession) {
             "linear-gradient(180deg, rgba(255,247,237,.96) 0%, rgba(255,255,255,.98) 28%)",
           boxShadow:
             "0 10px 28px rgba(249,115,22,.08), 0 0 0 2px rgba(251,146,60,.05)",
+          width: "100%",
+          maxWidth: punPsvView === "both" ? 840 : 900,
+          justifySelf: "center",
         }}
       >
         <div
@@ -11726,16 +11650,23 @@ if (!agentSession && !adminSession) {
               borderCollapse: "collapse",
               tableLayout: "fixed",
               background: "transparent",
-              minWidth: 560,
+              minWidth: 620,
             }}
           >
+            <colgroup>
+              <col style={{ width: "30%" }} />
+              <col style={{ width: "17.5%" }} />
+              <col style={{ width: "17.5%" }} />
+              <col style={{ width: "17.5%" }} />
+              <col style={{ width: "17.5%" }} />
+            </colgroup>
             <thead>
               <tr>
                 {["Mese", "PUN F0", "F1", "F2", "F3"].map((label, index) => (
                   <th
                     key={label}
                     style={{
-                      padding: "11px 12px",
+                      padding: "9px 10px",
                       textAlign: index === 0 ? "left" : "right",
                       color: index === 0 ? "#7c2d12" : "#c2410c",
                       background:
@@ -11770,7 +11701,7 @@ if (!agentSession && !adminSession) {
                 >
                   <td
                     style={{
-                      padding: "10px 12px",
+                      padding: "8px 10px",
                       borderBottom: "1px solid rgba(226,232,240,.82)",
                       color: "#334155",
                       fontWeight: 750,
@@ -11783,7 +11714,7 @@ if (!agentSession && !adminSession) {
                     <td
                       key={valueIndex}
                       style={{
-                        padding: "10px 12px",
+                        padding: "8px 10px",
                         textAlign: "right",
                         borderBottom: "1px solid rgba(226,232,240,.82)",
                         color: valueIndex === 0 ? "#ea580c" : "#475569",
@@ -11813,6 +11744,9 @@ if (!agentSession && !adminSession) {
             "linear-gradient(180deg, rgba(240,249,255,.96) 0%, rgba(255,255,255,.98) 28%)",
           boxShadow:
             "0 10px 28px rgba(14,165,233,.08), 0 0 0 2px rgba(56,189,248,.05)",
+          width: "100%",
+          maxWidth: punPsvView === "both" ? 520 : 560,
+          justifySelf: "center",
         }}
       >
         <div
@@ -11874,11 +11808,15 @@ if (!agentSession && !adminSession) {
               background: "transparent",
             }}
           >
+            <colgroup>
+              <col style={{ width: "58%" }} />
+              <col style={{ width: "42%" }} />
+            </colgroup>
             <thead>
               <tr>
                 <th
                   style={{
-                    padding: "11px 12px",
+                    padding: "9px 10px",
                     textAlign: "left",
                     color: "#075985",
                     background: "rgba(14,165,233,.10)",
@@ -11891,7 +11829,7 @@ if (!agentSession && !adminSession) {
                 </th>
                 <th
                   style={{
-                    padding: "11px 12px",
+                    padding: "9px 10px",
                     textAlign: "right",
                     color: "#0284c7",
                     background: "rgba(56,189,248,.07)",
@@ -11921,7 +11859,7 @@ if (!agentSession && !adminSession) {
                 >
                   <td
                     style={{
-                      padding: "10px 12px",
+                      padding: "8px 10px",
                       borderBottom: "1px solid rgba(226,232,240,.82)",
                       color: "#334155",
                       fontWeight: 750,
@@ -11932,7 +11870,7 @@ if (!agentSession && !adminSession) {
                   </td>
                   <td
                     style={{
-                      padding: "10px 12px",
+                      padding: "8px 10px",
                       textAlign: "right",
                       borderBottom: "1px solid rgba(226,232,240,.82)",
                       color: "#0284c7",
@@ -11951,7 +11889,333 @@ if (!agentSession && !adminSession) {
       </div>
     )}
   </div>
+
 </div>
+
+{/* LAYOUT DEDICATO EXPORT PDF A4 ORIZZONTALE */}
+<div
+  ref={punPsvPdfLayoutRef}
+  aria-hidden="true"
+  style={{
+    position: "fixed",
+    left: "-20000px",
+    top: 0,
+    width: 1400,
+    height: 990,
+    padding: "22px 26px 24px",
+    boxSizing: "border-box",
+    background: "#ffffff",
+    color: "#0f172a",
+    fontFamily: "Arial, Helvetica, sans-serif",
+    overflow: "hidden",
+  }}
+>
+  <div
+    style={{
+      height: 92,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 2,
+    }}
+  >
+    <img
+      src="/logo-piuenergia.svg"
+      alt="+energia"
+      style={{
+        width: 250,
+        height: 66,
+        objectFit: "contain",
+        display: "block",
+      }}
+    />
+    <div
+      style={{
+        marginTop: -4,
+        fontSize: 26,
+        lineHeight: 1.08,
+        fontWeight: 900,
+        color: "#10234b",
+        textAlign: "center",
+      }}
+    >
+      Andamento PUN e PSV {latestPunPsvMonthLabel}
+    </div>
+  </div>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1.12fr .88fr",
+      gap: 18,
+      height: 438,
+      marginTop: 8,
+    }}
+  >
+    <div
+      style={{
+        borderRadius: 16,
+        overflow: "hidden",
+        border: "1px solid rgba(249,115,22,.22)",
+        background: "linear-gradient(180deg,#fff7ed 0%,#ffffff 34%)",
+        boxShadow: "0 7px 24px rgba(249,115,22,.08)",
+      }}
+    >
+      <div
+        style={{
+          height: 53,
+          padding: "9px 13px",
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          background:
+            "linear-gradient(90deg,rgba(249,115,22,.16),rgba(251,146,60,.03))",
+          borderBottom: "1px solid rgba(249,115,22,.16)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 11 }}>
+          <span style={{ fontSize: 28, fontWeight: 950, color: "#ea580c" }}>PUN</span>
+          <span style={{ fontSize: 12, color: "#475569" }}>
+            Prezzo Unico Nazionale dell'energia elettrica
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 7 }}>
+          <span style={{ padding: "7px 9px", borderRadius: 9, background: "#ffedd5", color: "#c2410c", fontSize: 10, fontWeight: 900 }}>
+            Ultimo mese: {latestPunPsvMonthLabel}
+          </span>
+          <span style={{ padding: "7px 10px", borderRadius: 9, background: "#fb923c", color: "#fff", fontSize: 13, fontWeight: 950 }}>
+            {latestPun}
+          </span>
+        </div>
+      </div>
+
+      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: 12 }}>
+        <colgroup>
+          <col style={{ width: "28%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "18%" }} />
+          <col style={{ width: "18%" }} />
+        </colgroup>
+        <thead>
+          <tr style={{ background: "#f97316", color: "#fff" }}>
+            {["Mese", "PUN F0", "F1", "F2", "F3"].map((label, index) => (
+              <th key={label} style={{ padding: "8px 9px", textAlign: index === 0 ? "left" : "right", fontSize: 11, fontWeight: 900 }}>
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {tablePunPsvRows.slice(0, 12).map((row, index) => (
+            <tr
+              key={row.mese}
+              style={{
+                background: index % 2 === 0 ? "#fffaf5" : "#ffffff",
+                boxShadow: index === 0 ? "inset 0 0 0 2px #f97316" : "none",
+              }}
+            >
+              <td style={{ padding: "7px 9px", fontWeight: index === 0 ? 900 : 700 }}>{row.mese}</td>
+              {[row.mono,row.f1,row.f2,row.f3].map((value,valueIndex) => (
+                <td
+                  key={valueIndex}
+                  style={{
+                    padding: "7px 9px",
+                    textAlign: "right",
+                    color: valueIndex === 0 ? "#ea580c" : "#334155",
+                    fontWeight: valueIndex === 0 ? 900 : 650,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {Number(value || 0).toFixed(6)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div
+      style={{
+        borderRadius: 16,
+        overflow: "hidden",
+        border: "1px solid rgba(14,165,233,.22)",
+        background: "linear-gradient(180deg,#f0f9ff 0%,#ffffff 34%)",
+        boxShadow: "0 7px 24px rgba(14,165,233,.08)",
+      }}
+    >
+      <div
+        style={{
+          height: 53,
+          padding: "9px 13px",
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          background:
+            "linear-gradient(90deg,rgba(14,165,233,.16),rgba(103,232,249,.03))",
+          borderBottom: "1px solid rgba(14,165,233,.16)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "baseline", gap: 11 }}>
+          <span style={{ fontSize: 28, fontWeight: 950, color: "#0284c7" }}>PSV</span>
+          <span style={{ fontSize: 12, color: "#475569" }}>
+            Punto di Scambio Virtuale del gas naturale
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 7 }}>
+          <span style={{ padding: "7px 9px", borderRadius: 9, background: "#cffafe", color: "#0369a1", fontSize: 10, fontWeight: 900 }}>
+            Ultimo mese: {latestPunPsvMonthLabel}
+          </span>
+          <span style={{ padding: "7px 10px", borderRadius: 9, background: "#0ea5e9", color: "#fff", fontSize: 13, fontWeight: 950 }}>
+            {latestPsv}
+          </span>
+        </div>
+      </div>
+
+      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: 12 }}>
+        <colgroup>
+          <col style={{ width: "55%" }} />
+          <col style={{ width: "45%" }} />
+        </colgroup>
+        <thead>
+          <tr style={{ background: "#0284c7", color: "#fff" }}>
+            <th style={{ padding: "8px 9px", textAlign: "left", fontSize: 11, fontWeight: 900 }}>Mese</th>
+            <th style={{ padding: "8px 9px", textAlign: "right", fontSize: 11, fontWeight: 900 }}>PSV</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tablePunPsvRows.slice(0, 12).map((row, index) => (
+            <tr
+              key={row.mese}
+              style={{
+                background: index % 2 === 0 ? "#f5fbff" : "#ffffff",
+                boxShadow: index === 0 ? "inset 0 0 0 2px #0ea5e9" : "none",
+              }}
+            >
+              <td style={{ padding: "7px 9px", fontWeight: index === 0 ? 900 : 700 }}>{row.mese}</td>
+              <td style={{ padding: "7px 9px", textAlign: "right", color: "#0284c7", fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>
+                {Number(row.psv || 0).toFixed(6)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 18,
+      height: 392,
+      marginTop: 18,
+    }}
+  >
+    <div
+      style={{
+        borderRadius: 16,
+        padding: "13px 15px 8px",
+        border: "1px solid rgba(249,115,22,.22)",
+        background: "linear-gradient(180deg,#fffaf5,#ffffff)",
+        boxShadow: "0 7px 24px rgba(249,115,22,.08)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+        <div style={{ fontSize: 20, fontWeight: 900 }}>Andamento PUN</div>
+        <div style={{ display: "flex", gap: 7 }}>
+          <span style={{ padding: "6px 9px", borderRadius: 8, background: "#ffedd5", color: "#c2410c", fontSize: 10, fontWeight: 900 }}>
+            Ultimo mese: {latestPunPsvMonthLabel}
+          </span>
+          <span style={{ padding: "6px 10px", borderRadius: 8, background: "#fb923c", color: "#fff", fontSize: 12, fontWeight: 950 }}>
+            {latestPun}
+          </span>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 760 240" style={{ width: "100%", height: 306, display: "block" }}>
+        <defs>
+          <linearGradient id="pdfPunAreaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
+            <stop offset="100%" stopColor="#fb923c" stopOpacity="0.03" />
+          </linearGradient>
+        </defs>
+        {[40,80,120,160].map((y) => <line key={y} x1="0" x2="760" y1={y} y2={y} stroke="#dbe3ea" />)}
+        <polygon points={`${punPolyline} 732,180 28,180`} fill="url(#pdfPunAreaGradient)" />
+        <polyline fill="none" stroke="#f97316" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" points={punPolyline} />
+        {punCoords.map((p,i) => {
+          const isLast=i===punCoords.length-1;
+          return (
+            <g key={i}>
+              {isLast && <circle cx={p.x} cy={p.y} r="14" fill="rgba(249,115,22,.14)" stroke="#fb923c" strokeWidth="2" />}
+              <circle cx={p.x} cy={p.y} r={isLast ? 8 : 5.5} fill="#fff" stroke="#f97316" strokeWidth={isLast ? 4 : 2.5} />
+              <text x={p.x} y={p.y-12} textAnchor="middle" fontSize="13" fill="#111" fontWeight="700">{punValues[i].toFixed(3)}</text>
+              <text x={p.x} y="205" textAnchor="middle" fontSize="13" fill="#64748b">
+                <tspan x={p.x} dy="0">{(monthLabels[i]||"").toUpperCase()}</tspan>
+                <tspan x={p.x} dy="15">{chartYearLabels[i]}</tspan>
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+
+    <div
+      style={{
+        borderRadius: 16,
+        padding: "13px 15px 8px",
+        border: "1px solid rgba(14,165,233,.22)",
+        background: "linear-gradient(180deg,#f5fbff,#ffffff)",
+        boxShadow: "0 7px 24px rgba(14,165,233,.08)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+        <div style={{ fontSize: 20, fontWeight: 900 }}>Andamento PSV</div>
+        <div style={{ display: "flex", gap: 7 }}>
+          <span style={{ padding: "6px 9px", borderRadius: 8, background: "#cffafe", color: "#0369a1", fontSize: 10, fontWeight: 900 }}>
+            Ultimo mese: {latestPunPsvMonthLabel}
+          </span>
+          <span style={{ padding: "6px 10px", borderRadius: 8, background: "#0ea5e9", color: "#fff", fontSize: 12, fontWeight: 950 }}>
+            {latestPsv}
+          </span>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 760 240" style={{ width: "100%", height: 306, display: "block" }}>
+        <defs>
+          <linearGradient id="pdfPsvAreaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.03" />
+          </linearGradient>
+        </defs>
+        {[40,80,120,160].map((y) => <line key={y} x1="0" x2="760" y1={y} y2={y} stroke="#dbe3ea" />)}
+        <polygon points={`${psvPolyline} 732,180 28,180`} fill="url(#pdfPsvAreaGradient)" />
+        <polyline fill="none" stroke="#0ea5e9" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" points={psvPolyline} />
+        {psvCoords.map((p,i) => {
+          const isLast=i===psvCoords.length-1;
+          return (
+            <g key={i}>
+              {isLast && <circle cx={p.x} cy={p.y} r="14" fill="rgba(14,165,233,.14)" stroke="#38bdf8" strokeWidth="2" />}
+              <circle cx={p.x} cy={p.y} r={isLast ? 8 : 5.5} fill="#fff" stroke="#0ea5e9" strokeWidth={isLast ? 4 : 2.5} />
+              <text x={p.x} y={p.y-12} textAnchor="middle" fontSize="13" fill="#111" fontWeight="700">{psvValues[i].toFixed(3)}</text>
+              <text x={p.x} y="205" textAnchor="middle" fontSize="13" fill="#64748b">
+                <tspan x={p.x} dy="0">{(monthLabels[i]||"").toUpperCase()}</tspan>
+                <tspan x={p.x} dy="15">{chartYearLabels[i]}</tspan>
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  </div>
+</div>
+
           </div>
         ) : (
           renderAdminContent()
