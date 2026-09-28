@@ -11794,11 +11794,11 @@ if (!agentSession && !adminSession) {
       display: "grid",
       gridTemplateColumns:
         punPsvView === "both"
-          ? "minmax(0, 840px) minmax(0, 520px)"
+          ? "minmax(0, 1fr) minmax(0, 1fr)"
           : "minmax(0, 1fr)",
-      gap: 18,
+      gap: 20,
       alignItems: "start",
-      justifyContent: "center",
+      justifyContent: "stretch",
     }}
   >
     {(punPsvView === "both" || punPsvView === "pun") && (
@@ -11812,7 +11812,7 @@ if (!agentSession && !adminSession) {
           boxShadow:
             "0 10px 28px rgba(249,115,22,.08), 0 0 0 2px rgba(251,146,60,.05)",
           width: "100%",
-          maxWidth: punPsvView === "both" ? 840 : 900,
+          maxWidth: punPsvView === "both" ? 680 : 900,
           justifySelf: "center",
         }}
       >
@@ -12459,10 +12459,11 @@ if (!agentSession && !adminSession) {
   <div
     style={{
       display: "grid",
-      gridTemplateColumns: "1.12fr .88fr",
+      gridTemplateColumns: "1fr 1fr",
       gap: 18,
       height: 438,
       marginTop: 8,
+      alignItems: "start",
     }}
   >
     <div
@@ -12472,6 +12473,9 @@ if (!agentSession && !adminSession) {
         border: "1px solid rgba(249,115,22,.22)",
         background: "linear-gradient(180deg,#fff7ed 0%,#ffffff 34%)",
         boxShadow: "0 7px 24px rgba(249,115,22,.08)",
+        width: "100%",
+        maxWidth: 640,
+        justifySelf: "center",
       }}
     >
       <div
@@ -12558,6 +12562,9 @@ if (!agentSession && !adminSession) {
         border: "1px solid rgba(14,165,233,.22)",
         background: "linear-gradient(180deg,#f0f9ff 0%,#ffffff 34%)",
         boxShadow: "0 7px 24px rgba(14,165,233,.08)",
+        width: "100%",
+        maxWidth: 520,
+        justifySelf: "center",
       }}
     >
       <div
