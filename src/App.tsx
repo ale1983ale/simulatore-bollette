@@ -2064,6 +2064,44 @@ function selectField(
   );
 }
 
+function offerTypeField(
+  value: string,
+  setValue: (v: string) => void
+) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 900,
+          marginBottom: 4,
+          color: "#b91c1c",
+        }}
+      >
+        TIPOLOGIA OFFERTA
+      </div>
+      <select
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        style={{
+          width: "100%",
+          padding: 8,
+          border: "2px solid #ef4444",
+          background: "#fff",
+          color: "#0f172a",
+          fontWeight: 800,
+          borderRadius: 8,
+          boxSizing: "border-box",
+          outline: "none",
+        }}
+      >
+        <option value="FISSO">Prezzo fisso</option>
+        <option value="VARIABILE">Prezzo variabile</option>
+      </select>
+    </div>
+  );
+}
+
 function toggleAmount(
   label: string,
   flag: string,
@@ -2496,7 +2534,10 @@ function Energia({
     fatturazione: "MENSILE",
     numeroPod: "1",
     tipo: "BTA2",
-    offerta: visibleEnergyOffers[0]?.nome || "",
+    tipologiaOfferta: "VARIABILE",
+    offerta:
+      visibleEnergyOffers.find((offer) => !isSicuraOffer(offer.nome))?.nome ||
+      "",
     mese1: "",
     mese2: "",
     meseRifTabella1: "SETTEMBRE 2026",
@@ -2619,9 +2660,16 @@ function Energia({
   const openSavedEnergySimulation = (
     simulation: SavedSimulation
   ) => {
+    const storedState = simulation.state || {};
     const restored = {
       ...buildEnergyInitialState(),
-      ...(simulation.state || {}),
+      ...storedState,
+      tipologiaOfferta:
+        storedState.tipologiaOfferta ||
+        (isSicuraOffer(String(storedState.offerta || "")) ||
+        isFixedCompetenceMonth(String(storedState.mese1 || ""))
+          ? "FISSO"
+          : "VARIABILE"),
     };
 
     setS(restored);
@@ -2629,7 +2677,8 @@ function Energia({
     setEnergySavedOpen(false);
   };
 
-  const energyFixedMode = isFixedCompetenceMonth(s.mese1);
+  const energyFixedMode =
+    String(s.tipologiaOfferta || "VARIABILE") === "FISSO";
 
   const fixedModeEnergyOffers = visibleEnergyOffers.filter(
     (offer) => isSicuraOffer(offer.nome) === energyFixedMode
@@ -2654,8 +2703,6 @@ function Energia({
       : fixedModeEnergyOffers;
 
   useEffect(() => {
-    if (!s.mese1) return;
-
     const currentOffer = fixedModeEnergyOffers.find(
       (offer) => offer.nome === s.offerta
     );
@@ -2697,64 +2744,60 @@ function Energia({
     }));
   }, [
     energyOffers,
-    s.mese1,
     s.offerta,
     s.tipo,
+    s.tipologiaOfferta,
     energyFixedMode,
   ]);
 
   useEffect(() => {
-    const validMonthOptions = [...punPsvRows]
-      .filter((row) => {
-        if (
-          row.mese === "FISSO DOMESTICO" ||
-          row.mese === "FISSO BUSINESS"
-        ) {
-          return false;
-        }
-  
-        return (
-          Number(row.mono || 0) !== 0 ||
-          Number(row.f1 || 0) !== 0 ||
-          Number(row.f2 || 0) !== 0 ||
-          Number(row.f3 || 0) !== 0 ||
-          Number(row.psv || 0) !== 0
-        );
-      })
-      .sort((a, b) => {
-        const mesi = [
-          "GENNAIO",
-          "FEBBRAIO",
-          "MARZO",
-          "APRILE",
-          "MAGGIO",
-          "GIUGNO",
-          "LUGLIO",
-          "AGOSTO",
-          "SETTEMBRE",
-          "OTTOBRE",
-          "NOVEMBRE",
-          "DICEMBRE",
-        ];
-  
-        const score = (label: string) => {
-          const parts = String(label).trim().split(" ");
-          const mese = parts[0]?.toUpperCase() || "";
-          const anno = parseInt(parts[1] || "0", 10);
-          const meseIndex = mesi.indexOf(mese);
-          return anno * 100 + meseIndex;
-        };
-  
-        return score(b.mese) - score(a.mese);
-      });
-  
-    if (validMonthOptions.length > 0 && !s.mese1) {
+    const isFixed =
+      String(s.tipologiaOfferta || "VARIABILE") === "FISSO";
+    const isDomestic = [
+      "RESIDENTE",
+      "NON RESIDENTE",
+      "RESIDENTE CANONE ESENTE",
+    ].includes(s.tipo);
+
+    const variableRows = [...punPsvRows]
+      .filter(
+        (row) =>
+          !isFixedCompetenceMonth(row.mese) &&
+          (
+            Number(row.mono || 0) !== 0 ||
+            Number(row.f1 || 0) !== 0 ||
+            Number(row.f2 || 0) !== 0 ||
+            Number(row.f3 || 0) !== 0
+          )
+      )
+      .sort(
+        (a, b) =>
+          getMonthYearSortValue(b.mese) -
+          getMonthYearSortValue(a.mese)
+      );
+
+    const fixedLabels = [
+      isDomestic ? "FISSO DOMESTICO" : "FISSO BUSINESS",
+      "FISSO AD HOC",
+    ];
+
+    const validMonthOptions = isFixed
+      ? fixedLabels
+      : variableRows.map((row) => row.mese);
+
+    if (!validMonthOptions.includes(s.mese1)) {
       setS((prev) => ({
         ...prev,
-        mese1: validMonthOptions[0].mese,
+        mese1: validMonthOptions[0] || "",
+        mese2: "",
       }));
     }
-  }, [punPsvRows, s.mese1]);
+  }, [
+    punPsvRows,
+    s.mese1,
+    s.tipo,
+    s.tipologiaOfferta,
+  ]);
   
   
   const dispCpMonthOptions = [...dispCpRows]
@@ -2800,14 +2843,25 @@ function Energia({
     return getMeseNumero(b.mese) - getMeseNumero(a.mese);
   });
 
-  const energyAllMonthOptions = mesiOrdinati.map(
-    (item) => item.mese
-  );
+  const energyIsDomestic = [
+    "RESIDENTE",
+    "NON RESIDENTE",
+    "RESIDENTE CANONE ESENTE",
+  ].includes(s.tipo);
+
+  const energyAllMonthOptions = energyFixedMode
+    ? [
+        energyIsDomestic
+          ? "FISSO DOMESTICO"
+          : "FISSO BUSINESS",
+        "FISSO AD HOC",
+      ]
+    : mesiOrdinati
+        .map((item) => item.mese)
+        .filter((month) => !isFixedCompetenceMonth(month));
+
   const energySecondaryMonthOptions =
-    energyAllMonthOptions.filter(
-      (month) =>
-        isFixedCompetenceMonth(month) === energyFixedMode
-    );
+    energyAllMonthOptions;
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [openSections, setOpenSections] = useState({
@@ -3002,6 +3056,27 @@ function Energia({
 
       return newState;
     });
+  };
+
+  const handleEnergyOfferTypeChange = (tipologia: string) => {
+    setEnergyCompatibilityDriver("tipo");
+    setLastEnergyInputAt(Date.now());
+    setDispCpAutoMode(true);
+
+    const fixed = tipologia === "FISSO";
+    const candidateOffers = visibleEnergyOffers.filter(
+      (offer) =>
+        isSicuraOffer(offer.nome) === fixed &&
+        energyOfferAllowsType(offer, s.tipo)
+    );
+
+    setS((prev) => ({
+      ...prev,
+      tipologiaOfferta: tipologia,
+      offerta: candidateOffers[0]?.nome || "",
+      mese1: "",
+      mese2: "",
+    }));
   };
 
   const handleEnergyTypeChange = (tipo: string) => {
@@ -3494,6 +3569,10 @@ return (
               handleEnergyTypeChange,
               compatibleEnergyTypeOptions,
               energyTypeOptionLabel
+            )}
+            {offerTypeField(
+              s.tipologiaOfferta || "VARIABILE",
+              handleEnergyOfferTypeChange
             )}
             {selectField(
               "Offerta",
@@ -4312,7 +4391,10 @@ function Gas({
     pdr: "",
     uso: "DOMESTICO",
     fatturazione: "MENSILE",
-    offerta: visibleGasOffers[0]?.nome || "",
+    tipologiaOfferta: "VARIABILE",
+    offerta:
+      visibleGasOffers.find((offer) => !isSicuraOffer(offer.nome))?.nome ||
+      "",
     periodo1: "",
     periodo2: "",
     periodo3: "",
@@ -4427,9 +4509,16 @@ function Gas({
   const openSavedGasSimulation = (
     simulation: SavedSimulation
   ) => {
+    const storedState = simulation.state || {};
     const restored = {
       ...buildGasInitialState(),
-      ...(simulation.state || {}),
+      ...storedState,
+      tipologiaOfferta:
+        storedState.tipologiaOfferta ||
+        (isSicuraOffer(String(storedState.offerta || "")) ||
+        isFixedCompetenceMonth(String(storedState.periodo1 || ""))
+          ? "FISSO"
+          : "VARIABILE"),
     };
 
     setS(restored);
@@ -4438,7 +4527,7 @@ function Gas({
   };
 
   const gasFixedMode =
-    isFixedCompetenceMonth(s.periodo1);
+    String(s.tipologiaOfferta || "VARIABILE") === "FISSO";
 
   const fixedModeGasOffers = visibleGasOffers.filter(
     (offer) => isSicuraOffer(offer.nome) === gasFixedMode
@@ -4463,8 +4552,6 @@ function Gas({
       : fixedModeGasOffers;
 
   useEffect(() => {
-    if (!s.periodo1) return;
-
     const currentOffer = fixedModeGasOffers.find(
       (offer) => offer.nome === s.offerta
     );
@@ -4500,64 +4587,54 @@ function Gas({
     }));
   }, [
     gasOffers,
-    s.periodo1,
     s.offerta,
     s.uso,
+    s.tipologiaOfferta,
     gasFixedMode,
   ]);
 
   useEffect(() => {
-    const validMonthOptions = [...punPsvRows]
-      .filter((row) => {
-        if (
-          row.mese === "FISSO DOMESTICO" ||
-          row.mese === "FISSO BUSINESS"
-        ) {
-          return false;
-        }
-  
-        return (
-          Number(row.mono || 0) !== 0 ||
-          Number(row.f1 || 0) !== 0 ||
-          Number(row.f2 || 0) !== 0 ||
-          Number(row.f3 || 0) !== 0 ||
+    const isFixed =
+      String(s.tipologiaOfferta || "VARIABILE") === "FISSO";
+
+    const variableRows = [...punPsvRows]
+      .filter(
+        (row) =>
+          !isFixedCompetenceMonth(row.mese) &&
           Number(row.psv || 0) !== 0
-        );
-      })
-      .sort((a, b) => {
-        const mesi = [
-          "GENNAIO",
-          "FEBBRAIO",
-          "MARZO",
-          "APRILE",
-          "MAGGIO",
-          "GIUGNO",
-          "LUGLIO",
-          "AGOSTO",
-          "SETTEMBRE",
-          "OTTOBRE",
-          "NOVEMBRE",
-          "DICEMBRE",
-        ];
-  
-        const score = (label: string) => {
-          const parts = String(label).trim().split(" ");
-          const mese = parts[0]?.toUpperCase() || "";
-          const anno = parseInt(parts[1] || "0", 10);
-          const meseIndex = mesi.indexOf(mese);
-          return anno * 100 + meseIndex;
-        };
-  
-        return score(b.mese) - score(a.mese);
-      });
-  
-    if (validMonthOptions.length > 0 && !s.periodo1) {
+      )
+      .sort(
+        (a, b) =>
+          getMonthYearSortValue(b.mese) -
+          getMonthYearSortValue(a.mese)
+      );
+
+    const fixedLabels = [
+      s.uso === "DOMESTICO"
+        ? "FISSO DOMESTICO"
+        : "FISSO BUSINESS",
+      "FISSO AD HOC",
+    ];
+
+    const validMonthOptions = isFixed
+      ? fixedLabels
+      : variableRows.map((row) => row.mese);
+
+    if (!validMonthOptions.includes(s.periodo1)) {
       setS((prev) => ({
         ...prev,
-        periodo1: validMonthOptions[0].mese,
+        periodo1: validMonthOptions[0] || "",
+        periodo2: "",
+        periodo3: "",
+        periodo4: "",
       }));
     }
-  }, [punPsvRows, s.periodo1]);
+  }, [
+    punPsvRows,
+    s.periodo1,
+    s.uso,
+    s.tipologiaOfferta,
+  ]);
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [openSections, setOpenSections] = useState({
@@ -4705,18 +4782,23 @@ function Gas({
     r.spreadEff,
   ]);
 
-  const gasMonthOptions = mesiOrdinati
-  .filter((m) => {
-    if (m.mese === "FISSO DOMESTICO" || m.mese === "FISSO BUSINESS" || m.mese === "FISSO AD HOC") return true;
-    return m.psv && m.psv !== 0;
-  })
-  .map((m) => m.mese);
+  const gasMonthOptions = gasFixedMode
+    ? [
+        s.uso === "DOMESTICO"
+          ? "FISSO DOMESTICO"
+          : "FISSO BUSINESS",
+        "FISSO AD HOC",
+      ]
+    : mesiOrdinati
+        .filter(
+          (m) =>
+            !isFixedCompetenceMonth(m.mese) &&
+            Boolean(m.psv && m.psv !== 0)
+        )
+        .map((m) => m.mese);
 
   const gasSecondaryMonthOptions =
-    gasMonthOptions.filter(
-      (month) =>
-        isFixedCompetenceMonth(month) === gasFixedMode
-    );
+    gasMonthOptions;
 
   const set = (k: string, v: string) => {
     setLastGasInputAt(Date.now());
@@ -4753,6 +4835,28 @@ function Gas({
 
       return newState;
     });
+  };
+
+  const handleGasOfferTypeChange = (tipologia: string) => {
+    setGasCompatibilityDriver("uso");
+    setLastGasInputAt(Date.now());
+
+    const fixed = tipologia === "FISSO";
+    const candidateOffers = visibleGasOffers.filter(
+      (offer) =>
+        isSicuraOffer(offer.nome) === fixed &&
+        gasOfferAllowsUse(offer, s.uso)
+    );
+
+    setS((prev) => ({
+      ...prev,
+      tipologiaOfferta: tipologia,
+      offerta: candidateOffers[0]?.nome || "",
+      periodo1: "",
+      periodo2: "",
+      periodo3: "",
+      periodo4: "",
+    }));
   };
 
   const handleGasUseChange = (uso: string) => {
@@ -5164,6 +5268,10 @@ function Gas({
                 s.uso,
                 handleGasUseChange,
                 compatibleGasUseOptions
+              )}
+              {offerTypeField(
+                s.tipologiaOfferta || "VARIABILE",
+                handleGasOfferTypeChange
               )}
               {field("IVA %", s.iva, (v) => set("iva", v), "number")}
               {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), gasBilling)}
