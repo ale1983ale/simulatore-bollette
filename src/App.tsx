@@ -9832,7 +9832,7 @@ const latestPunPsvMonthLabel = latestPunPsvRow
 
 const latestPun =
 latestPunPsvRow
- ? Number(latestPunPsvRow.mono || 0).toFixed(6)
+ ? Number(latestPunPsvRow.mono || 0).toFixed(3)
  : "-";
 
 const latestPsv =
