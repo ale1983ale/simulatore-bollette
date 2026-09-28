@@ -12545,20 +12545,45 @@ if (!agentSession && !adminSession) {
             <tr
               key={row.mese}
               style={{
-                background: index % 2 === 0 ? "#fffaf5" : "#ffffff",
-                boxShadow: index === 0 ? "inset 0 0 0 2px #f97316" : "none",
+                background:
+                  index === 0
+                    ? "#fff3e8"
+                    : index % 2 === 0
+                    ? "#fffaf5"
+                    : "#ffffff",
               }}
             >
-              <td style={{ padding: "7px 9px", fontWeight: index === 0 ? 900 : 700 }}>{row.mese}</td>
+              <td
+                style={{
+                  padding: "7px 9px",
+                  fontWeight: index === 0 ? 900 : 700,
+                  borderTop: index === 0 ? "2px solid #fb923c" : undefined,
+                  borderBottom: index === 0 ? "2px solid #fb923c" : undefined,
+                  borderLeft: index === 0 ? "2px solid #fb923c" : undefined,
+                }}
+              >
+                {row.mese}
+              </td>
               {[row.mono,row.f1,row.f2,row.f3].map((value,valueIndex) => (
                 <td
                   key={valueIndex}
                   style={{
                     padding: "7px 9px",
                     textAlign: "right",
-                    color: valueIndex === 0 ? "#ea580c" : "#334155",
+                    color:
+                      valueIndex === 0
+                        ? index === 0
+                          ? "#c2410c"
+                          : "#ea580c"
+                        : "#334155",
                     fontWeight: valueIndex === 0 ? 900 : 650,
                     fontVariantNumeric: "tabular-nums",
+                    borderTop: index === 0 ? "2px solid #fb923c" : undefined,
+                    borderBottom: index === 0 ? "2px solid #fb923c" : undefined,
+                    borderRight:
+                      index === 0 && valueIndex === 3
+                        ? "2px solid #fb923c"
+                        : undefined,
                   }}
                 >
                   {Number(value || 0).toFixed(6)}
