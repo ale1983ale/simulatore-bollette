@@ -10837,7 +10837,7 @@ const renderAdminContent = () => {
                   ...fixedBandBase,
                   borderLeft: isFixed
                     ? "3px solid #dc2626"
-                    : tdStyle.borderLeft,
+                    : undefined,
                 }}
               >
                 {row.mese}
@@ -10938,7 +10938,7 @@ const renderAdminContent = () => {
                   background: "#f0f9ff",
                   borderRight: isFixed
                     ? "3px solid #dc2626"
-                    : tdStyle.borderRight,
+                    : undefined,
                 }}
               >
                 <input
