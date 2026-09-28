@@ -1274,6 +1274,8 @@ export default function Recruiting({
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
   const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
     useState(false);
+  const regionFilterMenuRef = useRef<HTMLDetailsElement>(null);
+  const excludeFilterMenuRef = useRef<HTMLDetailsElement>(null);
   const [candidateSortMode, setCandidateSortMode] =
     useState<CandidateSortMode>(() => {
       try {
@@ -1309,6 +1311,26 @@ export default function Recruiting({
   const selectedCandidateIdRef = useRef<string | null>(
     selectedCandidateId
   );
+
+  useEffect(() => {
+    const closeOpenFilterMenus = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+
+      [regionFilterMenuRef.current, excludeFilterMenuRef.current].forEach(
+        (menu) => {
+          if (menu?.open && !menu.contains(target)) {
+            menu.removeAttribute("open");
+          }
+        }
+      );
+    };
+
+    document.addEventListener("pointerdown", closeOpenFilterMenus);
+    return () =>
+      document.removeEventListener("pointerdown", closeOpenFilterMenus);
+  }, []);
+
   const [contactEditMode, setContactEditMode] = useState(false);
   const [deleteCandidatePromptOpen, setDeleteCandidatePromptOpen] =
     useState(false);
@@ -6306,6 +6328,7 @@ export default function Recruiting({
               <div>
                 <label style={labelStyle}>Regione · MULTISELEZIONE</label>
                 <details
+                  ref={regionFilterMenuRef}
                   style={{
                     position: "relative",
                     border: "1px solid #cbd5e1",
@@ -6908,6 +6931,7 @@ export default function Recruiting({
                   >
                     <span style={{ paddingTop: 9 }}>ESCLUDI</span>
                     <details
+                      ref={excludeFilterMenuRef}
                       style={{
                         position: "relative",
                         width: "100%",
