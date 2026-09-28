@@ -11825,8 +11825,8 @@ if (!agentSession && !adminSession) {
           boxShadow:
             "0 10px 28px rgba(249,115,22,.08), 0 0 0 2px rgba(251,146,60,.05)",
           width: "100%",
-          maxWidth: punPsvView === "both" ? 680 : 900,
-          justifySelf: "center",
+          maxWidth: "none",
+          justifySelf: "stretch",
         }}
       >
         <div
@@ -11985,8 +11985,8 @@ if (!agentSession && !adminSession) {
           boxShadow:
             "0 10px 28px rgba(14,165,233,.08), 0 0 0 2px rgba(56,189,248,.05)",
           width: "100%",
-          maxWidth: punPsvView === "both" ? 520 : 560,
-          justifySelf: "center",
+          maxWidth: "none",
+          justifySelf: "stretch",
         }}
       >
         <div
@@ -12136,6 +12136,7 @@ if (!agentSession && !adminSession) {
 
 {expandedMarketChart && (
   <div
+    onClick={() => setExpandedMarketChart(null)}
     style={{
       position: "fixed",
       inset: 0,
@@ -12145,6 +12146,7 @@ if (!agentSession && !adminSession) {
     }}
   >
     <div
+      onClick={(event) => event.stopPropagation()}
       style={{
         position: "absolute",
         left: "50%",
@@ -12487,8 +12489,8 @@ if (!agentSession && !adminSession) {
         background: "linear-gradient(180deg,#fff7ed 0%,#ffffff 34%)",
         boxShadow: "0 7px 24px rgba(249,115,22,.08)",
         width: "100%",
-        maxWidth: 640,
-        justifySelf: "center",
+        maxWidth: "none",
+        justifySelf: "stretch",
       }}
     >
       <div
@@ -12576,8 +12578,8 @@ if (!agentSession && !adminSession) {
         background: "linear-gradient(180deg,#f0f9ff 0%,#ffffff 34%)",
         boxShadow: "0 7px 24px rgba(14,165,233,.08)",
         width: "100%",
-        maxWidth: 520,
-        justifySelf: "center",
+        maxWidth: "none",
+        justifySelf: "stretch",
       }}
     >
       <div
