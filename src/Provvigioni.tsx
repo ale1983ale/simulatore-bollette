@@ -143,8 +143,10 @@ const productionLights = [
 
 export default function Provvigioni({
   prefill,
+  onPrefillConsumed,
 }: {
   prefill?: ProvvigioniPrefill | null;
+  onPrefillConsumed?: () => void;
 }) {
   const [commodity, setCommodity] = useState<CommodityType>("Energia");
   const [annualConsumption, setAnnualConsumption] = useState<number | string>(0);
@@ -277,7 +279,8 @@ export default function Provvigioni({
     );
     setManualTierSelection(null);
     setSelectedTableRow(null);
-  }, [prefill]);
+    onPrefillConsumed?.();
+  }, [prefill, onPrefillConsumed]);
 
   const toggleTableRow = (table: string, row: string) => {
     setSelectedTableRow((current) => current?.table === table && current.row === row ? null : { table, row });
