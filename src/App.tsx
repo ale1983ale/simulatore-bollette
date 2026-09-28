@@ -4550,7 +4550,9 @@ Base suggerito
                 onOpenProvvigioni({
                   commodity: "Energia",
                   annualConsumption: consumoAnnuoEnergia,
-                  offer: getProvvigioniOfferType(s.offerta),
+                  offer:
+                    selectedEnergyOffer?.provvigioneTipo ||
+                    getProvvigioniOfferType(s.offerta),
                   bonusFissoLuce:
                     String(s.tipologiaOfferta || "").toUpperCase() === "FISSO" &&
                     isDomesticEnergyType(s.tipo),
@@ -5834,7 +5836,9 @@ border: "1px solid #bfd8f6",
                   onOpenProvvigioni({
                     commodity: "Gas",
                     annualConsumption: consumoAnnuoGas,
-                    offer: getProvvigioniOfferType(s.offerta),
+                    offer:
+                      selectedGasOffer?.provvigioneTipo ||
+                      getProvvigioniOfferType(s.offerta),
                     bonusFissoLuce: false,
                   })
                 }
