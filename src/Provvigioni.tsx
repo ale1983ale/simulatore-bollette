@@ -280,11 +280,30 @@ export default function Provvigioni() {
     const bonusGettone = bonusFissoLuceCard ? Math.max(0, 100 - gettone) : 0;
     const portfolioTotal = includePortfolioBonus ? portfolioPerSemester * Math.floor(months / 6) : 0;
 
+    const initialGettone = gettone + bonusGettone;
+    const thirteenthMonth = months >= 13 ? gettone * 0.25 : 0;
+    const totalMatured =
+      initialGettone +
+      premioRid +
+      ricorrente * months +
+      maintenance +
+      thirteenthMonth +
+      portfolioTotal;
+    const monthlyNetInitial =
+      months > 1
+        ? (
+            totalMatured -
+            gettone -
+            bonusGettone -
+            premioRid
+          ) / months
+        : 0;
+
     return {
       months,
       gettone,
       bonusGettone,
-      initialGettone: gettone + bonusGettone,
+      initialGettone,
       premioRid,
       ricorrente,
       monthlyConsumption,
@@ -292,8 +311,10 @@ export default function Provvigioni() {
       maintenance,
       portfolioPerSemester,
       semesters: Math.floor(months / 6),
-      thirteenthMonth: months >= 13 ? gettone * 0.25 : 0,
+      thirteenthMonth,
       portfolioTotal,
+      totalMatured,
+      monthlyNetInitial,
     };
   }, [commodity, offer, result, safeConsumption, longMonths, bonusFissoLuceCard, includePortfolioBonus]);
 
@@ -516,10 +537,39 @@ export default function Provvigioni() {
           background: ${commodity === "Energia" ? "#f97316" : "#2563eb"};
           color: white;
         }
+        .provv-long-total__row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+        }
+        .provv-long-total__main {
+          min-width: 0;
+        }
         .provv-long-total strong {
           display: block;
           margin-top: 5px;
           font-size: clamp(1.8rem, 4vw, 3rem);
+        }
+        .provv-long-total__monthly {
+          flex: 0 0 auto;
+          min-width: 240px;
+          padding-left: 24px;
+          border-left: 1px solid rgba(255,255,255,0.38);
+          text-align: right;
+        }
+        .provv-long-total__monthly-value {
+          margin-top: 5px;
+          font-size: clamp(1.55rem, 3vw, 2.35rem);
+          font-weight: 900;
+          white-space: nowrap;
+        }
+        .provv-long-total__monthly-detail {
+          margin-top: 5px;
+          max-width: 360px;
+          color: rgba(255,255,255,0.86);
+          font-size: 11px;
+          line-height: 1.4;
         }
         .provv-col-standard {
           background: #ffedd5 !important;
@@ -684,6 +734,22 @@ export default function Provvigioni() {
           }
         }
         @media (max-width: 640px) {
+          .provv-long-total__row {
+            align-items: stretch;
+            flex-direction: column;
+            gap: 14px;
+          }
+          .provv-long-total__monthly {
+            min-width: 0;
+            padding-top: 14px;
+            padding-left: 0;
+            border-top: 1px solid rgba(255,255,255,0.38);
+            border-left: 0;
+            text-align: left;
+          }
+          .provv-long-total__monthly-detail {
+            max-width: none;
+          }
           .provv-panel,
           .provv-section {
             padding: 14px;
@@ -889,17 +955,28 @@ export default function Provvigioni() {
               </div>
 
               <div className="provv-long-total">
-                <div className="provv-card__label" style={{ color: "rgba(255,255,255,0.82)" }}>TOTALE MATURATO NEL PERIODO</div>
-                <strong>{formatMoney(
-                  longSimulation.initialGettone +
-                  longSimulation.premioRid +
-                  longSimulation.ricorrente * longSimulation.months +
-                  longSimulation.maintenance +
-                  longSimulation.thirteenthMonth +
-                  longSimulation.portfolioTotal
-                )}</strong>
-                <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5 }}>
-                  Gettone originario{bonusFissoLuceCard ? " + differenza bonus prezzo fisso" : ""} + Premio RID + ricorrente + mantenimento + bonus 13° mese sul gettone originario{includePortfolioBonus ? " + premio semestrale" : ""}
+                <div className="provv-long-total__row">
+                  <div className="provv-long-total__main">
+                    <div className="provv-card__label" style={{ color: "rgba(255,255,255,0.82)" }}>TOTALE MATURATO NEL PERIODO</div>
+                    <strong>{formatMoney(longSimulation.totalMatured)}</strong>
+                    <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5 }}>
+                      Gettone originario{bonusFissoLuceCard ? " + differenza bonus prezzo fisso" : ""} + Premio RID + ricorrente + mantenimento + bonus 13° mese sul gettone originario{includePortfolioBonus ? " + premio semestrale" : ""}
+                    </div>
+                  </div>
+
+                  {longSimulation.months > 1 && (
+                    <div className="provv-long-total__monthly">
+                      <div className="provv-card__label" style={{ color: "rgba(255,255,255,0.82)" }}>
+                        MEDIA MENSILE AL NETTO DELL'INIZIALE
+                      </div>
+                      <div className="provv-long-total__monthly-value">
+                        {formatMoney(longSimulation.monthlyNetInitial)} / mese
+                      </div>
+                      <div className="provv-long-total__monthly-detail">
+                        (Totale − gettone iniziale{bonusFissoLuceCard ? " − bonus prezzo fisso" : ""} − Premio RID) / {longSimulation.months} mesi
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
