@@ -6495,7 +6495,10 @@ function Listini({
       <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
         <h2 style={{ marginTop: 0 }}>Offerte Energia</h2>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table
+    className="punpsv-admin-table"
+    style={{ width: "100%", borderCollapse: "collapse" }}
+  >
             <thead>
               <tr>
                 {["Ordina", "Visibile", "Nome offerta", "Tipologie CTE", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
@@ -10763,9 +10766,33 @@ const renderAdminContent = () => {
         >
           F0
         </th>
-        <th style={thStyle}>F1</th>
-        <th style={thStyle}>F2</th>
-        <th style={thStyle}>F3</th>
+        <th
+          style={{
+            ...thStyle,
+            background: "#f97316",
+            color: "#ffffff",
+          }}
+        >
+          F1
+        </th>
+        <th
+          style={{
+            ...thStyle,
+            background: "#f97316",
+            color: "#ffffff",
+          }}
+        >
+          F2
+        </th>
+        <th
+          style={{
+            ...thStyle,
+            background: "#f97316",
+            color: "#ffffff",
+          }}
+        >
+          F3
+        </th>
         <th
           style={{
             ...thStyle,
@@ -10799,31 +10826,43 @@ const renderAdminContent = () => {
                 }}
               />
             </td>
-            <td style={tdStyle}>
+            <td style={{ ...tdStyle, background: "#ffedd5" }}>
               <input
                 type="number"
                 step="0.000001"
                 value={row.f1}
                 onChange={(e) => updatePunPsvValue(row.mese, "f1", e.target.value)}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  background: "#ffedd5",
+                  borderColor: "#fb923c",
+                }}
               />
             </td>
-            <td style={tdStyle}>
+            <td style={{ ...tdStyle, background: "#ffedd5" }}>
               <input
                 type="number"
                 step="0.000001"
                 value={row.f2}
                 onChange={(e) => updatePunPsvValue(row.mese, "f2", e.target.value)}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  background: "#ffedd5",
+                  borderColor: "#fb923c",
+                }}
               />
             </td>
-            <td style={tdStyle}>
+            <td style={{ ...tdStyle, background: "#ffedd5" }}>
               <input
                 type="number"
                 step="0.000001"
                 value={row.f3}
                 onChange={(e) => updatePunPsvValue(row.mese, "f3", e.target.value)}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  background: "#ffedd5",
+                  borderColor: "#fb923c",
+                }}
               />
             </td>
             <td style={{ ...tdStyle, background: "#f0f9ff" }}>
