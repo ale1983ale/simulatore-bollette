@@ -518,7 +518,7 @@ const isDedicatedOffer = (offer: string) =>
 function getProvvigioniOfferType(offer: string): "STANDARD" | "UNICA" | "SPECIAL" {
   const normalized = normalizeOfferName(offer);
 
-  if (normalized.includes("CONDOMINI")) return "STANDARD";
+  if (normalized.includes("CONDOMIN")) return "STANDARD";
   if (isDedicatedOffer(normalized)) return "SPECIAL";
   if (normalized.includes("SPECIAL")) return "SPECIAL";
   if (normalized.includes("UNICA")) return "UNICA";
