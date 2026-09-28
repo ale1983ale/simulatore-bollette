@@ -127,6 +127,7 @@ type Candidate = {
   phone: string;
   email: string;
   companyName: string;
+  referrer: string;
   createdAt: string;
   updatedAt: string;
   status: CandidateStatus;
@@ -883,6 +884,7 @@ function candidateFromRow(row: any): Candidate {
     phone: String(row.phone || ""),
     email: String(row.email || ""),
     companyName: String(row.company_name || ""),
+    referrer: String(row.referrer || ""),
     createdAt: String(row.created_at || ""),
     updatedAt: String(row.updated_at || row.created_at || ""),
     status: (String(row.contact_status || "DA_CHIAMARE") as CandidateStatus),
@@ -1273,6 +1275,7 @@ export default function Recruiting({
   const [sectorFilter, setSectorFilter] = useState<"" | "SI" | "NO">("");
   const [sectorOtherFilter, setSectorOtherFilter] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
+  const [referrerFilter, setReferrerFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | CandidateStatus>("");
   const [excludedStatusFilters, setExcludedStatusFilters] = useState<CandidateStatus[]>([]);
   const [forwardedToFilter, setForwardedToFilter] = useState("");
@@ -1367,6 +1370,7 @@ export default function Recruiting({
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newReferrer, setNewReferrer] = useState("");
 
   const [editName, setEditName] = useState("");
   const [editZone, setEditZone] = useState("");
@@ -1378,6 +1382,7 @@ export default function Recruiting({
   const [editCompanyName, setEditCompanyName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editReferrer, setEditReferrer] = useState("");
 
   const [noteDate, setNoteDate] = useState(localDateKey());
   const [noteText, setNoteText] = useState("");
@@ -1607,7 +1612,7 @@ export default function Recruiting({
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new")
+        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,referrer,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -2331,6 +2336,7 @@ export default function Recruiting({
     setEditCompanyName("");
     setEditPhone(selectedCandidate.phone);
     setEditEmail(selectedCandidate.email);
+    setEditReferrer(selectedCandidate.referrer || "");
 
     // Per una nuova nota il flag parte selezionato: l'utente può sempre
     // toglierlo manualmente se la nota non deriva da una chiamata propria.
@@ -2377,6 +2383,19 @@ export default function Recruiting({
           allCandidates
             .filter((candidate) => candidate.sectorEnergy)
             .map((candidate) => candidate.companyName.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it")),
+    [allCandidates]
+  );
+
+  const existingReferrers = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allCandidates
+            .filter((candidate) => candidate.contactScope === "external")
+            .map((candidate) => candidate.referrer.trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b, "it")),
@@ -2535,6 +2554,7 @@ export default function Recruiting({
     const excludedStatuses = new Set(excludedStatusFilters);
     const sectorOtherNeedle = normalizeFilterValue(sectorOtherFilter);
     const companyNeedle = normalizeFilterValue(companyFilter);
+    const referrerNeedle = normalizeFilterValue(referrerFilter);
     const forwardedNeedle = normalizeFilterValue(forwardedToFilter);
 
     const candidateGeneralChronologyKey = (candidate: Candidate) => {
@@ -2679,6 +2699,14 @@ export default function Recruiting({
         return false;
       }
 
+      if (
+        contactScope === "external" &&
+        referrerNeedle &&
+        normalizeFilterValue(candidate.referrer) !== referrerNeedle
+      ) {
+        return false;
+      }
+
       if (statusFilter && candidate.status !== statusFilter) return false;
       if (excludedStatuses.has(candidate.status)) return false;
 
@@ -2774,6 +2802,8 @@ export default function Recruiting({
     sectorFilter,
     sectorOtherFilter,
     companyFilter,
+    referrerFilter,
+    contactScope,
     statusFilter,
     excludedStatusFilters,
     forwardedToFilter,
@@ -2788,6 +2818,7 @@ export default function Recruiting({
       sectorFilter ||
       sectorOtherFilter ||
       companyFilter ||
+      (contactScope === "external" && referrerFilter) ||
       statusFilter ||
       excludedStatusFilters.length > 0 ||
       forwardedToFilter ||
@@ -2801,6 +2832,7 @@ export default function Recruiting({
     setSectorFilter("");
     setSectorOtherFilter("");
     setCompanyFilter("");
+    setReferrerFilter("");
     setStatusFilter("");
     setExcludedStatusFilters([]);
     setForwardedToFilter("");
@@ -3773,6 +3805,10 @@ export default function Recruiting({
           sector_energy: newSectorEnergy,
           sector_other: resolvedNewSector,
           company_name: resolvedNewCompany,
+          referrer:
+            contactScope === "external"
+              ? newReferrer.trim()
+              : "",
           phone: newPhone.trim(),
           email: newEmail.trim(),
           contact_status: "DA_CHIAMARE",
@@ -3796,6 +3832,7 @@ export default function Recruiting({
       setNewCompanyName("");
       setNewPhone("");
       setNewEmail("");
+      setNewReferrer("");
       setDuplicateCandidates([]);
       setShowNewContact(false);
       await loadAll(ctx);
@@ -3833,6 +3870,10 @@ export default function Recruiting({
     const nextSectorOther = editSectorEnergy ? "" : editSectorOther.trim();
     const nextPhone = editPhone.trim();
     const nextEmail = editEmail.trim();
+    const nextReferrer =
+      selectedCandidate.contactScope === "external"
+        ? editReferrer.trim()
+        : "";
 
     const hasMeaningfulChanges =
       nextName !== selectedCandidate.fullName ||
@@ -3846,7 +3887,8 @@ export default function Recruiting({
       nextSectorOther !== selectedCandidate.sectorOther ||
       resolvedEditCompany !== selectedCandidate.companyName ||
       nextPhone !== selectedCandidate.phone ||
-      nextEmail !== selectedCandidate.email;
+      nextEmail !== selectedCandidate.email ||
+      nextReferrer !== selectedCandidate.referrer;
 
     setBusy(true);
     try {
@@ -3902,6 +3944,7 @@ export default function Recruiting({
           company_name: resolvedEditCompany,
           phone: nextPhone,
           email: nextEmail,
+          referrer: nextReferrer,
           waiting_room_new:
             selectedCandidate.waitingRoomNew && hasMeaningfulChanges
               ? false
@@ -6504,6 +6547,33 @@ export default function Recruiting({
                       </div>
                     </div>
                   )}
+                  {contactScope === "external" && (
+                    <div>
+                      <label style={labelStyle}>Segnalatore</label>
+                      <input
+                        list="recruiting-referrer-options"
+                        value={newReferrer}
+                        onChange={(e) => setNewReferrer(e.target.value)}
+                        placeholder="Scrivi o seleziona un segnalatore"
+                        style={inputStyle}
+                      />
+                      <datalist id="recruiting-referrer-options">
+                        {existingReferrers.map((referrer) => (
+                          <option key={referrer} value={referrer} />
+                        ))}
+                      </datalist>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 11,
+                        }}
+                      >
+                        Puoi scegliere un segnalatore già usato oppure scriverne uno nuovo.
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label style={labelStyle}>Numero di telefono</label>
                     <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} style={inputStyle} />
@@ -6858,6 +6928,26 @@ export default function Recruiting({
                   )}
                 </div>
               </div>
+
+              {contactScope === "external" && (
+                <div>
+                  <label style={labelStyle}>Segnalatore</label>
+                  <select
+                    value={referrerFilter}
+                    onChange={(e) =>
+                      setReferrerFilter(e.target.value)
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="">Tutti i segnalatori</option>
+                    {existingReferrers.map((referrer) => (
+                      <option key={referrer} value={referrer}>
+                        {referrer}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label style={labelStyle}>Settore energia</label>
@@ -8014,6 +8104,45 @@ export default function Recruiting({
                       <h3 style={{ margin: 0 }}>Scheda contatto</h3>
 
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          disabled={!selectedNotes.length}
+                          title={
+                            selectedNotes.length
+                              ? "Vai alla nota più recente"
+                              : "Nessuna nota presente"
+                          }
+                          aria-label="Vai alla nota più recente"
+                          onClick={() =>
+                            document
+                              .getElementById("recruiting-latest-note")
+                              ?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "start",
+                              })
+                          }
+                          style={{
+                            ...buttonStyle,
+                            padding: "7px 10px",
+                            minWidth: 42,
+                            background: selectedNotes.length
+                              ? "#e0f2fe"
+                              : "#f1f5f9",
+                            color: selectedNotes.length
+                              ? "#0369a1"
+                              : "#94a3b8",
+                            border: "1px solid #bae6fd",
+                            fontSize: 18,
+                            lineHeight: 1,
+                            opacity: selectedNotes.length ? 1 : 0.65,
+                            cursor: selectedNotes.length
+                              ? "pointer"
+                              : "default",
+                          }}
+                        >
+                          👁
+                        </button>
+
                         {!contactEditMode ? (
                           <button
                             type="button"
@@ -8041,6 +8170,7 @@ export default function Recruiting({
                               setEditCompanyName("");
                               setEditPhone(selectedCandidate.phone);
                               setEditEmail(selectedCandidate.email);
+                              setEditReferrer(selectedCandidate.referrer || "");
                               setContactEditMode(false);
                             }}
                             style={{
@@ -8167,6 +8297,15 @@ export default function Recruiting({
                             <div>—</div>
                           )}
                         </div>
+
+                        {selectedCandidate.contactScope === "external" && (
+                          <div>
+                            <label style={labelStyle}>Segnalatore</label>
+                            <div style={{ fontWeight: 900 }}>
+                              {selectedCandidate.referrer || "—"}
+                            </div>
+                          </div>
+                        )}
 
                         <div>
                           <label style={labelStyle}>Chiamato da me</label>
@@ -8366,6 +8505,26 @@ export default function Recruiting({
                               <datalist id="recruiting-sector-options-edit">
                                 {existingOtherSectors.map((sector) => (
                                   <option key={sector} value={sector} />
+                                ))}
+                              </datalist>
+                            </div>
+                          )}
+
+                          {selectedCandidate.contactScope === "external" && (
+                            <div>
+                              <label style={labelStyle}>Segnalatore</label>
+                              <input
+                                list="recruiting-referrer-options-edit"
+                                value={editReferrer}
+                                onChange={(e) =>
+                                  setEditReferrer(e.target.value)
+                                }
+                                placeholder="Scrivi o seleziona un segnalatore"
+                                style={inputStyle}
+                              />
+                              <datalist id="recruiting-referrer-options-edit">
+                                {existingReferrers.map((referrer) => (
+                                  <option key={referrer} value={referrer} />
                                 ))}
                               </datalist>
                             </div>
@@ -8618,11 +8777,16 @@ export default function Recruiting({
                       </div>
 
                       <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
-                        {selectedNotes.map((note) => {
+                        {selectedNotes.map((note, noteIndex) => {
                           const isEditing = editingNoteId === note.id;
 
                           return (
                             <div
+                              id={
+                                noteIndex === 0
+                                  ? "recruiting-latest-note"
+                                  : undefined
+                              }
                               key={note.id}
                               style={{
                                 border: "1px solid #e2e8f0",
@@ -8813,6 +8977,43 @@ export default function Recruiting({
                           );
                         })}
                         {!selectedNotes.length && <div style={{ color: "#64748b" }}>Nessuna nota inserita.</div>}
+
+                        {selectedNotes.length > 0 && (
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "center",
+                              paddingTop: 4,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              title="Torna all'inizio della Scheda contatto"
+                              aria-label="Torna all'inizio della Scheda contatto"
+                              onClick={() =>
+                                document
+                                  .getElementById("recruiting-contact-detail")
+                                  ?.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "start",
+                                  })
+                              }
+                              style={{
+                                ...buttonStyle,
+                                width: 42,
+                                height: 42,
+                                borderRadius: 999,
+                                padding: 0,
+                                background: "#e2e8f0",
+                                color: "#0f172a",
+                                fontSize: 22,
+                                lineHeight: 1,
+                              }}
+                            >
+                              ↑
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
