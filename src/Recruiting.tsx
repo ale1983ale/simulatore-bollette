@@ -4718,7 +4718,7 @@ export default function Recruiting({
     setCalendarContactPreviewId(candidateId);
   };
 
-  const openContactForEditing = (candidateId: string) => {
+  const openFullContactDetails = (candidateId: string) => {
     const candidate = allCandidates.find(
       (item) => item.id === candidateId
     );
@@ -5644,7 +5644,7 @@ export default function Recruiting({
       sheetButton.onclick = () => {
         map.closePopup();
         if (linkedCandidate) {
-          openContactForEditing(linkedCandidate.id);
+          openFullContactDetails(linkedCandidate.id);
         } else {
           setMessage(
             `Non trovo una scheda contatto collegata a ${agent.firstName} ${agent.lastName}.`
@@ -5788,7 +5788,7 @@ export default function Recruiting({
         );
         candidateSheetButton.onclick = () => {
           map.closePopup();
-          openContactForEditing(candidate.id);
+          openFullContactDetails(candidate.id);
         };
         candidateActions.appendChild(candidateSheetButton);
 
@@ -5899,7 +5899,7 @@ export default function Recruiting({
       );
       focusedSheetButton.onclick = () => {
         map.closePopup();
-        openContactForEditing(focusedCandidateMap.candidateId);
+        openFullContactDetails(focusedCandidateMap.candidateId);
       };
       focusedActions.appendChild(focusedSheetButton);
 
@@ -11658,7 +11658,7 @@ export default function Recruiting({
                 <button
                   type="button"
                   onClick={() =>
-                    openContactForEditing(
+                    openFullContactDetails(
                       calendarContactPreview.id
                     )
                   }
@@ -11668,7 +11668,7 @@ export default function Recruiting({
                     color: "white",
                   }}
                 >
-                  MODIFICA
+                  SCHEDA COMPLETA
                 </button>
                 <button
                   type="button"
