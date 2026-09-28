@@ -11297,7 +11297,7 @@ if (!agentSession && !adminSession) {
             <div
   ref={punPsvRef}
   style={{
-    paddingBottom: "200px"
+    paddingBottom: "8px"
   }}
 >
               <div
@@ -11305,7 +11305,7 @@ if (!agentSession && !adminSession) {
                   display: "grid",
                   gridTemplateColumns: punPsvView === "both" ? "1fr 1fr" : "1fr",
                   gap: 20,
-                  marginBottom: 24,
+                  marginBottom: 10,
                 }}
               >
                 {(punPsvView === "both" || punPsvView === "pun") && (
