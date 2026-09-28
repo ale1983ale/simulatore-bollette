@@ -1185,11 +1185,16 @@ export default function Recruiting({
   contactScope = "internal",
   contactsOnly = false,
   hideNavigation = false,
+  onOpenContact,
 }: {
   initialSection?: RecruitingSection;
   contactScope?: RecruitingContactScope;
   contactsOnly?: boolean;
   hideNavigation?: boolean;
+  onOpenContact?: (
+    scope: RecruitingContactScope,
+    candidateId: string
+  ) => void;
 }) {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [section, setSection] = useState<RecruitingSection>(
@@ -4450,31 +4455,31 @@ export default function Recruiting({
     const candidate = allCandidates.find(
       (item) => item.id === candidateId
     );
+    const targetScope: RecruitingContactScope =
+      candidate?.contactScope === "external"
+        ? "external"
+        : "internal";
 
     setCalendarContactPreviewId(null);
     setEventModalId(null);
 
-    if (candidate?.contactScope === "external") {
-      try {
-        window.localStorage.setItem(
-          "recruiting_selected_candidate_external",
-          candidateId
-        );
-      } catch {
-        // La selezione viene comunque gestita appena la sezione si apre.
-      }
+    try {
+      window.localStorage.setItem(
+        `recruiting_selected_candidate_${targetScope}`,
+        candidateId
+      );
+    } catch {
+      // La selezione viene comunque gestita nello stato corrente.
+    }
 
+    if (onOpenContact) {
+      onOpenContact(targetScope, candidateId);
+      return;
+    }
+
+    if (targetScope === "external") {
       setSection("external_contacts");
     } else {
-      try {
-        window.localStorage.setItem(
-          "recruiting_selected_candidate_internal",
-          candidateId
-        );
-      } catch {
-        // La selezione resta comunque nello stato corrente.
-      }
-
       setSelectedCandidateId(candidateId);
       setSection("contacts");
     }
@@ -4486,7 +4491,7 @@ export default function Recruiting({
           behavior: "smooth",
           block: "center",
         });
-    }, candidate?.contactScope === "external" ? 220 : 100);
+    }, targetScope === "external" ? 220 : 100);
   };
 
   const candidateName = (candidateId: string | null) =>
