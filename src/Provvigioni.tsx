@@ -1,7 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type OfferType = "STANDARD" | "UNICA" | "SPECIAL";
 type CommodityType = "Energia" | "Gas";
+
+export type ProvvigioniPrefill = {
+  commodity: CommodityType;
+  annualConsumption: number;
+  offer: OfferType;
+  bonusFissoLuce?: boolean;
+  requestId?: number;
+};
 
 type CommissionTier = {
   label: string;
@@ -133,7 +141,11 @@ const productionLights = [
   { amount: 1500, text: "20 BUS con almeno 200.000 kWh/anno\noppure\n10 BUS con almeno 500.000 kWh/anno" },
 ];
 
-export default function Provvigioni() {
+export default function Provvigioni({
+  prefill,
+}: {
+  prefill?: ProvvigioniPrefill | null;
+}) {
   const [commodity, setCommodity] = useState<CommodityType>("Energia");
   const [annualConsumption, setAnnualConsumption] = useState<number | string>(0);
   const [offer, setOffer] = useState<OfferType>("STANDARD");
@@ -248,6 +260,24 @@ export default function Provvigioni() {
 
   const tableRows = commodity === "Energia" ? ENERGY_TIERS : GAS_TIERS;
   const [selectedTableRow, setSelectedTableRow] = useState<{ table: string; row: string } | null>(null);
+
+  useEffect(() => {
+    if (!prefill) return;
+
+    setCommodity(prefill.commodity);
+    setAnnualConsumption(
+      Number.isFinite(prefill.annualConsumption)
+        ? prefill.annualConsumption
+        : 0
+    );
+    setOffer(prefill.offer);
+    setBonusFissoLuce(
+      prefill.commodity === "Energia" &&
+        prefill.bonusFissoLuce === true
+    );
+    setManualTierSelection(null);
+    setSelectedTableRow(null);
+  }, [prefill]);
 
   const toggleTableRow = (table: string, row: string) => {
     setSelectedTableRow((current) => current?.table === table && current.row === row ? null : { table, row });
