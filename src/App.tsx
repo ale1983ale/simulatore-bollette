@@ -11637,203 +11637,313 @@ if (!agentSession && !adminSession) {
 </div>
 
 
-{/* TABELLA MESI */}
+{/* TABELLE MESI */}
 <div
- ref={punPsvTableRef}
- style={{
-   background:"#fff",
-   borderRadius:16,
-   padding:"0 20px 20px",
-   width:"100%",
-   maxWidth:"100%",
-   margin:"0 auto"
- }}
+  ref={punPsvTableRef}
+  style={{
+    width: "100%",
+    maxWidth: "100%",
+    margin: "0 auto",
+  }}
 >
-<div style={{ overflowX:"auto" }}>
-                <table
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns:
+        punPsvView === "both"
+          ? "minmax(0,1fr) minmax(0,1fr)"
+          : "minmax(0,1fr)",
+      gap: 20,
+      alignItems: "start",
+    }}
+  >
+    {(punPsvView === "both" || punPsvView === "pun") && (
+      <div
+        style={{
+          overflow: "hidden",
+          borderRadius: 16,
+          border: "1px solid rgba(249,115,22,.22)",
+          background:
+            "linear-gradient(180deg, rgba(255,247,237,.96) 0%, rgba(255,255,255,.98) 28%)",
+          boxShadow:
+            "0 10px 28px rgba(249,115,22,.08), 0 0 0 2px rgba(251,146,60,.05)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            padding: "14px 16px",
+            borderBottom: "1px solid rgba(249,115,22,.16)",
+            background:
+              "linear-gradient(90deg, rgba(249,115,22,.14), rgba(251,146,60,.04))",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                color: "#9a3412",
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: ".08em",
+                textTransform: "uppercase",
+              }}
+            >
+              ENERGIA
+            </div>
+            <div
+              style={{
+                marginTop: 2,
+                color: "#0f172a",
+                fontSize: 17,
+                fontWeight: 900,
+              }}
+            >
+              Valori PUN
+            </div>
+          </div>
+          <span
+            style={{
+              padding: "6px 9px",
+              borderRadius: 999,
+              background: "#ffedd5",
+              color: "#c2410c",
+              fontSize: 11,
+              fontWeight: 900,
+              boxShadow: "0 0 14px rgba(249,115,22,.12)",
+            }}
+          >
+            12 MESI
+          </span>
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+              background: "transparent",
+              minWidth: 560,
+            }}
+          >
+            <thead>
+              <tr>
+                {["Mese", "PUN F0", "F1", "F2", "F3"].map((label, index) => (
+                  <th
+                    key={label}
+                    style={{
+                      padding: "11px 12px",
+                      textAlign: index === 0 ? "left" : "right",
+                      color: index === 0 ? "#7c2d12" : "#c2410c",
+                      background:
+                        index === 0
+                          ? "rgba(249,115,22,.10)"
+                          : "rgba(251,146,60,.07)",
+                      borderBottom: "1px solid rgba(249,115,22,.16)",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tablePunPsvRows.slice(0, 12).map((row, index) => (
+                <tr
+                  key={row.mese}
                   style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    tableLayout: "fixed",
-                    background: "white",
+                    background:
+                      index % 2 === 0
+                        ? "rgba(255,255,255,.84)"
+                        : "rgba(255,247,237,.64)",
                   }}
                 >
-                  <thead>
-                    {punPsvView === "both" && (
-                      <tr style={{ background: "#fff7ed" }}>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: "14px 16px",
-                            width: "38%",
-                          }}
-                        >
-                          Mese
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "right",
-                            padding: "14px 16px",
-                            width: "20%",
-                            color: "#f59e0b",
-                          }}
-                        >
-                          PUN
-                        </th>
-                        <th
-                          style={{
-                            width: "18%",
-                            padding: 0,
-                          }}
-                        >
-                          <span style={{ visibility: "hidden" }}>spazio</span>
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "right",
-                            padding: "14px 16px",
-                            width: "28%",
-                            color: "#2563eb",
-                          }}
-                        >
-                          PSV
-                        </th>
-                      </tr>
-                    )}
-        
-                    {punPsvView === "pun" && (
-                      <tr style={{ background: "#fff7ed" }}>
-                        <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
-                        <th
-                          style={{
-                            textAlign: "right",
-                            padding: "14px 16px",
-                            color: "#f97316",
-                            fontWeight: 800,
-                          }}
-                        >
-                          PUN
-                        </th>
-                      </tr>
-                    )}
-        
-                    {punPsvView === "psv" && (
-                      <tr style={{ background: "#eff6ff" }}>
-                        <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
-                        <th
-                          style={{
-                            textAlign: "right",
-                            padding: "14px 16px",
-                            color: "#2563eb",
-                          }}
-                        >
-                          PSV
-                        </th>
-                      </tr>
-                    )}
-                  </thead>
-        
-                  <tbody>
-                  {tablePunPsvRows.slice(0,12).map((row,index)=>(
-                      <tr
-                        key={row.mese}
-                        style={{
-                          background:
-                            punPsvView === "pun"
-                              ? index % 2 === 0
-                                ? "#fffaf0"
-                                : "#fff7ed"
-                              : punPsvView === "psv"
-                              ? index % 2 === 0
-                                ? "#f8fbff"
-                                : "#eff6ff"
-                              : index % 2 === 0
-                              ? "white"
-                              : "#fcfdff",
-                        }}
-                      >
-                        <td
-                          style={{
-                            padding: "14px 16px",
-                            borderBottom: "1px solid #e2e8f0",
-                          }}
-                        >
-                          {row.mese}
-                        </td>
-        
-                        {punPsvView === "both" && (
-                          <>
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "14px 16px",
-                                borderBottom: "1px solid #e2e8f0",
-                                color: "#d97706",
-                                fontWeight: 600,
-                                width: "16%",
-                              }}
-                            >
-                              {Number(row.mono).toFixed(6)}
-                            </td>
-        
-                            <td
-                              style={{
-                                width: "18%",
-                                padding: 0,
-                                borderBottom: "1px solid #e2e8f0",
-                              }}
-                            >
-                              <span style={{ visibility: "hidden" }}>spazio</span>
-                            </td>
-        
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "14px 16px",
-                                borderBottom: "1px solid #e2e8f0",
-                                color: "#2563eb",
-                                fontWeight: 600,
-                                width: "28%",
-                              }}
-                            >
-                              {Number(row.psv).toFixed(6)}
-                            </td>
-                          </>
-                        )}
-        
-                        {punPsvView === "pun" && (
-                          <td
-                            style={{
-                              textAlign: "right",
-                              padding: "14px 16px",
-                              borderBottom: "1px solid #e2e8f0",
-                              color: "#f97316",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {Number(row.mono).toFixed(6)}
-                          </td>
-                        )}
-        
-                        {punPsvView === "psv" && (
-                          <td
-                            style={{
-                              textAlign: "right",
-                              padding: "14px 16px",
-                              borderBottom: "1px solid #e2e8f0",
-                              color: "#2563eb",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {Number(row.psv).toFixed(6)}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  <td
+                    style={{
+                      padding: "10px 12px",
+                      borderBottom: "1px solid rgba(226,232,240,.82)",
+                      color: "#334155",
+                      fontWeight: 750,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row.mese}
+                  </td>
+                  {[row.mono, row.f1, row.f2, row.f3].map((value, valueIndex) => (
+                    <td
+                      key={valueIndex}
+                      style={{
+                        padding: "10px 12px",
+                        textAlign: "right",
+                        borderBottom: "1px solid rgba(226,232,240,.82)",
+                        color: valueIndex === 0 ? "#ea580c" : "#475569",
+                        fontWeight: valueIndex === 0 ? 850 : 650,
+                        fontVariantNumeric: "tabular-nums",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {Number(value || 0).toFixed(6)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+
+    {(punPsvView === "both" || punPsvView === "psv") && (
+      <div
+        style={{
+          overflow: "hidden",
+          borderRadius: 16,
+          border: "1px solid rgba(14,165,233,.22)",
+          background:
+            "linear-gradient(180deg, rgba(240,249,255,.96) 0%, rgba(255,255,255,.98) 28%)",
+          boxShadow:
+            "0 10px 28px rgba(14,165,233,.08), 0 0 0 2px rgba(56,189,248,.05)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+            padding: "14px 16px",
+            borderBottom: "1px solid rgba(14,165,233,.16)",
+            background:
+              "linear-gradient(90deg, rgba(14,165,233,.14), rgba(103,232,249,.04))",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                color: "#0369a1",
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: ".08em",
+                textTransform: "uppercase",
+              }}
+            >
+              GAS
             </div>
+            <div
+              style={{
+                marginTop: 2,
+                color: "#0f172a",
+                fontSize: 17,
+                fontWeight: 900,
+              }}
+            >
+              Valori PSV
+            </div>
+          </div>
+          <span
+            style={{
+              padding: "6px 9px",
+              borderRadius: 999,
+              background: "#cffafe",
+              color: "#0369a1",
+              fontSize: 11,
+              fontWeight: 900,
+              boxShadow: "0 0 14px rgba(14,165,233,.12)",
+            }}
+          >
+            12 MESI
+          </span>
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+              background: "transparent",
+            }}
+          >
+            <thead>
+              <tr>
+                <th
+                  style={{
+                    padding: "11px 12px",
+                    textAlign: "left",
+                    color: "#075985",
+                    background: "rgba(14,165,233,.10)",
+                    borderBottom: "1px solid rgba(14,165,233,.16)",
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  Mese
+                </th>
+                <th
+                  style={{
+                    padding: "11px 12px",
+                    textAlign: "right",
+                    color: "#0284c7",
+                    background: "rgba(56,189,248,.07)",
+                    borderBottom: "1px solid rgba(14,165,233,.16)",
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  PSV
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {tablePunPsvRows.slice(0, 12).map((row, index) => (
+                <tr
+                  key={row.mese}
+                  style={{
+                    background:
+                      index % 2 === 0
+                        ? "rgba(255,255,255,.84)"
+                        : "rgba(240,249,255,.70)",
+                  }}
+                >
+                  <td
+                    style={{
+                      padding: "10px 12px",
+                      borderBottom: "1px solid rgba(226,232,240,.82)",
+                      color: "#334155",
+                      fontWeight: 750,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row.mese}
+                  </td>
+                  <td
+                    style={{
+                      padding: "10px 12px",
+                      textAlign: "right",
+                      borderBottom: "1px solid rgba(226,232,240,.82)",
+                      color: "#0284c7",
+                      fontWeight: 850,
+                      fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {Number(row.psv || 0).toFixed(6)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
           </div>
         ) : (
           renderAdminContent()
