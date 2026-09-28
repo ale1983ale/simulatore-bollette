@@ -11328,6 +11328,8 @@ if (!agentSession && !adminSession) {
       dispCpRows={dispCpRows}
       networkTariffRows={networkTariffRows}
       showAgentAssociation={Boolean(adminSession)}
+      canUseProvvigioni={canUseProvvigioni}
+      onOpenProvvigioni={openProvvigioniFromSimulation}
     />
   </>
 ) : tab === "gas" ? (
@@ -11343,6 +11345,8 @@ if (!agentSession && !adminSession) {
       gasOffers={gasOffers}
       gasAcciseSettings={gasAcciseSettings}
       showAgentAssociation={Boolean(adminSession)}
+      canUseProvvigioni={canUseProvvigioni}
+      onOpenProvvigioni={openProvvigioniFromSimulation}
     />
   </>
 ) : tab === "driveArchive" ? (
@@ -11365,7 +11369,7 @@ if (!agentSession && !adminSession) {
     />
     <ReportAgent agentSession={agentSession} />
   </>
-        ) : tab === "provvigioni" && isSuperAdmin ? (
+        ) : tab === "provvigioni" && canUseProvvigioni ? (
           <>
             <SectionHero
               title="PROVVIGIONI"
@@ -11373,7 +11377,7 @@ if (!agentSession && !adminSession) {
               icon="💰"
               variant="energy"
             />
-            <Provvigioni />
+            <Provvigioni prefill={provvigioniPrefill} />
           </>
         ) : tab === "ateco" ? (
           <>
