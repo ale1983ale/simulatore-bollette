@@ -10449,6 +10449,12 @@ useEffect(() => {
           .map((offer) => ({
             ...offer,
             visibile: offer.visibile !== false,
+            provvigioneTipo:
+              ["STANDARD", "UNICA", "SPECIAL"].includes(
+                String(offer.provvigioneTipo || "")
+              )
+                ? (offer.provvigioneTipo as ProvvigioniOfferType)
+                : getProvvigioniOfferType(offer.nome),
             allowedCustomerGroups:
               Array.isArray(offer.allowedCustomerGroups) &&
               offer.allowedCustomerGroups.some((group) =>
@@ -10481,6 +10487,12 @@ useEffect(() => {
           .map((offer) => ({
             ...offer,
             visibile: offer.visibile !== false,
+            provvigioneTipo:
+              ["STANDARD", "UNICA", "SPECIAL"].includes(
+                String(offer.provvigioneTipo || "")
+              )
+                ? (offer.provvigioneTipo as ProvvigioniOfferType)
+                : getProvvigioniOfferType(offer.nome),
             allowedCustomerGroups:
               Array.isArray(offer.allowedCustomerGroups) &&
               offer.allowedCustomerGroups.some((group) =>
