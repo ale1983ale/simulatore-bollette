@@ -292,7 +292,8 @@ async function logDelivery(
   pendingCount: number,
   status: string,
   error = "",
-  sentAt: string | null = null
+  sentAt: string | null = null,
+  pendingIds: string[] = []
 ) {
   const { error: logError } = await db
     .from("recruiting_hr_email_delivery_log")
@@ -302,6 +303,7 @@ async function logDelivery(
       status,
       error: error.slice(0, 1500),
       sent_at: sentAt,
+      pending_ids: pendingIds,
     });
 
   if (logError) {
@@ -309,10 +311,10 @@ async function logDelivery(
   }
 }
 
-async function getLastSuccessfulDeliveryAt(adminId: number) {
+async function getLastSuccessfulDelivery(adminId: number) {
   const { data, error } = await db
     .from("recruiting_hr_email_delivery_log")
-    .select("sent_at")
+    .select("sent_at,pending_ids")
     .eq("admin_id", adminId)
     .eq("status", "sent")
     .not("sent_at", "is", null)
@@ -324,7 +326,12 @@ async function getLastSuccessfulDeliveryAt(adminId: number) {
     throw error;
   }
 
-  return data?.sent_at ? String(data.sent_at) : "";
+  return {
+    sentAt: data?.sent_at ? String(data.sent_at) : "",
+    pendingIds: Array.isArray(data?.pending_ids)
+      ? data.pending_ids.map((value: unknown) => String(value))
+      : [],
+  };
 }
 
 async function notifyWaitingRoom(recipientEmail: string) {
@@ -380,10 +387,17 @@ async function notifyWaitingRoom(recipientEmail: string) {
       continue;
     }
 
-    let lastSuccessfulDeliveryAt = "";
+    const currentPendingIds = candidates
+      .map((candidate) => String(candidate?.id || ""))
+      .filter(Boolean);
+
+    let lastSuccessfulDelivery = {
+      sentAt: "",
+      pendingIds: [] as string[],
+    };
 
     try {
-      lastSuccessfulDeliveryAt = await getLastSuccessfulDeliveryAt(
+      lastSuccessfulDelivery = await getLastSuccessfulDelivery(
         Number(admin.id)
       );
     } catch (error: any) {
@@ -391,7 +405,9 @@ async function notifyWaitingRoom(recipientEmail: string) {
         Number(admin.id),
         pendingCount,
         "dedupe_query_error",
-        error?.message || String(error)
+        error?.message || String(error),
+        null,
+        currentPendingIds
       );
       results.push({
         admin_id: Number(admin.id),
@@ -401,15 +417,34 @@ async function notifyWaitingRoom(recipientEmail: string) {
       continue;
     }
 
-    if (lastSuccessfulDeliveryAt) {
-      const lastSentMs = new Date(lastSuccessfulDeliveryAt).getTime();
-      const hasNewPendingCandidate = candidates.some((candidate) => {
-        const receivedAtMs = candidate?.received_at
-          ? new Date(candidate.received_at).getTime()
-          : 0;
+    if (lastSuccessfulDelivery.sentAt) {
+      let hasNewPendingCandidate = false;
 
-        return Number.isFinite(receivedAtMs) && receivedAtMs > lastSentMs;
-      });
+      if (lastSuccessfulDelivery.pendingIds.length > 0) {
+        const lastPendingIds = new Set(
+          lastSuccessfulDelivery.pendingIds
+        );
+
+        hasNewPendingCandidate = currentPendingIds.some(
+          (candidateId) => !lastPendingIds.has(candidateId)
+        );
+      } else {
+        // Compatibilità con i log precedenti alla memorizzazione degli ID.
+        const lastSentMs = new Date(
+          lastSuccessfulDelivery.sentAt
+        ).getTime();
+
+        hasNewPendingCandidate = candidates.some((candidate) => {
+          const receivedAtMs = candidate?.received_at
+            ? new Date(candidate.received_at).getTime()
+            : 0;
+
+          return (
+            Number.isFinite(receivedAtMs) &&
+            receivedAtMs > lastSentMs
+          );
+        });
+      }
 
       if (!hasNewPendingCandidate) {
         results.push({
@@ -434,7 +469,8 @@ async function notifyWaitingRoom(recipientEmail: string) {
         pendingCount,
         "sent",
         "",
-        sentAt
+        sentAt,
+        currentPendingIds
       );
 
       results.push({
@@ -455,7 +491,9 @@ async function notifyWaitingRoom(recipientEmail: string) {
         Number(admin.id),
         pendingCount,
         status,
-        message
+        message,
+        null,
+        currentPendingIds
       );
 
       results.push({
