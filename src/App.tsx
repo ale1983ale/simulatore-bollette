@@ -9677,8 +9677,24 @@ export default function App() {
       const agentSaved = localStorage.getItem("agent_session");
       if (agentSaved) {
         try {
-          const agent = JSON.parse(agentSaved);
-          setAgentSession(agent);
+          const savedAgent = JSON.parse(agentSaved);
+
+          if (savedAgent?.id) {
+            const { data: freshAgent } = await supabase
+              .from("agents")
+              .select("*")
+              .eq("id", savedAgent.id)
+              .maybeSingle();
+
+            const agent = freshAgent || savedAgent;
+            setAgentSession(agent);
+            localStorage.setItem(
+              "agent_session",
+              JSON.stringify(agent)
+            );
+          } else {
+            setAgentSession(savedAgent);
+          }
         } catch {
           localStorage.removeItem("agent_session");
         }
