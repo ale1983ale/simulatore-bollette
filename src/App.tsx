@@ -45,6 +45,7 @@ type MonthlyRow = {
 };
 
 type EnergyCustomerGroup = "DOMESTICI" | "BTA" | "MT";
+type ProvvigioniOfferType = "STANDARD" | "UNICA" | "SPECIAL";
 
 type EnergyOffer = {
   nome: string;
@@ -53,6 +54,7 @@ type EnergyOffer = {
   maggiorazioneCapacityMarket: number;
   visibile?: boolean;
   allowedCustomerGroups?: EnergyCustomerGroup[];
+  provvigioneTipo?: ProvvigioniOfferType;
 };
 
 type GasCustomerGroup = "DOMESTICO" | "BUSINESS";
@@ -64,6 +66,7 @@ type GasOffer = {
   quotaVariabile: number;
   visibile?: boolean;
   allowedCustomerGroups?: GasCustomerGroup[];
+  provvigioneTipo?: ProvvigioniOfferType;
 };
 
 type GasAcciseSettings = {
@@ -317,6 +320,7 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     maggiorazioneCapacityMarket: 0,
     visibile: true,
     allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
+    provvigioneTipo: "SPECIAL",
   },
   {
     nome: "+SICURA DEDICATA",
@@ -325,6 +329,7 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     maggiorazioneCapacityMarket: 0,
     visibile: true,
     allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
+    provvigioneTipo: "SPECIAL",
   },
   {
     nome: "BILANCIATA",
@@ -333,6 +338,7 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     maggiorazioneCapacityMarket: 0,
     visibile: true,
     allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
+    provvigioneTipo: "STANDARD",
   },
 ];
 
@@ -344,6 +350,7 @@ const INITIAL_GAS_OFFERS: GasOffer[] = [
     quotaVariabile: 0,
     visibile: true,
     allowedCustomerGroups: ["DOMESTICO", "BUSINESS"],
+    provvigioneTipo: "SPECIAL",
   },
   {
     nome: "+SICURA DEDICATA",
@@ -352,6 +359,7 @@ const INITIAL_GAS_OFFERS: GasOffer[] = [
     quotaVariabile: 0,
     visibile: true,
     allowedCustomerGroups: ["DOMESTICO", "BUSINESS"],
+    provvigioneTipo: "SPECIAL",
   },
 ];
 
@@ -515,7 +523,7 @@ const isFixedDedicatedOffer = (offer: string) =>
 const isDedicatedOffer = (offer: string) =>
   normalizeOfferName(offer) === "DEDICATA" || isFixedDedicatedOffer(offer);
 
-function getProvvigioniOfferType(offer: string): "STANDARD" | "UNICA" | "SPECIAL" {
+function getProvvigioniOfferType(offer: string): ProvvigioniOfferType {
   const normalized = normalizeOfferName(offer);
 
   if (normalized.includes("CONDOMIN")) return "STANDARD";
