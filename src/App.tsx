@@ -12653,12 +12653,37 @@ if (!agentSession && !adminSession) {
             <tr
               key={row.mese}
               style={{
-                background: index % 2 === 0 ? "#f5fbff" : "#ffffff",
-                boxShadow: index === 0 ? "inset 0 0 0 2px #0ea5e9" : "none",
+                background:
+                  index === 0
+                    ? "#eef9ff"
+                    : index % 2 === 0
+                    ? "#f5fbff"
+                    : "#ffffff",
               }}
             >
-              <td style={{ padding: "7px 9px", fontWeight: index === 0 ? 900 : 700 }}>{row.mese}</td>
-              <td style={{ padding: "7px 9px", textAlign: "right", color: "#0284c7", fontWeight: 900, fontVariantNumeric: "tabular-nums" }}>
+              <td
+                style={{
+                  padding: "7px 9px",
+                  fontWeight: index === 0 ? 900 : 700,
+                  borderTop: index === 0 ? "2px solid #38bdf8" : undefined,
+                  borderBottom: index === 0 ? "2px solid #38bdf8" : undefined,
+                  borderLeft: index === 0 ? "2px solid #38bdf8" : undefined,
+                }}
+              >
+                {row.mese}
+              </td>
+              <td
+                style={{
+                  padding: "7px 9px",
+                  textAlign: "right",
+                  color: index === 0 ? "#0369a1" : "#0284c7",
+                  fontWeight: 900,
+                  fontVariantNumeric: "tabular-nums",
+                  borderTop: index === 0 ? "2px solid #38bdf8" : undefined,
+                  borderBottom: index === 0 ? "2px solid #38bdf8" : undefined,
+                  borderRight: index === 0 ? "2px solid #38bdf8" : undefined,
+                }}
+              >
                 {Number(row.psv || 0).toFixed(6)}
               </td>
             </tr>
