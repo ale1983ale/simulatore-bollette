@@ -11825,8 +11825,8 @@ if (!agentSession && !adminSession) {
           boxShadow:
             "0 10px 28px rgba(249,115,22,.08), 0 0 0 2px rgba(251,146,60,.05)",
           width: "100%",
-          maxWidth: "none",
-          justifySelf: "stretch",
+          maxWidth: punPsvView === "both" ? "none" : 900,
+          justifySelf: punPsvView === "both" ? "stretch" : "center",
         }}
       >
         <div
@@ -11985,8 +11985,8 @@ if (!agentSession && !adminSession) {
           boxShadow:
             "0 10px 28px rgba(14,165,233,.08), 0 0 0 2px rgba(56,189,248,.05)",
           width: "100%",
-          maxWidth: "none",
-          justifySelf: "stretch",
+          maxWidth: punPsvView === "both" ? "none" : 560,
+          justifySelf: punPsvView === "both" ? "stretch" : "center",
         }}
       >
         <div
