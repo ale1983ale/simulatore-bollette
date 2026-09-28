@@ -9806,7 +9806,9 @@ const tablePunPsvRows = getLast12PunPsvRows(
 
     return score(b.mese) - score(a.mese);
   });
-  const chartPunPsvRows = [...tablePunPsvRows];
+  // Nei grafici l'asse temporale deve procedere da sinistra a destra:
+  // mese più vecchio -> mese più recente.
+  const chartPunPsvRows = [...tablePunPsvRows].reverse();
 
 const punValues = chartPunPsvRows.map(r => Number(r.mono || 0));
 const psvValues = chartPunPsvRows.map(r => Number(r.psv || 0));
@@ -9834,14 +9836,25 @@ const monthLabels = chartPunPsvRows.map((row) => {
 
   return shortMap[mese] || mese;
 });
+
+const chartYearLabels = chartPunPsvRows.map(
+  (row) => String(row.mese || "").trim().split(" ")[1] || ""
+);
+
+const latestPunPsvRow =
+  tablePunPsvRows.length > 0 ? tablePunPsvRows[0] : null;
+const latestPunPsvMonthLabel = latestPunPsvRow
+  ? String(latestPunPsvRow.mese || "").trim().toUpperCase()
+  : "-";
+
 const latestPun =
-tablePunPsvRows.length > 0
- ? Number(tablePunPsvRows[0].mono || 0).toFixed(6)
+latestPunPsvRow
+ ? Number(latestPunPsvRow.mono || 0).toFixed(6)
  : "-";
 
 const latestPsv =
-tablePunPsvRows.length > 0
- ? Number(tablePunPsvRows[0].psv || 0).toFixed(6)
+latestPunPsvRow
+ ? Number(latestPunPsvRow.psv || 0).toFixed(6)
  : "-";
        
     function getRowMonthScore(row: any) {
@@ -11310,12 +11323,14 @@ if (!agentSession && !adminSession) {
                     <div
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: 10,
+                        flexWrap: "wrap",
                         marginBottom: 12,
                         fontWeight: 700,
                       }}
                     >
-                      <span>Ultimo:</span>
+                      <span>Ultimo mese: {latestPunPsvMonthLabel}</span>
                       <span>{latestPun}</span>
                     </div>
         
@@ -11359,7 +11374,7 @@ if (!agentSession && !adminSession) {
                           </tspan>
                       
                           <tspan x={p.x} dy="16">
-                          {selectedPunPsvMonth.split(" ")[1]}
+                          {chartYearLabels[i]}
                           </tspan>
                         </>
                       </text>
@@ -11397,12 +11412,14 @@ if (!agentSession && !adminSession) {
                     <div
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: 10,
+                        flexWrap: "wrap",
                         marginBottom: 12,
                         fontWeight: 700,
                       }}
                     >
-                      <span>Ultimo:</span>
+                      <span>Ultimo mese: {latestPunPsvMonthLabel}</span>
                       <span>{latestPsv}</span>
                     </div>
         
@@ -11446,7 +11463,7 @@ if (!agentSession && !adminSession) {
                           </tspan>
                       
                           <tspan x={p.x} dy="16">
-                          {selectedPunPsvMonth.split(" ")[1]}
+                          {chartYearLabels[i]}
                           </tspan>
                         </>
                       </text>
