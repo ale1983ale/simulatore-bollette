@@ -10810,76 +10810,154 @@ const renderAdminContent = () => {
           if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") return true;
           return row.mese.endsWith(String(selectedYear));
         })
-        .map((row) => (
-          <tr key={row.mese}>
-            <td style={tdStyle}>{row.mese}</td>
-            <td style={{ ...tdStyle, background: "#fff7ed" }}>
-              <input
-                type="number"
-                step="0.000001"
-                value={row.mono}
-                onChange={(e) => updatePunPsvValue(row.mese, "mono", e.target.value)}
+        .map((row) => {
+          const isFirstFixed = row.mese === "FISSO DOMESTICO";
+          const isLastFixed = row.mese === "FISSO AD HOC";
+          const isFixed =
+            row.mese === "FISSO DOMESTICO" ||
+            row.mese === "FISSO BUSINESS" ||
+            row.mese === "FISSO AD HOC";
+
+          const fixedBandBase = isFixed
+            ? {
+                borderTop: isFirstFixed
+                  ? "3px solid #dc2626"
+                  : undefined,
+                borderBottom: isLastFixed
+                  ? "3px solid #dc2626"
+                  : tdStyle.borderBottom,
+              }
+            : {};
+
+          return (
+            <tr key={row.mese}>
+              <td
                 style={{
-                  ...inputStyle,
+                  ...tdStyle,
+                  ...fixedBandBase,
+                  borderLeft: isFixed
+                    ? "3px solid #dc2626"
+                    : tdStyle.borderLeft,
+                }}
+              >
+                {row.mese}
+              </td>
+
+              <td
+                style={{
+                  ...tdStyle,
+                  ...fixedBandBase,
                   background: "#fff7ed",
-                  borderColor: "#fdba74",
                 }}
-              />
-            </td>
-            <td style={{ ...tdStyle, background: "#ffedd5" }}>
-              <input
-                type="number"
-                step="0.000001"
-                value={row.f1}
-                onChange={(e) => updatePunPsvValue(row.mese, "f1", e.target.value)}
+              >
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={row.mono}
+                  onChange={(e) =>
+                    updatePunPsvValue(row.mese, "mono", e.target.value)
+                  }
+                  style={{
+                    ...inputStyle,
+                    background: "#fff7ed",
+                    borderColor: "#fdba74",
+                  }}
+                />
+              </td>
+
+              <td
                 style={{
-                  ...inputStyle,
+                  ...tdStyle,
+                  ...fixedBandBase,
                   background: "#ffedd5",
-                  borderColor: "#fb923c",
                 }}
-              />
-            </td>
-            <td style={{ ...tdStyle, background: "#ffedd5" }}>
-              <input
-                type="number"
-                step="0.000001"
-                value={row.f2}
-                onChange={(e) => updatePunPsvValue(row.mese, "f2", e.target.value)}
+              >
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={row.f1}
+                  onChange={(e) =>
+                    updatePunPsvValue(row.mese, "f1", e.target.value)
+                  }
+                  style={{
+                    ...inputStyle,
+                    background: "#ffedd5",
+                    borderColor: "#fb923c",
+                  }}
+                />
+              </td>
+
+              <td
                 style={{
-                  ...inputStyle,
+                  ...tdStyle,
+                  ...fixedBandBase,
                   background: "#ffedd5",
-                  borderColor: "#fb923c",
                 }}
-              />
-            </td>
-            <td style={{ ...tdStyle, background: "#ffedd5" }}>
-              <input
-                type="number"
-                step="0.000001"
-                value={row.f3}
-                onChange={(e) => updatePunPsvValue(row.mese, "f3", e.target.value)}
+              >
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={row.f2}
+                  onChange={(e) =>
+                    updatePunPsvValue(row.mese, "f2", e.target.value)
+                  }
+                  style={{
+                    ...inputStyle,
+                    background: "#ffedd5",
+                    borderColor: "#fb923c",
+                  }}
+                />
+              </td>
+
+              <td
                 style={{
-                  ...inputStyle,
+                  ...tdStyle,
+                  ...fixedBandBase,
                   background: "#ffedd5",
-                  borderColor: "#fb923c",
                 }}
-              />
-            </td>
-            <td style={{ ...tdStyle, background: "#f0f9ff" }}>
-              <input
-                type="number"
-                step="0.000001"
-                value={row.psv}
-                onChange={(e) => updatePunPsvValue(row.mese, "psv", e.target.value)}
+              >
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={row.f3}
+                  onChange={(e) =>
+                    updatePunPsvValue(row.mese, "f3", e.target.value)
+                  }
+                  style={{
+                    ...inputStyle,
+                    background: "#ffedd5",
+                    borderColor: "#fb923c",
+                  }}
+                />
+              </td>
+
+              <td
                 style={{
-                  ...inputStyle,
-                  background: "#e0f2fe",
-                  borderColor: "#7dd3fc",
+                  ...tdStyle,
+                  ...fixedBandBase,
+                  background: "#f0f9ff",
+                  borderRight: isFixed
+                    ? "3px solid #dc2626"
+                    : tdStyle.borderRight,
                 }}
-              />
-            </td>
-          </tr>
-        ))}
+              >
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={row.psv}
+                  onChange={(e) =>
+                    updatePunPsvValue(row.mese, "psv", e.target.value)
+                  }
+                  style={{
+                    ...inputStyle,
+                    background: "#e0f2fe",
+                    borderColor: "#7dd3fc",
+                  }}
+                />
+              </td>
+            </tr>
+          );
+        })}
     </tbody>
   </table>
 </div>
