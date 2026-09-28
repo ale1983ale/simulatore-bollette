@@ -1150,3 +1150,37 @@ table {
     gap: 14px !important;
   }
 }
+
+
+/* PUN / PSV Admin: blocco tariffe fisse */
+.punpsv-admin-table tbody tr:nth-child(-n + 3) td:first-child {
+  border-left: 2px solid #dc2626 !important;
+}
+
+.punpsv-admin-table tbody tr:nth-child(-n + 3) td:last-child {
+  border-right: 2px solid #dc2626 !important;
+}
+
+.punpsv-admin-table tbody tr:first-child td {
+  border-top: 2px solid #dc2626 !important;
+}
+
+.punpsv-admin-table tbody tr:nth-child(3) td {
+  border-bottom: 2px solid #dc2626 !important;
+}
+
+.punpsv-admin-table tbody tr:first-child td:first-child {
+  border-top-left-radius: 8px;
+}
+
+.punpsv-admin-table tbody tr:first-child td:last-child {
+  border-top-right-radius: 8px;
+}
+
+.punpsv-admin-table tbody tr:nth-child(3) td:first-child {
+  border-bottom-left-radius: 8px;
+}
+
+.punpsv-admin-table tbody tr:nth-child(3) td:last-child {
+  border-bottom-right-radius: 8px;
+}
