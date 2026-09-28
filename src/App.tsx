@@ -7122,6 +7122,34 @@ function AgentsAdmin({
     await loadAgents();
   };
 
+  const setAgentProvvigioniVisibility = async (
+    agentId: number | undefined,
+    visible: boolean
+  ) => {
+    if (!agentId || adminProfile?.role !== "super_admin") return;
+
+    const { error } = await supabase
+      .from("agents")
+      .update({ provvigioni_visible: visible })
+      .eq("id", agentId);
+
+    if (error) {
+      alert(
+        "Errore aggiornamento visibilità Provvigione: " +
+          error.message
+      );
+      return;
+    }
+
+    setAgents((prev) =>
+      prev.map((agent) =>
+        agent.id === agentId
+          ? { ...agent, provvigioni_visible: visible }
+          : agent
+      )
+    );
+  };
+
   const deleteAgent = async (agentId?: number) => {
     if (!agentId) return;
 
@@ -7377,7 +7405,9 @@ function AgentsAdmin({
                     "Cognome",
                     "Username",
                     "Password",
-                    ...(adminProfile?.role === "super_admin" ? ["Admin"] : []),
+                    ...(adminProfile?.role === "super_admin"
+                      ? ["Admin", "Provvigione"]
+                      : []),
                     "Azioni",
                   ].map((h) => (
                     <th
@@ -7410,20 +7440,47 @@ function AgentsAdmin({
                     </td>
   
                     {adminProfile?.role === "super_admin" && (
-  <td
-    style={{
-      padding: 8,
-      borderBottom: "1px solid #f1f5f9",
-      fontWeight: 700,
-background:
-  a.owner_admin_id === adminProfile?.id
-    ? "#f0fdf4"
-    : "#eff6ff",
-borderRadius:8,
-    }}
-  >
-    {getOwnerAdminLabel(a.owner_admin_id as number)}
-  </td>
+  <>
+    <td
+      style={{
+        padding: 8,
+        borderBottom: "1px solid #f1f5f9",
+        fontWeight: 700,
+        background:
+          a.owner_admin_id === adminProfile?.id
+            ? "#f0fdf4"
+            : "#eff6ff",
+        borderRadius: 8,
+      }}
+    >
+      {getOwnerAdminLabel(a.owner_admin_id as number)}
+    </td>
+
+    <td
+      style={{
+        padding: 8,
+        borderBottom: "1px solid #f1f5f9",
+        textAlign: "center",
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={a.provvigioni_visible === true}
+        onChange={(event) =>
+          void setAgentProvvigioniVisibility(
+            a.id,
+            event.target.checked
+          )
+        }
+        title="Consenti a questo agente di vedere il pulsante PROVVIGIONE in Energia e Gas"
+        style={{
+          width: 20,
+          height: 20,
+          cursor: "pointer",
+        }}
+      />
+    </td>
+  </>
 )}
   
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
