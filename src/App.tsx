@@ -11367,6 +11367,20 @@ if (!agentSession && !adminSession) {
                     </div>
         
                     <svg viewBox="0 0 760 240" style={{ width: "100%", height: 280, display: "block" }}>
+                      <defs>
+                        <linearGradient id="punAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
+                          <stop offset="100%" stopColor="#fb923c" stopOpacity="0.03" />
+                        </linearGradient>
+                        <filter id="punGlow" x="-30%" y="-30%" width="160%" height="160%">
+                          <feGaussianBlur stdDeviation="4" result="blur" />
+                          <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                          </feMerge>
+                        </filter>
+                      </defs>
+
                       {[40, 80, 120, 160].map((y) => (
                         <line
                           key={y}
@@ -11378,18 +11392,46 @@ if (!agentSession && !adminSession) {
                         />
                       ))}
         
+                      <polygon
+                        points={`${punPolyline} 732,180 28,180`}
+                        fill="url(#punAreaGradient)"
+                      />
+
                       <polyline
                         fill="none"
-                        stroke="#f59e0b"
+                        stroke="#f97316"
                         strokeWidth="6"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         points={punPolyline}
+                        filter="url(#punGlow)"
                       />
-        
-                      {punCoords.map((p, i) => (
-                        <circle key={i} cx={p.x} cy={p.y} r="8" fill="#f59e0b" />
-                      ))}
+
+                      {punCoords.map((p, i) => {
+                        const isLast = i === punCoords.length - 1;
+                        return (
+                          <g key={i}>
+                            {isLast && (
+                              <circle
+                                cx={p.x}
+                                cy={p.y}
+                                r="14"
+                                fill="rgba(249,115,22,.16)"
+                                stroke="#fb923c"
+                                strokeWidth="2"
+                              />
+                            )}
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r={isLast ? 8 : 5.5}
+                              fill="#ffffff"
+                              stroke="#f97316"
+                              strokeWidth={isLast ? 4 : 2.5}
+                            />
+                          </g>
+                        );
+                      })}
         
                       {punCoords.map((p, i) => (
                         <text
@@ -11488,6 +11530,20 @@ if (!agentSession && !adminSession) {
                     </div>
         
                     <svg viewBox="0 0 760 240" style={{ width: "100%", height: 280, display: "block" }}>
+                      <defs>
+                        <linearGradient id="psvAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
+                          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.03" />
+                        </linearGradient>
+                        <filter id="psvGlow" x="-30%" y="-30%" width="160%" height="160%">
+                          <feGaussianBlur stdDeviation="4" result="blur" />
+                          <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                          </feMerge>
+                        </filter>
+                      </defs>
+
                       {[40, 80, 120, 160].map((y) => (
                         <line
                           key={y}
@@ -11499,18 +11555,46 @@ if (!agentSession && !adminSession) {
                         />
                       ))}
         
+                      <polygon
+                        points={`${psvPolyline} 732,180 28,180`}
+                        fill="url(#psvAreaGradient)"
+                      />
+
                       <polyline
                         fill="none"
-                        stroke="#2563eb"
+                        stroke="#0ea5e9"
                         strokeWidth="5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         points={psvPolyline}
+                        filter="url(#psvGlow)"
                       />
-        
-                      {psvCoords.map((p, i) => (
-                        <circle key={i} cx={p.x} cy={p.y} r="6" fill="#2563eb" />
-                      ))}
+
+                      {psvCoords.map((p, i) => {
+                        const isLast = i === psvCoords.length - 1;
+                        return (
+                          <g key={i}>
+                            {isLast && (
+                              <circle
+                                cx={p.x}
+                                cy={p.y}
+                                r="14"
+                                fill="rgba(14,165,233,.15)"
+                                stroke="#38bdf8"
+                                strokeWidth="2"
+                              />
+                            )}
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r={isLast ? 8 : 5.5}
+                              fill="#ffffff"
+                              stroke="#0ea5e9"
+                              strokeWidth={isLast ? 4 : 2.5}
+                            />
+                          </g>
+                        );
+                      })}
         
                       {psvCoords.map((p, i) => (
                         <text
@@ -11553,65 +11637,18 @@ if (!agentSession && !adminSession) {
 </div>
 
 
-{/* RIQUADRO ULTIMO MESE + TABELLA */}
+{/* TABELLA MESI */}
 <div
  ref={punPsvTableRef}
  style={{
    background:"#fff",
    borderRadius:16,
-   padding:20,
+   padding:"0 20px 20px",
    width:"100%",
    maxWidth:"100%",
    margin:"0 auto"
  }}
 >
- <div
-   style={{
-      display:"grid",
-      gridTemplateColumns:"1.5fr 1fr 1fr",
-      gap:18,
-      alignItems:"center"
-   }}
- >
-   <div>
-      <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>
-        ULTIMO MESE
-      </div>
-      <div style={{fontSize:24,fontWeight:800}}>
-        {tablePunPsvRows[0]?.mese}
-      </div>
-   </div>
-
-   <div>
-      <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>
-        PUN
-      </div>
-      <div style={{
-        fontSize:24,
-        fontWeight:800,
-        color:"#d97706"
-      }}>
-       {Number(tablePunPsvRows[0]?.mono||0).toFixed(6)}
-      </div>
-   </div>
-
-   <div>
-      <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>
-        PSV
-      </div>
-      <div style={{
-         fontSize:24,
-         fontWeight:800,
-         color:"#2563eb"
-      }}>
-       {Number(tablePunPsvRows[0]?.psv||0).toFixed(6)}
-      </div>
-   </div>
-
- </div>
-
-
-
 <div style={{ overflowX:"auto" }}>
                 <table
                   style={{
@@ -11665,51 +11702,17 @@ if (!agentSession && !adminSession) {
                     )}
         
                     {punPsvView === "pun" && (
-                      <tr style={{ background: "#f8fafc" }}>
+                      <tr style={{ background: "#fff7ed" }}>
                         <th style={{ textAlign: "left", padding: "14px 16px" }}>Mese</th>
                         <th
                           style={{
                             textAlign: "right",
                             padding: "14px 16px",
-                            background: "#ffedd5",
-                            color: "#c2410c",
+                            color: "#f97316",
                             fontWeight: 800,
                           }}
                         >
-                          Mono
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "right",
-                            padding: "14px 16px",
-                            background: "#fff7ed",
-                            color: "#d97706",
-                            fontWeight: 700,
-                          }}
-                        >
-                          F1
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "right",
-                            padding: "14px 16px",
-                            background: "#fffbeb",
-                            color: "#ea580c",
-                            fontWeight: 700,
-                          }}
-                        >
-                          F2
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "right",
-                            padding: "14px 16px",
-                            background: "#fef9c3",
-                            color: "#ca8a04",
-                            fontWeight: 700,
-                          }}
-                        >
-                          F3
+                          PUN
                         </th>
                       </tr>
                     )}
@@ -11799,56 +11802,17 @@ if (!agentSession && !adminSession) {
                         )}
         
                         {punPsvView === "pun" && (
-                          <>
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "14px 16px",
-                                borderBottom: "1px solid #e2e8f0",
-                                color: "#c2410c",
-                                fontWeight: 700,
-                                background: "#ffedd5",
-                              }}
-                            >
-                              {Number(row.mono).toFixed(6)}
-                            </td>
-        
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "14px 16px",
-                                borderBottom: "1px solid #e2e8f0",
-                                color: "#d97706",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {Number(row.f1).toFixed(6)}
-                            </td>
-        
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "14px 16px",
-                                borderBottom: "1px solid #e2e8f0",
-                                color: "#ea580c",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {Number(row.f2).toFixed(6)}
-                            </td>
-        
-                            <td
-                              style={{
-                                textAlign: "right",
-                                padding: "14px 16px",
-                                borderBottom: "1px solid #e2e8f0",
-                                color: "#ca8a04",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {Number(row.f3).toFixed(6)}
-                            </td>
-                          </>
+                          <td
+                            style={{
+                              textAlign: "right",
+                              padding: "14px 16px",
+                              borderBottom: "1px solid #e2e8f0",
+                              color: "#f97316",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {Number(row.mono).toFixed(6)}
+                          </td>
                         )}
         
                         {punPsvView === "psv" && (
