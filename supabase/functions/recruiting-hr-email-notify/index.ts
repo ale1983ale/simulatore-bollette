@@ -199,7 +199,7 @@ function buildEmail(recipient: string, candidates: any[]) {
       </a>
     </p>
     <p style="color:#64748b;font-size:12px">
-      Questa email viene inviata ogni ora soltanto finché restano elementi IN ARRIVO da lavorare.
+      Questa email viene inviata solo quando compaiono nuovi elementi IN ARRIVO da lavorare. Il riepilogo include tutti gli elementi ancora in attesa.
     </p>
   </body>
 </html>`.trim();
@@ -309,6 +309,24 @@ async function logDelivery(
   }
 }
 
+async function getLastSuccessfulDeliveryAt(adminId: number) {
+  const { data, error } = await db
+    .from("recruiting_hr_email_delivery_log")
+    .select("sent_at")
+    .eq("admin_id", adminId)
+    .eq("status", "sent")
+    .not("sent_at", "is", null)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.sent_at ? String(data.sent_at) : "";
+}
+
 async function notifyWaitingRoom(recipientEmail: string) {
   const { data: admins, error: adminsError } = await db
     .from("admin_users")
@@ -360,6 +378,47 @@ async function notifyWaitingRoom(recipientEmail: string) {
         status: "nothing_to_do",
       });
       continue;
+    }
+
+    let lastSuccessfulDeliveryAt = "";
+
+    try {
+      lastSuccessfulDeliveryAt = await getLastSuccessfulDeliveryAt(
+        Number(admin.id)
+      );
+    } catch (error: any) {
+      await logDelivery(
+        Number(admin.id),
+        pendingCount,
+        "dedupe_query_error",
+        error?.message || String(error)
+      );
+      results.push({
+        admin_id: Number(admin.id),
+        pending_count: pendingCount,
+        status: "dedupe_query_error",
+      });
+      continue;
+    }
+
+    if (lastSuccessfulDeliveryAt) {
+      const lastSentMs = new Date(lastSuccessfulDeliveryAt).getTime();
+      const hasNewPendingCandidate = candidates.some((candidate) => {
+        const receivedAtMs = candidate?.received_at
+          ? new Date(candidate.received_at).getTime()
+          : 0;
+
+        return Number.isFinite(receivedAtMs) && receivedAtMs > lastSentMs;
+      });
+
+      if (!hasNewPendingCandidate) {
+        results.push({
+          admin_id: Number(admin.id),
+          pending_count: pendingCount,
+          status: "unchanged_since_last_email",
+        });
+        continue;
+      }
     }
 
     try {
