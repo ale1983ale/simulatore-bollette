@@ -3418,7 +3418,15 @@ function Energia({
     `;
 
     const cleanName = sanitizeFileName(s.nome || "Cliente");
-printHtmlDocument("Preventivo Energia", html, `${cleanName} - Energia`);
+    const cleanOffer = sanitizeFileName(s.offerta || "");
+    const energyFileName = [cleanName, cleanOffer]
+      .filter(Boolean)
+      .join(" ");
+    printHtmlDocument(
+      "Preventivo Energia",
+      html,
+      `${energyFileName} - Energia`
+    );
 };
 
 return (
@@ -5126,7 +5134,15 @@ function Gas({
     `;
 
     const cleanName = sanitizeFileName(s.nome || "Cliente");
-    printHtmlDocument("Preventivo Gas", html, `${cleanName} - Gas`);
+    const cleanOffer = sanitizeFileName(s.offerta || "");
+    const gasFileName = [cleanName, cleanOffer]
+      .filter(Boolean)
+      .join(" ");
+    printHtmlDocument(
+      "Preventivo Gas",
+      html,
+      `${gasFileName} - Gas`
+    );
   };
 
   return (
