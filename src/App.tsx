@@ -8,7 +8,7 @@ import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogo
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
-import Provvigioni from "./Provvigioni";
+import Provvigioni, { type ProvvigioniPrefill } from "./Provvigioni";
 import Personale from "./Personale";
 import DriveArchive from "./DriveArchive";
 import { getRecruitingContext } from "./recruitingClient";
@@ -78,6 +78,8 @@ type Agent = {
   username: string;
   password: string;
   owner_auth_id?: string;
+  owner_admin_id?: number;
+  provvigioni_visible?: boolean;
 };
 
 type AdminProfile = {
@@ -512,6 +514,16 @@ const isFixedDedicatedOffer = (offer: string) =>
 
 const isDedicatedOffer = (offer: string) =>
   normalizeOfferName(offer) === "DEDICATA" || isFixedDedicatedOffer(offer);
+
+function getProvvigioniOfferType(offer: string): "STANDARD" | "UNICA" | "SPECIAL" {
+  const normalized = normalizeOfferName(offer);
+
+  if (normalized.includes("CONDOMINI")) return "STANDARD";
+  if (isDedicatedOffer(normalized)) return "SPECIAL";
+  if (normalized.includes("SPECIAL")) return "SPECIAL";
+  if (normalized.includes("UNICA")) return "UNICA";
+  return "STANDARD";
+}
 
 const FIXED_COMPETENCE_MONTHS = [
   "FISSO DOMESTICO",
@@ -9320,6 +9332,8 @@ export default function App() {
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [agentSession, setAgentSession] = useState<any>(null);
+  const [provvigioniPrefill, setProvvigioniPrefill] =
+    useState<ProvvigioniPrefill | null>(null);
   const [waitingRoomIncomingCount, setWaitingRoomIncomingCount] =
     useState(0);
   const [waitingRoomOutgoingCount, setWaitingRoomOutgoingCount] =
@@ -9444,6 +9458,16 @@ export default function App() {
 
     setTab(nextTab);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openProvvigioniFromSimulation = (
+    prefill: ProvvigioniPrefill
+  ) => {
+    setProvvigioniPrefill({
+      ...prefill,
+      requestId: Date.now(),
+    });
+    navigateTo("provvigioni");
   };
 
   const openRecruitingContactFromCalendar = (
@@ -10138,6 +10162,8 @@ useEffect(() => {
   const currentAdminSection = adminSectionMeta[tab];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = adminProfile?.role === "super_admin";
+  const canUseProvvigioni =
+    isSuperAdmin || Boolean(agentSession?.provvigioni_visible);
   const hasFullAdminAccess =
     adminProfile?.role === "super_admin" ||
     adminProfile?.full_access !== false;
