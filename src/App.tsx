@@ -1740,6 +1740,12 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
             grid-template-columns: 1fr 1fr;
             gap: 5px 10px;
           }
+          .offer-pair {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px 10px;
+          }
           .label {
             font-size: 9px;
             color: #64748b;
@@ -3216,8 +3222,13 @@ function Energia({
           <div class="section-title">Dati cliente</div>
           <div class="grid">
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
-            <div><div class="label">POD</div><div class="value">${s.pod || "-"}</div></div>
-            <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
+            ${String(s.pod || "").trim()
+              ? `<div><div class="label">POD</div><div class="value">${s.pod}</div></div>`
+              : ""}
+            <div class="offer-pair">
+              <div><div class="label">Tipo</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
+              <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
+            </div>
             <div><div class="label">Tipologia</div><div class="value">${energyPdfTipologia(s.tipo)}</div></div>
             <div><div class="label">Fatturazione</div><div class="value">${s.fatturazione || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
@@ -4974,8 +4985,13 @@ function Gas({
           <div class="section-title">Dati cliente</div>
           <div class="grid">
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
-            <div><div class="label">PDR</div><div class="value">${s.pdr || "-"}</div></div>
-            <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
+            ${String(s.pdr || "").trim()
+              ? `<div><div class="label">PDR</div><div class="value">${s.pdr}</div></div>`
+              : ""}
+            <div class="offer-pair">
+              <div><div class="label">Tipo</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
+              <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
+            </div>
             <div><div class="label">Uso</div><div class="value">${s.uso || "-"}</div></div>
             <div><div class="label">Fatturazione</div><div class="value">${s.fatturazione || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
