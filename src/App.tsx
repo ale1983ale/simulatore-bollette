@@ -2669,12 +2669,16 @@ function Energia({
   dispCpRows,
   networkTariffRows,
   showAgentAssociation,
+  canUseProvvigioni,
+  onOpenProvvigioni,
 }: {
   punPsvRows: PunPsvRow[];
   energyOffers: EnergyOffer[];
   dispCpRows: DispCpRow[];
   networkTariffRows: NetworkTariffRow[];
   showAgentAssociation: boolean;
+  canUseProvvigioni: boolean;
+  onOpenProvvigioni: (prefill: ProvvigioniPrefill) => void;
 }) {
   const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
 
@@ -4530,6 +4534,35 @@ Base suggerito
           >
             Crea PDF Energia
           </button>
+
+          {canUseProvvigioni && (
+            <button
+              type="button"
+              onClick={() =>
+                onOpenProvvigioni({
+                  commodity: "Energia",
+                  annualConsumption: consumoAnnuoEnergia,
+                  offer: getProvvigioniOfferType(s.offerta),
+                  bonusFissoLuce:
+                    String(s.tipologiaOfferta || "").toUpperCase() === "FISSO" &&
+                    isDomesticEnergyType(s.tipo),
+                })
+              }
+              style={{
+                marginTop: 10,
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "#7c3aed",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+                width: "100%",
+                fontWeight: 900,
+              }}
+            >
+              PROVVIGIONE
+            </button>
+          )}
         </>
       )}
     </div>
@@ -4559,11 +4592,15 @@ function Gas({
   gasOffers,
   gasAcciseSettings,
   showAgentAssociation,
+  canUseProvvigioni,
+  onOpenProvvigioni,
 }: {
   punPsvRows: PunPsvRow[];
   gasOffers: GasOffer[];
   gasAcciseSettings: GasAcciseSettings;
   showAgentAssociation: boolean;
+  canUseProvvigioni: boolean;
+  onOpenProvvigioni: (prefill: ProvvigioniPrefill) => void;
 }) {
   const visibleGasOffers = gasOffers.filter((offer) => offer.visibile !== false);
 
@@ -5781,6 +5818,33 @@ border: "1px solid #bfd8f6",
             >
               Crea PDF Gas
             </button>
+
+            {canUseProvvigioni && (
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenProvvigioni({
+                    commodity: "Gas",
+                    annualConsumption: consumoAnnuoGas,
+                    offer: getProvvigioniOfferType(s.offerta),
+                    bonusFissoLuce: false,
+                  })
+                }
+                style={{
+                  marginTop: 10,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "#7c3aed",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
+                  width: "100%",
+                  fontWeight: 900,
+                }}
+              >
+                PROVVIGIONE
+              </button>
+            )}
           </>
         )}
       </div>
