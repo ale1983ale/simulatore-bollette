@@ -11672,6 +11672,7 @@ if (!agentSession && !adminSession) {
   }}
 >
   <div
+    className="pun-psv-table-grid"
     style={{
       display: "grid",
       gridTemplateColumns:
