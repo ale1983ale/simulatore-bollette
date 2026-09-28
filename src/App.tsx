@@ -11316,25 +11316,57 @@ if (!agentSession && !adminSession) {
                     border: "1px solid #e2e8f0",
                     borderRadius: 16,
                     padding: 20,
+                    display: "flex",
+                    flexDirection: "column",
                   }}
                 >
-                    <h3 style={{ marginTop: 0 }}>Andamento PUN</h3>
+                    <h3 style={{ marginTop: 0, marginBottom: 16 }}>Andamento PUN</h3>
         
                     <div
                       style={{
                         display: "flex",
-                        alignItems: "baseline",
-                        gap: 10,
+                        alignItems: "center",
+                        gap: 8,
                         flexWrap: "wrap",
-                        marginBottom: 12,
-                        fontWeight: 700,
+                        marginBottom: 14,
+                        minHeight: 38,
                       }}
                     >
-                      <span>Ultimo mese: {latestPunPsvMonthLabel}</span>
-                      <span>{latestPun}</span>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          minHeight: 34,
+                          padding: "7px 11px",
+                          borderRadius: 10,
+                          background: "#ff9f1c",
+                          color: "#111827",
+                          fontSize: 13,
+                          fontWeight: 900,
+                          boxShadow: "0 0 0 2px rgba(255,159,28,.18)",
+                        }}
+                      >
+                        Ultimo mese: {latestPunPsvMonthLabel}
+                      </span>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          minHeight: 34,
+                          padding: "7px 11px",
+                          borderRadius: 10,
+                          background: "#ff9f1c",
+                          color: "#111827",
+                          fontSize: 13,
+                          fontWeight: 900,
+                          boxShadow: "0 0 0 2px rgba(255,159,28,.18)",
+                        }}
+                      >
+                        {latestPun}
+                      </span>
                     </div>
         
-                    <svg viewBox="0 0 760 300" style={{ width:"100%", height:340 }}>
+                    <svg viewBox="0 0 760 240" style={{ width: "100%", height: 280, display: "block" }}>
                       {[40, 80, 120, 160].map((y) => (
                         <line
                           key={y}
@@ -11363,7 +11395,7 @@ if (!agentSession && !adminSession) {
                         <text
                         key={"m" + i}
                         x={p.x}
-                        y="195"
+                        y="205"
                         textAnchor="middle"
                         fontSize="15"
                         fill="#64748b"
@@ -11405,25 +11437,57 @@ if (!agentSession && !adminSession) {
                     border: "1px solid #e2e8f0",
                     borderRadius: 16,
                     padding: 20,
+                    display: "flex",
+                    flexDirection: "column",
                   }}
                 >
-                    <h3 style={{ marginTop: 0 }}>Andamento PSV</h3>
+                    <h3 style={{ marginTop: 0, marginBottom: 16 }}>Andamento PSV</h3>
         
                     <div
                       style={{
                         display: "flex",
-                        alignItems: "baseline",
-                        gap: 10,
+                        alignItems: "center",
+                        gap: 8,
                         flexWrap: "wrap",
-                        marginBottom: 12,
-                        fontWeight: 700,
+                        marginBottom: 14,
+                        minHeight: 38,
                       }}
                     >
-                      <span>Ultimo mese: {latestPunPsvMonthLabel}</span>
-                      <span>{latestPsv}</span>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          minHeight: 34,
+                          padding: "7px 11px",
+                          borderRadius: 10,
+                          background: "#67e8f9",
+                          color: "#0f172a",
+                          fontSize: 13,
+                          fontWeight: 900,
+                          boxShadow: "0 0 0 2px rgba(103,232,249,.20)",
+                        }}
+                      >
+                        Ultimo mese: {latestPunPsvMonthLabel}
+                      </span>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          minHeight: 34,
+                          padding: "7px 11px",
+                          borderRadius: 10,
+                          background: "#67e8f9",
+                          color: "#0f172a",
+                          fontSize: 13,
+                          fontWeight: 900,
+                          boxShadow: "0 0 0 2px rgba(103,232,249,.20)",
+                        }}
+                      >
+                        {latestPsv}
+                      </span>
                     </div>
         
-                    <svg viewBox="0 0 760 220" style={{ width: "100%", height: 240 }}>
+                    <svg viewBox="0 0 760 240" style={{ width: "100%", height: 280, display: "block" }}>
                       {[40, 80, 120, 160].map((y) => (
                         <line
                           key={y}
@@ -11452,7 +11516,7 @@ if (!agentSession && !adminSession) {
                         <text
                         key={"psv" + i}
                         x={p.x}
-                        y="190"
+                        y="205"
                         textAnchor="middle"
                         fontSize="15"
                         fill="#64748b"
