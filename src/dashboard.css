@@ -1133,3 +1133,20 @@ table {
     max-height: 440px;
   }
 }
+
+
+/* PUN / PSV responsive layout */
+@media (max-width: 720px) {
+  .pun-psv-chart-grid,
+  .pun-psv-table-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .pun-psv-chart-grid {
+    gap: 14px !important;
+  }
+
+  .pun-psv-table-grid {
+    gap: 14px !important;
+  }
+}
