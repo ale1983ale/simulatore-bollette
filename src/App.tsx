@@ -11450,7 +11450,10 @@ if (!agentSession && !adminSession) {
               icon="💰"
               variant="energy"
             />
-            <Provvigioni prefill={provvigioniPrefill} />
+            <Provvigioni
+              prefill={provvigioniPrefill}
+              onPrefillConsumed={() => setProvvigioniPrefill(null)}
+            />
           </>
         ) : tab === "ateco" ? (
           <>
