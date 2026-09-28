@@ -9193,6 +9193,9 @@ export default function App() {
     );
   };
   
+  const [recruitingEntrySection, setRecruitingEntrySection] =
+    useState<"contacts" | "external_contacts">("contacts");
+
   const [tab, setTab] = useState(() => {
     const requestedTab =
       typeof window !== "undefined"
@@ -9280,7 +9283,34 @@ export default function App() {
 
   const navigateTo = (nextTab: string) => {
     setAdminMenuOpen(false);
+
+    if (nextTab === "recruiting") {
+      setRecruitingEntrySection("contacts");
+    }
+
     setTab(nextTab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openRecruitingContactFromCalendar = (
+    scope: "internal" | "external",
+    candidateId: string
+  ) => {
+    const nextSection =
+      scope === "external" ? "external_contacts" : "contacts";
+
+    try {
+      window.localStorage.setItem(
+        `recruiting_selected_candidate_${scope}`,
+        candidateId
+      );
+    } catch {
+      // Il componente Recruiting userà comunque l'ID già ricevuto.
+    }
+
+    setAdminMenuOpen(false);
+    setRecruitingEntrySection(nextSection);
+    setTab("recruiting");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -10432,7 +10462,11 @@ const renderAdminContent = () => {
 
       {tab === "calendarAdmin" && (
         <div style={{ width: "100%", minWidth: 0 }}>
-          <Recruiting initialSection="calendar" hideNavigation />
+          <Recruiting
+            initialSection="calendar"
+            hideNavigation
+            onOpenContact={openRecruitingContactFromCalendar}
+          />
         </div>
       )}
 
@@ -10464,7 +10498,10 @@ const renderAdminContent = () => {
 
       {tab === "recruiting" && (
         <div style={{ width: "100%", minWidth: 0 }}>
-          <Recruiting />
+          <Recruiting
+            key={`recruiting-${recruitingEntrySection}`}
+            initialSection={recruitingEntrySection}
+          />
         </div>
       )}
 
