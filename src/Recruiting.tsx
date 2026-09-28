@@ -6354,11 +6354,21 @@ export default function Recruiting({
                   </summary>
                   <div
                     style={{
+                      position: "absolute",
+                      zIndex: 50,
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      width: "100%",
+                      minWidth: 260,
+                      boxSizing: "border-box",
                       display: "grid",
                       gap: 6,
                       padding: 9,
-                      borderTop: "1px solid #e2e8f0",
-                      maxHeight: 260,
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 10,
+                      background: "#fff",
+                      boxShadow: "0 10px 28px rgba(15,23,42,.16)",
+                      maxHeight: 300,
                       overflowY: "auto",
                     }}
                   >
