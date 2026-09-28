@@ -6489,117 +6489,6 @@ export default function Recruiting({
               </div>
 
               <div>
-                <label style={labelStyle}>ESCLUDI · STATI DA NON VEDERE</label>
-                <details
-                  style={{
-                    position: "relative",
-                    border: "1px solid #fecaca",
-                    borderRadius: 10,
-                    background: "#fff",
-                  }}
-                >
-                  <summary
-                    style={{
-                      listStyle: "none",
-                      cursor: "pointer",
-                      padding: "10px 12px",
-                      fontWeight: 850,
-                      color:
-                        excludedStatusFilters.length > 0
-                          ? "#b91c1c"
-                          : "#475569",
-                    }}
-                  >
-                    {excludedStatusFilters.length === 0
-                      ? "NESSUNO STATO ESCLUSO"
-                      : excludedStatusFilters.length === 1
-                      ? `ESCLUSO: ${
-                          getStatusDefinition(excludedStatusFilters[0]).label
-                        }`
-                      : `${excludedStatusFilters.length} STATI ESCLUSI`}
-                  </summary>
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: 6,
-                      padding: 9,
-                      borderTop: "1px solid #fee2e2",
-                      maxHeight: 280,
-                      overflowY: "auto",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setExcludedStatusFilters([])}
-                      style={{
-                        ...buttonStyle,
-                        minHeight: 34,
-                        padding: "6px 9px",
-                        background:
-                          excludedStatusFilters.length === 0
-                            ? "#f1f5f9"
-                            : "#fff",
-                        color: "#475569",
-                        border: "1px solid #e2e8f0",
-                        textAlign: "left",
-                      }}
-                    >
-                      NON ESCLUDERE NESSUNO STATO
-                    </button>
-                    {statusDefinitions.map((option) => {
-                      const checked = excludedStatusFilters.includes(
-                        option.code
-                      );
-                      return (
-                        <label
-                          key={option.code}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "7px 9px",
-                            borderRadius: 8,
-                            background: checked
-                              ? "#fee2e2"
-                              : option.background,
-                            color: checked ? "#991b1b" : option.color,
-                            border: `2px solid ${
-                              checked ? "#fca5a5" : option.border
-                            }`,
-                            fontWeight: 850,
-                            cursor: "pointer",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) => {
-                              const shouldExclude = event.target.checked;
-                              setExcludedStatusFilters((current) =>
-                                shouldExclude
-                                  ? [...current, option.code]
-                                  : current.filter(
-                                      (status) => status !== option.code
-                                    )
-                              );
-                              if (
-                                shouldExclude &&
-                                statusFilter === option.code
-                              ) {
-                                setStatusFilter("");
-                                setForwardedToFilter("");
-                              }
-                            }}
-                          />
-                          {option.label}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </details>
-              </div>
-
-              <div>
                 <label style={labelStyle}>Chiamato da me</label>
                 <select
                   value={calledByMeFilter}
@@ -6955,48 +6844,177 @@ export default function Recruiting({
                   </span>
                 </div>
 
-                <label
+                <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
+                    display: "grid",
                     gap: 7,
-                    fontSize: 11,
-                    fontWeight: 900,
-                    color: "#475569",
+                    minWidth: 0,
                   }}
                 >
-                  ORDINA
-                  <select
-                    value={candidateSortMode}
-                    onChange={(event) =>
-                      setCandidateSortMode(
-                        event.target.value as CandidateSortMode
-                      )
-                    }
+                  <label
                     style={{
-                      ...inputStyle,
-                      width: "auto",
-                      minWidth: 205,
-                      padding: "7px 9px",
-                      fontSize: 12,
-                      fontWeight: 800,
-                      background: "white",
+                      display: "grid",
+                      gridTemplateColumns: "78px minmax(205px, 1fr)",
+                      alignItems: "center",
+                      gap: 7,
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#475569",
                     }}
                   >
-                    <option value="priority_chronological">
-                      Priorità + cronologico
-                    </option>
-                    <option value="chronological">
-                      Cronologico
-                    </option>
-                    <option value="alphabetical">
-                      Alfabetico
-                    </option>
-                    <option value="activity">
-                      Per attività
-                    </option>
-                  </select>
-                </label>
+                    <span>ORDINA</span>
+                    <select
+                      value={candidateSortMode}
+                      onChange={(event) =>
+                        setCandidateSortMode(
+                          event.target.value as CandidateSortMode
+                        )
+                      }
+                      style={{
+                        ...inputStyle,
+                        width: "100%",
+                        minWidth: 205,
+                        padding: "7px 9px",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        background: "white",
+                      }}
+                    >
+                      <option value="priority_chronological">
+                        Priorità + cronologico
+                      </option>
+                      <option value="chronological">
+                        Cronologico
+                      </option>
+                      <option value="alphabetical">
+                        Alfabetico
+                      </option>
+                      <option value="activity">
+                        Per attività
+                      </option>
+                    </select>
+                  </label>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "78px minmax(205px, 1fr)",
+                      alignItems: "start",
+                      gap: 7,
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#475569",
+                    }}
+                  >
+                    <span style={{ paddingTop: 9 }}>ESCLUDI</span>
+                    <details
+                      style={{
+                        position: "relative",
+                        width: "100%",
+                        minWidth: 205,
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 9,
+                        background: "#fff",
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      <summary
+                        style={{
+                          listStyle: "none",
+                          cursor: "pointer",
+                          padding: "8px 9px",
+                          color:
+                            excludedStatusFilters.length > 0
+                              ? "#b91c1c"
+                              : "#0f172a",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {excludedStatusFilters.length === 0
+                          ? "Nessuno stato escluso"
+                          : excludedStatusFilters.length === 1
+                          ? getStatusDefinition(
+                              excludedStatusFilters[0]
+                            ).label
+                          : `${excludedStatusFilters.length} stati esclusi`}
+                      </summary>
+                      <div
+                        style={{
+                          position: "absolute",
+                          zIndex: 40,
+                          top: "calc(100% + 4px)",
+                          right: 0,
+                          width: "max(260px, 100%)",
+                          display: "grid",
+                          gap: 6,
+                          padding: 9,
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 10,
+                          background: "#fff",
+                          boxShadow: "0 10px 28px rgba(15,23,42,.16)",
+                          maxHeight: 300,
+                          overflowY: "auto",
+                        }}
+                      >
+                        {statusDefinitions.map((option) => {
+                          const checked =
+                            excludedStatusFilters.includes(option.code);
+                          return (
+                            <label
+                              key={option.code}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "7px 9px",
+                                borderRadius: 8,
+                                background: checked
+                                  ? "#fee2e2"
+                                  : option.background,
+                                color: checked
+                                  ? "#991b1b"
+                                  : option.color,
+                                border: `2px solid ${
+                                  checked ? "#fca5a5" : option.border
+                                }`,
+                                fontWeight: 850,
+                                cursor: "pointer",
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) => {
+                                  const shouldExclude =
+                                    event.target.checked;
+                                  setExcludedStatusFilters((current) =>
+                                    shouldExclude
+                                      ? [...current, option.code]
+                                      : current.filter(
+                                          (status) =>
+                                            status !== option.code
+                                        )
+                                  );
+                                  if (
+                                    shouldExclude &&
+                                    statusFilter === option.code
+                                  ) {
+                                    setStatusFilter("");
+                                    setForwardedToFilter("");
+                                  }
+                                }}
+                              />
+                              {option.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  </div>
+                </div>
               </div>
               <div className="recruiting-contact-list-scroll">
                 {filteredCandidates.map((candidate) => {
