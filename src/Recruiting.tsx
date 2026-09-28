@@ -1274,7 +1274,8 @@ export default function Recruiting({
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
   const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
     useState(false);
-  const regionFilterMenuRef = useRef<HTMLDetailsElement>(null);
+  const [regionFilterMenuOpen, setRegionFilterMenuOpen] = useState(false);
+  const regionFilterMenuRef = useRef<HTMLDivElement>(null);
   const excludeFilterMenuRef = useRef<HTMLDetailsElement>(null);
   const [candidateSortMode, setCandidateSortMode] =
     useState<CandidateSortMode>(() => {
@@ -1317,19 +1318,28 @@ export default function Recruiting({
       const target = event.target as Node | null;
       if (!target) return;
 
-      [regionFilterMenuRef.current, excludeFilterMenuRef.current].forEach(
-        (menu) => {
-          if (menu?.open && !menu.contains(target)) {
-            menu.removeAttribute("open");
-          }
-        }
-      );
+      const regionMenu = regionFilterMenuRef.current;
+      if (
+        regionFilterMenuOpen &&
+        regionMenu &&
+        !regionMenu.contains(target)
+      ) {
+        setRegionFilterMenuOpen(false);
+      }
+
+      const excludeMenu = excludeFilterMenuRef.current;
+      if (
+        excludeMenu?.open &&
+        !excludeMenu.contains(target)
+      ) {
+        excludeMenu.removeAttribute("open");
+      }
     };
 
     document.addEventListener("pointerdown", closeOpenFilterMenus);
     return () =>
       document.removeEventListener("pointerdown", closeOpenFilterMenus);
-  }, []);
+  }, [regionFilterMenuOpen]);
 
   const [contactEditMode, setContactEditMode] = useState(false);
   const [deleteCandidatePromptOpen, setDeleteCandidatePromptOpen] =
@@ -6327,104 +6337,139 @@ export default function Recruiting({
               >
               <div>
                 <label style={labelStyle}>Regione · MULTISELEZIONE</label>
-                <details
+                <div
                   ref={regionFilterMenuRef}
                   style={{
                     position: "relative",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: 10,
-                    background: "white",
+                    width: "100%",
+                    minWidth: 0,
                   }}
                 >
-                  <summary
+                  <button
+                    type="button"
+                    aria-expanded={regionFilterMenuOpen}
+                    onClick={() =>
+                      setRegionFilterMenuOpen((current) => !current)
+                    }
                     style={{
-                      listStyle: "none",
-                      cursor: "pointer",
-                      padding: "10px 12px",
-                      fontWeight: 800,
-                      color: "#0f172a",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {regionFilters.length === 0
-                      ? "TUTTE LE REGIONI"
-                      : regionFilters.length === 1
-                      ? regionFilters[0]
-                      : `${regionFilters.length} REGIONI SELEZIONATE`}
-                  </summary>
-                  <div
-                    style={{
-                      position: "absolute",
-                      zIndex: 50,
-                      top: "calc(100% + 4px)",
-                      left: 0,
+                      ...inputStyle,
                       width: "100%",
-                      minWidth: 260,
-                      boxSizing: "border-box",
-                      display: "grid",
-                      gap: 6,
-                      padding: 9,
-                      border: "1px solid #cbd5e1",
-                      borderRadius: 10,
-                      background: "#fff",
-                      boxShadow: "0 10px 28px rgba(15,23,42,.16)",
-                      maxHeight: 300,
-                      overflowY: "auto",
+                      minHeight: 42,
+                      padding: "10px 12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      background: "white",
+                      color: "#0f172a",
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      textAlign: "left",
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setRegionFilters([])}
+                    <span
                       style={{
-                        ...buttonStyle,
-                        minHeight: 34,
-                        padding: "6px 9px",
-                        background:
-                          regionFilters.length === 0 ? "#dbeafe" : "#f8fafc",
-                        color: "#1e3a8a",
-                        border: "1px solid #bfdbfe",
-                        textAlign: "left",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      TUTTE LE REGIONI
-                    </button>
-                    {ITALIAN_REGIONS.map((region) => {
-                      const checked = regionFilters.includes(region);
-                      return (
-                        <label
-                          key={region}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "7px 9px",
-                            borderRadius: 8,
-                            background: checked ? "#eff6ff" : "#fff",
-                            border: checked
-                              ? "1px solid #93c5fd"
-                              : "1px solid #e2e8f0",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) =>
-                              setRegionFilters((current) =>
-                                event.target.checked
-                                  ? [...current, region]
-                                  : current.filter((item) => item !== region)
-                              )
-                            }
-                          />
-                          {region}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </details>
+                      {regionFilters.length === 0
+                        ? "TUTTE LE REGIONI"
+                        : regionFilters.length === 1
+                        ? regionFilters[0]
+                        : `${regionFilters.length} REGIONI SELEZIONATE`}
+                    </span>
+                    <span aria-hidden="true">
+                      {regionFilterMenuOpen ? "▲" : "▼"}
+                    </span>
+                  </button>
+
+                  {regionFilterMenuOpen && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        zIndex: 200,
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        width: "100%",
+                        minWidth: 260,
+                        boxSizing: "border-box",
+                        display: "grid",
+                        gap: 6,
+                        padding: 9,
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 10,
+                        background: "#fff",
+                        boxShadow: "0 10px 28px rgba(15,23,42,.18)",
+                        maxHeight: 300,
+                        overflowY: "auto",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setRegionFilters([])}
+                        style={{
+                          ...buttonStyle,
+                          minHeight: 34,
+                          padding: "6px 9px",
+                          background:
+                            regionFilters.length === 0
+                              ? "#dbeafe"
+                              : "#f8fafc",
+                          color: "#1e3a8a",
+                          border: "1px solid #bfdbfe",
+                          textAlign: "left",
+                        }}
+                      >
+                        TUTTE LE REGIONI
+                      </button>
+
+                      {ITALIAN_REGIONS.map((region) => {
+                        const checked = regionFilters.includes(region);
+
+                        return (
+                          <label
+                            key={region}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "7px 9px",
+                              borderRadius: 8,
+                              background: checked
+                                ? "#eff6ff"
+                                : "#fff",
+                              border: checked
+                                ? "1px solid #93c5fd"
+                                : "1px solid #e2e8f0",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) =>
+                                setRegionFilters((current) =>
+                                  event.target.checked
+                                    ? [...current, region]
+                                    : current.filter(
+                                        (item) => item !== region
+                                      )
+                                )
+                              }
+                            />
+                            {region}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
