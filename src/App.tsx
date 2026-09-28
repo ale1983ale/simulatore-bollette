@@ -3930,7 +3930,8 @@ return (
     setDispCpAutoMode(false);
     set("dispacciamentoCapacityMarket", pulito);
   },
-  "text"
+  "text",
+  "Valore rilevato da circolari ARERA. Controllare sempre il valore corretto sulla fattura del cliente, anche se quel valore stesso potrebbe essere aumentato da variabili commerciali."
 )}
 </div>
 
