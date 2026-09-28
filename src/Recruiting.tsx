@@ -1264,11 +1264,12 @@ export default function Recruiting({
 
   const [nameFilter, setNameFilter] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
-  const [regionFilter, setRegionFilter] = useState("");
+  const [regionFilters, setRegionFilters] = useState<string[]>([]);
   const [sectorFilter, setSectorFilter] = useState<"" | "SI" | "NO">("");
   const [sectorOtherFilter, setSectorOtherFilter] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | CandidateStatus>("");
+  const [excludedStatusFilters, setExcludedStatusFilters] = useState<CandidateStatus[]>([]);
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
   const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
@@ -2459,7 +2460,10 @@ export default function Recruiting({
   const filteredCandidates = useMemo(() => {
     const nameNeedle = normalizeFilterValue(nameFilter);
     const zoneNeedle = normalizeFilterValue(zoneFilter);
-    const regionNeedle = normalizeFilterValue(regionFilter);
+    const selectedRegionNeedles = new Set(
+      regionFilters.map((region) => normalizeFilterValue(region))
+    );
+    const excludedStatuses = new Set(excludedStatusFilters);
     const sectorOtherNeedle = normalizeFilterValue(sectorOtherFilter);
     const companyNeedle = normalizeFilterValue(companyFilter);
     const forwardedNeedle = normalizeFilterValue(forwardedToFilter);
@@ -2579,8 +2583,10 @@ export default function Recruiting({
       }
 
       if (
-        regionNeedle &&
-        normalizeFilterValue(candidate.region) !== regionNeedle
+        selectedRegionNeedles.size > 0 &&
+        !selectedRegionNeedles.has(
+          normalizeFilterValue(candidate.region)
+        )
       ) {
         return false;
       }
@@ -2605,6 +2611,7 @@ export default function Recruiting({
       }
 
       if (statusFilter && candidate.status !== statusFilter) return false;
+      if (excludedStatuses.has(candidate.status)) return false;
 
       if (
         statusFilter === "INOLTRATO_A" &&
@@ -2694,11 +2701,12 @@ export default function Recruiting({
     statusDefinitions,
     nameFilter,
     zoneFilter,
-    regionFilter,
+    regionFilters,
     sectorFilter,
     sectorOtherFilter,
     companyFilter,
     statusFilter,
+    excludedStatusFilters,
     forwardedToFilter,
     calledByMeFilter,
     calledByMeCandidateIds,
@@ -2707,11 +2715,12 @@ export default function Recruiting({
   const hasActiveContactFilters = Boolean(
     nameFilter.trim() ||
       zoneFilter.trim() ||
-      regionFilter ||
+      regionFilters.length > 0 ||
       sectorFilter ||
       sectorOtherFilter ||
       companyFilter ||
       statusFilter ||
+      excludedStatusFilters.length > 0 ||
       forwardedToFilter ||
       calledByMeFilter
   );
@@ -2719,11 +2728,12 @@ export default function Recruiting({
   const resetContactFilters = () => {
     setNameFilter("");
     setZoneFilter("");
-    setRegionFilter("");
+    setRegionFilters([]);
     setSectorFilter("");
     setSectorOtherFilter("");
     setCompanyFilter("");
     setStatusFilter("");
+    setExcludedStatusFilters([]);
     setForwardedToFilter("");
     setCalledByMeFilter("");
   };
@@ -6294,19 +6304,94 @@ export default function Recruiting({
                 }`}
               >
               <div>
-                <label style={labelStyle}>Regione</label>
-                <select
-                  value={regionFilter}
-                  onChange={(e) => setRegionFilter(e.target.value)}
-                  style={{ ...inputStyle, textTransform: "uppercase" }}
+                <label style={labelStyle}>Regione · MULTISELEZIONE</label>
+                <details
+                  style={{
+                    position: "relative",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 10,
+                    background: "white",
+                  }}
                 >
-                  <option value="">TUTTE LE REGIONI</option>
-                  {ITALIAN_REGIONS.map((region) => (
-                    <option key={region} value={region}>
-                      {region.toLocaleUpperCase("it")}
-                    </option>
-                  ))}
-                </select>
+                  <summary
+                    style={{
+                      listStyle: "none",
+                      cursor: "pointer",
+                      padding: "10px 12px",
+                      fontWeight: 800,
+                      color: "#0f172a",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {regionFilters.length === 0
+                      ? "TUTTE LE REGIONI"
+                      : regionFilters.length === 1
+                      ? regionFilters[0]
+                      : `${regionFilters.length} REGIONI SELEZIONATE`}
+                  </summary>
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 6,
+                      padding: 9,
+                      borderTop: "1px solid #e2e8f0",
+                      maxHeight: 260,
+                      overflowY: "auto",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setRegionFilters([])}
+                      style={{
+                        ...buttonStyle,
+                        minHeight: 34,
+                        padding: "6px 9px",
+                        background:
+                          regionFilters.length === 0 ? "#dbeafe" : "#f8fafc",
+                        color: "#1e3a8a",
+                        border: "1px solid #bfdbfe",
+                        textAlign: "left",
+                      }}
+                    >
+                      TUTTE LE REGIONI
+                    </button>
+                    {ITALIAN_REGIONS.map((region) => {
+                      const checked = regionFilters.includes(region);
+                      return (
+                        <label
+                          key={region}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "7px 9px",
+                            borderRadius: 8,
+                            background: checked ? "#eff6ff" : "#fff",
+                            border: checked
+                              ? "1px solid #93c5fd"
+                              : "1px solid #e2e8f0",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) =>
+                              setRegionFilters((current) =>
+                                event.target.checked
+                                  ? [...current, region]
+                                  : current.filter((item) => item !== region)
+                              )
+                            }
+                          />
+                          {region}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </details>
               </div>
 
               <div>
@@ -6375,6 +6460,11 @@ export default function Recruiting({
                   onChange={(e) => {
                     const value = e.target.value as "" | CandidateStatus;
                     setStatusFilter(value);
+                    if (value) {
+                      setExcludedStatusFilters((current) =>
+                        current.filter((status) => status !== value)
+                      );
+                    }
                     if (value !== "INOLTRATO_A") {
                       setForwardedToFilter("");
                     }
@@ -6396,6 +6486,117 @@ export default function Recruiting({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label style={labelStyle}>ESCLUDI · STATI DA NON VEDERE</label>
+                <details
+                  style={{
+                    position: "relative",
+                    border: "1px solid #fecaca",
+                    borderRadius: 10,
+                    background: "#fff",
+                  }}
+                >
+                  <summary
+                    style={{
+                      listStyle: "none",
+                      cursor: "pointer",
+                      padding: "10px 12px",
+                      fontWeight: 850,
+                      color:
+                        excludedStatusFilters.length > 0
+                          ? "#b91c1c"
+                          : "#475569",
+                    }}
+                  >
+                    {excludedStatusFilters.length === 0
+                      ? "NESSUNO STATO ESCLUSO"
+                      : excludedStatusFilters.length === 1
+                      ? `ESCLUSO: ${
+                          getStatusDefinition(excludedStatusFilters[0]).label
+                        }`
+                      : `${excludedStatusFilters.length} STATI ESCLUSI`}
+                  </summary>
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 6,
+                      padding: 9,
+                      borderTop: "1px solid #fee2e2",
+                      maxHeight: 280,
+                      overflowY: "auto",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExcludedStatusFilters([])}
+                      style={{
+                        ...buttonStyle,
+                        minHeight: 34,
+                        padding: "6px 9px",
+                        background:
+                          excludedStatusFilters.length === 0
+                            ? "#f1f5f9"
+                            : "#fff",
+                        color: "#475569",
+                        border: "1px solid #e2e8f0",
+                        textAlign: "left",
+                      }}
+                    >
+                      NON ESCLUDERE NESSUNO STATO
+                    </button>
+                    {statusDefinitions.map((option) => {
+                      const checked = excludedStatusFilters.includes(
+                        option.code
+                      );
+                      return (
+                        <label
+                          key={option.code}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "7px 9px",
+                            borderRadius: 8,
+                            background: checked
+                              ? "#fee2e2"
+                              : option.background,
+                            color: checked ? "#991b1b" : option.color,
+                            border: `2px solid ${
+                              checked ? "#fca5a5" : option.border
+                            }`,
+                            fontWeight: 850,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => {
+                              const shouldExclude = event.target.checked;
+                              setExcludedStatusFilters((current) =>
+                                shouldExclude
+                                  ? [...current, option.code]
+                                  : current.filter(
+                                      (status) => status !== option.code
+                                    )
+                              );
+                              if (
+                                shouldExclude &&
+                                statusFilter === option.code
+                              ) {
+                                setStatusFilter("");
+                                setForwardedToFilter("");
+                              }
+                            }}
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </details>
               </div>
 
               <div>
