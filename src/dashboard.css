@@ -1146,6 +1146,18 @@ table {
     gap: 14px !important;
   }
 
+  /* Su mobile evita le grandi fasce vuote create dall'altezza desktop fissa. */
+  .pun-psv-chart-grid > div {
+    padding: 14px !important;
+  }
+
+  .pun-psv-chart-grid svg {
+    height: auto !important;
+    aspect-ratio: 760 / 240;
+    margin-top: 2px;
+    margin-bottom: 2px;
+  }
+
   .pun-psv-table-grid {
     gap: 14px !important;
   }
