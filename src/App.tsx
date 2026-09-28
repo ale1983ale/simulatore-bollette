@@ -2003,12 +2003,144 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
   }, 450);
 }
 
-function field(label: string, value: string, setValue: (v: string) => void, type = "text") {
+function HelpHint({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const isDesktopPointer = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+  return (
+    <span
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        marginLeft: 5,
+      }}
+      onMouseEnter={() => {
+        if (isDesktopPointer()) setOpen(true);
+      }}
+      onMouseLeave={() => {
+        if (isDesktopPointer()) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        aria-label="Apri guida"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!isDesktopPointer()) {
+            setOpen((current) => !current);
+          }
+        }}
+        style={{
+          width: 17,
+          height: 17,
+          borderRadius: 999,
+          border: "1px solid #94a3b8",
+          background: "#f8fafc",
+          color: "#475569",
+          padding: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 11,
+          fontWeight: 900,
+          lineHeight: 1,
+          cursor: "help",
+        }}
+      >
+        ?
+      </button>
+
+      {open && (
+        <span
+          role="dialog"
+          aria-label="Guida campo"
+          style={{
+            position: "absolute",
+            zIndex: 1000,
+            top: "calc(100% + 7px)",
+            left: 0,
+            width: "min(320px, 78vw)",
+            padding: 10,
+            borderRadius: 9,
+            border: "1px solid #cbd5e1",
+            background: "#ffffff",
+            color: "#0f172a",
+            boxShadow: "0 10px 26px rgba(15,23,42,.18)",
+            fontSize: 12,
+            fontWeight: 500,
+            lineHeight: 1.45,
+            textAlign: "left",
+          }}
+        >
+          <span style={{ display: "block" }}>{text}</span>
+          {!isDesktopPointer() && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setOpen(false);
+              }}
+              style={{
+                marginTop: 9,
+                border: 0,
+                borderRadius: 7,
+                padding: "6px 9px",
+                background: "#e2e8f0",
+                color: "#0f172a",
+                fontSize: 11,
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              CHIUDI
+            </button>
+          )}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function FieldLabel({
+  label,
+  helpText,
+}: {
+  label: string;
+  helpText?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        fontSize: 12,
+        fontWeight: 700,
+        marginBottom: 4,
+      }}
+    >
+      <span>{label}</span>
+      {helpText ? <HelpHint text={helpText} /> : null}
+    </div>
+  );
+}
+
+function field(
+  label: string,
+  value: string,
+  setValue: (v: string) => void,
+  type = "text",
+  helpText?: string
+) {
   const inputType = type === "number" ? "text" : type;
 
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+      <FieldLabel label={label} helpText={helpText} />
       <input
         style={{
           width: "100%",
@@ -2031,20 +2163,12 @@ function selectField(
   value: string,
   setValue: (v: string) => void,
   options: string[],
-  optionLabel?: (option: string) => string
+  optionLabel?: (option: string) => string,
+  helpText?: string
 ) {
   return (
     <div>
-      <div
-        style={{
-          fontSize:12,
-          fontWeight:700,
-          marginBottom:4,
-          color:"inherit"
-        }}
-      >
-        {label}
-      </div>
+      <FieldLabel label={label} helpText={helpText} />
 
       <select
         style={{
@@ -3599,7 +3723,13 @@ return (
               handleEnergyOfferChange,
               compatibleEnergyOfferOptions.map((x) => x.nome)
             )}
-            {field("Canone RAI già pagato", s.canoneRaiGiaPagato, (v) => set("canoneRaiGiaPagato", v), "number")}
+            {isDomesticEnergyType(s.tipo) &&
+              field(
+                "Canone RAI già pagato",
+                s.canoneRaiGiaPagato,
+                (v) => set("canoneRaiGiaPagato", v),
+                "number"
+              )}
           </div>
 
           {isDedicatedOffer(s.offerta) && (
