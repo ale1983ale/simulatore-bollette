@@ -4447,10 +4447,37 @@ export default function Recruiting({
   };
 
   const openContactForEditing = (candidateId: string) => {
+    const candidate = allCandidates.find(
+      (item) => item.id === candidateId
+    );
+
     setCalendarContactPreviewId(null);
     setEventModalId(null);
-    setSelectedCandidateId(candidateId);
-    setSection("contacts");
+
+    if (candidate?.contactScope === "external") {
+      try {
+        window.localStorage.setItem(
+          "recruiting_selected_candidate_external",
+          candidateId
+        );
+      } catch {
+        // La selezione viene comunque gestita appena la sezione si apre.
+      }
+
+      setSection("external_contacts");
+    } else {
+      try {
+        window.localStorage.setItem(
+          "recruiting_selected_candidate_internal",
+          candidateId
+        );
+      } catch {
+        // La selezione resta comunque nello stato corrente.
+      }
+
+      setSelectedCandidateId(candidateId);
+      setSection("contacts");
+    }
 
     window.setTimeout(() => {
       document
@@ -4459,7 +4486,7 @@ export default function Recruiting({
           behavior: "smooth",
           block: "center",
         });
-    }, 100);
+    }, candidate?.contactScope === "external" ? 220 : 100);
   };
 
   const candidateName = (candidateId: string | null) =>
