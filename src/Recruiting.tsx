@@ -2406,16 +2406,13 @@ export default function Recruiting({
     [candidates]
   );
 
-  const chronologicalAllCandidates = useMemo(
+  const alphabeticalAllCandidates = useMemo(
     () =>
-      [...allCandidates].sort((a, b) => {
-        const aDate = new Date(a.createdAt || 0).getTime();
-        const bDate = new Date(b.createdAt || 0).getTime();
-
-        if (aDate !== bDate) return bDate - aDate;
-
-        return a.fullName.localeCompare(b.fullName, "it");
-      }),
+      [...allCandidates].sort((a, b) =>
+        a.fullName.localeCompare(b.fullName, "it", {
+          sensitivity: "base",
+        })
+      ),
     [allCandidates]
   );
 
@@ -4515,10 +4512,10 @@ export default function Recruiting({
         .filter((value): value is string => Boolean(value))
     );
 
-    return chronologicalAllCandidates.filter((candidate) =>
+    return alphabeticalAllCandidates.filter((candidate) =>
       ids.has(candidate.id)
     );
-  }, [events, chronologicalAllCandidates]);
+  }, [events, alphabeticalAllCandidates]);
 
   const importedGoogleEventKeys = useMemo(
     () =>
@@ -10662,7 +10659,7 @@ export default function Recruiting({
                   style={inputStyle}
                 >
                   <option value="">Senza nominativo</option>
-                  {chronologicalAllCandidates.map((candidate) => (
+                  {alphabeticalAllCandidates.map((candidate) => (
                     <option
                       key={candidate.id}
                       value={candidate.id}
@@ -11152,7 +11149,7 @@ export default function Recruiting({
                     style={inputStyle}
                   >
                     <option value="">Senza contatto</option>
-                    {chronologicalAllCandidates.map((candidate) => (
+                    {alphabeticalAllCandidates.map((candidate) => (
                       <option
                         key={candidate.id}
                         value={candidate.id}
