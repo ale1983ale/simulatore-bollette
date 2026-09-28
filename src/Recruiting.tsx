@@ -3167,65 +3167,107 @@ export default function Recruiting({
       (item) => item.candidateId === candidate.id
     );
 
-    let insertedQueueId = "";
-    let previousQueuedStatus = "";
+    if (hasPendingHrNote) {
+      const updated = await updateCandidateStatus(
+        candidate,
+        status
+      );
 
-    if (!hasPendingHrNote) {
-      try {
-        if (existingStatusItem) {
-          previousQueuedStatus = existingStatusItem.newStatus;
+      if (!updated) return false;
 
+      // Se esiste già una NOTA DA SINCRONIZZARE, quella è l'unico
+      // riquadro che deve rimanere in Sala d'attesa. Il badge stato della
+      // nota usa lo stato corrente del nominativo, quindi si aggiorna
+      // automaticamente. Eventuali riquadri stato separati vengono rimossi.
+      if (existingStatusItem) {
+        try {
           const { error } = await ctx.client
             .from("recruiting_hr_status_sync_queue")
-            .update({
-              new_status: status,
-            })
-            .eq("id", existingStatusItem.id)
-            .eq("owner_key", ctx.ownerKey);
+            .delete()
+            .eq("owner_key", ctx.ownerKey)
+            .eq("candidate_id", candidate.id);
 
           if (error) throw error;
 
           setHrStatusSyncItems((current) =>
-            current.map((item) =>
-              item.id === existingStatusItem.id
-                ? { ...item, newStatus: status }
-                : item
+            current.filter(
+              (item) => item.candidateId !== candidate.id
             )
           );
-        } else {
-          const { data, error } = await ctx.client
-            .from("recruiting_hr_status_sync_queue")
-            .insert({
-              owner_key: ctx.ownerKey,
-              candidate_id: candidate.id,
-              previous_status: candidate.status,
-              new_status: status,
-            })
-            .select("id,created_at")
-            .single();
-
-          if (error) throw error;
-
-          insertedQueueId = String(data.id);
-
-          setHrStatusSyncItems((current) => [
-            ...current,
-            {
-              id: insertedQueueId,
-              candidateId: candidate.id,
-              previousStatus: candidate.status,
-              newStatus: status,
-              createdAt: String(data.created_at || new Date().toISOString()),
-            },
-          ]);
+        } catch (error: any) {
+          setMessage(
+            "Stato aggiornato, ma non sono riuscito a rimuovere il riquadro stato duplicato dalla Sala d'attesa HR: " +
+              (error?.message || error)
+          );
+          return true;
         }
-      } catch (error: any) {
-        setMessage(
-          "Errore nell'aggiunta dello stato alla Sala d'attesa HR: " +
-            (error?.message || error)
-        );
-        return false;
       }
+
+      setMessage(
+        "Stato aggiornato nel riquadro della nota già presente in Sala d'attesa HR."
+      );
+      return true;
+    }
+
+    let insertedQueueId = "";
+    let previousQueuedStatus = "";
+
+    try {
+      if (existingStatusItem) {
+        previousQueuedStatus = existingStatusItem.newStatus;
+
+        const { error } = await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .update({
+            new_status: status,
+          })
+          .eq("id", existingStatusItem.id)
+          .eq("owner_key", ctx.ownerKey);
+
+        if (error) throw error;
+
+        setHrStatusSyncItems((current) =>
+          current.map((item) =>
+            item.id === existingStatusItem.id
+              ? { ...item, newStatus: status }
+              : item
+          )
+        );
+      } else {
+        const { data, error } = await ctx.client
+          .from("recruiting_hr_status_sync_queue")
+          .insert({
+            owner_key: ctx.ownerKey,
+            candidate_id: candidate.id,
+            previous_status: candidate.status,
+            new_status: status,
+          })
+          .select("id,created_at")
+          .single();
+
+        if (error) throw error;
+
+        insertedQueueId = String(data.id);
+
+        setHrStatusSyncItems((current) => [
+          ...current,
+          {
+            id: insertedQueueId,
+            candidateId: candidate.id,
+            previousStatus: candidate.status,
+            newStatus: status,
+            createdAt: String(
+              data.created_at || new Date().toISOString()
+            ),
+          },
+        ]);
+      }
+    } catch (error: any) {
+      setMessage(
+        "Errore nell'aggiunta dello stato alla Sala d'attesa HR: " +
+          (error?.message || error)
+      );
+      return false;
     }
 
     const updated = await updateCandidateStatus(
@@ -3233,7 +3275,7 @@ export default function Recruiting({
       status
     );
 
-    if (!updated && !hasPendingHrNote) {
+    if (!updated) {
       if (insertedQueueId) {
         await ctx.client
           .from("recruiting_hr_status_sync_queue")
@@ -3267,11 +3309,9 @@ export default function Recruiting({
       return false;
     }
 
-    if (!hasPendingHrNote) {
-      setMessage(
-        "Stato aggiornato e aggiunto agli STATI DA SINCRONIZZARE in Sala d'attesa HR."
-      );
-    }
+    setMessage(
+      "Stato aggiornato e aggiunto agli STATI DA SINCRONIZZARE in Sala d'attesa HR."
+    );
 
     return true;
   };
