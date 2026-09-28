@@ -10840,7 +10840,20 @@ const renderAdminContent = () => {
                     : undefined,
                 }}
               >
-                {row.mese}
+                <div>{row.mese}</div>
+                {(row.mese === "FISSO DOMESTICO" ||
+                  row.mese === "FISSO BUSINESS") && (
+                  <div
+                    style={{
+                      marginTop: 2,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#64748b",
+                    }}
+                  >
+                    (senza perdite)
+                  </div>
+                )}
               </td>
 
               <td
