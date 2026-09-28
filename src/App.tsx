@@ -2024,13 +2024,21 @@ function HelpHint({ text }: { text: string }) {
         if (isDesktopPointer()) setOpen(false);
       }}
     >
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         aria-label="Apri guida"
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
           if (!isDesktopPointer()) {
+            setOpen((current) => !current);
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
             setOpen((current) => !current);
           }
         }}
@@ -2049,10 +2057,11 @@ function HelpHint({ text }: { text: string }) {
           fontWeight: 900,
           lineHeight: 1,
           cursor: "help",
+          userSelect: "none",
         }}
       >
         ?
-      </button>
+      </span>
 
       {open && (
         <span
@@ -3027,7 +3036,7 @@ function Energia({
 
   const sectionCard = (
     key: "dati" | "mesi" | "rete" | "anteprima",
-    title: string,
+    title: React.ReactNode,
     children: React.ReactNode
   ) => (
     <div
@@ -3711,7 +3720,8 @@ return (
               s.tipo,
               handleEnergyTypeChange,
               compatibleEnergyTypeOptions,
-              energyTypeOptionLabel
+              energyTypeOptionLabel,
+              "controllare accuratamente la tipologia di cliente per il corretto calcolo automatico delle voci Reti e oneri"
             )}
             {offerTypeField(
               s.tipologiaOfferta || "VARIABILE",
@@ -4006,7 +4016,16 @@ Base suggerito
 
       {sectionCard(
         "rete",
-        "Rete, oneri, rettifiche",
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+          }}
+        >
+          <span>Rete, oneri, rettifiche</span>
+          <HelpHint text="valori rilevati automaticamente da circolari ARERA in base alla tipologia di cliente. Controllare sempre i medesimi campi sull'attuale fattura del cliente; in caso di incongruenze, è disponibile la compilazione manuale." />
+        </span>,
         <>
           <div
             style={{
@@ -4130,8 +4149,8 @@ Base suggerito
                   {field(
                     s.fatturazione === "MULTI POD MENSILE" ||
                     s.fatturazione === "MULTI POD BIMESTRALE"
-                      ? "Potenza totale impegnata (kW)"
-                      : "Potenza impegnata (kW)",
+                      ? "Potenza totale fatturata (kW)"
+                      : "Potenza fatturata (kW)",
                     s.potenzaImpegnata || "",
                     (v) => set("potenzaImpegnata", v),
                     "number"
