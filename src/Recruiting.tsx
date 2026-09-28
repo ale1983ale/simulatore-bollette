@@ -1391,6 +1391,9 @@ export default function Recruiting({
   const [activityNotes, setActivityNotes] = useState("");
 
   const [calendarMonth, setCalendarMonth] = useState(localMonthKey());
+  const calendarTodayFocusPendingRef = useRef(
+    initialSection === "calendar"
+  );
   const [calendarSearchFilter, setCalendarSearchFilter] = useState("");
   const [calendarCandidateFilter, setCalendarCandidateFilter] = useState("");
   const [calendarTypeFilter, setCalendarTypeFilter] = useState<"" | EventType>("");
@@ -2236,6 +2239,8 @@ export default function Recruiting({
       const connected = await refreshGoogleCalendarConnectionStatus();
 
       if (googleResult) {
+        calendarTodayFocusPendingRef.current = true;
+        setCalendarMonth(localMonthKey());
         setSection("calendar");
 
         if (googleResult === "connected") {
@@ -4512,6 +4517,34 @@ export default function Recruiting({
   );
 
   useEffect(() => {
+    if (
+      section !== "calendar" ||
+      !calendarTodayFocusPendingRef.current ||
+      calendarMonth !== localMonthKey()
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const todayCell = document.getElementById(
+        "recruiting-calendar-today"
+      );
+
+      if (!todayCell) return;
+
+      todayCell.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "center",
+      });
+
+      calendarTodayFocusPendingRef.current = false;
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [section, calendarMonth, calendarCells]);
+
+  useEffect(() => {
     if (section !== "calendar") return;
 
     let cancelled = false;
@@ -5865,6 +5898,8 @@ export default function Recruiting({
                 if (key === "calendar") {
                   setGooglePanelOpen(false);
                   setNewActivityPanelOpen(false);
+                  calendarTodayFocusPendingRef.current = true;
+                  setCalendarMonth(localMonthKey());
                 }
                 setSection(key as RecruitingSection);
               }}
@@ -9315,11 +9350,27 @@ export default function Recruiting({
                 return (
                   <div
                     key={cell.dateKey}
+                    id={
+                      cell.dateKey === localDateKey()
+                        ? "recruiting-calendar-today"
+                        : undefined
+                    }
                     style={{
                       minHeight: 125,
-                      background: cell.inMonth ? "white" : "#f8fafc",
+                      background:
+                        cell.dateKey === localDateKey()
+                          ? "#eff6ff"
+                          : cell.inMonth
+                          ? "white"
+                          : "#f8fafc",
                       padding: 7,
                       opacity: cell.inMonth ? 1 : 0.65,
+                      outline:
+                        cell.dateKey === localDateKey()
+                          ? "3px solid #2563eb"
+                          : "none",
+                      outlineOffset:
+                        cell.dateKey === localDateKey() ? -3 : 0,
                     }}
                   >
                     <div style={{ fontWeight: 900, marginBottom: 5 }}>{cell.day}</div>
