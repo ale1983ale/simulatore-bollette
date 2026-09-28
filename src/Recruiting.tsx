@@ -1204,7 +1204,7 @@ export default function Recruiting({
     useState(false);
   const [googleCalendarBusy, setGoogleCalendarBusy] = useState(false);
   const [showFullGoogleCalendar, setShowFullGoogleCalendar] =
-    useState(false);
+    useState(initialSection === "calendar");
   const [googleExternalEvents, setGoogleExternalEvents] = useState<
     GoogleCalendarExternalEvent[]
   >([]);
@@ -1402,7 +1402,11 @@ export default function Recruiting({
   type CalendarOrigin = "APP" | "CRM" | "EXTERNAL" | "GOOGLE";
   const [calendarOriginFilters, setCalendarOriginFilters] = useState<
     CalendarOrigin[]
-  >(["APP", "CRM"]);
+  >(
+    initialSection === "calendar"
+      ? ["APP", "CRM", "EXTERNAL", "GOOGLE"]
+      : ["APP", "CRM"]
+  );
   const [calendarCandidateId, setCalendarCandidateId] = useState("");
   const [calendarType, setCalendarType] = useState<EventType>("CHIAMARE");
   const [calendarCustom, setCalendarCustom] = useState("");
@@ -2241,6 +2245,15 @@ export default function Recruiting({
       if (googleResult) {
         calendarTodayFocusPendingRef.current = true;
         setCalendarMonth(localMonthKey());
+        setCalendarOriginFilters([
+          "APP",
+          "CRM",
+          "EXTERNAL",
+          "GOOGLE",
+        ]);
+        setCalendarCandidateFilter("");
+        setCalendarTypeFilter("");
+        setShowFullGoogleCalendar(true);
         setSection("calendar");
 
         if (googleResult === "connected") {
@@ -2391,6 +2404,19 @@ export default function Recruiting({
         a.fullName.localeCompare(b.fullName, "it")
       ),
     [candidates]
+  );
+
+  const chronologicalAllCandidates = useMemo(
+    () =>
+      [...allCandidates].sort((a, b) => {
+        const aDate = new Date(a.createdAt || 0).getTime();
+        const bDate = new Date(b.createdAt || 0).getTime();
+
+        if (aDate !== bDate) return bDate - aDate;
+
+        return a.fullName.localeCompare(b.fullName, "it");
+      }),
+    [allCandidates]
   );
 
   const statusDefinitions = useMemo(() => {
@@ -4489,10 +4515,10 @@ export default function Recruiting({
         .filter((value): value is string => Boolean(value))
     );
 
-    return allCandidates
-      .filter((candidate) => ids.has(candidate.id))
-      .sort((a, b) => a.fullName.localeCompare(b.fullName, "it"));
-  }, [events, allCandidates]);
+    return chronologicalAllCandidates.filter((candidate) =>
+      ids.has(candidate.id)
+    );
+  }, [events, chronologicalAllCandidates]);
 
   const importedGoogleEventKeys = useMemo(
     () =>
@@ -5900,6 +5926,15 @@ export default function Recruiting({
                   setNewActivityPanelOpen(false);
                   calendarTodayFocusPendingRef.current = true;
                   setCalendarMonth(localMonthKey());
+                  setCalendarOriginFilters([
+                    "APP",
+                    "CRM",
+                    "EXTERNAL",
+                    "GOOGLE",
+                  ]);
+                  setCalendarCandidateFilter("");
+                  setCalendarTypeFilter("");
+                  setShowFullGoogleCalendar(true);
                 }
                 setSection(key as RecruitingSection);
               }}
@@ -10627,21 +10662,17 @@ export default function Recruiting({
                   style={inputStyle}
                 >
                   <option value="">Senza nominativo</option>
-                  {[...allCandidates]
-                    .sort((a, b) =>
-                      a.fullName.localeCompare(b.fullName, "it")
-                    )
-                    .map((candidate) => (
-                      <option
-                        key={candidate.id}
-                        value={candidate.id}
-                      >
-                        {candidate.contactScope === "external"
-                          ? "[ESTERNO] "
-                          : ""}
-                        {candidate.fullName}
-                      </option>
-                    ))}
+                  {chronologicalAllCandidates.map((candidate) => (
+                    <option
+                      key={candidate.id}
+                      value={candidate.id}
+                    >
+                      {candidate.contactScope === "external"
+                        ? "[ESTERNO] "
+                        : ""}
+                      {candidate.fullName}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -11121,11 +11152,14 @@ export default function Recruiting({
                     style={inputStyle}
                   >
                     <option value="">Senza contatto</option>
-                    {alphabeticalCandidates.map((candidate) => (
+                    {chronologicalAllCandidates.map((candidate) => (
                       <option
                         key={candidate.id}
                         value={candidate.id}
                       >
+                        {candidate.contactScope === "external"
+                          ? "[ESTERNO] "
+                          : ""}
                         {candidate.fullName}
                       </option>
                     ))}
