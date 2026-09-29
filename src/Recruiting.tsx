@@ -6191,6 +6191,22 @@ export default function Recruiting({
     }, 40);
   };
 
+  useEffect(() => {
+    const handleCalendarFocusToday = () => focusCalendarToday();
+
+    window.addEventListener(
+      "ge:calendar-focus-today",
+      handleCalendarFocusToday
+    );
+
+    return () => {
+      window.removeEventListener(
+        "ge:calendar-focus-today",
+        handleCalendarFocusToday
+      );
+    };
+  }, [calendarMonth]);
+
   if (loading) return <div style={cardStyle}>Caricamento RECRUITING...</div>;
 
   return (
@@ -9872,24 +9888,6 @@ export default function Recruiting({
                   onChange={(e) => setCalendarMonth(e.target.value)}
                   style={{ ...inputStyle, width: 190, fontWeight: 900 }}
                 />
-                <button
-                  type="button"
-                  onClick={focusCalendarToday}
-                  title="Vai al giorno di oggi"
-                  aria-label="Vai al giorno di oggi"
-                  style={{
-                    ...buttonStyle,
-                    minWidth: 48,
-                    padding: "8px 11px",
-                    background: "#dbeafe",
-                    color: "#1d4ed8",
-                    border: "1px solid #93c5fd",
-                    fontSize: 18,
-                    lineHeight: 1,
-                  }}
-                >
-                  👁
-                </button>
               </div>
 
               <button type="button" onClick={() => changeCalendarMonth(1)} style={{ ...buttonStyle, background: "#e2e8f0" }}>Mese successivo →</button>
