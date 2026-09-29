@@ -5033,141 +5033,38 @@ export default function Recruiting({
     }
   };
 
-  const escapeVCardValue = (value: string) =>
-    String(value || "")
-      .replace(/\\/g, "\\\\")
-      .replace(/\n/g, "\\n")
-      .replace(/;/g, "\\;")
-      .replace(/,/g, "\\,");
-
-  const addCandidateToPhoneContacts = (candidate: Candidate) => {
+  const buildAndroidContactIntent = (candidate: Candidate) => {
     const fullName = String(candidate.fullName || "").trim() || "Contatto";
     const phone = String(candidate.phone || "").trim();
     const email = String(candidate.email || "").trim();
     const company = String(candidate.companyName || "").trim();
 
-    const nameParts = fullName.split(/\s+/).filter(Boolean);
-    const familyName =
-      nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
-    const givenName =
-      nameParts.length > 1
-        ? nameParts.slice(0, -1).join(" ")
-        : nameParts[0] || fullName;
-
-    const openGoogleContactForm = () => {
-      const url = new URL("https://contacts.google.com/new");
-      if (givenName) url.searchParams.set("givenname", givenName);
-      if (familyName) url.searchParams.set("familyname", familyName);
-      if (phone) url.searchParams.set("phone", phone);
-      if (email) url.searchParams.set("email", email);
-      window.location.href = url.toString();
-    };
-
-    const userAgent = navigator.userAgent || "";
-    const isAndroid = /Android/i.test(userAgent);
-
-    if (isAndroid) {
-      const googleFallback = new URL("https://contacts.google.com/new");
-      if (givenName) googleFallback.searchParams.set("givenname", givenName);
-      if (familyName) googleFallback.searchParams.set("familyname", familyName);
-      if (phone) googleFallback.searchParams.set("phone", phone);
-      if (email) googleFallback.searchParams.set("email", email);
-
-      const isSamsung =
-        /SamsungBrowser/i.test(userAgent) || /\bSM-[A-Z0-9-]+\b/i.test(userAgent);
-
-      const intentParts = ["intent:#Intent"];
-
-      if (isSamsung) {
-        intentParts.push(
-          "package=com.samsung.android.app.contacts",
-          "component=com.samsung.android.app.contacts/com.samsung.android.contacts.editor.ContactEditorActivity"
-        );
-      }
-
-      intentParts.push(
-        "action=android.intent.action.INSERT",
-        `type=${isSamsung ? "vnd.android.cursor.dir/raw_contact" : "vnd.android.cursor.dir/contact"}`,
-        `S.name=${encodeURIComponent(fullName)}`
-      );
-
-      if (phone) {
-        intentParts.push(`S.phone=${encodeURIComponent(phone)}`);
-      }
-
-      if (email) {
-        intentParts.push(`S.email=${encodeURIComponent(email)}`);
-      }
-
-      if (company) {
-        intentParts.push(`S.company=${encodeURIComponent(company)}`);
-      }
-
-      intentParts.push(
-        `S.browser_fallback_url=${encodeURIComponent(googleFallback.toString())}`,
-        "end"
-      );
-
-      setMessage(
-        isSamsung
-          ? "Apro la scheda Nuovo contatto della rubrica Samsung..."
-          : "Apro la scheda Nuovo contatto del telefono..."
-      );
-
-      window.location.href = intentParts.join(";");
-      return;
-    }
-
-    const escapeVCardValue = (value: string) =>
-      value
-        .replace(/\\/g, "\\\\")
-        .replace(/\n/g, "\\n")
-        .replace(/,/g, "\\,")
-        .replace(/;/g, "\\;");
-
-    const lines = [
-      "BEGIN:VCARD",
-      "VERSION:3.0",
-      `N:${escapeVCardValue(familyName)};${escapeVCardValue(givenName)};;;`,
-      `FN:${escapeVCardValue(fullName)}`,
+    const intentParts = [
+      "intent:#Intent",
+      "action=android.intent.action.INSERT",
+      "type=vnd.android.cursor.dir/raw_contact",
+      `S.name=${encodeURIComponent(fullName)}`,
     ];
 
     if (phone) {
-      lines.push(`TEL;TYPE=CELL:${escapeVCardValue(phone)}`);
+      intentParts.push(`S.phone=${encodeURIComponent(phone)}`);
     }
 
     if (email) {
-      lines.push(`EMAIL;TYPE=INTERNET:${escapeVCardValue(email)}`);
+      intentParts.push(`S.email=${encodeURIComponent(email)}`);
     }
 
     if (company) {
-      lines.push(`ORG:${escapeVCardValue(company)}`);
+      intentParts.push(`S.company=${encodeURIComponent(company)}`);
     }
 
-    lines.push("END:VCARD");
-
-    try {
-      const blob = new Blob([lines.join("\r\n")], {
-        type: "text/vcard;charset=utf-8",
-      });
-      const file = new File([blob], `${fullName.replace(/[^a-zA-Z0-9À-ÿ _-]/g, "").trim() || "contatto"}.vcf`, {
-        type: "text/vcard",
-      });
-
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        void navigator.share({
-          files: [file],
-          title: fullName,
-          text: "Aggiungi questo contatto alla rubrica",
-        });
-        return;
-      }
-    } catch {
-      // Se la condivisione file non è disponibile, usa Contatti Google.
-    }
-
-    openGoogleContactForm();
+    intentParts.push("end");
+    return intentParts.join(";");
   };
+
+  const isAndroidDevice =
+    typeof navigator !== "undefined" &&
+    /Android/i.test(navigator.userAgent || "");
 
   const showCandidateOnMap = async (candidate: Candidate) => {
     const zone =
@@ -8335,21 +8232,34 @@ export default function Recruiting({
                           </button>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            addCandidateToPhoneContacts(selectedCandidate)
+                        <a
+                          href={
+                            isAndroidDevice
+                              ? buildAndroidContactIntent(selectedCandidate)
+                              : "#"
                           }
+                          onClick={(event) => {
+                            if (!isAndroidDevice) {
+                              event.preventDefault();
+                              setMessage(
+                                "L'apertura diretta della rubrica è disponibile solo su Android."
+                              );
+                            }
+                          }}
                           style={{
                             ...buttonStyle,
                             padding: "7px 10px",
                             background: "#ecfdf5",
                             color: "#047857",
                             border: "1px solid #6ee7b7",
+                            textDecoration: "none",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                           }}
                         >
                           📇 AGGIUNGI A RUBRICA
-                        </button>
+                        </a>
 
                         <button
                           type="button"
