@@ -9377,23 +9377,28 @@ function SectionHero({
   subtitle,
   icon,
   variant,
+  action,
 }: {
   title: string;
   subtitle: string;
   icon: string;
   variant: string;
+  action?: React.ReactNode;
 }) {
   return (
     <div
       className={`ge-section-hero ge-section-hero--${variant}`}
     >
       <div className="ge-section-hero__icon">{icon}</div>
-      <div>
+      <div className="ge-section-hero__content">
         <div className="ge-section-hero__title">{title}</div>
         <div className="ge-section-hero__subtitle">
           {subtitle}
         </div>
       </div>
+      {action && (
+        <div className="ge-section-hero__action">{action}</div>
+      )}
     </div>
   );
 }
@@ -10850,6 +10855,23 @@ const renderAdminContent = () => {
           subtitle={currentAdminSection.subtitle}
           icon={currentAdminSection.icon}
           variant={currentAdminSection.variant}
+          action={
+            tab === "calendarAdmin" ? (
+              <button
+                type="button"
+                className="ge-section-hero__today-button"
+                onClick={() =>
+                  window.dispatchEvent(
+                    new Event("ge:calendar-focus-today")
+                  )
+                }
+                title="Vai al giorno di oggi"
+                aria-label="Vai al giorno di oggi"
+              >
+                👁
+              </button>
+            ) : undefined
+          }
         />
       )}
 
