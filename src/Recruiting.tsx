@@ -5046,65 +5046,13 @@ export default function Recruiting({
     const email = String(candidate.email || "").trim();
     const company = String(candidate.companyName || "").trim();
 
-    const nameParts = fullName.split(/\s+/).filter(Boolean);
-    const familyName =
-      nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
-    const givenName =
-      nameParts.length > 1
-        ? nameParts.slice(0, -1).join(" ")
-        : fullName;
-
-    const lines = [
-      "BEGIN:VCARD",
-      "VERSION:3.0",
-      `N:${escapeVCardValue(familyName)};${escapeVCardValue(givenName)};;;`,
-      `FN:${escapeVCardValue(fullName)}`,
-    ];
-
-    if (phone) {
-      lines.push(`TEL;TYPE=CELL:${escapeVCardValue(phone)}`);
-    }
-
-    if (email) {
-      lines.push(`EMAIL;TYPE=INTERNET:${escapeVCardValue(email)}`);
-    }
-
-    if (company) {
-      lines.push(`ORG:${escapeVCardValue(company)}`);
-    }
-
-    lines.push("END:VCARD");
-
-    const downloadVCardFallback = () => {
-      const blob = new Blob([lines.join("\r\n")], {
-        type: "text/vcard;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      const safeName = fullName
-        .replace(/[^a-zA-Z0-9À-ÿ _-]/g, "")
-        .trim()
-        .replace(/\s+/g, "_");
-
-      link.href = url;
-      link.download = `${safeName || "contatto"}.vcf`;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-      setMessage(
-        "Il browser non ha aperto direttamente la rubrica: usa il file VCF appena scaricato."
-      );
-    };
-
     const isAndroid = /Android/i.test(navigator.userAgent || "");
 
     if (isAndroid) {
       const intentParts = [
-        "intent:#Intent",
+        "intent://contacts/people/#Intent",
         "action=android.intent.action.INSERT",
+        "category=android.intent.category.DEFAULT",
         "type=vnd.android.cursor.dir/contact",
         `S.name=${encodeURIComponent(fullName)}`,
       ];
@@ -5124,39 +5072,22 @@ export default function Recruiting({
       intentParts.push("end");
       const intentUrl = intentParts.join(";");
 
-      let externalAppOpened = false;
-      const handleVisibilityChange = () => {
-        if (document.hidden) {
-          externalAppOpened = true;
-        }
-      };
-
-      document.addEventListener(
-        "visibilitychange",
-        handleVisibilityChange,
-        { once: true }
-      );
-
-      window.location.href = intentUrl;
-
-      window.setTimeout(() => {
-        document.removeEventListener(
-          "visibilitychange",
-          handleVisibilityChange
-        );
-
-        if (!externalAppOpened && !document.hidden) {
-          downloadVCardFallback();
-        }
-      }, 1200);
+      const link = document.createElement("a");
+      link.href = intentUrl;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
 
       setMessage(
-        "Apro la rubrica del telefono con il contatto già compilato..."
+        "Apro la schermata Nuovo contatto della rubrica Android..."
       );
       return;
     }
 
-    downloadVCardFallback();
+    setMessage(
+      "L'apertura diretta della rubrica è disponibile solo su Android."
+    );
   };
 
   const showCandidateOnMap = async (candidate: Candidate) => {
