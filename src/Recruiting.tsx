@@ -1,4 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    AndroidContacts?: {
+      addContact: (payload: string) => void;
+    };
+  }
+}
+
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
@@ -5045,6 +5054,19 @@ export default function Recruiting({
     const phone = String(candidate.phone || "").trim();
     const email = String(candidate.email || "").trim();
     const company = String(candidate.companyName || "").trim();
+
+    if (window.AndroidContacts?.addContact) {
+      window.AndroidContacts.addContact(
+        JSON.stringify({
+          name: fullName,
+          phone,
+          email,
+          company,
+        })
+      );
+      setMessage("Apro la schermata Nuovo contatto di Android...");
+      return;
+    }
 
     const nameParts = fullName.split(/\s+/).filter(Boolean);
     const familyName =
