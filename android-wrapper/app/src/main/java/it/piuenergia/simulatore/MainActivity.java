@@ -213,18 +213,16 @@ public class MainActivity extends Activity {
     private class ContactsBridge {
         @JavascriptInterface
         public void addContact(String payload) {
-            if (!bridgeAllowed()) {
-                runOnUiThread(() ->
+            runOnUiThread(() -> {
+                if (!bridgeAllowed()) {
                     Toast.makeText(
                         MainActivity.this,
                         "Impossibile aprire la Rubrica da questa pagina.",
                         Toast.LENGTH_LONG
-                    ).show()
-                );
-                return;
-            }
+                    ).show();
+                    return;
+                }
 
-            runOnUiThread(() -> {
                 try {
                     JSONObject json = new JSONObject(payload);
                     String name = json.optString("name", "").trim();
