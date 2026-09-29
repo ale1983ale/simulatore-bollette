@@ -6303,12 +6303,24 @@ export default function Recruiting({
           cursor: pointer;
         }
 
+        .recruiting-contact-detail {
+          container-type: inline-size;
+          container-name: recruiting-contact-detail;
+          min-width: 0;
+        }
+
         .recruiting-detail-bottom-layout {
           display: grid;
           grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
           gap: 14px;
           align-items: start;
           min-width: 0;
+        }
+
+        @container recruiting-contact-detail (max-width: 820px) {
+          .recruiting-detail-bottom-layout {
+            grid-template-columns: minmax(0, 1fr);
+          }
         }
 
         @media (max-width: 820px) {
@@ -8226,6 +8238,7 @@ export default function Recruiting({
 
             <div
               id="recruiting-contact-detail"
+              className="recruiting-contact-detail"
               style={{ display: "flex", flexDirection: "column", gap: 14 }}
             >
               {!selectedCandidate ? (
