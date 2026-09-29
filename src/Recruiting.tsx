@@ -5042,6 +5042,10 @@ export default function Recruiting({
 
   const addCandidateToPhoneContacts = (candidate: Candidate) => {
     const fullName = String(candidate.fullName || "").trim() || "Contatto";
+    const phone = String(candidate.phone || "").trim();
+    const email = String(candidate.email || "").trim();
+    const company = String(candidate.companyName || "").trim();
+
     const nameParts = fullName.split(/\s+/).filter(Boolean);
     const familyName =
       nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
@@ -5057,47 +5061,102 @@ export default function Recruiting({
       `FN:${escapeVCardValue(fullName)}`,
     ];
 
-    if (candidate.phone?.trim()) {
-      lines.push(
-        `TEL;TYPE=CELL:${escapeVCardValue(candidate.phone.trim())}`
-      );
+    if (phone) {
+      lines.push(`TEL;TYPE=CELL:${escapeVCardValue(phone)}`);
     }
 
-    if (candidate.email?.trim()) {
-      lines.push(
-        `EMAIL;TYPE=INTERNET:${escapeVCardValue(candidate.email.trim())}`
-      );
+    if (email) {
+      lines.push(`EMAIL;TYPE=INTERNET:${escapeVCardValue(email)}`);
     }
 
-    if (candidate.companyName?.trim()) {
-      lines.push(
-        `ORG:${escapeVCardValue(candidate.companyName.trim())}`
-      );
+    if (company) {
+      lines.push(`ORG:${escapeVCardValue(company)}`);
     }
 
     lines.push("END:VCARD");
 
-    const blob = new Blob([lines.join("\r\n")], {
-      type: "text/vcard;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const safeName = fullName
-      .replace(/[^a-zA-Z0-9À-ÿ _-]/g, "")
-      .trim()
-      .replace(/\s+/g, "_");
+    const downloadVCardFallback = () => {
+      const blob = new Blob([lines.join("\r\n")], {
+        type: "text/vcard;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const safeName = fullName
+        .replace(/[^a-zA-Z0-9À-ÿ _-]/g, "")
+        .trim()
+        .replace(/\s+/g, "_");
 
-    link.href = url;
-    link.download = `${safeName || "contatto"}.vcf`;
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+      link.href = url;
+      link.download = `${safeName || "contatto"}.vcf`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
 
-    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-    setMessage(
-      "Contatto pronto per la rubrica: apri il file VCF scaricato per salvarlo sul telefono."
-    );
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+      setMessage(
+        "Il browser non ha aperto direttamente la rubrica: usa il file VCF appena scaricato."
+      );
+    };
+
+    const isAndroid = /Android/i.test(navigator.userAgent || "");
+
+    if (isAndroid) {
+      const intentParts = [
+        "intent:#Intent",
+        "action=android.intent.action.INSERT",
+        "type=vnd.android.cursor.dir/contact",
+        `S.name=${encodeURIComponent(fullName)}`,
+      ];
+
+      if (phone) {
+        intentParts.push(`S.phone=${encodeURIComponent(phone)}`);
+      }
+
+      if (email) {
+        intentParts.push(`S.email=${encodeURIComponent(email)}`);
+      }
+
+      if (company) {
+        intentParts.push(`S.company=${encodeURIComponent(company)}`);
+      }
+
+      intentParts.push("end");
+      const intentUrl = intentParts.join(";");
+
+      let externalAppOpened = false;
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          externalAppOpened = true;
+        }
+      };
+
+      document.addEventListener(
+        "visibilitychange",
+        handleVisibilityChange,
+        { once: true }
+      );
+
+      window.location.href = intentUrl;
+
+      window.setTimeout(() => {
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange
+        );
+
+        if (!externalAppOpened && !document.hidden) {
+          downloadVCardFallback();
+        }
+      }, 1200);
+
+      setMessage(
+        "Apro la rubrica del telefono con il contatto già compilato..."
+      );
+      return;
+    }
+
+    downloadVCardFallback();
   };
 
   const showCandidateOnMap = async (candidate: Candidate) => {
