@@ -1,0 +1,46 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "android-wrapper/**"
+      - ".github/workflows/build-android-apk.yml"
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Verify production webapp
+        run: curl --fail --location --silent --show-error --head https://simulatore-bollette.vercel.app/
+
+      - name: Build debug APK
+        run: gradle -p android-wrapper assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp android-wrapper/app/build/outputs/apk/debug/app-debug.apk Simulatore-Bollette.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Simulatore-Bollette-APK
+          path: Simulatore-Bollette.apk
+          if-no-files-found: error
+          retention-days: 30
