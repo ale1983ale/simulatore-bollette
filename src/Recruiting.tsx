@@ -5046,16 +5046,50 @@ export default function Recruiting({
     const email = String(candidate.email || "").trim();
     const company = String(candidate.companyName || "").trim();
 
-    const isAndroid = /Android/i.test(navigator.userAgent || "");
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
+    const familyName =
+      nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+    const givenName =
+      nameParts.length > 1
+        ? nameParts.slice(0, -1).join(" ")
+        : nameParts[0] || fullName;
+
+    const openGoogleContactForm = () => {
+      const url = new URL("https://contacts.google.com/new");
+      if (givenName) url.searchParams.set("givenname", givenName);
+      if (familyName) url.searchParams.set("familyname", familyName);
+      if (phone) url.searchParams.set("phone", phone);
+      if (email) url.searchParams.set("email", email);
+      window.location.href = url.toString();
+    };
+
+    const userAgent = navigator.userAgent || "";
+    const isAndroid = /Android/i.test(userAgent);
 
     if (isAndroid) {
-      const intentParts = [
-        "intent://contacts/people/#Intent",
+      const googleFallback = new URL("https://contacts.google.com/new");
+      if (givenName) googleFallback.searchParams.set("givenname", givenName);
+      if (familyName) googleFallback.searchParams.set("familyname", familyName);
+      if (phone) googleFallback.searchParams.set("phone", phone);
+      if (email) googleFallback.searchParams.set("email", email);
+
+      const isSamsung =
+        /SamsungBrowser/i.test(userAgent) || /\bSM-[A-Z0-9-]+\b/i.test(userAgent);
+
+      const intentParts = ["intent:#Intent"];
+
+      if (isSamsung) {
+        intentParts.push(
+          "package=com.samsung.android.app.contacts",
+          "component=com.samsung.android.app.contacts/com.samsung.android.contacts.editor.ContactEditorActivity"
+        );
+      }
+
+      intentParts.push(
         "action=android.intent.action.INSERT",
-        "category=android.intent.category.DEFAULT",
-        "type=vnd.android.cursor.dir/contact",
-        `S.name=${encodeURIComponent(fullName)}`,
-      ];
+        `type=${isSamsung ? "vnd.android.cursor.dir/raw_contact" : "vnd.android.cursor.dir/contact"}`,
+        `S.name=${encodeURIComponent(fullName)}`
+      );
 
       if (phone) {
         intentParts.push(`S.phone=${encodeURIComponent(phone)}`);
@@ -5069,25 +5103,70 @@ export default function Recruiting({
         intentParts.push(`S.company=${encodeURIComponent(company)}`);
       }
 
-      intentParts.push("end");
-      const intentUrl = intentParts.join(";");
-
-      const link = document.createElement("a");
-      link.href = intentUrl;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      intentParts.push(
+        `S.browser_fallback_url=${encodeURIComponent(googleFallback.toString())}`,
+        "end"
+      );
 
       setMessage(
-        "Apro la schermata Nuovo contatto della rubrica Android..."
+        isSamsung
+          ? "Apro la scheda Nuovo contatto della rubrica Samsung..."
+          : "Apro la scheda Nuovo contatto del telefono..."
       );
+
+      window.location.href = intentParts.join(";");
       return;
     }
 
-    setMessage(
-      "L'apertura diretta della rubrica è disponibile solo su Android."
-    );
+    const escapeVCardValue = (value: string) =>
+      value
+        .replace(/\\/g, "\\\\")
+        .replace(/\n/g, "\\n")
+        .replace(/,/g, "\\,")
+        .replace(/;/g, "\\;");
+
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `N:${escapeVCardValue(familyName)};${escapeVCardValue(givenName)};;;`,
+      `FN:${escapeVCardValue(fullName)}`,
+    ];
+
+    if (phone) {
+      lines.push(`TEL;TYPE=CELL:${escapeVCardValue(phone)}`);
+    }
+
+    if (email) {
+      lines.push(`EMAIL;TYPE=INTERNET:${escapeVCardValue(email)}`);
+    }
+
+    if (company) {
+      lines.push(`ORG:${escapeVCardValue(company)}`);
+    }
+
+    lines.push("END:VCARD");
+
+    try {
+      const blob = new Blob([lines.join("\r\n")], {
+        type: "text/vcard;charset=utf-8",
+      });
+      const file = new File([blob], `${fullName.replace(/[^a-zA-Z0-9À-ÿ _-]/g, "").trim() || "contatto"}.vcf`, {
+        type: "text/vcard",
+      });
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        void navigator.share({
+          files: [file],
+          title: fullName,
+          text: "Aggiungi questo contatto alla rubrica",
+        });
+        return;
+      }
+    } catch {
+      // Se la condivisione file non è disponibile, usa Contatti Google.
+    }
+
+    openGoogleContactForm();
   };
 
   const showCandidateOnMap = async (candidate: Candidate) => {
