@@ -5033,6 +5033,73 @@ export default function Recruiting({
     }
   };
 
+  const escapeVCardValue = (value: string) =>
+    String(value || "")
+      .replace(/\\/g, "\\\\")
+      .replace(/\n/g, "\\n")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,");
+
+  const addCandidateToPhoneContacts = (candidate: Candidate) => {
+    const fullName = String(candidate.fullName || "").trim() || "Contatto";
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
+    const familyName =
+      nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+    const givenName =
+      nameParts.length > 1
+        ? nameParts.slice(0, -1).join(" ")
+        : fullName;
+
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `N:${escapeVCardValue(familyName)};${escapeVCardValue(givenName)};;;`,
+      `FN:${escapeVCardValue(fullName)}`,
+    ];
+
+    if (candidate.phone?.trim()) {
+      lines.push(
+        `TEL;TYPE=CELL:${escapeVCardValue(candidate.phone.trim())}`
+      );
+    }
+
+    if (candidate.email?.trim()) {
+      lines.push(
+        `EMAIL;TYPE=INTERNET:${escapeVCardValue(candidate.email.trim())}`
+      );
+    }
+
+    if (candidate.companyName?.trim()) {
+      lines.push(
+        `ORG:${escapeVCardValue(candidate.companyName.trim())}`
+      );
+    }
+
+    lines.push("END:VCARD");
+
+    const blob = new Blob([lines.join("\r\n")], {
+      type: "text/vcard;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeName = fullName
+      .replace(/[^a-zA-Z0-9À-ÿ _-]/g, "")
+      .trim()
+      .replace(/\s+/g, "_");
+
+    link.href = url;
+    link.download = `${safeName || "contatto"}.vcf`;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+    setMessage(
+      "Contatto pronto per la rubrica: apri il file VCF scaricato per salvarlo sul telefono."
+    );
+  };
+
   const showCandidateOnMap = async (candidate: Candidate) => {
     const zone =
       candidate.id === selectedCandidateId
@@ -8198,6 +8265,22 @@ export default function Recruiting({
                             ANNULLA MODIFICA
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            addCandidateToPhoneContacts(selectedCandidate)
+                          }
+                          style={{
+                            ...buttonStyle,
+                            padding: "7px 10px",
+                            background: "#ecfdf5",
+                            color: "#047857",
+                            border: "1px solid #6ee7b7",
+                          }}
+                        >
+                          📇 AGGIUNGI A RUBRICA
+                        </button>
 
                         <button
                           type="button"
