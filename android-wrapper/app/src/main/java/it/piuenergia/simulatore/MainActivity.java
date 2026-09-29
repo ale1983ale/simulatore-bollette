@@ -6,7 +6,6 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
-import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -15,6 +14,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 import org.json.JSONObject;
 
@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUserAgentString(
-            settings.getUserAgentString() + " SimulatoreBolletteAndroid/1.0"
+            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.1"
         );
 
         CookieManager.getInstance().setAcceptCookie(true);
@@ -134,65 +134,125 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void applyContactExtras(
+        Intent intent,
+        String name,
+        String phone,
+        String email,
+        String company
+    ) {
+        if (!name.isEmpty()) {
+            intent.putExtra(ContactsContract.Intents.Insert.NAME, name);
+        }
+
+        if (!phone.isEmpty()) {
+            intent.putExtra(ContactsContract.Intents.Insert.PHONE, phone);
+            intent.putExtra(
+                ContactsContract.Intents.Insert.PHONE_TYPE,
+                ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE
+            );
+        }
+
+        if (!email.isEmpty()) {
+            intent.putExtra(ContactsContract.Intents.Insert.EMAIL, email);
+            intent.putExtra(
+                ContactsContract.Intents.Insert.EMAIL_TYPE,
+                ContactsContract.CommonDataKinds.Email.TYPE_WORK
+            );
+        }
+
+        if (!company.isEmpty()) {
+            intent.putExtra(ContactsContract.Intents.Insert.COMPANY, company);
+        }
+    }
+
+    private boolean launchContactEditor(
+        String name,
+        String phone,
+        String email,
+        String company
+    ) {
+        try {
+            Intent insertIntent = new Intent(
+                Intent.ACTION_INSERT,
+                ContactsContract.Contacts.CONTENT_URI
+            );
+            applyContactExtras(
+                insertIntent,
+                name,
+                phone,
+                email,
+                company
+            );
+            startActivity(insertIntent);
+            return true;
+        } catch (Exception primaryError) {
+            try {
+                Intent fallbackIntent = new Intent(
+                    Intent.ACTION_INSERT_OR_EDIT
+                );
+                fallbackIntent.setType(
+                    ContactsContract.Contacts.CONTENT_ITEM_TYPE
+                );
+                applyContactExtras(
+                    fallbackIntent,
+                    name,
+                    phone,
+                    email,
+                    company
+                );
+                startActivity(fallbackIntent);
+                return true;
+            } catch (Exception fallbackError) {
+                fallbackError.printStackTrace();
+                return false;
+            }
+        }
+    }
+
     private class ContactsBridge {
         @JavascriptInterface
         public void addContact(String payload) {
-            if (!bridgeAllowed()) return;
+            if (!bridgeAllowed()) {
+                runOnUiThread(() ->
+                    Toast.makeText(
+                        MainActivity.this,
+                        "Impossibile aprire la Rubrica da questa pagina.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                );
+                return;
+            }
 
             runOnUiThread(() -> {
                 try {
                     JSONObject json = new JSONObject(payload);
-                    String name = json.optString("name", "");
-                    String phone = json.optString("phone", "");
-                    String email = json.optString("email", "");
-                    String company = json.optString("company", "");
+                    String name = json.optString("name", "").trim();
+                    String phone = json.optString("phone", "").trim();
+                    String email = json.optString("email", "").trim();
+                    String company = json.optString("company", "").trim();
 
-                    Intent intent = new Intent(
-                        ContactsContract.Intents.Insert.ACTION
+                    boolean opened = launchContactEditor(
+                        name,
+                        phone,
+                        email,
+                        company
                     );
-                    intent.setType(
-                        ContactsContract.RawContacts.CONTENT_TYPE
-                    );
 
-                    if (!name.isEmpty()) {
-                        intent.putExtra(
-                            ContactsContract.Intents.Insert.NAME,
-                            name
-                        );
+                    if (!opened) {
+                        Toast.makeText(
+                            MainActivity.this,
+                            "Android non ha trovato un'app Rubrica compatibile.",
+                            Toast.LENGTH_LONG
+                        ).show();
                     }
-
-                    if (!phone.isEmpty()) {
-                        intent.putExtra(
-                            ContactsContract.Intents.Insert.PHONE,
-                            phone
-                        );
-                        intent.putExtra(
-                            ContactsContract.Intents.Insert.PHONE_TYPE,
-                            ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE
-                        );
-                    }
-
-                    if (!email.isEmpty()) {
-                        intent.putExtra(
-                            ContactsContract.Intents.Insert.EMAIL,
-                            email
-                        );
-                        intent.putExtra(
-                            ContactsContract.Intents.Insert.EMAIL_TYPE,
-                            ContactsContract.CommonDataKinds.Email.TYPE_WORK
-                        );
-                    }
-
-                    if (!company.isEmpty()) {
-                        intent.putExtra(
-                            ContactsContract.Intents.Insert.COMPANY,
-                            company
-                        );
-                    }
-
-                    startActivity(intent);
                 } catch (Exception error) {
                     error.printStackTrace();
+                    Toast.makeText(
+                        MainActivity.this,
+                        "Errore nell'apertura della Rubrica.",
+                        Toast.LENGTH_LONG
+                    ).show();
                 }
             });
         }
