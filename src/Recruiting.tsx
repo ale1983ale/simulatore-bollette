@@ -5033,38 +5033,101 @@ export default function Recruiting({
     }
   };
 
-  const buildAndroidContactIntent = (candidate: Candidate) => {
+  const escapeVCardValue = (value: string) =>
+    String(value || "")
+      .replace(/\\/g, "\\\\")
+      .replace(/\n/g, "\\n")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,");
+
+  const addCandidateToPhoneContacts = async (candidate: Candidate) => {
     const fullName = String(candidate.fullName || "").trim() || "Contatto";
     const phone = String(candidate.phone || "").trim();
     const email = String(candidate.email || "").trim();
     const company = String(candidate.companyName || "").trim();
 
-    const intentParts = [
-      "intent:#Intent",
-      "action=android.intent.action.INSERT",
-      "type=vnd.android.cursor.dir/raw_contact",
-      `S.name=${encodeURIComponent(fullName)}`,
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
+    const familyName =
+      nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+    const givenName =
+      nameParts.length > 1
+        ? nameParts.slice(0, -1).join(" ")
+        : fullName;
+
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `N:${escapeVCardValue(familyName)};${escapeVCardValue(givenName)};;;`,
+      `FN:${escapeVCardValue(fullName)}`,
     ];
 
     if (phone) {
-      intentParts.push(`S.phone=${encodeURIComponent(phone)}`);
+      lines.push(`TEL;TYPE=CELL:${escapeVCardValue(phone)}`);
     }
 
     if (email) {
-      intentParts.push(`S.email=${encodeURIComponent(email)}`);
+      lines.push(`EMAIL;TYPE=INTERNET:${escapeVCardValue(email)}`);
     }
 
     if (company) {
-      intentParts.push(`S.company=${encodeURIComponent(company)}`);
+      lines.push(`ORG:${escapeVCardValue(company)}`);
     }
 
-    intentParts.push("end");
-    return intentParts.join(";");
-  };
+    lines.push("END:VCARD");
 
-  const isAndroidDevice =
-    typeof navigator !== "undefined" &&
-    /Android/i.test(navigator.userAgent || "");
+    const safeName =
+      fullName
+        .replace(/[^a-zA-Z0-9À-ÿ _-]/g, "")
+        .trim()
+        .replace(/\s+/g, "_") || "contatto";
+
+    const file = new File(
+      [lines.join("\r\n")],
+      `${safeName}.vcf`,
+      { type: "text/vcard;charset=utf-8" }
+    );
+
+    try {
+      const canShare =
+        typeof navigator.share === "function" &&
+        (typeof navigator.canShare !== "function" ||
+          navigator.canShare({ files: [file] }));
+
+      if (canShare) {
+        await navigator.share({
+          files: [file],
+          title: fullName,
+        });
+
+        setMessage(
+          "Seleziona Contatti/Rubrica dal pannello Android per salvare il nominativo."
+        );
+        return;
+      }
+    } catch (error: any) {
+      if (error?.name === "AbortError") return;
+      console.warn("VCARD SHARE ERROR:", error);
+    }
+
+    const blob = new Blob([lines.join("\r\n")], {
+      type: "text/vcard;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `${safeName}.vcf`;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    setMessage(
+      "Il browser non supporta la condivisione del contatto: ho preparato il file VCF da aprire con Contatti."
+    );
+  };
 
   const showCandidateOnMap = async (candidate: Candidate) => {
     const zone =
@@ -8232,34 +8295,24 @@ export default function Recruiting({
                           </button>
                         )}
 
-                        <a
-                          href={
-                            isAndroidDevice
-                              ? buildAndroidContactIntent(selectedCandidate)
-                              : "#"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void addCandidateToPhoneContacts(selectedCandidate)
                           }
-                          onClick={(event) => {
-                            if (!isAndroidDevice) {
-                              event.preventDefault();
-                              setMessage(
-                                "L'apertura diretta della rubrica è disponibile solo su Android."
-                              );
-                            }
-                          }}
                           style={{
                             ...buttonStyle,
                             padding: "7px 10px",
                             background: "#ecfdf5",
                             color: "#047857",
                             border: "1px solid #6ee7b7",
-                            textDecoration: "none",
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
                           }}
                         >
                           📇 AGGIUNGI A RUBRICA
-                        </a>
+                        </button>
 
                         <button
                           type="button"
