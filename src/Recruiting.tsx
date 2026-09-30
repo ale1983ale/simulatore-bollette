@@ -2882,15 +2882,26 @@ export default function Recruiting({
   );
 
   const hrSyncNotes = useMemo(
-    () =>
-      notes
-        .filter((note) => note.hrSyncPending)
+    () => {
+      const internalCandidateIds = new Set(
+        allCandidates
+          .filter((candidate) => candidate.contactScope === "internal")
+          .map((candidate) => candidate.id)
+      );
+
+      return notes
+        .filter(
+          (note) =>
+            note.hrSyncPending &&
+            internalCandidateIds.has(note.candidateId)
+        )
         .sort((a, b) =>
           `${b.noteDate}|${b.createdAt}`.localeCompare(
             `${a.noteDate}|${a.createdAt}`
           )
-        ),
-    [notes]
+        );
+    },
+    [notes, allCandidates]
   );
 
   // Se un nominativo ha già almeno una nota in attesa, quella nota
@@ -2903,11 +2914,24 @@ export default function Recruiting({
   );
 
   const visibleHrStatusSyncItems = useMemo(
-    () =>
-      hrStatusSyncItems.filter(
-        (item) => !pendingHrNoteCandidateIds.has(item.candidateId)
-      ),
-    [hrStatusSyncItems, pendingHrNoteCandidateIds]
+    () => {
+      const internalCandidateIds = new Set(
+        allCandidates
+          .filter((candidate) => candidate.contactScope === "internal")
+          .map((candidate) => candidate.id)
+      );
+
+      return hrStatusSyncItems.filter(
+        (item) =>
+          internalCandidateIds.has(item.candidateId) &&
+          !pendingHrNoteCandidateIds.has(item.candidateId)
+      );
+    },
+    [
+      hrStatusSyncItems,
+      pendingHrNoteCandidateIds,
+      allCandidates,
+    ]
   );
 
   const hrOutgoingPendingCount =
@@ -3283,6 +3307,19 @@ export default function Recruiting({
     if (!ctx) return false;
     if (candidate.status === status) return true;
 
+    if (candidate.contactScope === "external") {
+      const updated = await updateCandidateStatus(
+        candidate,
+        status
+      );
+
+      if (updated) {
+        setMessage("Stato salvato.");
+      }
+
+      return updated;
+    }
+
     const hasPendingHrNote = notes.some(
       (note) =>
         note.candidateId === candidate.id &&
@@ -3445,11 +3482,13 @@ export default function Recruiting({
   const confirmNoteStatus = async (sendToHr = false) => {
     if (!selectedCandidate || !ctx || !noteStatusDraft) return;
 
+    const shouldSyncHr =
+      sendToHr && selectedCandidate.contactScope !== "external";
     const previousStatus = selectedCandidate.status;
     const nextStatus = noteStatusDraft;
 
     if (previousStatus === nextStatus) {
-      if (sendToHr) {
+      if (shouldSyncHr) {
         setMessage(
           "Lo stato selezionato è già attivo: nessuno stato è stato aggiunto alla sincronizzazione HR."
         );
@@ -3460,7 +3499,7 @@ export default function Recruiting({
 
     let queueId = "";
 
-    if (sendToHr) {
+    if (shouldSyncHr) {
       setBusy(true);
       try {
         const { data, error } = await ctx.client
@@ -3504,7 +3543,7 @@ export default function Recruiting({
 
     setNoteStatusDraft(nextStatus);
 
-    if (sendToHr) {
+    if (shouldSyncHr) {
       try {
         await loadAll(ctx);
       } catch (error) {
@@ -3514,6 +3553,8 @@ export default function Recruiting({
         "Stato aggiornato e aggiunto agli STATI DA SINCRONIZZARE SU HR SPECIALIST."
       );
       setBusy(false);
+    } else if (selectedCandidate.contactScope === "external") {
+      setMessage("Stato salvato.");
     }
   };
 
@@ -4033,6 +4074,8 @@ export default function Recruiting({
 
   const addNote = async (sendToHr = false) => {
     if (!ctx || !selectedCandidate) return;
+    const shouldSyncHr =
+      sendToHr && selectedCandidate.contactScope !== "external";
     if (!noteText.trim()) {
       setMessage("Scrivi la nota prima di salvarla.");
       return;
@@ -4046,7 +4089,7 @@ export default function Recruiting({
         note_date: noteDate,
         note_text: noteText.trim(),
         called_by_me: noteCalledByMe,
-        hr_sync_pending: sendToHr,
+        hr_sync_pending: shouldSyncHr,
       });
       if (error) throw error;
 
@@ -4060,9 +4103,9 @@ export default function Recruiting({
       );
       await loadAll(ctx);
       setMessage(
-        sendToHr
+        shouldSyncHr
           ? "Nota aggiunta e inserita nelle NOTE DA SINCRONIZZARE SU HR SPECIALIST."
-          : "Nota aggiunta."
+          : "Nota salvata."
       );
     } catch (error: any) {
       setMessage("Errore nel salvataggio della nota: " + (error?.message || error));
@@ -4073,6 +4116,12 @@ export default function Recruiting({
 
   const addNoteAndStatusToHr = async () => {
     if (!ctx || !selectedCandidate) return;
+
+    if (selectedCandidate.contactScope === "external") {
+      await addNote(false);
+      return;
+    }
+
     if (!noteText.trim()) {
       setMessage("Scrivi la nota prima di salvarla.");
       return;
@@ -8974,24 +9023,28 @@ export default function Recruiting({
                                   busy || !noteStatusDraft ? 0.6 : 1,
                               }}
                             >
-                              OK
+                              {selectedCandidate.contactScope === "external"
+                                ? "SALVA"
+                                : "OK"}
                             </button>
 
-                            <button
-                              type="button"
-                              disabled={busy || !noteStatusDraft}
-                              onClick={() => void confirmNoteStatus(true)}
-                              style={{
-                                ...buttonStyle,
-                                minHeight: 40,
-                                background: "#2563eb",
-                                color: "white",
-                                opacity:
-                                  busy || !noteStatusDraft ? 0.6 : 1,
-                              }}
-                            >
-                              OK E SINCRO HR
-                            </button>
+                            {selectedCandidate.contactScope !== "external" && (
+                              <button
+                                type="button"
+                                disabled={busy || !noteStatusDraft}
+                                onClick={() => void confirmNoteStatus(true)}
+                                style={{
+                                  ...buttonStyle,
+                                  minHeight: 40,
+                                  background: "#2563eb",
+                                  color: "white",
+                                  opacity:
+                                    busy || !noteStatusDraft ? 0.6 : 1,
+                                }}
+                              >
+                                OK E SINCRO HR
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -9054,41 +9107,47 @@ export default function Recruiting({
                             opacity: busy ? 0.6 : 1,
                           }}
                         >
-                          AGGIUNGI NOTA
+                          {selectedCandidate.contactScope === "external"
+                            ? "SALVA NOTA"
+                            : "AGGIUNGI NOTA"}
                         </button>
 
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void addNote(true)}
-                          style={{
-                            ...buttonStyle,
-                            minHeight: 42,
-                            background: "#2563eb",
-                            color: "white",
-                            opacity: busy ? 0.6 : 1,
-                          }}
-                        >
-                          AGGIUNGI NOTA E SU HR
-                        </button>
+                        {selectedCandidate.contactScope !== "external" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void addNote(true)}
+                              style={{
+                                ...buttonStyle,
+                                minHeight: 42,
+                                background: "#2563eb",
+                                color: "white",
+                                opacity: busy ? 0.6 : 1,
+                              }}
+                            >
+                              AGGIUNGI NOTA E SU HR
+                            </button>
 
-                        <button
-                          type="button"
-                          disabled={busy || !noteStatusDraft}
-                          onClick={() =>
-                            void addNoteAndStatusToHr()
-                          }
-                          style={{
-                            ...buttonStyle,
-                            minHeight: 42,
-                            background: "#7c3aed",
-                            color: "white",
-                            opacity:
-                              busy || !noteStatusDraft ? 0.6 : 1,
-                          }}
-                        >
-                          AGGIUNGI NOTA E STATO SU HR
-                        </button>
+                            <button
+                              type="button"
+                              disabled={busy || !noteStatusDraft}
+                              onClick={() =>
+                                void addNoteAndStatusToHr()
+                              }
+                              style={{
+                                ...buttonStyle,
+                                minHeight: 42,
+                                background: "#7c3aed",
+                                color: "white",
+                                opacity:
+                                  busy || !noteStatusDraft ? 0.6 : 1,
+                              }}
+                            >
+                              AGGIUNGI NOTA E STATO SU HR
+                            </button>
+                          </>
+                        )}
                       </div>
 
                       <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
