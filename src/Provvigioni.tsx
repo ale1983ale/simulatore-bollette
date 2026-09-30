@@ -975,11 +975,13 @@ export default function Provvigioni({
                     Consumo mensile: {longSimulation.monthlyConsumption.toLocaleString("it-IT", { maximumFractionDigits: 2 })} {commodity === "Energia" ? "kWh" : "Smc"} · Tariffa: {formatMoney(longSimulation.maintenanceRate)} /{commodity === "Energia" ? "MWh" : "Smc"} · {longSimulation.months} mesi
                   </div>
                 </div>
-                <div className="provv-long-item">
-                  <div className="provv-long-item__label">Bonus 13° mese</div>
-                  <div className="provv-long-item__value">{formatMoney(longSimulation.thirteenthMonth)}</div>
-                  <div className="provv-long-item__detail">{longSimulation.months >= 13 ? "25% del gettone iniziale, una sola volta" : "Spetta da 13 mesi"}</div>
-                </div>
+                {longSimulation.thirteenthMonth > 0.1 && (
+                  <div className="provv-long-item">
+                    <div className="provv-long-item__label">Bonus 13° mese</div>
+                    <div className="provv-long-item__value">{formatMoney(longSimulation.thirteenthMonth)}</div>
+                    <div className="provv-long-item__detail">25% del gettone iniziale, una sola volta</div>
+                  </div>
+                )}
                 {includePortfolioBonus && (
                   <div className="provv-long-item">
                     <div className="provv-long-item__label">Contributo premio semestrale</div>
