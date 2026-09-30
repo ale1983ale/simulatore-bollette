@@ -9539,6 +9539,22 @@ export default function App() {
     color: "white",
     border: "1px solid #0f172a",
   };
+
+  const mainNavBtn = {
+    ...baseBtn,
+    padding: "9px 11px",
+  };
+
+  const mainNavIconBtn = {
+    ...mainNavBtn,
+    minWidth: 42,
+    padding: "8px 9px",
+    fontSize: 18,
+    lineHeight: 1,
+    display: "inline-grid",
+    placeItems: "center",
+  };
+
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [agentSession, setAgentSession] = useState<any>(null);
@@ -11370,7 +11386,7 @@ if (!agentSession && !adminSession) {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: 7,
           marginBottom: 16,
           flexWrap: "wrap",
           width: "100%",
@@ -11380,7 +11396,7 @@ if (!agentSession && !adminSession) {
           className="ge-main-nav__primary"
           style={{
             display: "flex",
-            gap: 8,
+            gap: 6,
             flexWrap: "wrap",
             alignItems: "center",
           }}
@@ -11388,7 +11404,7 @@ if (!agentSession && !adminSession) {
           <button
             onClick={() => navigateTo("energia")}
             style={{
-              ...baseBtn,
+              ...mainNavBtn,
               ...(tab === "energia" ? activeBtn : {}),
             }}
           >
@@ -11398,7 +11414,7 @@ if (!agentSession && !adminSession) {
           <button
             onClick={() => navigateTo("gas")}
             style={{
-              ...baseBtn,
+              ...mainNavBtn,
               ...(tab === "gas" ? activeBtn : {}),
             }}
           >
@@ -11408,7 +11424,7 @@ if (!agentSession && !adminSession) {
           <button
             onClick={() => navigateTo("report")}
             style={{
-              ...baseBtn,
+              ...mainNavBtn,
               ...(tab === "report" ? activeBtn : {}),
             }}
           >
@@ -11418,7 +11434,7 @@ if (!agentSession && !adminSession) {
           <button
             onClick={() => navigateTo("punpsvPublic")}
             style={{
-              ...baseBtn,
+              ...mainNavBtn,
               ...(tab === "punpsvPublic" ? activeBtn : {}),
             }}
           >
@@ -11428,7 +11444,7 @@ if (!agentSession && !adminSession) {
           <button
             onClick={() => navigateTo("ateco")}
             style={{
-              ...baseBtn,
+              ...mainNavBtn,
               ...(tab === "ateco" ? activeBtn : {}),
             }}
           >
@@ -11438,12 +11454,42 @@ if (!agentSession && !adminSession) {
           <button
             onClick={() => navigateTo("driveArchive")}
             style={{
-              ...baseBtn,
+              ...mainNavBtn,
               ...(tab === "driveArchive" ? activeBtn : {}),
             }}
           >
             ARCHIVIO
           </button>
+
+          {adminSession && hasFullAdminAccess && (
+            <>
+              <button
+                type="button"
+                title="Calendario"
+                aria-label="Apri Calendario"
+                onClick={() => navigateTo("calendarAdmin")}
+                style={{
+                  ...mainNavIconBtn,
+                  ...(tab === "calendarAdmin" ? activeBtn : {}),
+                }}
+              >
+                📅
+              </button>
+
+              <button
+                type="button"
+                title="Recruiting"
+                aria-label="Apri Recruiting"
+                onClick={() => navigateTo("recruiting")}
+                style={{
+                  ...mainNavIconBtn,
+                  ...(tab === "recruiting" ? activeBtn : {}),
+                }}
+              >
+                👥
+              </button>
+            </>
+          )}
 
         </div>
 
