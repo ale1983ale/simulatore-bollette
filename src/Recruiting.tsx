@@ -1197,6 +1197,7 @@ export default function Recruiting({
   contactsOnly = false,
   hideNavigation = false,
   onOpenContact,
+  onOpenAppointment,
 }: {
   initialSection?: RecruitingSection;
   contactScope?: RecruitingContactScope;
@@ -1205,6 +1206,10 @@ export default function Recruiting({
   onOpenContact?: (
     scope: RecruitingContactScope,
     candidateId: string
+  ) => void;
+  onOpenAppointment?: (
+    crmEventId: string,
+    mode: "view" | "reschedule"
   ) => void;
 }) {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
@@ -11922,6 +11927,50 @@ export default function Recruiting({
                       marginTop: 14,
                     }}
                   >
+                    {onOpenAppointment && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const crmEventId =
+                              crmDetailEvent.crmEventId;
+                            setCrmDetailEventId(null);
+                            onOpenAppointment(
+                              crmEventId,
+                              "view"
+                            );
+                          }}
+                          style={{
+                            ...buttonStyle,
+                            background: "#2563eb",
+                            color: "white",
+                          }}
+                        >
+                          APRI IN APPUNTAMENTI
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const crmEventId =
+                              crmDetailEvent.crmEventId;
+                            setCrmDetailEventId(null);
+                            onOpenAppointment(
+                              crmEventId,
+                              "reschedule"
+                            );
+                          }}
+                          style={{
+                            ...buttonStyle,
+                            background: "#f97316",
+                            color: "white",
+                          }}
+                        >
+                          RIPROGRAMMA
+                        </button>
+                      </>
+                    )}
+
                     {mapUrl && (
                       <button
                         type="button"
