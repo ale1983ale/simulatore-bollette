@@ -951,11 +951,13 @@ export default function Provvigioni({
                     <div className="provv-long-item__detail">Differenza necessaria per arrivare a {formatMoney(100)}</div>
                   </div>
                 )}
-                <div className="provv-long-item">
-                  <div className="provv-long-item__label">Gettone complessivo iniziale</div>
-                  <div className="provv-long-item__value">{formatMoney(longSimulation.initialGettone)}</div>
-                  <div className="provv-long-item__detail">Gettone originario + bonus prezzo fisso</div>
-                </div>
+                {bonusFissoLuceCard && (
+                  <div className="provv-long-item">
+                    <div className="provv-long-item__label">Gettone complessivo iniziale</div>
+                    <div className="provv-long-item__value">{formatMoney(longSimulation.initialGettone)}</div>
+                    <div className="provv-long-item__detail">Gettone originario + bonus prezzo fisso</div>
+                  </div>
+                )}
                 <div className="provv-long-item">
                   <div className="provv-long-item__label">Premio RID iniziale</div>
                   <div className="provv-long-item__value">{formatMoney(longSimulation.premioRid)}</div>
