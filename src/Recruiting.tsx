@@ -1446,6 +1446,16 @@ export default function Recruiting({
     useState(localDateKey());
   const [googleImportTime, setGoogleImportTime] = useState("");
   const [googleImportNotes, setGoogleImportNotes] = useState("");
+  const [googleImportNewCandidateOpen, setGoogleImportNewCandidateOpen] =
+    useState(false);
+  const [googleImportNewName, setGoogleImportNewName] = useState("");
+  const [googleImportNewZone, setGoogleImportNewZone] = useState("");
+  const [googleImportNewPhone, setGoogleImportNewPhone] = useState("");
+  const [googleImportNewEmail, setGoogleImportNewEmail] = useState("");
+  const [googleImportNewReferrer, setGoogleImportNewReferrer] =
+    useState("");
+  const [googleImportNewCandidateMessage, setGoogleImportNewCandidateMessage] =
+    useState("");
 
   const [forwardedNewCandidateId, setForwardedNewCandidateId] = useState<string | null>(null);
   const [forwardedNewName, setForwardedNewName] = useState("");
@@ -4572,6 +4582,125 @@ export default function Recruiting({
     );
     setGoogleImportTime(event.all_day ? "" : event.start_time || "");
     setGoogleImportNotes(noteParts.join("\n"));
+    setGoogleImportNewCandidateOpen(false);
+    setGoogleImportNewName("");
+    setGoogleImportNewZone("");
+    setGoogleImportNewPhone("");
+    setGoogleImportNewEmail("");
+    setGoogleImportNewReferrer("");
+    setGoogleImportNewCandidateMessage("");
+  };
+
+  const createGoogleImportExternalCandidate = async () => {
+    if (!ctx || !googleImportEvent) return;
+
+    const fullName = googleImportNewName.trim().toLocaleUpperCase("it");
+    if (!fullName) {
+      setGoogleImportNewCandidateMessage(
+        "Inserisci almeno nome e cognome."
+      );
+      return;
+    }
+
+    const existingExternal = allCandidates.find(
+      (candidate) =>
+        candidate.contactScope === "external" &&
+        normalizeCandidateName(candidate.fullName) ===
+          normalizeCandidateName(fullName)
+    );
+
+    if (existingExternal) {
+      setGoogleImportCandidateId(existingExternal.id);
+      setGoogleImportNewCandidateOpen(false);
+      setGoogleImportNewCandidateMessage(
+        "Il nominativo era già presente nei Contatti esterni: l'ho associato all'evento."
+      );
+      return;
+    }
+
+    setBusy(true);
+    setGoogleImportNewCandidateMessage("");
+
+    try {
+      let geography = {
+        provinceCode: "",
+        region: "",
+        latitude: null as number | null,
+        longitude: null as number | null,
+      };
+
+      if (googleImportNewZone.trim()) {
+        try {
+          const geo = await geocodeRecruitingCandidateZone(
+            googleImportNewZone.trim()
+          );
+          geography = {
+            provinceCode: geo.provinceCode || "",
+            region: geo.region || "",
+            latitude:
+              geo.latitude !== null && Number.isFinite(geo.latitude)
+                ? geo.latitude
+                : null,
+            longitude:
+              geo.longitude !== null && Number.isFinite(geo.longitude)
+                ? geo.longitude
+                : null,
+          };
+        } catch (error) {
+          console.warn(
+            "GOOGLE IMPORT EXTERNAL CONTACT GEOGRAPHY ERROR:",
+            error
+          );
+        }
+      }
+
+      const { data, error } = await ctx.client
+        .from("recruiting_candidates")
+        .insert({
+          owner_key: ctx.ownerKey,
+          contact_scope: "external",
+          full_name: fullName,
+          operational_zone:
+            googleImportNewZone.trim().toLocaleUpperCase("it"),
+          sector_energy: false,
+          sector_other: "CONTATTO ESTERNO",
+          company_name: "",
+          referrer: googleImportNewReferrer.trim(),
+          phone: googleImportNewPhone.trim(),
+          email: googleImportNewEmail.trim(),
+          contact_status: "DA_CHIAMARE",
+          forwarded_to: "",
+          province_code: geography.provinceCode,
+          region: geography.region,
+          latitude: geography.latitude,
+          longitude: geography.longitude,
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      const newCandidateId = String(data.id);
+      setGoogleImportCandidateId(newCandidateId);
+      setGoogleImportNewCandidateOpen(false);
+      setGoogleImportNewCandidateMessage(
+        "Nominativo aggiunto ai Contatti esterni e associato all'evento."
+      );
+      setGoogleImportNewName("");
+      setGoogleImportNewZone("");
+      setGoogleImportNewPhone("");
+      setGoogleImportNewEmail("");
+      setGoogleImportNewReferrer("");
+
+      await loadAll(ctx);
+    } catch (error: any) {
+      setGoogleImportNewCandidateMessage(
+        "Errore nell'aggiunta del nominativo: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const importGoogleEventToInternal = async () => {
@@ -11354,15 +11483,44 @@ export default function Recruiting({
               }}
             >
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>
-                  Associa a nominativo
-                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "end",
+                    gap: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>
+                    Associa a nominativo
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGoogleImportNewCandidateOpen((current) => !current);
+                      setGoogleImportNewCandidateMessage("");
+                    }}
+                    style={{
+                      ...buttonStyle,
+                      padding: "6px 9px",
+                      background: "#16a34a",
+                      color: "white",
+                      fontSize: 11,
+                    }}
+                  >
+                    {googleImportNewCandidateOpen
+                      ? "ANNULLA"
+                      : "+ AGGIUNGI NOMINATIVO"}
+                  </button>
+                </div>
+
                 <select
                   value={googleImportCandidateId}
                   onChange={(e) =>
                     setGoogleImportCandidateId(e.target.value)
                   }
-                  style={inputStyle}
+                  style={{ ...inputStyle, marginTop: 6 }}
                 >
                   <option value="">Senza nominativo</option>
                   {alphabeticalAllCandidates.map((candidate) => (
@@ -11377,6 +11535,149 @@ export default function Recruiting({
                     </option>
                   ))}
                 </select>
+
+                {googleImportNewCandidateOpen && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: 12,
+                      borderRadius: 10,
+                      border: "1px solid #86efac",
+                      background: "#f0fdf4",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 900,
+                        color: "#166534",
+                        marginBottom: 9,
+                      }}
+                    >
+                      NUOVO CONTATTO ESTERNO
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit,minmax(180px,1fr))",
+                        gap: 9,
+                      }}
+                    >
+                      <div>
+                        <label style={labelStyle}>Nome e cognome *</label>
+                        <input
+                          value={googleImportNewName}
+                          onChange={(e) =>
+                            setGoogleImportNewName(
+                              e.target.value.toLocaleUpperCase("it")
+                            )
+                          }
+                          placeholder="NOME COGNOME"
+                          style={{
+                            ...inputStyle,
+                            textTransform: "uppercase",
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Città / zona</label>
+                        <input
+                          value={googleImportNewZone}
+                          onChange={(e) =>
+                            setGoogleImportNewZone(
+                              e.target.value.toLocaleUpperCase("it")
+                            )
+                          }
+                          placeholder="CITTÀ"
+                          style={{
+                            ...inputStyle,
+                            textTransform: "uppercase",
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Telefono</label>
+                        <input
+                          value={googleImportNewPhone}
+                          onChange={(e) =>
+                            setGoogleImportNewPhone(e.target.value)
+                          }
+                          placeholder="+39 ..."
+                          style={inputStyle}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Email</label>
+                        <input
+                          type="email"
+                          value={googleImportNewEmail}
+                          onChange={(e) =>
+                            setGoogleImportNewEmail(e.target.value)
+                          }
+                          style={inputStyle}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Segnalatore</label>
+                        <input
+                          value={googleImportNewReferrer}
+                          onChange={(e) =>
+                            setGoogleImportNewReferrer(e.target.value)
+                          }
+                          placeholder="Facoltativo"
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        marginTop: 10,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void createGoogleImportExternalCandidate()
+                        }
+                        style={{
+                          ...buttonStyle,
+                          background: "#16a34a",
+                          color: "white",
+                          opacity: busy ? 0.6 : 1,
+                        }}
+                      >
+                        {busy ? "SALVATAGGIO..." : "SALVA E ASSOCIA"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {googleImportNewCandidateMessage && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "7px 9px",
+                      borderRadius: 8,
+                      background: "#ecfdf5",
+                      color: "#166534",
+                      border: "1px solid #bbf7d0",
+                      fontSize: 11,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {googleImportNewCandidateMessage}
+                  </div>
+                )}
               </div>
 
               <div>
