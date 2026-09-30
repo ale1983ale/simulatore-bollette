@@ -11344,8 +11344,8 @@ if (!agentSession && !adminSession) {
             style={{
               position: "absolute",
               zIndex: 19,
-              right: 12,
-              bottom: 10,
+              right: 142,
+              bottom: 11,
               display: "flex",
               alignItems: "center",
               gap: 7,
@@ -11410,33 +11410,40 @@ if (!agentSession && !adminSession) {
             >
               👥
             </button>
-
-            {adminProfile?.role === "super_admin" && (
-              <button
-                type="button"
-                className="ge-brand-waiting"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  width: "auto",
-                  padding: 0,
-                  border: 0,
-                  background: "transparent",
-                }}
-                onClick={() => navigateTo("recruitingWaiting")}
-                aria-label={`Apri Sala d'attesa: ${waitingRoomIncomingCount} in entrata, ${waitingRoomOutgoingCount} in uscita`}
-                title="Apri Sala d'attesa"
-              >
-                <span className="ge-brand-waiting__incoming">
-                  {waitingRoomIncomingCount}
-                </span>
-                <span className="ge-brand-waiting__outgoing">
-                  {waitingRoomOutgoingCount}
-                </span>
-              </button>
-            )}
           </div>
+        )}
+
+        {adminProfile?.role === "super_admin" && (
+          <button
+            type="button"
+            className="ge-brand-waiting"
+            style={{
+              position: "absolute",
+              zIndex: 19,
+              right: 12,
+              bottom: 10,
+              top: "auto",
+              transform: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              width: "auto",
+              padding: 0,
+              border: 0,
+              background: "transparent",
+            }}
+            onClick={() => navigateTo("recruitingWaiting")}
+            aria-label={`Apri Sala d'attesa: ${waitingRoomIncomingCount} in entrata, ${waitingRoomOutgoingCount} in uscita`}
+            title="Apri Sala d'attesa"
+          >
+            <span className="ge-brand-waiting__incoming">
+              {waitingRoomIncomingCount}
+            </span>
+            <span className="ge-brand-waiting__outgoing">
+              {waitingRoomOutgoingCount}
+            </span>
+          </button>
+        )}
         )}
       </div>
   
