@@ -349,7 +349,17 @@ function crmEventFromRow(row: any): CrmEvent {
   };
 }
 
-export default function Appointments() {
+export default function Appointments({
+  openRequest,
+  onOpenRequestConsumed,
+}: {
+  openRequest?: {
+    crmEventId: string;
+    mode: "view" | "reschedule";
+    requestId: number;
+  } | null;
+  onOpenRequestConsumed?: () => void;
+}) {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [events, setEvents] = useState<RecruitingEvent[]>([]);
@@ -371,6 +381,8 @@ export default function Appointments() {
   const [activityDate, setActivityDate] = useState(localDateKey());
   const [activityTime, setActivityTime] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
+  const [rescheduleCrmEventId, setRescheduleCrmEventId] =
+    useState("");
 
   const loadData = async (context?: RecruitingContext) => {
     const active = context || ctx || (await getRecruitingContext());
@@ -459,6 +471,59 @@ export default function Appointments() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!openRequest || loading) return;
+
+    const target = crmEvents.find(
+      (event) => event.crmEventId === openRequest.crmEventId
+    );
+
+    if (!target) {
+      if (crmEvents.length) {
+        setMessage(
+          `Appuntamento CRM #${openRequest.crmEventId} non trovato tra gli eventi attivi.`
+        );
+        onOpenRequestConsumed?.();
+      }
+      return;
+    }
+
+    setSearch("");
+    setSourceFilter("CRM");
+    setShowPast(target.startDate < localDateKey());
+    setSelectedKey(`crm:${target.id}`);
+
+    if (openRequest.mode === "reschedule") {
+      setRescheduleCrmEventId(target.crmEventId);
+      setActivityType("APPUNTAMENTO_ZONA");
+      setActivityCustom("");
+      setActivityDate(target.startDate || localDateKey());
+      setActivityTime(target.startTime || "");
+      setActivityNotes("");
+    } else {
+      setRescheduleCrmEventId("");
+    }
+
+    window.setTimeout(() => {
+      document
+        .getElementById(
+          openRequest.mode === "reschedule"
+            ? "appointments-program-activity"
+            : "appointments-selected-detail"
+        )
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 120);
+
+    onOpenRequestConsumed?.();
+  }, [
+    openRequest?.requestId,
+    loading,
+    crmEvents,
+  ]);
 
   const candidateMap = useMemo(
     () => new Map(candidates.map((candidate) => [candidate.id, candidate])),
@@ -636,6 +701,7 @@ export default function Appointments() {
 
       setActivityNotes("");
       setActivityCustom("");
+      setRescheduleCrmEventId("");
       await loadData(ctx);
       setMessage(
         `Attività inserita nel calendario${googleMessage}.`
@@ -1024,7 +1090,10 @@ export default function Appointments() {
                 alignItems: "start",
               }}
             >
-              <div style={cardStyle}>
+              <div
+                id="appointments-selected-detail"
+                style={cardStyle}
+              >
                 <div
                   style={{
                     display: "flex",
@@ -1342,6 +1411,7 @@ export default function Appointments() {
               </div>
 
               <div
+                id="appointments-program-activity"
                 style={{
                   ...cardStyle,
                   background: "#fff7ed",
@@ -1349,7 +1419,10 @@ export default function Appointments() {
                 }}
               >
                 <h3 style={{ marginTop: 0 }}>
-                  Programma attività
+                  {selected.source === "crm" &&
+                  rescheduleCrmEventId === selected.crm.crmEventId
+                    ? "Riprogramma appuntamento"
+                    : "Programma attività"}
                 </h3>
                 <div
                   style={{
@@ -1358,8 +1431,10 @@ export default function Appointments() {
                     marginBottom: 14,
                   }}
                 >
-                  Rifissa una chiamata, un appuntamento o una
-                  videocal nel CALENDARIO.
+                  {selected.source === "crm" &&
+                  rescheduleCrmEventId === selected.crm.crmEventId
+                    ? "Data e ora attuali sono già compilate: modificale e salva la nuova attività nel CALENDARIO."
+                    : "Rifissa una chiamata, un appuntamento o una videocal nel CALENDARIO."}
                 </div>
 
                 <div style={{ display: "grid", gap: 10 }}>
@@ -1481,7 +1556,10 @@ export default function Appointments() {
                   >
                     {busy
                       ? "INSERIMENTO..."
-                      : "INSERISCI NEL CALENDARIO"}
+                      : selected.source === "crm" &&
+                          rescheduleCrmEventId === selected.crm.crmEventId
+                        ? "SALVA RIPROGRAMMAZIONE"
+                        : "INSERISCI NEL CALENDARIO"}
                   </button>
                 </div>
               </div>
