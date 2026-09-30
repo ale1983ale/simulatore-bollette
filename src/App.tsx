@@ -11444,7 +11444,6 @@ if (!agentSession && !adminSession) {
             </span>
           </button>
         )}
-        )}
       </div>
   
       <div
