@@ -9550,6 +9550,12 @@ export default function App() {
   const [agentSession, setAgentSession] = useState<any>(null);
   const [provvigioniPrefill, setProvvigioniPrefill] =
     useState<ProvvigioniPrefill | null>(null);
+  const [appointmentOpenRequest, setAppointmentOpenRequest] =
+    useState<{
+      crmEventId: string;
+      mode: "view" | "reschedule";
+      requestId: number;
+    } | null>(null);
   const [waitingRoomIncomingCount, setWaitingRoomIncomingCount] =
     useState(0);
   const [waitingRoomOutgoingCount, setWaitingRoomOutgoingCount] =
@@ -9684,6 +9690,20 @@ export default function App() {
       requestId: Date.now(),
     });
     navigateTo("provvigioni");
+  };
+
+  const openAppointmentFromCalendar = (
+    crmEventId: string,
+    mode: "view" | "reschedule"
+  ) => {
+    setAppointmentOpenRequest({
+      crmEventId,
+      mode,
+      requestId: Date.now(),
+    });
+    setAdminMenuOpen(false);
+    setTab("appointments");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const openRecruitingContactFromCalendar = (
@@ -10899,13 +10919,19 @@ const renderAdminContent = () => {
             initialSection="calendar"
             hideNavigation
             onOpenContact={openRecruitingContactFromCalendar}
+            onOpenAppointment={openAppointmentFromCalendar}
           />
         </div>
       )}
 
       {tab === "appointments" && (
         <div style={{ width: "100%", minWidth: 0 }}>
-          <Appointments />
+          <Appointments
+            openRequest={appointmentOpenRequest}
+            onOpenRequestConsumed={() =>
+              setAppointmentOpenRequest(null)
+            }
+          />
         </div>
       )}
 
