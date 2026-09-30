@@ -9545,16 +9545,6 @@ export default function App() {
     padding: "9px 11px",
   };
 
-  const mainNavIconBtn = {
-    ...mainNavBtn,
-    minWidth: 42,
-    padding: "8px 9px",
-    fontSize: 18,
-    lineHeight: 1,
-    display: "inline-grid",
-    placeItems: "center",
-  };
-
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [agentSession, setAgentSession] = useState<any>(null);
@@ -11348,36 +11338,105 @@ if (!agentSession && !adminSession) {
           </button>
         )}
 
-        {adminProfile?.role === "super_admin" && (
-          <button
-            type="button"
-            className="ge-brand-waiting"
+        {adminSession && hasFullAdminAccess && (
+          <div
+            className="ge-brand-quick-actions"
             style={{
               position: "absolute",
               zIndex: 19,
               right: 12,
               bottom: 10,
-              top: "auto",
-              transform: "none",
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              width: "auto",
-              padding: 0,
-              border: 0,
-              background: "transparent",
+              gap: 7,
             }}
-            onClick={() => navigateTo("recruitingWaiting")}
-            aria-label={`Apri Sala d'attesa: ${waitingRoomIncomingCount} in entrata, ${waitingRoomOutgoingCount} in uscita`}
-            title="Apri Sala d'attesa"
           >
-            <span className="ge-brand-waiting__incoming">
-              {waitingRoomIncomingCount}
-            </span>
-            <span className="ge-brand-waiting__outgoing">
-              {waitingRoomOutgoingCount}
-            </span>
-          </button>
+            <button
+              type="button"
+              title="Calendario"
+              aria-label="Apri Calendario"
+              onClick={() => navigateTo("calendarAdmin")}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                border:
+                  tab === "calendarAdmin"
+                    ? "2px solid #ffffff"
+                    : "1px solid rgba(255,255,255,.72)",
+                background:
+                  tab === "calendarAdmin"
+                    ? "rgba(255,255,255,.30)"
+                    : "rgba(255,255,255,.16)",
+                color: "#ffffff",
+                display: "grid",
+                placeItems: "center",
+                padding: 0,
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: "pointer",
+                boxShadow: "0 3px 9px rgba(15,23,42,.16)",
+              }}
+            >
+              📅
+            </button>
+
+            <button
+              type="button"
+              title="Recruiting"
+              aria-label="Apri Recruiting"
+              onClick={() => navigateTo("recruiting")}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                border:
+                  tab === "recruiting"
+                    ? "2px solid #ffffff"
+                    : "1px solid rgba(255,255,255,.72)",
+                background:
+                  tab === "recruiting"
+                    ? "rgba(255,255,255,.30)"
+                    : "rgba(255,255,255,.16)",
+                color: "#ffffff",
+                display: "grid",
+                placeItems: "center",
+                padding: 0,
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: "pointer",
+                boxShadow: "0 3px 9px rgba(15,23,42,.16)",
+              }}
+            >
+              👥
+            </button>
+
+            {adminProfile?.role === "super_admin" && (
+              <button
+                type="button"
+                className="ge-brand-waiting"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  width: "auto",
+                  padding: 0,
+                  border: 0,
+                  background: "transparent",
+                }}
+                onClick={() => navigateTo("recruitingWaiting")}
+                aria-label={`Apri Sala d'attesa: ${waitingRoomIncomingCount} in entrata, ${waitingRoomOutgoingCount} in uscita`}
+                title="Apri Sala d'attesa"
+              >
+                <span className="ge-brand-waiting__incoming">
+                  {waitingRoomIncomingCount}
+                </span>
+                <span className="ge-brand-waiting__outgoing">
+                  {waitingRoomOutgoingCount}
+                </span>
+              </button>
+            )}
+          </div>
         )}
       </div>
   
@@ -11460,36 +11519,6 @@ if (!agentSession && !adminSession) {
           >
             ARCHIVIO
           </button>
-
-          {adminSession && hasFullAdminAccess && (
-            <>
-              <button
-                type="button"
-                title="Calendario"
-                aria-label="Apri Calendario"
-                onClick={() => navigateTo("calendarAdmin")}
-                style={{
-                  ...mainNavIconBtn,
-                  ...(tab === "calendarAdmin" ? activeBtn : {}),
-                }}
-              >
-                📅
-              </button>
-
-              <button
-                type="button"
-                title="Recruiting"
-                aria-label="Apri Recruiting"
-                onClick={() => navigateTo("recruiting")}
-                style={{
-                  ...mainNavIconBtn,
-                  ...(tab === "recruiting" ? activeBtn : {}),
-                }}
-              >
-                👥
-              </button>
-            </>
-          )}
 
         </div>
 
