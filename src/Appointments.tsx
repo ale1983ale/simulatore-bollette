@@ -4,6 +4,7 @@ import {
   getGoogleCalendarStatus,
   syncGoogleCalendarEvent,
 } from "./googleCalendar";
+import { updateRecruitingCrmEventNote } from "./crmIntegration";
 
 type EventType =
   | "CHIAMARE"
@@ -335,11 +336,17 @@ function recruitingEventFromRow(row: any): RecruitingEvent {
 }
 
 function crmEventFromRow(row: any): CrmEvent {
+  const effectiveNotes =
+    row.notes_override !== null &&
+    row.notes_override !== undefined
+      ? String(row.notes_override)
+      : String(row.notes || "");
+
   return {
     id: String(row.id),
     crmEventId: String(row.crm_event_id || ""),
     title: String(row.title || ""),
-    notes: String(row.notes || ""),
+    notes: effectiveNotes,
     clientName: String(row.client_name || ""),
     assignedTo: String(row.assigned_to || ""),
     startDate: String(row.start_date || ""),
@@ -381,7 +388,8 @@ export default function Appointments({
   const [activityDate, setActivityDate] = useState(localDateKey());
   const [activityTime, setActivityTime] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
-  const [editCrmEventId, setEditCrmEventId] = useState("");
+  const [crmNoteEditId, setCrmNoteEditId] = useState("");
+  const [crmNoteDraft, setCrmNoteDraft] = useState("");
   const [rescheduleCrmEventId, setRescheduleCrmEventId] =
     useState("");
 
@@ -406,7 +414,7 @@ export default function Appointments({
       active.client
         .from("recruiting_crm_events")
         .select(
-          "id,crm_event_id,title,notes,client_name,assigned_to,start_date,start_time,end_date,end_time,active"
+          "id,crm_event_id,title,notes,notes_override,client_name,assigned_to,start_date,start_time,end_date,end_time,active"
         )
         .eq("active", true)
         .order("start_date", { ascending: true })
@@ -496,7 +504,6 @@ export default function Appointments({
     setSelectedKey(`crm:${target.id}`);
 
     if (openRequest.mode === "reschedule") {
-      setEditCrmEventId("");
       setRescheduleCrmEventId(target.crmEventId);
       setActivityType("APPUNTAMENTO_ZONA");
       setActivityCustom("");
@@ -504,7 +511,6 @@ export default function Appointments({
       setActivityTime(target.startTime || "");
       setActivityNotes("");
     } else {
-      setEditCrmEventId("");
       setRescheduleCrmEventId("");
     }
 
@@ -657,25 +663,32 @@ export default function Appointments({
     crm: CrmEvent,
     mode: "edit" | "reschedule"
   ) => {
-    const inferredType = inferCrmActivityType(crm);
+    if (mode === "edit") {
+      setCrmNoteEditId(crm.crmEventId);
+      setCrmNoteDraft(plainText(crm.notes));
 
+      window.setTimeout(() => {
+        document
+          .getElementById(`crm-note-${crm.crmEventId}`)
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+      }, 50);
+      return;
+    }
+
+    const inferredType = inferCrmActivityType(crm);
+    setCrmNoteEditId("");
+    setCrmNoteDraft("");
     setActivityType(inferredType);
     setActivityCustom(
       inferredType === "ALTRO" ? plainText(crm.title) : ""
     );
     setActivityDate(crm.startDate || localDateKey());
     setActivityTime(crm.startTime || "");
-    setActivityNotes(
-      mode === "edit" ? plainText(crm.notes) : ""
-    );
-
-    if (mode === "edit") {
-      setEditCrmEventId(crm.crmEventId);
-      setRescheduleCrmEventId("");
-    } else {
-      setEditCrmEventId("");
-      setRescheduleCrmEventId(crm.crmEventId);
-    }
+    setActivityNotes("");
+    setRescheduleCrmEventId(crm.crmEventId);
 
     window.setTimeout(() => {
       document
@@ -685,6 +698,40 @@ export default function Appointments({
           block: "start",
         });
     }, 50);
+  };
+
+  const saveCrmNote = async (crm: CrmEvent) => {
+    setBusy(true);
+    setMessage("");
+
+    try {
+      const result = await updateRecruitingCrmEventNote({
+        crmEventId: crm.crmEventId,
+        note: crmNoteDraft,
+      });
+
+      const savedNote = String(
+        result?.note ?? crmNoteDraft
+      );
+
+      setCrmEvents((current) =>
+        current.map((item) =>
+          item.crmEventId === crm.crmEventId
+            ? { ...item, notes: savedNote }
+            : item
+        )
+      );
+      setCrmNoteEditId("");
+      setCrmNoteDraft("");
+      setMessage("Nota dell'appuntamento aggiornata.");
+    } catch (error: any) {
+      setMessage(
+        "Errore durante il salvataggio della nota: " +
+          (error?.message || String(error))
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const scheduleActivity = async () => {
@@ -757,7 +804,6 @@ export default function Appointments({
 
       setActivityNotes("");
       setActivityCustom("");
-      setEditCrmEventId("");
       setRescheduleCrmEventId("");
       await loadData(ctx);
       setMessage(
@@ -1441,20 +1487,92 @@ export default function Appointments({
                           </div>
                         </div>
 
-                        {notes && (
+                        <div
+                          id={`crm-note-${crm.crmEventId}`}
+                          style={{
+                            padding: 12,
+                            borderRadius: 9,
+                            background: "#fff7ed",
+                            border: "1px solid #fed7aa",
+                            lineHeight: 1.45,
+                          }}
+                        >
                           <div
                             style={{
-                              padding: 12,
-                              borderRadius: 9,
-                              background: "#fff7ed",
-                              border: "1px solid #fed7aa",
-                              whiteSpace: "pre-wrap",
-                              lineHeight: 1.45,
+                              fontSize: 12,
+                              fontWeight: 900,
+                              color: "#9a3412",
+                              marginBottom: 7,
                             }}
                           >
-                            {notes}
+                            NOTA APPUNTAMENTO
                           </div>
-                        )}
+
+                          {crmNoteEditId === crm.crmEventId ? (
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <textarea
+                                value={crmNoteDraft}
+                                onChange={(event) =>
+                                  setCrmNoteDraft(event.target.value)
+                                }
+                                rows={7}
+                                style={{
+                                  ...inputStyle,
+                                  resize: "vertical",
+                                  minHeight: 150,
+                                  background: "white",
+                                }}
+                              />
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void saveCrmNote(crm)}
+                                  style={{
+                                    ...baseButton,
+                                    background: "#16a34a",
+                                    color: "white",
+                                    borderColor: "#16a34a",
+                                    opacity: busy ? 0.65 : 1,
+                                  }}
+                                >
+                                  {busy ? "SALVATAGGIO..." : "SALVA NOTA"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setCrmNoteEditId("");
+                                    setCrmNoteDraft("");
+                                  }}
+                                  style={{
+                                    ...baseButton,
+                                    background: "#e2e8f0",
+                                    color: "#0f172a",
+                                  }}
+                                >
+                                  ANNULLA
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {notes || "Nessuna nota inserita."}
+                            </div>
+                          )}
+                        </div>
 
                         <div
                           style={{
@@ -1549,12 +1667,9 @@ export default function Appointments({
               >
                 <h3 style={{ marginTop: 0 }}>
                   {selected.source === "crm" &&
-                  editCrmEventId === selected.crm.crmEventId
-                    ? "Modifica appuntamento"
-                    : selected.source === "crm" &&
-                        rescheduleCrmEventId === selected.crm.crmEventId
-                      ? "Riprogramma appuntamento"
-                      : "Programma attività"}
+                  rescheduleCrmEventId === selected.crm.crmEventId
+                    ? "Riprogramma appuntamento"
+                    : "Programma attività"}
                 </h3>
                 <div
                   style={{
@@ -1564,12 +1679,9 @@ export default function Appointments({
                   }}
                 >
                   {selected.source === "crm" &&
-                  editCrmEventId === selected.crm.crmEventId
-                    ? "Dati dell'appuntamento già precompilati: modifica ciò che serve e salva la nuova attività collegata al CRM nel CALENDARIO."
-                    : selected.source === "crm" &&
-                        rescheduleCrmEventId === selected.crm.crmEventId
-                      ? "Data e ora attuali sono già compilate: modificale e salva la riprogrammazione nel CALENDARIO."
-                      : "Rifissa una chiamata, un appuntamento o una videocal nel CALENDARIO."}
+                  rescheduleCrmEventId === selected.crm.crmEventId
+                    ? "Data e ora attuali sono già compilate: modificale e salva la riprogrammazione nel CALENDARIO."
+                    : "Rifissa una chiamata, un appuntamento o una videocal nel CALENDARIO."}
                 </div>
 
                 <div style={{ display: "grid", gap: 10 }}>
@@ -1686,12 +1798,9 @@ export default function Appointments({
                     {busy
                       ? "INSERIMENTO..."
                       : selected.source === "crm" &&
-                          editCrmEventId === selected.crm.crmEventId
-                        ? "SALVA MODIFICA"
-                        : selected.source === "crm" &&
-                            rescheduleCrmEventId === selected.crm.crmEventId
-                          ? "SALVA RIPROGRAMMAZIONE"
-                          : "INSERISCI NEL CALENDARIO"}
+                          rescheduleCrmEventId === selected.crm.crmEventId
+                        ? "SALVA RIPROGRAMMAZIONE"
+                        : "INSERISCI NEL CALENDARIO"}
                   </button>
                 </div>
               </div>
