@@ -665,7 +665,7 @@ export default function Appointments({
   ) => {
     if (mode === "edit") {
       setCrmNoteEditId(crm.crmEventId);
-      setCrmNoteDraft(plainText(crm.notes));
+      setCrmNoteDraft("");
 
       window.setTimeout(() => {
         document
@@ -701,25 +701,31 @@ export default function Appointments({
   };
 
   const saveCrmNote = async (crm: CrmEvent) => {
+    const cleanDraft = crmNoteDraft.trim();
+
+    if (!cleanDraft) {
+      setMessage("Scrivi la nuova nota prima di salvarla.");
+      return;
+    }
+
     setBusy(true);
     setMessage("");
 
     try {
       const todayLabel = formatShortDate(localDateKey());
-      const cleanDraft = crmNoteDraft.trim();
-      const datedNote = cleanDraft
-        ? cleanDraft.startsWith(`${todayLabel} · `)
-          ? cleanDraft
-          : `${todayLabel} · ${cleanDraft}`
-        : "";
+      const existingNotes = plainText(crm.notes).trim();
+      const newNote = `${todayLabel} · ${cleanDraft}`;
+      const combinedNotes = existingNotes
+        ? `${existingNotes}\n\n${newNote}`
+        : newNote;
 
       const result = await updateRecruitingCrmEventNote({
         crmEventId: crm.crmEventId,
-        note: datedNote,
+        note: combinedNotes,
       });
 
       const savedNote = String(
-        result?.note ?? datedNote
+        result?.note ?? combinedNotes
       );
 
       setCrmEvents((current) =>
@@ -1523,7 +1529,8 @@ export default function Appointments({
                                 onChange={(event) =>
                                   setCrmNoteDraft(event.target.value)
                                 }
-                                rows={7}
+                                rows={5}
+                                placeholder="Scrivi la nuova nota..."
                                 style={{
                                   ...inputStyle,
                                   resize: "vertical",
