@@ -739,6 +739,72 @@ export default function Appointments({
         minWidth: 0,
       }}
     >
+      <style>{`
+        .appointments-filter-grid {
+          display: grid;
+          grid-template-columns:
+            minmax(220px,1.5fr) minmax(180px,.8fr) minmax(160px,.7fr) auto;
+          gap: 10px;
+          align-items: end;
+          margin-top: 14px;
+          min-width: 0;
+        }
+
+        .appointments-main-layout {
+          display: grid;
+          grid-template-columns: minmax(320px,.78fr) minmax(0,1.65fr);
+          gap: 12px;
+          align-items: start;
+          min-width: 0;
+        }
+
+        .appointments-list-card {
+          position: sticky;
+          top: 8px;
+          min-width: 0;
+        }
+
+        .appointments-detail-layout {
+          display: grid;
+          grid-template-columns: minmax(0,1.35fr) minmax(300px,.8fr);
+          gap: 12px;
+          align-items: start;
+          min-width: 0;
+        }
+
+        .appointments-date-time-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        @media (max-width: 1180px) {
+          .appointments-filter-grid {
+            grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+          }
+
+          .appointments-main-layout,
+          .appointments-detail-layout {
+            grid-template-columns: minmax(0,1fr);
+          }
+
+          .appointments-list-card {
+            position: static;
+            top: auto;
+          }
+        }
+
+        @media (max-width: 680px) {
+          .appointments-filter-grid {
+            grid-template-columns: minmax(0,1fr);
+          }
+
+          .appointments-date-time-grid {
+            grid-template-columns: minmax(0,1fr);
+          }
+        }
+      `}</style>
+
       <div style={cardStyle}>
         <div
           style={{
@@ -774,16 +840,7 @@ export default function Appointments({
           </button>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "minmax(220px,1.5fr) minmax(180px,.8fr) minmax(160px,.7fr) auto",
-            gap: 10,
-            alignItems: "end",
-            marginTop: 14,
-          }}
-        >
+        <div className="appointments-filter-grid">
           <div>
             <label style={labelStyle}>Ricerca libera</label>
             <input
@@ -874,22 +931,12 @@ export default function Appointments({
         </div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "minmax(320px,.78fr) minmax(0,1.65fr)",
-          gap: 12,
-          alignItems: "start",
-          minWidth: 0,
-        }}
-      >
+      <div className="appointments-main-layout">
         <div
+          className="appointments-list-card"
           style={{
             ...cardStyle,
             padding: 12,
-            position: "sticky",
-            top: 8,
           }}
         >
           <div
@@ -1081,15 +1128,7 @@ export default function Appointments({
           )}
 
           {selected && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "minmax(0,1.35fr) minmax(300px,.8fr)",
-                gap: 12,
-                alignItems: "start",
-              }}
-            >
+            <div className="appointments-detail-layout">
               <div
                 id="appointments-selected-detail"
                 style={cardStyle}
@@ -1491,13 +1530,7 @@ export default function Appointments({
                     </div>
                   )}
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 8,
-                    }}
-                  >
+                  <div className="appointments-date-time-grid">
                     <div>
                       <label style={labelStyle}>Data</label>
                       <input
