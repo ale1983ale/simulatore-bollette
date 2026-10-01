@@ -705,13 +705,21 @@ export default function Appointments({
     setMessage("");
 
     try {
+      const todayLabel = formatShortDate(localDateKey());
+      const cleanDraft = crmNoteDraft.trim();
+      const datedNote = cleanDraft
+        ? cleanDraft.startsWith(`${todayLabel} · `)
+          ? cleanDraft
+          : `${todayLabel} · ${cleanDraft}`
+        : "";
+
       const result = await updateRecruitingCrmEventNote({
         crmEventId: crm.crmEventId,
-        note: crmNoteDraft,
+        note: datedNote,
       });
 
       const savedNote = String(
-        result?.note ?? crmNoteDraft
+        result?.note ?? datedNote
       );
 
       setCrmEvents((current) =>
