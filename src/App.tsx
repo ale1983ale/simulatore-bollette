@@ -9607,24 +9607,50 @@ export default function App() {
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const browserHistoryReadyRef = useRef(false);
   const browserHistoryPopRef = useRef(false);
+  const browserHistoryDepthRef = useRef(0);
 
   useEffect(() => {
-    const currentUrl =
-      `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const initialDepth = Number(
+      window.history.state?.geDepth || 0
+    );
+    browserHistoryDepthRef.current = Number.isFinite(initialDepth)
+      ? Math.max(0, initialDepth)
+      : 0;
+
+    const currentUrl = new URL(window.location.href);
+    currentUrl.hash =
+      tab === "dashboard"
+        ? ""
+        : `ge-${encodeURIComponent(tab)}`;
 
     window.history.replaceState(
-      { ...(window.history.state || {}), geTab: tab },
+      {
+        ...(window.history.state || {}),
+        geTab: tab,
+        geDepth: browserHistoryDepthRef.current,
+      },
       "",
-      currentUrl
+      `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`
     );
 
     browserHistoryReadyRef.current = true;
 
     const handlePopState = (event: PopStateEvent) => {
+      const hashTab = window.location.hash.startsWith("#ge-")
+        ? decodeURIComponent(
+            window.location.hash.slice("#ge-".length)
+          )
+        : "";
+
       const historyTab =
         typeof event.state?.geTab === "string"
           ? event.state.geTab
-          : "dashboard";
+          : hashTab || "dashboard";
+
+      const nextDepth = Number(event.state?.geDepth || 0);
+      browserHistoryDepthRef.current = Number.isFinite(nextDepth)
+        ? Math.max(0, nextDepth)
+        : 0;
 
       browserHistoryPopRef.current = true;
       setAdminMenuOpen(false);
@@ -9651,8 +9677,20 @@ export default function App() {
       url.searchParams.delete("tab");
     }
 
+    url.hash =
+      tab === "dashboard"
+        ? ""
+        : `ge-${encodeURIComponent(tab)}`;
+
+    const nextDepth = browserHistoryDepthRef.current + 1;
+    browserHistoryDepthRef.current = nextDepth;
+
     window.history.pushState(
-      { ...(window.history.state || {}), geTab: tab },
+      {
+        ...(window.history.state || {}),
+        geTab: tab,
+        geDepth: nextDepth,
+      },
       "",
       `${url.pathname}${url.search}${url.hash}`
     );
@@ -10297,8 +10335,14 @@ useEffect(() => {
   if (url.searchParams.get("tab") !== "recruitingWaiting") return;
 
   url.searchParams.delete("tab");
+  url.hash = `ge-${encodeURIComponent(tab)}`;
+
   window.history.replaceState(
-    { ...(window.history.state || {}), geTab: tab },
+    {
+      ...(window.history.state || {}),
+      geTab: tab,
+      geDepth: browserHistoryDepthRef.current,
+    },
     "",
     `${url.pathname}${url.search}${url.hash}`
   );
