@@ -43,6 +43,7 @@ type CrmEvent = {
   crmEventId: string;
   title: string;
   notes: string;
+  sourceNotes: string;
   clientName: string;
   assignedTo: string;
   startDate: string;
@@ -268,7 +269,9 @@ const PROVINCE_CODES = new Set(
 );
 
 function crmZone(event: CrmEvent) {
-  const raw = String(`${event.notes || ""}\n${event.title || ""}`)
+  const raw = String(
+    `${event.sourceNotes || event.notes || ""}\n${event.title || ""}`
+  )
     .replace(/<br\s*\/?\s*>/gi, "\n")
     .replace(/<\/(div|p|li|tr|h[1-6])>/gi, "\n")
     .replace(/<[^>]*>/g, " ")
@@ -352,17 +355,19 @@ function recruitingEventFromRow(row: any): RecruitingEvent {
 }
 
 function crmEventFromRow(row: any): CrmEvent {
+  const sourceNotes = String(row.notes || "");
   const effectiveNotes =
     row.notes_override !== null &&
     row.notes_override !== undefined
       ? String(row.notes_override)
-      : String(row.notes || "");
+      : sourceNotes;
 
   return {
     id: String(row.id),
     crmEventId: String(row.crm_event_id || ""),
     title: String(row.title || ""),
     notes: effectiveNotes,
+    sourceNotes,
     clientName: String(row.client_name || ""),
     assignedTo: String(row.assigned_to || ""),
     startDate: String(row.start_date || ""),
