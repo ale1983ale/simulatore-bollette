@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUserAgentString(
-            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.1"
+            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.4"
         );
 
         CookieManager.getInstance().setAcceptCookie(true);
@@ -287,10 +287,32 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
+        if (webView == null) {
             super.onBackPressed();
+            return;
         }
+
+        webView.evaluateJavascript(
+            "(function(){" +
+                "try{" +
+                    "var s=window.history.state||{};" +
+                    "var d=Number(s.geDepth||0);" +
+                    "if(d>0){window.history.back();return true;}" +
+                    "return false;" +
+                "}catch(e){return false;}" +
+            "})()",
+            result -> {
+                if ("true".equals(result)) {
+                    return;
+                }
+
+                if (!bridgeAllowed() && webView.canGoBack()) {
+                    webView.goBack();
+                    return;
+                }
+
+                MainActivity.super.onBackPressed();
+            }
+        );
     }
 }
