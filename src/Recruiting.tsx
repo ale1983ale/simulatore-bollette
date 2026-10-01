@@ -12503,7 +12503,6 @@ export default function Recruiting({
                 {(calendarContactPreview.region || "—").toLocaleUpperCase("it")}
               </div>
               <div><strong>Telefono:</strong> {calendarContactPreview.phone || "—"}</div>
-              <div><strong>Email:</strong> {calendarContactPreview.email || "—"}</div>
               <div>
                 <strong>Settore energia:</strong>{" "}
                 {calendarContactPreview.sectorEnergy
@@ -12520,6 +12519,17 @@ export default function Recruiting({
                   {calendarContactPreview.forwardedTo || "—"}
                 </div>
               )}
+
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                <strong>Email:</strong>{" "}
+                {calendarContactPreview.email || "—"}
+              </div>
             </div>
 
             <div style={{ marginTop: 18 }}>
