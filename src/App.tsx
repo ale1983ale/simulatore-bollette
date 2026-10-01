@@ -11480,6 +11480,31 @@ if (!agentSession && !adminSession) {
             >
               👥
             </button>
+
+            <button
+              type="button"
+              title="Ricarica pagina"
+              aria-label="Ricarica pagina"
+              onClick={() => window.location.reload()}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,.72)",
+                background: "rgba(255,255,255,.16)",
+                color: "#ffffff",
+                display: "grid",
+                placeItems: "center",
+                padding: 0,
+                fontSize: 21,
+                fontWeight: 900,
+                lineHeight: 1,
+                cursor: "pointer",
+                boxShadow: "0 3px 9px rgba(15,23,42,.16)",
+              }}
+            >
+              ↻
+            </button>
           </div>
         )}
 
