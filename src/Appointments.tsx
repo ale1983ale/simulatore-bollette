@@ -381,6 +381,7 @@ export default function Appointments({
   const [activityDate, setActivityDate] = useState(localDateKey());
   const [activityTime, setActivityTime] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
+  const [editCrmEventId, setEditCrmEventId] = useState("");
   const [rescheduleCrmEventId, setRescheduleCrmEventId] =
     useState("");
 
@@ -495,6 +496,7 @@ export default function Appointments({
     setSelectedKey(`crm:${target.id}`);
 
     if (openRequest.mode === "reschedule") {
+      setEditCrmEventId("");
       setRescheduleCrmEventId(target.crmEventId);
       setActivityType("APPUNTAMENTO_ZONA");
       setActivityCustom("");
@@ -502,6 +504,7 @@ export default function Appointments({
       setActivityTime(target.startTime || "");
       setActivityNotes("");
     } else {
+      setEditCrmEventId("");
       setRescheduleCrmEventId("");
     }
 
@@ -631,6 +634,59 @@ export default function Appointments({
       ? candidateMap.get(selected.recruiting.candidateId) || null
       : null;
 
+  const inferCrmActivityType = (crm: CrmEvent): EventType => {
+    const text = `${crm.title || ""} ${crm.notes || ""}`
+      .toLocaleUpperCase("it");
+
+    if (text.includes("VIDEO")) return "VIDEOCALL";
+    if (text.includes("SEDE")) return "APPUNTAMENTO_SEDE";
+    if (
+      text.includes("APP") ||
+      text.includes("FISS") ||
+      text.includes("INCONTRO")
+    ) {
+      return "APPUNTAMENTO_ZONA";
+    }
+    if (text.includes("CHIAMA") || text.includes("CALL")) {
+      return "CHIAMARE";
+    }
+    return "ALTRO";
+  };
+
+  const openCrmActivityEditor = (
+    crm: CrmEvent,
+    mode: "edit" | "reschedule"
+  ) => {
+    const inferredType = inferCrmActivityType(crm);
+
+    setActivityType(inferredType);
+    setActivityCustom(
+      inferredType === "ALTRO" ? plainText(crm.title) : ""
+    );
+    setActivityDate(crm.startDate || localDateKey());
+    setActivityTime(crm.startTime || "");
+    setActivityNotes(
+      mode === "edit" ? plainText(crm.notes) : ""
+    );
+
+    if (mode === "edit") {
+      setEditCrmEventId(crm.crmEventId);
+      setRescheduleCrmEventId("");
+    } else {
+      setEditCrmEventId("");
+      setRescheduleCrmEventId(crm.crmEventId);
+    }
+
+    window.setTimeout(() => {
+      document
+        .getElementById("appointments-program-activity")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 50);
+  };
+
   const scheduleActivity = async () => {
     if (!ctx || !selected) return;
 
@@ -701,6 +757,7 @@ export default function Appointments({
 
       setActivityNotes("");
       setActivityCustom("");
+      setEditCrmEventId("");
       setRescheduleCrmEventId("");
       await loadData(ctx);
       setMessage(
@@ -1406,6 +1463,39 @@ export default function Appointments({
                             flexWrap: "wrap",
                           }}
                         >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openCrmActivityEditor(crm, "edit")
+                            }
+                            style={{
+                              ...baseButton,
+                              background: "#2563eb",
+                              color: "white",
+                              borderColor: "#2563eb",
+                            }}
+                          >
+                            ✏ MODIFICA
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openCrmActivityEditor(
+                                crm,
+                                "reschedule"
+                              )
+                            }
+                            style={{
+                              ...baseButton,
+                              background: "#f97316",
+                              color: "white",
+                              borderColor: "#f97316",
+                            }}
+                          >
+                            ↻ RIPROGRAMMA
+                          </button>
+
                           {mapUrl && (
                             <button
                               type="button"
@@ -1459,9 +1549,12 @@ export default function Appointments({
               >
                 <h3 style={{ marginTop: 0 }}>
                   {selected.source === "crm" &&
-                  rescheduleCrmEventId === selected.crm.crmEventId
-                    ? "Riprogramma appuntamento"
-                    : "Programma attività"}
+                  editCrmEventId === selected.crm.crmEventId
+                    ? "Modifica appuntamento"
+                    : selected.source === "crm" &&
+                        rescheduleCrmEventId === selected.crm.crmEventId
+                      ? "Riprogramma appuntamento"
+                      : "Programma attività"}
                 </h3>
                 <div
                   style={{
@@ -1471,9 +1564,12 @@ export default function Appointments({
                   }}
                 >
                   {selected.source === "crm" &&
-                  rescheduleCrmEventId === selected.crm.crmEventId
-                    ? "Data e ora attuali sono già compilate: modificale e salva la nuova attività nel CALENDARIO."
-                    : "Rifissa una chiamata, un appuntamento o una videocal nel CALENDARIO."}
+                  editCrmEventId === selected.crm.crmEventId
+                    ? "Dati dell'appuntamento già precompilati: modifica ciò che serve e salva la nuova attività collegata al CRM nel CALENDARIO."
+                    : selected.source === "crm" &&
+                        rescheduleCrmEventId === selected.crm.crmEventId
+                      ? "Data e ora attuali sono già compilate: modificale e salva la riprogrammazione nel CALENDARIO."
+                      : "Rifissa una chiamata, un appuntamento o una videocal nel CALENDARIO."}
                 </div>
 
                 <div style={{ display: "grid", gap: 10 }}>
@@ -1590,9 +1686,12 @@ export default function Appointments({
                     {busy
                       ? "INSERIMENTO..."
                       : selected.source === "crm" &&
-                          rescheduleCrmEventId === selected.crm.crmEventId
-                        ? "SALVA RIPROGRAMMAZIONE"
-                        : "INSERISCI NEL CALENDARIO"}
+                          editCrmEventId === selected.crm.crmEventId
+                        ? "SALVA MODIFICA"
+                        : selected.source === "crm" &&
+                            rescheduleCrmEventId === selected.crm.crmEventId
+                          ? "SALVA RIPROGRAMMAZIONE"
+                          : "INSERISCI NEL CALENDARIO"}
                   </button>
                 </div>
               </div>
