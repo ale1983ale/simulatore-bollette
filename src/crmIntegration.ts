@@ -66,3 +66,13 @@ export async function testRecruitingCrmConnection() {
 export async function syncRecruitingCrmNow() {
   return callCrm("sync");
 }
+
+export async function updateRecruitingCrmEventNote(input: {
+  crmEventId: string;
+  note: string;
+}) {
+  return callCrm("update_event_note", {
+    crm_event_id: input.crmEventId,
+    note: input.note,
+  });
+}
