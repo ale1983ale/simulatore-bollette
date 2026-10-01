@@ -190,6 +190,22 @@ function plainText(value: string) {
     .trim();
 }
 
+function plainTextPreserveBreaks(value: string) {
+  return String(value || "")
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/(div|p|li|tr|h[1-6])>/gi, "\n")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function crmMapUrl(event: CrmEvent) {
   const raw = `${event.notes || ""}\n${event.title || ""}`.replace(
     /&amp;/gi,
@@ -389,6 +405,9 @@ export default function Appointments({
   const [activityTime, setActivityTime] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
   const [crmNoteEditId, setCrmNoteEditId] = useState("");
+  const [crmNoteEditMode, setCrmNoteEditMode] = useState<
+    "append" | "history"
+  >("append");
   const [crmNoteDraft, setCrmNoteDraft] = useState("");
   const [rescheduleCrmEventId, setRescheduleCrmEventId] =
     useState("");
@@ -665,6 +684,7 @@ export default function Appointments({
   ) => {
     if (mode === "edit") {
       setCrmNoteEditId(crm.crmEventId);
+      setCrmNoteEditMode("append");
       setCrmNoteDraft("");
 
       window.setTimeout(() => {
@@ -700,10 +720,25 @@ export default function Appointments({
     }, 50);
   };
 
+  const openCrmNoteHistoryEditor = (crm: CrmEvent) => {
+    setCrmNoteEditId(crm.crmEventId);
+    setCrmNoteEditMode("history");
+    setCrmNoteDraft(plainTextPreserveBreaks(crm.notes));
+
+    window.setTimeout(() => {
+      document
+        .getElementById(`crm-note-${crm.crmEventId}`)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+    }, 50);
+  };
+
   const saveCrmNote = async (crm: CrmEvent) => {
     const cleanDraft = crmNoteDraft.trim();
 
-    if (!cleanDraft) {
+    if (crmNoteEditMode === "append" && !cleanDraft) {
       setMessage("Scrivi la nuova nota prima di salvarla.");
       return;
     }
@@ -712,20 +747,24 @@ export default function Appointments({
     setMessage("");
 
     try {
-      const todayLabel = formatShortDate(localDateKey());
-      const existingNotes = plainText(crm.notes).trim();
-      const newNote = `${todayLabel} · ${cleanDraft}`;
-      const combinedNotes = existingNotes
-        ? `${existingNotes}\n\n${newNote}`
-        : newNote;
+      let noteToSave = cleanDraft;
+
+      if (crmNoteEditMode === "append") {
+        const todayLabel = formatShortDate(localDateKey());
+        const existingNotes = plainTextPreserveBreaks(crm.notes);
+        const newNote = `${todayLabel} · ${cleanDraft}`;
+        noteToSave = existingNotes
+          ? `${existingNotes}\n\n${newNote}`
+          : newNote;
+      }
 
       const result = await updateRecruitingCrmEventNote({
         crmEventId: crm.crmEventId,
-        note: combinedNotes,
+        note: noteToSave,
       });
 
       const savedNote = String(
-        result?.note ?? combinedNotes
+        result?.note ?? noteToSave
       );
 
       setCrmEvents((current) =>
@@ -736,8 +775,13 @@ export default function Appointments({
         )
       );
       setCrmNoteEditId("");
+      setCrmNoteEditMode("append");
       setCrmNoteDraft("");
-      setMessage("Nota dell'appuntamento aggiornata.");
+      setMessage(
+        crmNoteEditMode === "history"
+          ? "Note precedenti aggiornate."
+          : "Nota dell'appuntamento aggiunta."
+      );
     } catch (error: any) {
       setMessage(
         "Errore durante il salvataggio della nota: " +
@@ -1449,7 +1493,8 @@ export default function Appointments({
                     const zone = crmZone(crm);
                     const mapUrl = crmMapUrl(crm);
                     const phones = crmPhones(crm);
-                    const notes = plainText(crm.notes);
+                    const notes =
+                      plainTextPreserveBreaks(crm.notes);
 
                     return (
                       <div
@@ -1529,8 +1574,14 @@ export default function Appointments({
                                 onChange={(event) =>
                                   setCrmNoteDraft(event.target.value)
                                 }
-                                rows={5}
-                                placeholder="Scrivi la nuova nota..."
+                                rows={
+                                  crmNoteEditMode === "history" ? 10 : 5
+                                }
+                                placeholder={
+                                  crmNoteEditMode === "history"
+                                    ? "Modifica lo storico delle note..."
+                                    : "Scrivi la nuova nota..."
+                                }
                                 style={{
                                   ...inputStyle,
                                   resize: "vertical",
@@ -1558,7 +1609,11 @@ export default function Appointments({
                                     opacity: busy ? 0.65 : 1,
                                   }}
                                 >
-                                  {busy ? "SALVATAGGIO..." : "SALVA NOTA"}
+                                  {busy
+                                    ? "SALVATAGGIO..."
+                                    : crmNoteEditMode === "history"
+                                      ? "SALVA MODIFICHE"
+                                      : "SALVA NOTA"}
                                 </button>
 
                                 <button
@@ -1566,6 +1621,7 @@ export default function Appointments({
                                   disabled={busy}
                                   onClick={() => {
                                     setCrmNoteEditId("");
+                                    setCrmNoteEditMode("append");
                                     setCrmNoteDraft("");
                                   }}
                                   style={{
@@ -1608,7 +1664,22 @@ export default function Appointments({
                               borderColor: "#2563eb",
                             }}
                           >
-                            ✏ MODIFICA
+                            ＋ AGGIUNGI NOTA
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openCrmNoteHistoryEditor(crm)
+                            }
+                            style={{
+                              ...baseButton,
+                              background: "#7c3aed",
+                              color: "white",
+                              borderColor: "#7c3aed",
+                            }}
+                          >
+                            ✏ MODIFICA NOTE PRECEDENTI
                           </button>
 
                           <button
