@@ -1285,6 +1285,7 @@ export default function Recruiting({
 
   const [nameFilter, setNameFilter] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
+  const [phoneFilter, setPhoneFilter] = useState("");
   const [regionFilters, setRegionFilters] = useState<string[]>([]);
   const [sectorFilter, setSectorFilter] = useState<"" | "SI" | "NO">("");
   const [sectorOtherFilter, setSectorOtherFilter] = useState("");
@@ -2572,6 +2573,7 @@ export default function Recruiting({
   const filteredCandidates = useMemo(() => {
     const nameNeedle = normalizeFilterValue(nameFilter);
     const zoneNeedle = normalizeFilterValue(zoneFilter);
+    const phoneNeedle = String(phoneFilter || "").replace(/\D/g, "");
     const selectedRegionNeedles = new Set(
       regionFilters.map((region) => normalizeFilterValue(region))
     );
@@ -2691,6 +2693,15 @@ export default function Recruiting({
       if (
         zoneNeedle &&
         !normalizeFilterValue(candidate.operationalZone).includes(zoneNeedle)
+      ) {
+        return false;
+      }
+
+      if (
+        phoneNeedle &&
+        !String(candidate.phone || "")
+          .replace(/\D/g, "")
+          .includes(phoneNeedle)
       ) {
         return false;
       }
@@ -2822,6 +2833,7 @@ export default function Recruiting({
     statusDefinitions,
     nameFilter,
     zoneFilter,
+    phoneFilter,
     regionFilters,
     sectorFilter,
     sectorOtherFilter,
@@ -2838,6 +2850,7 @@ export default function Recruiting({
   const hasActiveContactFilters = Boolean(
     nameFilter.trim() ||
       zoneFilter.trim() ||
+      phoneFilter.trim() ||
       regionFilters.length > 0 ||
       sectorFilter ||
       sectorOtherFilter ||
@@ -2852,6 +2865,7 @@ export default function Recruiting({
   const resetContactFilters = () => {
     setNameFilter("");
     setZoneFilter("");
+    setPhoneFilter("");
     setRegionFilters([]);
     setSectorFilter("");
     setSectorOtherFilter("");
@@ -7151,6 +7165,18 @@ export default function Recruiting({
                   mobileExtraFiltersOpen ? " is-open" : ""
                 }`}
               >
+              <div>
+                <label style={labelStyle}>Telefono</label>
+                <input
+                  type="search"
+                  inputMode="tel"
+                  value={phoneFilter}
+                  onChange={(e) => setPhoneFilter(e.target.value)}
+                  placeholder="Cerca numero..."
+                  style={inputStyle}
+                />
+              </div>
+
               <div>
                 <label style={labelStyle}>Regione · MULTISELEZIONE</label>
                 <div
