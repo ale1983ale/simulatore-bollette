@@ -974,7 +974,7 @@ export default function RecruitingManagement() {
                                 type="button"
                                 disabled={busy}
                                 onClick={() =>
-                                  void saveAgentDm(
+                                  stageAgentDm(
                                     agent,
                                     field,
                                     customDmEditor?.value || ""
