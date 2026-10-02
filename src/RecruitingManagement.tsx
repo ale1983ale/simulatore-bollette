@@ -15,8 +15,7 @@ type ActiveAgent = {
   phone: string;
   zone: string;
   region: string;
-  dm1: string;
-  dm2: string;
+  dmReference: string;
   latitude: number | null;
   longitude: number | null;
 };
@@ -62,8 +61,9 @@ function rowToAgent(row: any): ActiveAgent {
     phone: String(row.phone || ""),
     zone: String(row.zone || ""),
     region: String(row.region || ""),
-    dm1: String(row.dm1 || ""),
-    dm2: String(row.dm2 || ""),
+    dmReference: String(
+      row.dm_reference || row.dm1 || row.dm2 || ""
+    ),
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
   };
@@ -87,11 +87,9 @@ export default function RecruitingManagement() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [zone, setZone] = useState("");
-  const [dm1Filter, setDm1Filter] = useState("");
-  const [dm2Filter, setDm2Filter] = useState("");
+  const [dmReferenceFilter, setDmReferenceFilter] = useState("");
   const [customDmEditor, setCustomDmEditor] = useState<{
     agentId: string;
-    field: "dm1" | "dm2";
     value: string;
   } | null>(null);
   const [dmDirtyAgentIds, setDmDirtyAgentIds] =
@@ -111,7 +109,7 @@ export default function RecruitingManagement() {
         .select("macroarea_id,region"),
       active.client
         .from("recruiting_active_agents")
-        .select("id,first_name,last_name,phone,zone,region,dm1,dm2,latitude,longitude")
+        .select("id,first_name,last_name,phone,zone,region,dm_reference,dm1,dm2,latitude,longitude")
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true }),
     ]);
@@ -164,36 +162,33 @@ export default function RecruitingManagement() {
       Array.from(
         new Set(
           agents
-            .flatMap((agent) => [agent.dm1, agent.dm2])
-            .map((value) => value.trim())
+            .map((agent) => agent.dmReference.trim())
             .filter(Boolean)
         )
-      ).sort((a, b) => a.localeCompare(b, "it", { sensitivity: "base" })),
+      ).sort((a, b) =>
+        a.localeCompare(b, "it", { sensitivity: "base" })
+      ),
     [agents]
   );
 
   const filteredAgents = useMemo(() => {
-    const dm1Needle = dm1Filter.trim().toLocaleLowerCase("it");
-    const dm2Needle = dm2Filter.trim().toLocaleLowerCase("it");
+    const dmNeedle = dmReferenceFilter
+      .trim()
+      .toLocaleLowerCase("it");
 
     return agents.filter((agent) => {
       if (
-        dm1Needle &&
-        !agent.dm1.toLocaleLowerCase("it").includes(dm1Needle)
-      ) {
-        return false;
-      }
-
-      if (
-        dm2Needle &&
-        !agent.dm2.toLocaleLowerCase("it").includes(dm2Needle)
+        dmNeedle &&
+        !agent.dmReference
+          .toLocaleLowerCase("it")
+          .includes(dmNeedle)
       ) {
         return false;
       }
 
       return true;
     });
-  }, [agents, dm1Filter, dm2Filter]);
+  }, [agents, dmReferenceFilter]);
 
   const resetMacroForm = () => {
     setMacroId(null);
@@ -294,7 +289,6 @@ export default function RecruitingManagement() {
 
   const stageAgentDm = (
     agent: ActiveAgent,
-    field: "dm1" | "dm2",
     value: string
   ) => {
     const clean = value.trim();
@@ -302,7 +296,7 @@ export default function RecruitingManagement() {
     setAgents((current) =>
       current.map((item) =>
         item.id === agent.id
-          ? { ...item, [field]: clean }
+          ? { ...item, dmReference: clean }
           : item
       )
     );
@@ -313,7 +307,7 @@ export default function RecruitingManagement() {
     });
     setCustomDmEditor(null);
     setMessage(
-      `${field.toUpperCase()} modificato. Premi SALVA MODIFICHE per confermare.`
+      "DM di Riferimento modificato. Premi SALVA MODIFICHE per confermare."
     );
   };
 
@@ -332,8 +326,7 @@ export default function RecruitingManagement() {
         const { error } = await ctx.client
           .from("recruiting_active_agents")
           .update({
-            dm1: agent.dm1.trim(),
-            dm2: agent.dm2.trim(),
+            dm_reference: agent.dmReference.trim(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", agent.id)
@@ -345,11 +338,11 @@ export default function RecruitingManagement() {
       setDmDirtyAgentIds(new Set());
       setCustomDmEditor(null);
       setMessage(
-        `Modifiche DM1 / DM2 salvate per ${rowsToSave.length} ${rowsToSave.length === 1 ? "agente" : "agenti"}.`
+        `DM di Riferimento salvato per ${rowsToSave.length} ${rowsToSave.length === 1 ? "agente" : "agenti"}.`
       );
     } catch (error: any) {
       setMessage(
-        "Errore nel salvataggio DM1 / DM2: " +
+        "Errore nel salvataggio DM di Riferimento: " +
           (error?.message || error)
       );
     } finally {
@@ -774,25 +767,15 @@ export default function RecruitingManagement() {
           }}
         >
           <div>
-            <label style={labelStyle}>Filtro DM1</label>
+            <label style={labelStyle}>Filtro DM di Riferimento</label>
             <input
               type="search"
               list="recruiting-dm-suggestions"
-              value={dm1Filter}
-              onChange={(event) => setDm1Filter(event.target.value)}
-              placeholder="Cerca DM1..."
-              style={inputStyle}
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Filtro DM2</label>
-            <input
-              type="search"
-              list="recruiting-dm-suggestions"
-              value={dm2Filter}
-              onChange={(event) => setDm2Filter(event.target.value)}
-              placeholder="Cerca DM2..."
+              value={dmReferenceFilter}
+              onChange={(event) =>
+                setDmReferenceFilter(event.target.value)
+              }
+              placeholder="Cerca DM di Riferimento..."
               style={inputStyle}
             />
           </div>
@@ -827,8 +810,7 @@ export default function RecruitingManagement() {
             <button
               type="button"
               onClick={() => {
-                setDm1Filter("");
-                setDm2Filter("");
+                setDmReferenceFilter("");
               }}
               style={{
                 ...buttonStyle,
@@ -852,10 +834,10 @@ export default function RecruitingManagement() {
         </div>
 
         <div style={{ overflowX: "auto", marginTop: 12 }}>
-          <table style={{ width: "100%", minWidth: 1040, borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
-                {["Nome", "Cognome", "Cellulare", "Zona", "Regione", "DM1", "DM2", "Mappa", "Azioni"].map((head) => (
+                {["Nome", "Cognome", "Cellulare", "Zona", "Regione", "DM di Riferimento", "Mappa", "Azioni"].map((head) => (
                   <th key={head} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1" }}>
                     {head}
                   </th>
@@ -878,135 +860,122 @@ export default function RecruitingManagement() {
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.zone || "—"}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.region || "—"}</td>
 
-                  {(["dm1", "dm2"] as const).map((field) => {
-                    const currentValue = agent[field];
-                    const editorOpen =
-                      customDmEditor?.agentId === agent.id &&
-                      customDmEditor?.field === field;
+                  <td
+                    style={{
+                      padding: "9px 10px",
+                      borderBottom: "1px solid #f1f5f9",
+                      minWidth: 190,
+                      verticalAlign: "top",
+                    }}
+                  >
+                    <select
+                      value={
+                        customDmEditor?.agentId === agent.id
+                          ? "__ALTRO__"
+                          : agent.dmReference
+                      }
+                      disabled={busy}
+                      onChange={(event) => {
+                        const value = event.target.value;
 
-                    return (
-                      <td
-                        key={field}
+                        if (value === "__ALTRO__") {
+                          setCustomDmEditor({
+                            agentId: agent.id,
+                            value: agent.dmReference,
+                          });
+                          return;
+                        }
+
+                        stageAgentDm(agent, value);
+                      }}
+                      style={{
+                        ...inputStyle,
+                        minWidth: 180,
+                        padding: "7px 8px",
+                      }}
+                    >
+                      <option value="">—</option>
+                      {dmSuggestions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                      <option value="__ALTRO__">ALTRO</option>
+                    </select>
+
+                    {customDmEditor?.agentId === agent.id && (
+                      <div
                         style={{
-                          padding: "9px 10px",
-                          borderBottom: "1px solid #f1f5f9",
-                          minWidth: 170,
-                          verticalAlign: "top",
+                          display: "grid",
+                          gap: 6,
+                          marginTop: 6,
                         }}
                       >
-                        <select
-                          value={
-                            editorOpen
-                              ? "__ALTRO__"
-                              : currentValue
+                        <input
+                          autoFocus
+                          list="recruiting-dm-suggestions"
+                          value={customDmEditor?.value || ""}
+                          onChange={(event) =>
+                            setCustomDmEditor((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    value: event.target.value,
+                                  }
+                                : current
+                            )
                           }
-                          disabled={busy}
-                          onChange={(event) => {
-                            const value = event.target.value;
-
-                            if (value === "__ALTRO__") {
-                              setCustomDmEditor({
-                                agentId: agent.id,
-                                field,
-                                value: currentValue,
-                              });
-                              return;
-                            }
-
-                            stageAgentDm(agent, field, value);
-                          }}
+                          placeholder="Inserisci DM di Riferimento"
                           style={{
                             ...inputStyle,
-                            minWidth: 160,
+                            minWidth: 180,
                             padding: "7px 8px",
                           }}
-                        >
-                          <option value="">—</option>
-                          {dmSuggestions.map((name) => (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
-                          ))}
-                          <option value="__ALTRO__">ALTRO</option>
-                        </select>
-
-                        {editorOpen && (
-                          <div
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              stageAgentDm(
+                                agent,
+                                customDmEditor?.value || ""
+                              );
+                            }
+                          }}
+                        />
+                        <div style={{ display: "flex", gap: 5 }}>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              stageAgentDm(
+                                agent,
+                                customDmEditor?.value || ""
+                              )
+                            }
                             style={{
-                              display: "grid",
-                              gap: 6,
-                              marginTop: 6,
+                              ...buttonStyle,
+                              padding: "5px 8px",
+                              background: "#16a34a",
+                              color: "white",
                             }}
                           >
-                            <input
-                              autoFocus
-                              list="recruiting-dm-suggestions"
-                              value={customDmEditor?.value || ""}
-                              onChange={(event) =>
-                                setCustomDmEditor((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        value: event.target.value,
-                                      }
-                                    : current
-                                )
-                              }
-                              placeholder={`Inserisci ${field.toUpperCase()}`}
-                              style={{
-                                ...inputStyle,
-                                minWidth: 160,
-                                padding: "7px 8px",
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  stageAgentDm(
-                                    agent,
-                                    field,
-                                    customDmEditor?.value || ""
-                                  );
-                                }
-                              }}
-                            />
-                            <div style={{ display: "flex", gap: 5 }}>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() =>
-                                  stageAgentDm(
-                                    agent,
-                                    field,
-                                    customDmEditor?.value || ""
-                                  )
-                                }
-                                style={{
-                                  ...buttonStyle,
-                                  padding: "5px 8px",
-                                  background: "#16a34a",
-                                  color: "white",
-                                }}
-                              >
-                                OK
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => setCustomDmEditor(null)}
-                                style={{
-                                  ...buttonStyle,
-                                  padding: "5px 8px",
-                                  background: "#e2e8f0",
-                                }}
-                              >
-                                Annulla
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
+                            OK
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setCustomDmEditor(null)}
+                            style={{
+                              ...buttonStyle,
+                              padding: "5px 8px",
+                              background: "#e2e8f0",
+                            }}
+                          >
+                            Annulla
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </td>
 
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 800 }}>
                     <label
@@ -1057,9 +1026,9 @@ export default function RecruitingManagement() {
               ))}
               {!filteredAgents.length && (
                 <tr>
-                  <td colSpan={9} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>
+                  <td colSpan={8} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>
                     {agents.length
-                      ? "Nessun agente corrisponde ai filtri DM1 / DM2."
+                      ? "Nessun agente corrisponde al filtro DM di Riferimento."
                       : "Nessun agente attivo inserito."}
                   </td>
                 </tr>
