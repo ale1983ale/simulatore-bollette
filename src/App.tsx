@@ -9926,6 +9926,7 @@ export default function App() {
   }, []);
 
   const navigateTo = (nextTab: string) => {
+    window.dispatchEvent(new Event("close-outlook-email"));
     setAdminMenuOpen(false);
 
     if (nextTab === "recruiting") {
@@ -9983,6 +9984,7 @@ export default function App() {
   };
 
   const openDatabaseSettings = () => {
+    window.dispatchEvent(new Event("close-outlook-email"));
     setAdminMenuOpen(false);
 
     window.requestAnimationFrame(() => {
@@ -9992,6 +9994,7 @@ export default function App() {
   };
 
   const toggleAdminMenu = () => {
+    window.dispatchEvent(new Event("close-outlook-email"));
     if (tab !== "dashboard") {
       setAdminMenuOpen(true);
       setTab("dashboard");
@@ -11899,6 +11902,7 @@ if (!agentSession && !adminSession) {
           {adminSession && hasFullAdminAccess && (
             <button
               type="button"
+              className="ge-main-nav__reload"
               title="Ricarica pagina"
               aria-label="Ricarica pagina"
               onClick={() => window.location.reload()}
@@ -11924,6 +11928,7 @@ if (!agentSession && !adminSession) {
           {adminSession && hasFullAdminAccess && (
             <button
               type="button"
+              className="ge-main-nav__settings"
               title="IMPOSTAZIONI LOGIN"
               aria-label="Apri Impostazioni e Database"
               onClick={openDatabaseSettings}
