@@ -1764,34 +1764,6 @@ export default function OutlookEmail() {
                   <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>{readyRows.length} email pronte. I nominativi senza file associato vengono esclusi.</div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => void saveRecipients()}
-                    disabled={syncBusy || !dirty}
-                    style={{
-                      ...button,
-                      background:
-                        syncBusy || !dirty ? "#cbd5e1" : "#16a34a",
-                      color: "white",
-                      padding: "7px 11px",
-                      opacity: syncBusy || !dirty ? 0.7 : 1,
-                    }}
-                  >
-                    {syncBusy ? "Salvataggio..." : "Salva elenco online"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void loadSavedRecipients(true)}
-                    disabled={syncBusy}
-                    style={{
-                      ...button,
-                      background: "#e2e8f0",
-                      padding: "7px 11px",
-                      opacity: syncBusy ? 0.6 : 1,
-                    }}
-                  >
-                    Ricarica elenco
-                  </button>
                   {renderRecipientEditButtons()}
                 </div>
               </div>
