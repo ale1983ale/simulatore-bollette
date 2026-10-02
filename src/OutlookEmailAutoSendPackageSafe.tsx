@@ -83,25 +83,60 @@ function findEmailTable() {
 
 function readRecipients(requireFile: boolean): Recipient[] {
   const table = findEmailTable();
-  if (!table) return [];
-  const headers = Array.from(table.querySelectorAll<HTMLTableCellElement>("thead th"));
-  const agencyIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Agenzia");
-  const emailIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Email");
-  const statusIndex = headers.findIndex((cell) => (cell.textContent || "").includes("File associato / Stato"));
-  if (agencyIndex < 0 || emailIndex < 0) return [];
+  const regularRows: Recipient[] = [];
 
-  return Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr"))
-    .filter((row) => row.dataset.emailRemoved !== "true")
-    .map((row) => {
-      const cells = Array.from(row.querySelectorAll<HTMLTableCellElement>("td"));
-      const agencyInput = cells[agencyIndex]?.querySelector<HTMLInputElement>("input");
-      const emailInput = cells[emailIndex]?.querySelector<HTMLInputElement>("input");
-      const agency = (agencyInput?.value || cells[agencyIndex]?.textContent || "").trim();
-      const email = (emailInput?.value || cells[emailIndex]?.textContent || "").trim();
-      const fileName = statusIndex >= 0 ? extractFileName((cells[statusIndex]?.textContent || "").trim()) : "";
-      return { agency, email, fileName };
-    })
-    .filter((row) => row.email && (!requireFile || row.fileName));
+  if (table) {
+    const headers = Array.from(table.querySelectorAll<HTMLTableCellElement>("thead th"));
+    const agencyIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Agenzia");
+    const emailIndex = headers.findIndex((cell) => (cell.textContent || "").trim() === "Email");
+    const statusIndex = headers.findIndex((cell) => (cell.textContent || "").includes("File associato / Stato"));
+
+    if (agencyIndex >= 0 && emailIndex >= 0) {
+      regularRows.push(
+        ...Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr"))
+          .filter((row) => row.dataset.emailRemoved !== "true")
+          .map((row) => {
+            const cells = Array.from(row.querySelectorAll<HTMLTableCellElement>("td"));
+            const agencyInput = cells[agencyIndex]?.querySelector<HTMLInputElement>("input");
+            const emailInput = cells[emailIndex]?.querySelector<HTMLInputElement>("input");
+            const agency = (agencyInput?.value || cells[agencyIndex]?.textContent || "").trim();
+            const email = (emailInput?.value || cells[emailIndex]?.textContent || "").trim();
+            const fileName =
+              row.dataset.emailFileName ||
+              (statusIndex >= 0
+                ? extractFileName((cells[statusIndex]?.textContent || "").trim())
+                : "");
+            return { agency, email, fileName };
+          })
+          .filter((row) => row.email && (!requireFile || row.fileName))
+      );
+    }
+  }
+
+  const directRows = requireFile
+    ? Array.from(
+        document.querySelectorAll<HTMLElement>('[data-email-unmatched-summary="true"]')
+      )
+        .filter((node) => node.dataset.emailRemoved !== "true")
+        .map((node) => ({
+          agency: String(node.dataset.emailAgency || "").trim(),
+          email: String(node.dataset.emailDirectEmail || "").trim(),
+          fileName: String(node.dataset.emailFileName || "").trim(),
+        }))
+        .filter((row) => row.agency && row.email && row.fileName)
+    : [];
+
+  return [...regularRows, ...directRows];
+}
+
+function readExcludedUnmatchedFileNames() {
+  return new Set(
+    Array.from(
+      document.querySelectorAll<HTMLElement>('[data-email-unmatched-summary="true"][data-email-removed="true"]')
+    )
+      .map((node) => normalize(String(node.dataset.emailFileName || "")))
+      .filter(Boolean)
+  );
 }
 
 function readMessage() {
@@ -170,6 +205,9 @@ async function splitWorkbook(sourceFile: File, recipients: Recipient[]) {
         .filter((row) => normalize(row.agency) !== "NONASSEGNATI")
         .map((row) => normalize(row.fileName || ""))
         .filter(Boolean)
+    );
+    readExcludedUnmatchedFileNames().forEach((fileName) =>
+      assignedFileNames.add(fileName)
     );
     const mergedSheets = new Map<string, { rows: unknown[][]; cols?: any }>();
 
