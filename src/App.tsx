@@ -10197,6 +10197,11 @@ export default function App() {
   const [appliedMonthPUN, setAppliedMonthPUN] = useState("");
   const activePunPsvMonth = appliedMonthPUN || selectedMonthPUN;
 
+  const selectPunPsvMonth = (month: string) => {
+    setSelectedMonthPUN(month);
+    setAppliedMonthPUN(month);
+  };
+
   
   const [punPsvView, setPunPsvView] = useState<"both" | "pun" | "psv">("both");
   const [expandedMarketChart, setExpandedMarketChart] =
@@ -10273,57 +10278,62 @@ export default function App() {
     );
   }
   
-  const visiblePunPsvRows =
-  getLast12PunPsvRows(
-    punPsvRows,
-    appliedMonthPUN || selectedMonthPUN
-  );
-  console.log("selectedMonthPUN:", selectedMonthPUN);
-console.log("punPsvRows:", punPsvRows);
-console.log("visiblePunPsvRows:", visiblePunPsvRows);
-const tablePunPsvRows = getLast12PunPsvRows(
-  punPsvRows,
-  activePunPsvMonth
-).reverse();
-  const validMonthOptions = [...punPsvRows]
-  .filter((row) => {
-    if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") {
-      return false;
-    }
-
-    return (
-      Number(row.mono || 0) !== 0 ||
-      Number(row.f1 || 0) !== 0 ||
-      Number(row.f2 || 0) !== 0 ||
-      Number(row.f3 || 0) !== 0 ||
-      Number(row.psv || 0) !== 0
-    );
-  })
-  .sort((a, b) => {
+  function punPsvMonthScore(label: string) {
     const mesi = [
       "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
       "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
     ];
+    const parts = normalizeMonthLabel(label).split(" ");
+    const monthIndex = mesi.indexOf(parts[0] || "");
+    const year = Number(parts[1] || 0);
+    if (monthIndex < 0 || !year) return -1;
+    return year * 12 + monthIndex;
+  }
 
-    const score = (label: string) => {
-      const parts = String(label).trim().split(" ");
-      const mese = parts[0]?.toUpperCase() || "";
-      const anno = parseInt(parts[1] || "0", 10);
-      const meseIndex = mesi.indexOf(mese);
-      return anno * 100 + meseIndex;
-    };
+  const validPunPsvRowsChronological = [...punPsvRows]
+    .filter((row) => {
+      const mese = normalizeMonthLabel(row.mese);
+      if (!mese || mese.startsWith("FISSO ")) return false;
+      return (
+        Number(row.mono || 0) !== 0 ||
+        Number(row.f1 || 0) !== 0 ||
+        Number(row.f2 || 0) !== 0 ||
+        Number(row.f3 || 0) !== 0 ||
+        Number(row.psv || 0) !== 0
+      );
+    })
+    .sort((a, b) => punPsvMonthScore(a.mese) - punPsvMonthScore(b.mese));
 
-    return score(b.mese) - score(a.mese);
-  });
-  // I grafici mostrano SEMPRE gli ultimi 12 mesi realmente disponibili,
-  // indipendentemente dal mese scelto nel selettore (che resta valido per le tabelle).
-  // Asse temporale: mese più vecchio a sinistra -> più recente a destra.
-  const latestAvailablePunPsvMonth =
-    validMonthOptions[0]?.mese || activePunPsvMonth;
-  const chartPunPsvRows = getLast12PunPsvRows(
-    punPsvRows,
-    latestAvailablePunPsvMonth
-  );
+  function getCentered12PunPsvRows(selectedMonth: string) {
+    if (!validPunPsvRowsChronological.length) return [];
+
+    const normalizedSelected = normalizeMonthLabel(selectedMonth);
+    let selectedIndex = validPunPsvRowsChronological.findIndex(
+      (row) => normalizeMonthLabel(row.mese) === normalizedSelected
+    );
+
+    if (selectedIndex < 0) selectedIndex = validPunPsvRowsChronological.length - 1;
+
+    let startIndex = selectedIndex - 5;
+    let endIndex = startIndex + 12;
+
+    if (startIndex < 0) {
+      startIndex = 0;
+      endIndex = Math.min(12, validPunPsvRowsChronological.length);
+    }
+
+    if (endIndex > validPunPsvRowsChronological.length) {
+      endIndex = validPunPsvRowsChronological.length;
+      startIndex = Math.max(0, endIndex - 12);
+    }
+
+    return validPunPsvRowsChronological.slice(startIndex, endIndex);
+  }
+
+  const chartPunPsvRows = getCentered12PunPsvRows(activePunPsvMonth);
+  const visiblePunPsvRows = chartPunPsvRows;
+  const tablePunPsvRows = [...chartPunPsvRows].reverse();
+  const validMonthOptions = [...validPunPsvRowsChronological].reverse();
 
 const punValues = chartPunPsvRows.map(r => Number(r.mono || 0));
 const psvValues = chartPunPsvRows.map(r => Number(r.psv || 0));
@@ -10356,10 +10366,13 @@ const chartYearLabels = chartPunPsvRows.map(
   (row) => String(row.mese || "").trim().split(" ")[1] || ""
 );
 
+const selectedChartIndex = chartPunPsvRows.findIndex(
+  (row) => normalizeMonthLabel(row.mese) === normalizeMonthLabel(activePunPsvMonth)
+);
 const latestPunPsvRow =
-  chartPunPsvRows.length > 0
-    ? chartPunPsvRows[chartPunPsvRows.length - 1]
-    : null;
+  selectedChartIndex >= 0
+    ? chartPunPsvRows[selectedChartIndex]
+    : chartPunPsvRows[chartPunPsvRows.length - 1] || null;
 const latestPunPsvMonthLabel = latestPunPsvRow
   ? String(latestPunPsvRow.mese || "").trim().toUpperCase()
   : "-";
@@ -12068,10 +12081,7 @@ if (!agentSession && !adminSession) {
               >
                 <select
   value={selectedMonthPUN}
-  onChange={(e)=>{
-    setSelectedMonthPUN(e.target.value);
-    setAppliedMonthPUN(e.target.value);
-  }}
+  onChange={(e)=> selectPunPsvMonth(e.target.value)}
                   style={{
                     padding: "12px 16px",
                     borderRadius: 10,
@@ -12209,7 +12219,7 @@ if (!agentSession && !adminSession) {
                           boxShadow: "0 0 0 2px rgba(255,159,28,.18)",
                         }}
                       >
-                        Ultimo mese: {latestPunPsvMonthLabel}
+                        Mese selezionato: {latestPunPsvMonthLabel}
                       </span>
                       <span
                         style={{
@@ -12382,7 +12392,7 @@ if (!agentSession && !adminSession) {
                           boxShadow: "0 0 0 2px rgba(103,232,249,.20)",
                         }}
                       >
-                        Ultimo mese: {latestPunPsvMonthLabel}
+                        Mese selezionato: {latestPunPsvMonthLabel}
                       </span>
                       <span
                         style={{
@@ -12984,7 +12994,7 @@ if (!agentSession && !adminSession) {
               fontWeight: 900,
             }}
           >
-            Ultimo mese: {latestPunPsvMonthLabel}
+            Mese selezionato: {latestPunPsvMonthLabel}
           </span>
           <span
             style={{
@@ -13243,7 +13253,7 @@ if (!agentSession && !adminSession) {
         </div>
         <div style={{ display: "flex", gap: 7 }}>
           <span style={{ padding: "7px 9px", borderRadius: 9, background: "#ffedd5", color: "#c2410c", fontSize: 10, fontWeight: 900 }}>
-            Ultimo mese: {latestPunPsvMonthLabel}
+            Mese selezionato: {latestPunPsvMonthLabel}
           </span>
           <span style={{ padding: "7px 10px", borderRadius: 9, background: "#fb923c", color: "#fff", fontSize: 13, fontWeight: 950 }}>
             {latestPun}
@@ -13357,7 +13367,7 @@ if (!agentSession && !adminSession) {
         </div>
         <div style={{ display: "flex", gap: 7 }}>
           <span style={{ padding: "7px 9px", borderRadius: 9, background: "#cffafe", color: "#0369a1", fontSize: 10, fontWeight: 900 }}>
-            Ultimo mese: {latestPunPsvMonthLabel}
+            Mese selezionato: {latestPunPsvMonthLabel}
           </span>
           <span style={{ padding: "7px 10px", borderRadius: 9, background: "#0ea5e9", color: "#fff", fontSize: 13, fontWeight: 950 }}>
             {latestPsv}
@@ -13443,7 +13453,7 @@ if (!agentSession && !adminSession) {
         <div style={{ fontSize: 20, fontWeight: 900 }}>Andamento PUN</div>
         <div style={{ display: "flex", gap: 7 }}>
           <span style={{ padding: "6px 9px", borderRadius: 8, background: "#ffedd5", color: "#c2410c", fontSize: 10, fontWeight: 900 }}>
-            Ultimo mese: {latestPunPsvMonthLabel}
+            Mese selezionato: {latestPunPsvMonthLabel}
           </span>
           <span style={{ padding: "6px 10px", borderRadius: 8, background: "#fb923c", color: "#fff", fontSize: 12, fontWeight: 950 }}>
             {latestPun}
@@ -13491,7 +13501,7 @@ if (!agentSession && !adminSession) {
         <div style={{ fontSize: 20, fontWeight: 900 }}>Andamento PSV</div>
         <div style={{ display: "flex", gap: 7 }}>
           <span style={{ padding: "6px 9px", borderRadius: 8, background: "#cffafe", color: "#0369a1", fontSize: 10, fontWeight: 900 }}>
-            Ultimo mese: {latestPunPsvMonthLabel}
+            Mese selezionato: {latestPunPsvMonthLabel}
           </span>
           <span style={{ padding: "6px 10px", borderRadius: 8, background: "#0ea5e9", color: "#fff", fontSize: 12, fontWeight: 950 }}>
             {latestPsv}
