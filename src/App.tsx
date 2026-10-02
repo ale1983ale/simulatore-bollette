@@ -4857,6 +4857,7 @@ function Gas({
   punPsvRows,
   gasOffers,
   gasAcciseSettings,
+  gasNetworkTariffRows,
   showAgentAssociation,
   canUseProvvigioni,
   onOpenProvvigioni,
@@ -4864,6 +4865,7 @@ function Gas({
   punPsvRows: PunPsvRow[];
   gasOffers: GasOffer[];
   gasAcciseSettings: GasAcciseSettings;
+  gasNetworkTariffRows: GasNetworkTariffRow[];
   showAgentAssociation: boolean;
   canUseProvvigioni: boolean;
   onOpenProvvigioni: (prefill: ProvvigioniPrefill) => void;
@@ -4892,6 +4894,9 @@ function Gas({
     dedicataSpread: "",
     dedicataQuotaVariabile: "",
     dedicataQuotaFissa: "",
+    reteMode: "AUTO",
+    regione: "UMBRIA",
+    classeContatore: "G4-G6",
     quotaVariabileAggiuntiva: "",
     quotaFissaAggiuntiva: "",
     accisaAgevolata: "NO",
@@ -5230,7 +5235,10 @@ function Gas({
     </div>
   );
 
-  const r = useMemo(() => calcGas(s, punPsvRows, gasOffers), [s, punPsvRows, gasOffers]);
+  const r = useMemo(
+    () => calcGas(s, punPsvRows, gasOffers, gasNetworkTariffRows),
+    [s, punPsvRows, gasOffers, gasNetworkTariffRows]
+  );
 
   const gasReferenceRows = useMemo(() => {
     const selectedPeriods = [s.periodo1, s.periodo2, s.periodo3, s.periodo4];
@@ -12168,6 +12176,7 @@ if (!agentSession && !adminSession) {
       punPsvRows={punPsvRows}
       gasOffers={gasOffers}
       gasAcciseSettings={gasAcciseSettings}
+      gasNetworkTariffRows={gasNetworkTariffRows}
       showAgentAssociation={Boolean(adminSession)}
       canUseProvvigioni={canUseProvvigioni}
       onOpenProvvigioni={openProvvigioniFromSimulation}
