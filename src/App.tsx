@@ -9639,7 +9639,7 @@ function AdminDashboard({
       <div className="ge-dashboard-primary ge-dashboard-primary--admin">
         <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />
         <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />
-        <DashboardCard title="PUN" description="Analizza e monitora i dati PUN." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />
+        <DashboardCard title="PUN/PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />
         <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
@@ -9689,8 +9689,8 @@ function AgentDashboard({
 
       <div className="ge-dashboard-secondary ge-dashboard-secondary--agent">
         <DashboardCard
-          title="PUN"
-          description="Analizza i dati del mercato PUN."
+          title="PUN/PSV"
+          description="Analizza i dati del mercato PUN e PSV."
           icon="📈"
           className="ge-card-pun"
           compact
@@ -10455,6 +10455,38 @@ latestPunPsvRow
 
     return score(String(b.mese)) - score(String(a.mese));
   });
+
+  const resetPunPsvToCurrentMonth = () => {
+    const monthNames = [
+      "GENNAIO",
+      "FEBBRAIO",
+      "MARZO",
+      "APRILE",
+      "MAGGIO",
+      "GIUGNO",
+      "LUGLIO",
+      "AGOSTO",
+      "SETTEMBRE",
+      "OTTOBRE",
+      "NOVEMBRE",
+      "DICEMBRE",
+    ];
+
+    const now = new Date();
+    const currentMonthLabel = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+    const currentAvailable = publicPunPsvOptions.find(
+      (row) =>
+        normalizeMonthLabel(row.mese) ===
+        normalizeMonthLabel(currentMonthLabel)
+    )?.mese;
+
+    const targetMonth =
+      currentAvailable ||
+      publicPunPsvOptions[0]?.mese ||
+      currentMonthLabel;
+
+    selectPunPsvMonth(targetMonth);
+  };
 
   useEffect(() => {
     if (!appliedMonthPUN && publicPunPsvOptions.length > 0) {
@@ -12095,8 +12127,31 @@ if (!agentSession && !adminSession) {
                     </option>
                   ))}
                 </select>
+
+                <button
+                  type="button"
+                  onClick={resetPunPsvToCurrentMonth}
+                  title="Torna al mese corrente"
+                  aria-label="Torna al mese corrente"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    padding: 0,
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#f1f5f9",
+                    color: "#334155",
+                    fontSize: 22,
+                    fontWeight: 900,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  ↩
+                </button>
         
-                       
                 <button
                   type="button"
                   onClick={exportPunPsvPdf}
