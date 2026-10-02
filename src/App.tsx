@@ -5947,21 +5947,236 @@ border: "1px solid #bfd8f6",
   
         {sectionCard(
           "rete",
-          "Rete e corrispettivi",
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <span>Rete + oneri Gas</span>
+            <HelpHint text="In Automatico il periodo viene preso direttamente dai mesi selezionati nei consumi. Il calcolo usa Regione → Ambito tariffario, classe del contatore e scaglioni ARERA. In Manuale restano disponibili i campi liberi." />
+          </span>,
           <>
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(2,minmax(0,1fr))",
-                gap: 12,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                alignItems: "center",
+                marginBottom: 12,
               }}
             >
-              {field("Quota consumi rete", s.quotaVariabileAggiuntiva, (v) => set("quotaVariabileAggiuntiva", v), "number")}
-              {field("Quota fissa rete", s.quotaFissaAggiuntiva, (v) => set("quotaFissaAggiuntiva", v), "number")}
+              <button
+                type="button"
+                onClick={() => set("reteMode", "AUTO")}
+                style={{
+                  padding: "9px 15px",
+                  borderRadius: 999,
+                  border:
+                    String(s.reteMode || "AUTO") === "AUTO"
+                      ? "2px solid #0284c7"
+                      : "1px solid #cbd5e1",
+                  background:
+                    String(s.reteMode || "AUTO") === "AUTO"
+                      ? "#e0f2fe"
+                      : "#ffffff",
+                  color:
+                    String(s.reteMode || "AUTO") === "AUTO"
+                      ? "#0369a1"
+                      : "#475569",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                ⚡ AUTOMATICO
+              </button>
+
+              <button
+                type="button"
+                onClick={() => set("reteMode", "MANUALE")}
+                style={{
+                  padding: "9px 15px",
+                  borderRadius: 999,
+                  border:
+                    String(s.reteMode || "AUTO") === "MANUALE"
+                      ? "2px solid #0f172a"
+                      : "1px solid #cbd5e1",
+                  background:
+                    String(s.reteMode || "AUTO") === "MANUALE"
+                      ? "#0f172a"
+                      : "#ffffff",
+                  color:
+                    String(s.reteMode || "AUTO") === "MANUALE"
+                      ? "#ffffff"
+                      : "#475569",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                ✎ MANUALE
+              </button>
+
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "#64748b",
+                  fontWeight: 700,
+                }}
+              >
+                I valori manuali restano memorizzati quando passi ad Automatico.
+              </span>
             </div>
-  
+
+            {String(s.reteMode || "AUTO") === "AUTO" ? (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile
+                      ? "1fr"
+                      : "repeat(4,minmax(0,1fr))",
+                    gap: 12,
+                    marginBottom: 12,
+                  }}
+                >
+                  {selectField(
+                    "Regione",
+                    s.regione || "UMBRIA",
+                    (v) => set("regione", v),
+                    GAS_REGIONS
+                  )}
+
+                  {selectField(
+                    "Classe contatore",
+                    s.classeContatore || "G4-G6",
+                    (v) => set("classeContatore", v),
+                    ["G4-G6", "G10-G40", "OLTRE G40"]
+                  )}
+
+                  <div
+                    style={{
+                      border: "1px solid #bae6fd",
+                      borderRadius: 10,
+                      padding: 10,
+                      background: "#f0f9ff",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 800 }}>
+                      AMBITO AUTOMATICO
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 15, fontWeight: 900 }}>
+                      {r.networkAmbito || gasRegionToAmbito(s.regione || "UMBRIA") || "-"}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      border: "1px solid #bae6fd",
+                      borderRadius: 10,
+                      padding: 10,
+                      background: "#f0f9ff",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 800 }}>
+                      PERIODO AUTOMATICO
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 13, fontWeight: 900, lineHeight: 1.35 }}>
+                      {r.networkPeriods
+                        .filter((item: any) => item.mese)
+                        .map((item: any) => item.mese)
+                        .join(" · ") || "Seleziona i mesi nei consumi"}
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile
+                      ? "1fr"
+                      : "repeat(3,minmax(0,1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {[
+                    ["Quota consumi rete + oneri", r.H23],
+                    ["Quota fissa rete + oneri", r.H28],
+                    ["Totale rete + oneri", r.H23 + r.H28],
+                  ].map(([label, value]) => (
+                    <div
+                      key={String(label)}
+                      style={{
+                        border: "1px solid #7dd3fc",
+                        borderRadius: 10,
+                        padding: 12,
+                        background: "#f0f9ff",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "#075985",
+                          fontWeight: 800,
+                          marginBottom: 6,
+                        }}
+                      >
+                        {label}
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 900 }}>
+                        {money(Number(value || 0))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: 10,
+                    borderRadius: 9,
+                    background: r.networkAutoAvailable ? "#ecfdf5" : "#fff7ed",
+                    border: r.networkAutoAvailable
+                      ? "1px solid #86efac"
+                      : "1px solid #fdba74",
+                    color: r.networkAutoAvailable ? "#166534" : "#9a3412",
+                    fontSize: 12,
+                    fontWeight: 750,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {r.networkAutoAvailable
+                    ? `Calcolo automatico ARERA · consumo annuo stimato ${numFormat(r.consumoAnnuoStimato, 0)} Smc · ${gasMonths(s.fatturazione)} ${gasMonths(s.fatturazione) === 1 ? "mese" : "mesi"} di competenza.`
+                    : `Automatico non disponibile: ${r.gasNetworkAuto.reason || "dati mancanti"}. In questo caso vengono mantenuti i valori manuali.`}
+                </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile
+                    ? "1fr"
+                    : "repeat(2,minmax(0,1fr))",
+                  gap: 12,
+                }}
+              >
+                {field(
+                  "Quota consumi rete",
+                  s.quotaVariabileAggiuntiva,
+                  (v) => set("quotaVariabileAggiuntiva", v),
+                  "number"
+                )}
+                {field(
+                  "Quota fissa rete",
+                  s.quotaFissaAggiuntiva,
+                  (v) => set("quotaFissaAggiuntiva", v),
+                  "number"
+                )}
+              </div>
+            )}
+
             <div style={{ height: 12 }} />
-  
+
             <div
               style={{
                 display: "grid",
