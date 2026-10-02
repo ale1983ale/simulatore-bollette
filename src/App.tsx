@@ -1684,8 +1684,34 @@ function sanitizeFileName(name: string) {
 }
 
 function printHtmlDocument(title: string, html: string, fileName?: string) {
-  const win = window.open("", "_blank", "width=1000,height=900");
-  if (!win) return;
+  const androidFiles = (window as any).AndroidFiles;
+  const useNativePdf =
+    Boolean(androidFiles && typeof androidFiles.savePdf === "function");
+
+  let renderFrame: HTMLIFrameElement | null = null;
+  let win: Window | null = null;
+
+  if (useNativePdf) {
+    renderFrame = document.createElement("iframe");
+    renderFrame.setAttribute("aria-hidden", "true");
+    renderFrame.style.position = "fixed";
+    renderFrame.style.left = "-12000px";
+    renderFrame.style.top = "0";
+    renderFrame.style.width = "700px";
+    renderFrame.style.height = "1000px";
+    renderFrame.style.border = "0";
+    renderFrame.style.opacity = "0";
+    renderFrame.style.pointerEvents = "none";
+    document.body.appendChild(renderFrame);
+    win = renderFrame.contentWindow;
+  } else {
+    win = window.open("", "_blank", "width=1000,height=900");
+  }
+
+  if (!win) {
+    renderFrame?.remove();
+    return;
+  }
 
   win.document.write(`
     <html>
@@ -1857,7 +1883,9 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
   `);
 
   win.document.close();
-  win.focus();
+  if (!useNativePdf) {
+    win.focus();
+  }
 
   const finalFileName = sanitizeFileName(fileName || title);
 
@@ -2006,6 +2034,36 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
         blob = pdf.output("blob");
       }
 
+      if (useNativePdf) {
+        const reader = new FileReader();
+
+        reader.onloadend = () => {
+          try {
+            const dataUrl = String(reader.result || "");
+            const base64 = dataUrl.includes(",")
+              ? dataUrl.slice(dataUrl.indexOf(",") + 1)
+              : dataUrl;
+
+            androidFiles.savePdf(
+              base64,
+              `${finalFileName}.pdf`
+            );
+          } catch (nativeError) {
+            console.error("ANDROID PDF SAVE ERROR:", nativeError);
+          } finally {
+            renderFrame?.remove();
+          }
+        };
+
+        reader.onerror = () => {
+          console.error("ANDROID PDF BASE64 ERROR");
+          renderFrame?.remove();
+        };
+
+        reader.readAsDataURL(blob);
+        return;
+      }
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -2018,7 +2076,12 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       win.close();
     } catch (error) {
       console.error("PDF GENERATION ERROR:", error);
-      win.print();
+
+      if (useNativePdf) {
+        renderFrame?.remove();
+      } else {
+        win.print();
+      }
     }
   }, 450);
 }
