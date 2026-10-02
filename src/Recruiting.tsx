@@ -6813,7 +6813,7 @@ export default function Recruiting({
                   : "1px solid #cbd5e1",
             }}
           >
-            GESTIONE RECRUITING
+            GESTIONE AGENTI ATTIVI / ZONE
           </button>
 
         </div>
@@ -10982,7 +10982,7 @@ export default function Recruiting({
               }}
             >
               {mapView === "agents"
-                ? "I punti arancioni provengono da GESTIONE RECRUITING → ASSEGNAZIONE ZONE."
+                ? "I punti arancioni provengono da GESTIONE AGENTI ATTIVI / ZONE → ASSEGNAZIONE ZONE."
                 : "I nominativi provengono dall'elenco CONTATTI e sono colorati in base allo stato."}
               {focusedCandidateMap && (
                 <span
