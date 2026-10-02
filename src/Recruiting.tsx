@@ -146,6 +146,7 @@ type Candidate = {
   latitude: number | null;
   longitude: number | null;
   waitingRoomNew: boolean;
+  isFavorite: boolean;
 };
 
 type ContactNote = {
@@ -909,6 +910,7 @@ function candidateFromRow(row: any): Candidate {
         ? null
         : Number(row.longitude),
     waitingRoomNew: Boolean(row.waiting_room_new),
+    isFavorite: Boolean(row.is_favorite),
   };
 }
 
@@ -1295,6 +1297,7 @@ export default function Recruiting({
   const [excludedStatusFilters, setExcludedStatusFilters] = useState<CandidateStatus[]>([]);
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
+  const [favoriteFilter, setFavoriteFilter] = useState<"" | "SI" | "NO">("");
   const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
     useState(false);
   const [regionFilterMenuOpen, setRegionFilterMenuOpen] = useState(false);
@@ -1637,7 +1640,7 @@ export default function Recruiting({
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,referrer,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new")
+        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,referrer,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new,is_favorite")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -2753,6 +2756,9 @@ export default function Recruiting({
         return false;
       }
 
+      if (favoriteFilter === "SI" && !candidate.isFavorite) return false;
+      if (favoriteFilter === "NO" && candidate.isFavorite) return false;
+
       const calledByMe = calledByMeCandidateIds.has(candidate.id);
       if (calledByMeFilter === "SI" && !calledByMe) return false;
       if (calledByMeFilter === "NO" && calledByMe) return false;
@@ -2843,6 +2849,7 @@ export default function Recruiting({
     statusFilter,
     excludedStatusFilters,
     forwardedToFilter,
+    favoriteFilter,
     calledByMeFilter,
     calledByMeCandidateIds,
   ]);
@@ -2859,6 +2866,7 @@ export default function Recruiting({
       statusFilter ||
       excludedStatusFilters.length > 0 ||
       forwardedToFilter ||
+      favoriteFilter ||
       calledByMeFilter
   );
 
@@ -2874,6 +2882,7 @@ export default function Recruiting({
     setStatusFilter("");
     setExcludedStatusFilters([]);
     setForwardedToFilter("");
+    setFavoriteFilter("");
     setCalledByMeFilter("");
   };
 
@@ -3245,6 +3254,67 @@ export default function Recruiting({
     );
 
     return true;
+  };
+
+  const toggleCandidateFavorite = async (
+    candidate: Candidate
+  ) => {
+    if (!ctx) return;
+
+    const nextValue = !candidate.isFavorite;
+
+    setCandidates((current) =>
+      current.map((item) =>
+        item.id === candidate.id
+          ? { ...item, isFavorite: nextValue }
+          : item
+      )
+    );
+    setAllCandidates((current) =>
+      current.map((item) =>
+        item.id === candidate.id
+          ? { ...item, isFavorite: nextValue }
+          : item
+      )
+    );
+
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_candidates")
+        .update({
+          is_favorite: nextValue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", candidate.id)
+        .eq("owner_key", ctx.ownerKey);
+
+      if (error) throw error;
+
+      setMessage(
+        nextValue
+          ? "Contatto aggiunto ai preferiti."
+          : "Contatto rimosso dai preferiti."
+      );
+    } catch (error: any) {
+      setCandidates((current) =>
+        current.map((item) =>
+          item.id === candidate.id
+            ? { ...item, isFavorite: candidate.isFavorite }
+            : item
+        )
+      );
+      setAllCandidates((current) =>
+        current.map((item) =>
+          item.id === candidate.id
+            ? { ...item, isFavorite: candidate.isFavorite }
+            : item
+        )
+      );
+      setMessage(
+        "Errore nel salvataggio del preferito: " +
+          (error?.message || error)
+      );
+    }
   };
 
   const updateCandidateStatus = async (
@@ -7178,6 +7248,23 @@ export default function Recruiting({
               </div>
 
               <div>
+                <label style={labelStyle}>Preferiti</label>
+                <select
+                  value={favoriteFilter}
+                  onChange={(e) =>
+                    setFavoriteFilter(
+                      e.target.value as "" | "SI" | "NO"
+                    )
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Tutti</option>
+                  <option value="SI">Solo preferiti</option>
+                  <option value="NO">Non preferiti</option>
+                </select>
+              </div>
+
+              <div>
                 <label style={labelStyle}>Regione · MULTISELEZIONE</label>
                 <div
                   ref={regionFilterMenuRef}
@@ -7965,6 +8052,7 @@ export default function Recruiting({
                       }}
                       className="recruiting-candidate-card"
                       style={{
+                        position: "relative",
                         textAlign: "left",
                         border: `${candidate.waitingRoomNew ? 8 : 6}px solid ${statusStyle.border}`,
                         background: candidate.waitingRoomNew
@@ -7983,7 +8071,52 @@ export default function Recruiting({
                         lineHeight: 1.35,
                       }}
                     >
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, paddingRight: 38 }}>
+                        <button
+                          type="button"
+                          title={
+                            candidate.isFavorite
+                              ? "Rimuovi dai preferiti"
+                              : "Aggiungi ai preferiti"
+                          }
+                          aria-label={
+                            candidate.isFavorite
+                              ? `Rimuovi ${candidate.fullName} dai preferiti`
+                              : `Aggiungi ${candidate.fullName} ai preferiti`
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void toggleCandidateFavorite(candidate);
+                          }}
+                          style={{
+                            position: "absolute",
+                            top: 7,
+                            right: 7,
+                            zIndex: 3,
+                            width: 32,
+                            height: 32,
+                            padding: 0,
+                            borderRadius: 999,
+                            border: candidate.isFavorite
+                              ? "1px solid #f59e0b"
+                              : "1px solid #cbd5e1",
+                            background: candidate.isFavorite
+                              ? "#fef3c7"
+                              : "#ffffff",
+                            color: candidate.isFavorite
+                              ? "#d97706"
+                              : "#94a3b8",
+                            fontSize: 20,
+                            lineHeight: 1,
+                            cursor: "pointer",
+                            display: "grid",
+                            placeItems: "center",
+                            boxShadow: "0 2px 7px rgba(15,23,42,.08)",
+                          }}
+                        >
+                          {candidate.isFavorite ? "★" : "☆"}
+                        </button>
+
                         <div
                           style={{
                             fontWeight: 700,
@@ -8475,6 +8608,37 @@ export default function Recruiting({
                       <h3 style={{ margin: 0 }}>Scheda contatto</h3>
 
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void toggleCandidateFavorite(selectedCandidate)
+                          }
+                          title={
+                            selectedCandidate.isFavorite
+                              ? "Rimuovi dai preferiti"
+                              : "Aggiungi ai preferiti"
+                          }
+                          style={{
+                            ...buttonStyle,
+                            padding: "7px 10px",
+                            minWidth: 42,
+                            background: selectedCandidate.isFavorite
+                              ? "#fef3c7"
+                              : "#f8fafc",
+                            color: selectedCandidate.isFavorite
+                              ? "#d97706"
+                              : "#64748b",
+                            border: selectedCandidate.isFavorite
+                              ? "1px solid #f59e0b"
+                              : "1px solid #cbd5e1",
+                            fontSize: 16,
+                          }}
+                        >
+                          {selectedCandidate.isFavorite
+                            ? "★ PREFERITO"
+                            : "☆ PREFERITO"}
+                        </button>
+
                         <button
                           type="button"
                           disabled={!selectedNotes.length}
