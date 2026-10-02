@@ -467,6 +467,26 @@
     line-height: 1 !important;
   }
 
+  .ge-main-nav__reload,
+  .ge-main-nav__settings {
+    grid-column: 4 !important;
+    grid-row: 2 !important;
+    width: calc(50% - 2px) !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    padding: 0 !important;
+    font-size: 17px !important;
+    line-height: 1 !important;
+  }
+
+  .ge-main-nav__reload {
+    justify-self: start !important;
+  }
+
+  .ge-main-nav__settings {
+    justify-self: end !important;
+  }
+
   .ge-brand {
     border-radius: 14px;
     padding: 13px 17px;
