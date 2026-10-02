@@ -11000,15 +11000,7 @@ const renderAdminContent = () => {
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {hasFullAdminAccess && (
-            <>
-              <button onClick={() => setTab("calendarAdmin")} style={{ ...baseBtn, ...(tab === "calendarAdmin" ? activeBtn : {}) }}>CALENDARIO</button>
-              <button onClick={() => setTab("archive")} style={{ ...baseBtn, ...(tab === "archive" ? activeBtn : {}) }}>DATI PRODUZIONE</button>
-              <button onClick={() => setTab("driveArchive")} style={{ ...baseBtn, ...(tab === "driveArchive" ? activeBtn : {}) }}>ARCHIVIO DRIVE</button>
-              <button onClick={() => setTab("recruiting")} style={{ ...baseBtn, ...(tab === "recruiting" ? activeBtn : {}) }}>RECRUITING</button>
-              <button onClick={() => setTab("appointments")} style={{ ...baseBtn, ...(tab === "appointments" ? activeBtn : {}) }}>APPUNTAMENTI</button>
-              {isSuperAdmin && <button onClick={() => setTab("provvigioni")} style={{ ...baseBtn, ...(tab === "provvigioni" ? activeBtn : {}) }}>PROVVIGIONI</button>}
-              <button onClick={() => setTab("personale")} style={{ ...baseBtn, ...(tab === "personale" ? activeBtn : {}) }}>PERSONALE</button>
-            </>
+            <button onClick={() => setTab("personale")} style={{ ...baseBtn, ...(tab === "personale" ? activeBtn : {}) }}>PERSONALE</button>
           )}
           <button onClick={() => setTab("reportAdmin")} style={{ ...baseBtn, ...(tab === "reportAdmin" ? activeBtn : {}) }}>REPORT ADMIN</button>
           {hasFullAdminAccess && (
@@ -11694,6 +11686,30 @@ if (!agentSession && !adminSession) {
               }}
             >
               👥
+            </button>
+
+            <button
+              type="button"
+              title="Invio Email"
+              aria-label="Apri Invio Email"
+              onClick={openOutlookEmail}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,.72)",
+                background: "rgba(255,255,255,.16)",
+                color: "#ffffff",
+                display: "grid",
+                placeItems: "center",
+                padding: 0,
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: "pointer",
+                boxShadow: "0 3px 9px rgba(15,23,42,.16)",
+              }}
+            >
+              ✉️
             </button>
 
             <button
