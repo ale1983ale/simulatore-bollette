@@ -2223,6 +2223,56 @@ function selectField(
   );
 }
 
+function highlightedSelectField(
+  label: string,
+  value: string,
+  setValue: (v: string) => void,
+  options: string[],
+  optionLabel?: (option: string) => string,
+  helpText?: string
+) {
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          fontSize: 12,
+          fontWeight: 900,
+          marginBottom: 4,
+          color: "#b91c1c",
+        }}
+      >
+        <span>{label.toUpperCase()}</span>
+        {helpText ? <HelpHint text={helpText} /> : null}
+      </div>
+
+      <select
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        style={{
+          width: "100%",
+          padding: 8,
+          border: "2px solid #ef4444",
+          background: "#fff",
+          color: "#0f172a",
+          fontWeight: 800,
+          borderRadius: 8,
+          boxSizing: "border-box",
+          outline: "none",
+        }}
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {optionLabel ? optionLabel(o) : (o || "-")}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function offerTypeField(
   value: string,
   setValue: (v: string) => void
@@ -3740,7 +3790,7 @@ return (
             {field("IVA %", s.iva, (v) => set("iva", v), "number")}
             {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
             {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
-            {selectField(
+            {highlightedSelectField(
               "Tipo",
               s.tipo,
               handleEnergyTypeChange,
