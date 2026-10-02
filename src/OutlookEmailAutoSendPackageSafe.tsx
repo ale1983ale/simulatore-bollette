@@ -368,7 +368,6 @@ export default function OutlookEmailAutoSendPackageSafe() {
       const selected = Array.from(input.files || []);
       if (!selected.length) return;
       if (input.closest('[data-common-panel="true"]')) {
-        commonFilesRef.current = selected;
         return;
       }
       const card = findFileCard(input);
@@ -380,6 +379,15 @@ export default function OutlookEmailAutoSendPackageSafe() {
         sourceFileRef.current = selected[0];
         separateFilesRef.current = new Map();
       }
+    };
+
+    const onCommonFilesConfirmed = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ files?: File[] }>
+      ).detail;
+      commonFilesRef.current = Array.isArray(detail?.files)
+        ? detail.files
+        : [];
     };
 
     const makePackage = async (button: HTMLButtonElement) => {
@@ -482,10 +490,18 @@ export default function OutlookEmailAutoSendPackageSafe() {
     };
 
     document.addEventListener("change", onFileChange, true);
+    window.addEventListener(
+      "outlook-email-common-files-confirmed",
+      onCommonFilesConfirmed as EventListener
+    );
     ensureButton();
     const timer = window.setInterval(ensureButton, 900);
     return () => {
       document.removeEventListener("change", onFileChange, true);
+      window.removeEventListener(
+        "outlook-email-common-files-confirmed",
+        onCommonFilesConfirmed as EventListener
+      );
       window.clearInterval(timer);
       document.querySelector('[data-auto-send-outlook="true"]')?.remove();
     };
