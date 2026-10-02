@@ -382,15 +382,27 @@ export default function OutlookEmail() {
       setOpen(true);
     };
 
+    const onCloseEmail = () => setOpen(false);
+
     window.addEventListener(
       "open-outlook-email",
       onOpenEmail as EventListener
     );
-    return () =>
+    window.addEventListener(
+      "close-outlook-email",
+      onCloseEmail as EventListener
+    );
+
+    return () => {
       window.removeEventListener(
         "open-outlook-email",
         onOpenEmail as EventListener
       );
+      window.removeEventListener(
+        "close-outlook-email",
+        onCloseEmail as EventListener
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -424,7 +436,7 @@ export default function OutlookEmail() {
       if (!target) return;
 
       const navigationTarget = target.closest(
-        ".ge-brand, .ge-main-nav, .ge-admin-nav"
+        ".ge-brand-shell, .ge-main-nav, .ge-admin-nav"
       );
       if (!navigationTarget) return;
 
