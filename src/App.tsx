@@ -2725,7 +2725,12 @@ function calcEnergia(
   };
 }
 
-function calcGas(d: any, punPsvRows: PunPsvRow[], gasOffers: GasOffer[]) {
+function calcGas(
+  d: any,
+  punPsvRows: PunPsvRow[],
+  gasOffers: GasOffer[],
+  gasNetworkTariffRows: GasNetworkTariffRow[]
+) {
   const off = gasOffers.find((x) => x.nome === d.offerta) || gasOffers[0];
   const mesi = gasMonths(d.fatturazione);
 
@@ -2740,31 +2745,93 @@ function calcGas(d: any, punPsvRows: PunPsvRow[], gasOffers: GasOffer[]) {
   const quotaFissaEff =
     isDedicatedOffer(d.offerta) ? n(d.dedicataQuotaFissa) : n(off.canone);
 
-  const p1 = n((punPsvRows.find((x) => x.mese === d.periodo1) || { psv: 0 }).psv);
-  const p2 = n((punPsvRows.find((x) => x.mese === d.periodo2) || { psv: 0 }).psv);
-  const p3 = n((punPsvRows.find((x) => x.mese === d.periodo3) || { psv: 0 }).psv);
-  const p4 = n((punPsvRows.find((x) => x.mese === d.periodo4) || { psv: 0 }).psv);
+  const gasFixedMode =
+    String(d.tipologiaOfferta || "VARIABILE") === "FISSO";
 
-  const consumoTotale =
-    n(d.consumo1) +
-    n(d.consumo2) +
-    n(d.consumo3) +
-    n(d.consumo4);
+  const fixedGasRow =
+    punPsvRows.find(
+      (x) =>
+        x.mese ===
+        (String(d.uso || "").toUpperCase() === "DOMESTICO"
+          ? "FISSO DOMESTICO"
+          : "FISSO BUSINESS")
+    ) || { psv: 0 };
+
+  const periodPrice = (period: string) => {
+    if (isFixedDedicatedOffer(d.offerta)) return 0;
+    if (gasFixedMode) return n(fixedGasRow.psv);
+    return n(
+      (punPsvRows.find((x) => x.mese === period) || { psv: 0 }).psv
+    );
+  };
+
+  const p1 = periodPrice(d.periodo1);
+  const p2 = periodPrice(d.periodo2);
+  const p3 = periodPrice(d.periodo3);
+  const p4 = periodPrice(d.periodo4);
+
+  const consumi = [
+    n(d.consumo1),
+    n(d.consumo2),
+    n(d.consumo3),
+    n(d.consumo4),
+  ];
+
+  const selectedPeriods = [
+    d.periodo1,
+    d.periodo2,
+    d.periodo3,
+    d.periodo4,
+  ]
+    .slice(0, mesi)
+    .map((mese, index) => ({
+      mese: String(mese || ""),
+      consumo: consumi[index] || 0,
+    }));
+
+  const consumoTotale = consumi
+    .slice(0, mesi)
+    .reduce((sum, value) => sum + value, 0);
+
+  const consumoAnnuoStimato =
+    mesi > 0 ? (consumoTotale * 12) / mesi : 0;
+
+  const gasNetworkAuto = calculateGasNetworkCharges({
+    rows: gasNetworkTariffRows,
+    regione: d.regione || "UMBRIA",
+    classeContatore: (d.classeContatore || "G4-G6") as GasMeterClass,
+    uso: d.uso || "DOMESTICO",
+    annualConsumption: consumoAnnuoStimato,
+    periods: selectedPeriods,
+  });
 
   const X55 =
-    p1 * n(d.consumo1) +
-    p2 * n(d.consumo2) +
-    p3 * n(d.consumo3) +
-    p4 * n(d.consumo4) +
+    p1 * consumi[0] +
+    p2 * consumi[1] +
+    p3 * consumi[2] +
+    p4 * consumi[3] +
     consumoTotale * spreadEff;
 
   const X56 = consumoTotale * quotaVarEff;
   const X57 = consumoTotale * n(d.adeguamentoParametro);
   const H22 = X55 + X56 + X57;
-  const H23 = n(d.quotaVariabileAggiuntiva);
+
+  const networkAutoMode =
+    String(d.reteMode || "AUTO") !== "MANUALE";
+
+  const H23 =
+    networkAutoMode && gasNetworkAuto.available
+      ? gasNetworkAuto.quotaConsumiRete
+      : n(d.quotaVariabileAggiuntiva);
+
   const H24 = H22 + H23;
   const H27 = quotaFissaEff * mesi;
-  const H28 = n(d.quotaFissaAggiuntiva);
+
+  const H28 =
+    networkAutoMode && gasNetworkAuto.available
+      ? gasNetworkAuto.quotaFissaRete
+      : n(d.quotaFissaAggiuntiva);
+
   const H29 = H27 + H28;
   const accisaCoeff = n(d.accisaValore);
   const H32 = isSi(d.overrideAcciseFlag)
@@ -2778,8 +2845,12 @@ function calcGas(d: any, punPsvRows: PunPsvRow[], gasOffers: GasOffer[]) {
       ? n(d.bonusValore)
       : 0;
   const H37 = H24 + H29 + H34 + H35 - H36;
-  const risparmioFattura = isSi(d.confrontoFlag) ? H37 - n(d.confrontoValore) : 0;
-  const risparmioAnnuo = isSi(d.confrontoFlag) ? (risparmioFattura / mesi) * 12 : 0;
+  const risparmioFattura = isSi(d.confrontoFlag)
+    ? H37 - n(d.confrontoValore)
+    : 0;
+  const risparmioAnnuo = isSi(d.confrontoFlag)
+    ? (risparmioFattura / mesi) * 12
+    : 0;
 
   return {
     X55,
@@ -2803,11 +2874,17 @@ function calcGas(d: any, punPsvRows: PunPsvRow[], gasOffers: GasOffer[]) {
     quotaVarEff,
     quotaFissaEff,
     consumoTotale,
+    consumoAnnuoStimato,
     accisaCoeff,
     p1,
     p2,
     p3,
     p4,
+    networkAutoMode,
+    gasNetworkAuto,
+    networkAutoAvailable: gasNetworkAuto.available,
+    networkAmbito: gasNetworkAuto.ambito,
+    networkPeriods: selectedPeriods,
   };
 }
 
