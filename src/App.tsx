@@ -9622,7 +9622,6 @@ function SectionHero({
 function AdminDashboard({
   navigate,
   openEmail,
-  openDatabase,
   waitingIncomingCount,
   waitingOutgoingCount,
   fullAccess,
@@ -9630,7 +9629,6 @@ function AdminDashboard({
 }: {
   navigate: DashboardNavigate;
   openEmail: () => void;
-  openDatabase: () => void;
   waitingIncomingCount: number;
   waitingOutgoingCount: number;
   fullAccess: boolean;
@@ -9658,16 +9656,6 @@ function AdminDashboard({
         <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />
         {fullAccess && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
         {fullAccess && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
-        {fullAccess && (
-          <DashboardCard
-            title="IMPOSTAZIONI LOGIN"
-            description="Gestisci impostazioni e accessi login."
-            icon="⚙"
-            className="ge-card-settings"
-            compact
-            onClick={openDatabase}
-          />
-        )}
       </div>
     </div>
   );
@@ -11198,7 +11186,6 @@ const renderAdminContent = () => {
           waitingOutgoingCount={waitingRoomOutgoingCount}
           fullAccess={hasFullAdminAccess}
           superAdmin={isSuperAdmin}
-          openDatabase={openDatabaseSettings}
         />
       )}
 
