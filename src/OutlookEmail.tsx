@@ -1810,14 +1810,14 @@ export default function OutlookEmail() {
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <th style={{ padding: 6, width: "14%" }}>Agenzia</th>
-                    <th style={{ padding: 6, width: "19%" }}>Email</th>
-                    <th style={{ padding: 6, width: "14%" }}>Allegato previsto</th>
-                    <th style={{ padding: 6, width: "23%" }}>File associato / Stato</th>
+                    <th style={{ padding: 5, width: "13%" }}>Agenzia</th>
+                    <th style={{ padding: 5, width: "18%" }}>Email</th>
+                    <th style={{ padding: 5, width: "12%" }}>Allegato previsto</th>
+                    <th style={{ padding: 5, width: "20%" }}>File associato / Stato</th>
                     {editingRecipients && (
-                      <th style={{ padding: 8 }}>Azioni</th>
+                      <th style={{ padding: 5, width: "12%" }}>Azioni</th>
                     )}
-                    <th style={{ padding: 6, width: "10%" }}>DM</th>
+                    <th style={{ padding: 5, width: "8%" }}>DM</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1830,21 +1830,22 @@ export default function OutlookEmail() {
                         {removedRows.has(index) ? "Rimosso manualmente — non inviata" : row.file && row.email ? `✓ ${row.file.name}` : row.file && !row.email ? `Email mancante — ${row.file.name}` : fileMode === "single" && sourceAgencies.length ? "Nessun dato nel file — non inviata" : files.length ? "Nessun file associato — non inviata" : "File non caricati"}
                       </td>
                       {editingRecipients && (
-                        <td style={{ padding: 8 }}>
+                        <td style={{ padding: 5 }}>
                           <button
                             onClick={() => deleteAgent(index)}
                             style={{
                               ...button,
                               background: "#fee2e2",
                               color: "#991b1b",
-                              padding: "7px 10px",
+                              padding: "5px 7px",
+                              fontSize: 11,
                             }}
                           >
                             Elimina
                           </button>
                         </td>
                       )}
-                      <td style={{ padding: 8 }}>
+                      <td style={{ padding: 5, overflowWrap: "anywhere" }}>
                         {editingRecipients ? (
                           <input
                             list="outlook-email-dm-options"
