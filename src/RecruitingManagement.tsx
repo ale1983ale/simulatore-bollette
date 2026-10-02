@@ -920,7 +920,7 @@ export default function RecruitingManagement() {
                                   void saveAgentDm(
                                     agent,
                                     field,
-                                    customDmEditor.value
+                                    customDmEditor?.value || ""
                                   )
                                 }
                                 style={{
