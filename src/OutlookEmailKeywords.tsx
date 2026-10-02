@@ -36,7 +36,7 @@ export default function OutlookEmailKeywords() {
         });
 
         const controlTitle = Array.from(table.parentElement?.querySelectorAll("strong") || []).find(
-          (node) => normalizeText(node.textContent || "") === "4. Controllo abbinamenti"
+          (node) => ["Controllo abbinamento email", "4. Controllo abbinamento email"].includes(normalizeText(node.textContent || ""))
         );
         const controlContainer = controlTitle?.parentElement;
         if (controlContainer && !controlContainer.querySelector('[data-agent-keyword-help="true"]')) {
