@@ -6815,6 +6815,293 @@ function SystemChargesAdmin({
   );
 }
 
+function GasNetworkChargesAdmin({
+  rows,
+  meta,
+  refreshing,
+  onRefresh,
+}: {
+  rows: GasNetworkTariffRow[];
+  meta: GasNetworkTariffMeta;
+  refreshing: boolean;
+  onRefresh: () => Promise<void>;
+}) {
+  const ambiti = Array.from(new Set(rows.map((row) => row.ambito))).sort();
+  const months = Array.from(new Set(rows.map((row) => row.mese))).sort(
+    (a, b) => {
+      const aRow = rows.find((row) => row.mese === a);
+      const bRow = rows.find((row) => row.mese === b);
+      return (
+        Number(aRow?.anno || 0) * 12 +
+        Number(aRow?.meseNumero || 0) -
+        (Number(bRow?.anno || 0) * 12 + Number(bRow?.meseNumero || 0))
+      );
+    }
+  );
+
+  const [ambito, setAmbito] = useState("CENTRALE");
+  const [classe, setClasse] = useState<GasMeterClass>("G4-G6");
+  const [mese, setMese] = useState(
+    months[months.length - 1] || "OTTOBRE 2026"
+  );
+
+  useEffect(() => {
+    if (!months.length) return;
+    if (!months.includes(mese)) {
+      setMese(months[months.length - 1]);
+    }
+  }, [months.join("|"), mese]);
+
+  const visibleRows = rows
+    .filter(
+      (row) =>
+        row.ambito === ambito &&
+        row.classeContatore === classe &&
+        row.mese === mese
+    )
+    .sort((a, b) => a.scaglione - b.scaglione);
+
+  const thStyle: React.CSSProperties = {
+    padding: 8,
+    textAlign: "left",
+    borderBottom: "1px solid #cbd5e1",
+    background: "#f8fafc",
+    fontSize: 12,
+    whiteSpace: "nowrap",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: 8,
+    borderBottom: "1px solid #e2e8f0",
+    fontSize: 12,
+    whiteSpace: "nowrap",
+  };
+
+  return (
+    <div
+      style={{
+        background: "white",
+        border: "1px solid #e2e8f0",
+        borderRadius: 12,
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0 }}>Rete + Oneri Gas · automatico</h2>
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              color: "#64748b",
+              lineHeight: 1.45,
+              maxWidth: 760,
+            }}
+          >
+            Tariffe ARERA 2026 per ambito tariffario, classe contatore e
+            scaglione. La scheda Gas usa automaticamente i mesi selezionati
+            nei consumi: 1 mese per mensile, 2 per bimestrale, 3 per
+            trimestrale e 4 per quadrimestrale.
+          </div>
+        </div>
+
+        <button
+          type="button"
+          disabled={refreshing}
+          onClick={() => void onRefresh()}
+          style={{
+            padding: "10px 15px",
+            borderRadius: 9,
+            border: "1px solid #0284c7",
+            background: refreshing ? "#e0f2fe" : "#0284c7",
+            color: refreshing ? "#0369a1" : "white",
+            fontWeight: 900,
+            cursor: refreshing ? "default" : "pointer",
+          }}
+        >
+          {refreshing ? "AGGIORNAMENTO..." : "AGGIORNA DA ARERA"}
+        </button>
+      </div>
+
+      <div
+        style={{
+          marginTop: 14,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
+          gap: 10,
+        }}
+      >
+        <label style={{ fontSize: 12, fontWeight: 800 }}>
+          Ambito
+          <select
+            value={ambito}
+            onChange={(e) => setAmbito(e.target.value)}
+            style={{
+              display: "block",
+              width: "100%",
+              marginTop: 5,
+              padding: 9,
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+            }}
+          >
+            {ambiti.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ fontSize: 12, fontWeight: 800 }}>
+          Classe contatore
+          <select
+            value={classe}
+            onChange={(e) => setClasse(e.target.value as GasMeterClass)}
+            style={{
+              display: "block",
+              width: "100%",
+              marginTop: 5,
+              padding: 9,
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+            }}
+          >
+            <option value="G4-G6">G4-G6</option>
+            <option value="G10-G40">G10-G40</option>
+            <option value="OLTRE G40">OLTRE G40</option>
+          </select>
+        </label>
+
+        <label style={{ fontSize: 12, fontWeight: 800 }}>
+          Mese
+          <select
+            value={mese}
+            onChange={(e) => setMese(e.target.value)}
+            style={{
+              display: "block",
+              width: "100%",
+              marginTop: 5,
+              padding: 9,
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+            }}
+          >
+            {months.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div
+        style={{
+          marginTop: 12,
+          padding: 10,
+          borderRadius: 9,
+          background: "#f0f9ff",
+          border: "1px solid #bae6fd",
+          color: "#0c4a6e",
+          fontSize: 12,
+          lineHeight: 1.45,
+        }}
+      >
+        Stato fonte: <strong>{meta.sourceStatus || "STORICO LOCALE"}</strong>
+        {meta.checkedAt && (
+          <>
+            {" · "}ultimo controllo{" "}
+            <strong>{new Date(meta.checkedAt).toLocaleString("it-IT")}</strong>
+          </>
+        )}
+        {meta.warnings.length > 0 && (
+          <div style={{ marginTop: 5, color: "#9a3412" }}>
+            {meta.warnings.join(" · ")}
+          </div>
+        )}
+      </div>
+
+      <div style={{ overflowX: "auto", marginTop: 14 }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            minWidth: 1050,
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={thStyle}>Scaglione</th>
+              <th style={thStyle}>Smc annui</th>
+              <th style={thStyle}>Quota fissa annua</th>
+              <th style={thStyle}>Distribuzione €/Smc</th>
+              <th style={thStyle}>UG2</th>
+              <th style={thStyle}>UG1</th>
+              <th style={thStyle}>UG3</th>
+              <th style={thStyle}>GS business</th>
+              <th style={thStyle}>RE</th>
+              <th style={thStyle}>RS</th>
+              <th style={thStyle}>Tot. domestico €/Smc</th>
+              <th style={thStyle}>Tot. business €/Smc</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((row) => (
+              <tr key={`${row.mese}-${row.ambito}-${row.classeContatore}-${row.scaglione}`}>
+                <td style={tdStyle}>{row.scaglione}</td>
+                <td style={tdStyle}>
+                  {row.aSmc == null
+                    ? `oltre ${row.daSmc.toLocaleString("it-IT")}`
+                    : `${row.daSmc.toLocaleString("it-IT")} – ${row.aSmc.toLocaleString("it-IT")}`}
+                </td>
+                <td style={{ ...tdStyle, fontWeight: 900 }}>
+                  {row.quotaFissaAnnua.toFixed(2)}
+                </td>
+                <td style={tdStyle}>{row.quotaDistribuzione.toFixed(6)}</td>
+                <td style={tdStyle}>{row.ug2.toFixed(6)}</td>
+                <td style={tdStyle}>{row.ug1.toFixed(6)}</td>
+                <td style={tdStyle}>{row.ug3.toFixed(6)}</td>
+                <td style={tdStyle}>{row.gsBusiness.toFixed(6)}</td>
+                <td style={tdStyle}>{row.re.toFixed(6)}</td>
+                <td style={tdStyle}>{row.rs.toFixed(6)}</td>
+                <td style={{ ...tdStyle, fontWeight: 900 }}>
+                  {row.quotaVariabileDomestico.toFixed(6)}
+                </td>
+                <td style={{ ...tdStyle, fontWeight: 900 }}>
+                  {row.quotaVariabileBusiness.toFixed(6)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        style={{
+          marginTop: 10,
+          fontSize: 11,
+          color: "#64748b",
+          lineHeight: 1.4,
+        }}
+      >
+        Fonti: deliberazioni ARERA 574/2025/R/gas, 588/2025/R/com e
+        126/2025/R/gas. La componente GS è esclusa per uso domestico.
+        Il trasporto QTt non è incluso in questa prima automazione
+        Rete + Oneri Gas.
+      </div>
+    </div>
+  );
+}
+
 function Listini({
   energyOffers,
   setEnergyOffers,
