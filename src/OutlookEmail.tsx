@@ -363,6 +363,9 @@ export default function OutlookEmail() {
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [removedRows, setRemovedRows] = useState<Set<number>>(new Set());
+  const [pendingRecipientFile, setPendingRecipientFile] = useState<File | null>(null);
+  const [pendingSourceFile, setPendingSourceFile] = useState<File | null>(null);
+  const [pendingSeparateFiles, setPendingSeparateFiles] = useState<File[]>([]);
   const [excludedUnmatchedKeys, setExcludedUnmatchedKeys] = useState<Set<string>>(new Set());
   const [unmatchedDirectEmails, setUnmatchedDirectEmails] = useState<Record<string, string>>({});
   const [editingUnmatchedEmailKey, setEditingUnmatchedEmailKey] = useState<string | null>(null);
@@ -847,6 +850,7 @@ export default function OutlookEmail() {
       setRemovedRows(new Set());
       setDirty(true);
       setEditingRecipients(false);
+      setPendingRecipientFile(null);
       setNotice(`Importati ${parsed.length} destinatari. Premi “Salva elenco online” per conservarli.`);
     } catch (error: any) {
       setNotice(`Errore Excel destinatari: ${error?.message || error}`);
@@ -995,6 +999,8 @@ export default function OutlookEmail() {
   const switchFileMode = (mode: FileMode) => {
     setFileMode(mode);
     setFiles([]);
+    setPendingSourceFile(null);
+    setPendingSeparateFiles([]);
     setSourceFile(null);
     setSourceAgencies([]);
     setGeneratedByAgency(new Map());
@@ -1221,20 +1227,9 @@ export default function OutlookEmail() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 16, marginBottom: 16 }}>
+            <div style={{ marginBottom: 16 }}>
               <div style={card}>
-                <strong>1. Elenco destinatari</strong>
-                <p style={{ color: "#64748b", fontSize: 14 }}>Importa l'Excel AGENZIA / EMAIL / ALLEGATO oppure usa l'elenco salvato online.</p>
-                <input type="file" accept=".xlsx,.xls" onChange={(e) => importRecipientsExcel(e.target.files?.[0])} />
-                <div style={{ marginTop: 10, fontWeight: 700 }}>{agents.length} nominativi presenti</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-                  <button onClick={() => void saveRecipients()} disabled={syncBusy} style={{ ...button, background: "#16a34a", color: "white", opacity: syncBusy ? 0.6 : 1 }}>{syncBusy ? "Sincronizzo..." : "Salva elenco online"}</button>
-                  <button onClick={() => void loadSavedRecipients(true)} disabled={syncBusy} style={{ ...button, background: "#e2e8f0", opacity: syncBusy ? 0.6 : 1 }}>Ricarica elenco</button>
-                </div>
-              </div>
-
-              <div style={card}>
-                <strong>2. File da allegare</strong>
+                <strong>1. File da allegare</strong>
                 <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12, flexWrap: "wrap" }}>
                   <button onClick={() => switchFileMode("single")} style={{ ...button, background: fileMode === "single" ? "#2563eb" : "#e2e8f0", color: fileMode === "single" ? "white" : "#0f172a" }}>File unico (consigliato)</button>
                   <button onClick={() => switchFileMode("separate")} style={{ ...button, background: fileMode === "separate" ? "#2563eb" : "#e2e8f0", color: fileMode === "separate" ? "white" : "#0f172a" }}>File già separati</button>
@@ -1245,14 +1240,41 @@ export default function OutlookEmail() {
                     <p style={{ color: "#64748b", fontSize: 14 }}>Carica il file completo. La webapp crea un Excel per ogni agenzia e riconosce anche nomi scritti in ordine diverso o con parole aggiuntive.</p>
                     <label style={{ fontSize: 13, color: "#475569" }}>Nome colonna agenzia</label>
                     <input style={{ ...field, marginTop: 6, marginBottom: 8 }} value={preferredAgencyHeader} onChange={(e) => setPreferredAgencyHeader(e.target.value)} placeholder="AGENZIA" />
-                    <input type="file" accept=".xlsx,.xls,.xlsm" onChange={(e) => { const selected = e.target.files?.[0]; if (selected) void splitSourceWorkbook(selected); }} />
-                    {sourceFile && <div style={{ marginTop: 8, fontSize: 13, color: "#475569" }}>{sourceFile.name}</div>}
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <input type="file" accept=".xlsx,.xls,.xlsm" onChange={(e) => setPendingSourceFile(e.target.files?.[0] || null)} />
+                      <button
+                        type="button"
+                        disabled={!pendingSourceFile || splitBusy}
+                        onClick={async () => {
+                          if (!pendingSourceFile) return;
+                          await splitSourceWorkbook(pendingSourceFile);
+                          setPendingSourceFile(null);
+                        }}
+                        style={{ ...button, padding: "7px 12px", background: pendingSourceFile ? "#2563eb" : "#cbd5e1", color: "white", opacity: pendingSourceFile ? 1 : 0.65 }}
+                      >
+                        CARICA
+                      </button>
+                    </div>
+                    {sourceFile && <div style={{ marginTop: 8, fontSize: 13, color: "#166534", fontWeight: 700 }}>✓ Caricato: {sourceFile.name}</div>}
                     <div style={{ marginTop: 10, fontWeight: 700 }}>{splitBusy ? "Sto dividendo il file..." : `${files.length} file generati automaticamente`}</div>
                   </>
                 ) : (
                   <>
                     <p style={{ color: "#64748b", fontSize: 14 }}>Seleziona tutti i file già separati. La webapp prova ad abbinarli anche se il nome è scritto in modo leggermente diverso.</p>
-                    <input type="file" multiple onChange={(e) => handleSeparateFiles(Array.from(e.target.files || []))} />
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <input type="file" multiple onChange={(e) => setPendingSeparateFiles(Array.from(e.target.files || []))} />
+                      <button
+                        type="button"
+                        disabled={!pendingSeparateFiles.length}
+                        onClick={() => {
+                          handleSeparateFiles(pendingSeparateFiles);
+                          setPendingSeparateFiles([]);
+                        }}
+                        style={{ ...button, padding: "7px 12px", background: pendingSeparateFiles.length ? "#2563eb" : "#cbd5e1", color: "white", opacity: pendingSeparateFiles.length ? 1 : 0.65 }}
+                      >
+                        CARICA
+                      </button>
+                    </div>
                     <div style={{ marginTop: 10, fontWeight: 700 }}>{files.length} file caricati</div>
                   </>
                 )}
@@ -1679,6 +1701,27 @@ export default function OutlookEmail() {
 
             {activeView === "matches" && (
               <>
+                <div style={{ ...card, marginBottom: 16 }}>
+                  <strong>Elenco destinatari</strong>
+                  <p style={{ color: "#64748b", fontSize: 13, marginBottom: 10 }}>Importa l'Excel AGENZIA / EMAIL / ALLEGATO oppure usa l'elenco salvato online. Il campo ALLEGATO viene usato come Parole chiave agente.</p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <input type="file" accept=".xlsx,.xls" onChange={(e) => setPendingRecipientFile(e.target.files?.[0] || null)} />
+                    <button
+                      type="button"
+                      disabled={!pendingRecipientFile}
+                      onClick={() => pendingRecipientFile && void importRecipientsExcel(pendingRecipientFile)}
+                      style={{ ...button, padding: "7px 12px", background: pendingRecipientFile ? "#2563eb" : "#cbd5e1", color: "white", opacity: pendingRecipientFile ? 1 : 0.65 }}
+                    >
+                      CARICA
+                    </button>
+                  </div>
+                  <div style={{ marginTop: 10, fontWeight: 700 }}>{agents.length} nominativi presenti</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    <button onClick={() => void saveRecipients()} disabled={syncBusy} style={{ ...button, background: "#16a34a", color: "white", opacity: syncBusy ? 0.6 : 1, padding: "7px 11px" }}>{syncBusy ? "Sincronizzo..." : "Salva elenco online"}</button>
+                    <button onClick={() => void loadSavedRecipients(true)} disabled={syncBusy} style={{ ...button, background: "#e2e8f0", opacity: syncBusy ? 0.6 : 1, padding: "7px 11px" }}>Ricarica elenco</button>
+                  </div>
+                </div>
+
                 <div
                   style={{
                     ...card,
@@ -1714,7 +1757,7 @@ export default function OutlookEmail() {
                   </div>
                 </div>
 
-            <div style={{ ...card, marginBottom: 16, overflowX: "auto" }}>
+            <div style={{ ...card, marginBottom: 16, overflowX: "hidden", padding: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div>
                   <strong>Controllo abbinamenti</strong>
@@ -1759,7 +1802,7 @@ export default function OutlookEmail() {
                 ))}
               </datalist>
 
-              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: 14 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 10, fontSize: 12, tableLayout: "fixed" }}>
                 <thead>
                   <tr
                     style={{
@@ -1767,23 +1810,23 @@ export default function OutlookEmail() {
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <th style={{ padding: 8 }}>Agenzia</th>
-                    <th style={{ padding: 8 }}>Email</th>
-                    <th style={{ padding: 8 }}>Allegato previsto</th>
-                    <th style={{ padding: 8 }}>File associato / Stato</th>
+                    <th style={{ padding: 6, width: "14%" }}>Agenzia</th>
+                    <th style={{ padding: 6, width: "19%" }}>Email</th>
+                    <th style={{ padding: 6, width: "14%" }}>Allegato previsto</th>
+                    <th style={{ padding: 6, width: "23%" }}>File associato / Stato</th>
                     {editingRecipients && (
                       <th style={{ padding: 8 }}>Azioni</th>
                     )}
-                    <th style={{ padding: 8, minWidth: 170 }}>DM</th>
+                    <th style={{ padding: 6, width: "10%" }}>DM</th>
                   </tr>
                 </thead>
                 <tbody>
                   {matched.map((row, index) => (
                     <tr key={index} data-email-row-index={index} data-email-removed={removedRows.has(index) ? "true" : "false"} data-email-file-name={row.file?.name || ""} style={{ borderBottom: "1px solid #f1f5f9", opacity: removedRows.has(index) ? 0.62 : 1 }}>
-                      <td style={{ padding: 8 }}>{editingRecipients ? <input style={smallField} value={agents[index]?.agenzia ?? ""} onChange={(e) => updateAgent(index, "agenzia", e.target.value)} placeholder="Agenzia" /> : row.agenzia || "—"}</td>
-                      <td style={{ padding: 8 }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 220 }} value={agents[index]?.email ?? ""} onChange={(e) => updateAgent(index, "email", e.target.value)} placeholder="email@esempio.it" type="email" /> : row.email || "—"}</td>
-                      <td style={{ padding: 8 }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 210 }} value={agents[index]?.allegato ?? ""} onChange={(e) => updateAgent(index, "allegato", e.target.value)} placeholder="NOMEFILE.xlsx" /> : row.allegato || "—"}</td>
-                      <td style={{ padding: 8, fontWeight: 700, color: removedRows.has(index) ? "#b91c1c" : row.file && row.email ? "#15803d" : row.file && !row.email ? "#b91c1c" : "#64748b", whiteSpace: "nowrap" }}>
+                      <td style={{ padding: 6, overflowWrap: "anywhere" }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 0 }} value={agents[index]?.agenzia ?? ""} onChange={(e) => updateAgent(index, "agenzia", e.target.value)} placeholder="Agenzia" /> : row.agenzia || "—"}</td>
+                      <td style={{ padding: 6, overflowWrap: "anywhere" }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 0 }} value={agents[index]?.email ?? ""} onChange={(e) => updateAgent(index, "email", e.target.value)} placeholder="email@esempio.it" type="email" /> : row.email || "—"}</td>
+                      <td style={{ padding: 6, overflowWrap: "anywhere" }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 0 }} value={agents[index]?.allegato ?? ""} onChange={(e) => updateAgent(index, "allegato", e.target.value)} placeholder="NOMEFILE.xlsx" /> : row.allegato || "—"}</td>
+                      <td style={{ padding: 6, fontWeight: 700, fontSize: 11, lineHeight: 1.2, color: removedRows.has(index) ? "#b91c1c" : row.file && row.email ? "#15803d" : row.file && !row.email ? "#b91c1c" : "#64748b", whiteSpace: "normal", overflowWrap: "anywhere" }}>
                         {removedRows.has(index) ? "Rimosso manualmente — non inviata" : row.file && row.email ? `✓ ${row.file.name}` : row.file && !row.email ? `Email mancante — ${row.file.name}` : fileMode === "single" && sourceAgencies.length ? "Nessun dato nel file — non inviata" : files.length ? "Nessun file associato — non inviata" : "File non caricati"}
                       </td>
                       {editingRecipients && (
@@ -1812,7 +1855,7 @@ export default function OutlookEmail() {
                             placeholder="Scrivi o scegli DM"
                             style={{
                               ...smallField,
-                              minWidth: 170,
+                              minWidth: 0,
                             }}
                           />
                         ) : (
