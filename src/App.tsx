@@ -2588,8 +2588,14 @@ function calcEnergia(
 
   const H35 = isSi(d.acciseManualiFlag) ? n(d.acciseManualiValore) : consumiTot * 0.0125;
   const H38 = isSi(d.ricalcoloFlag) ? n(d.ricalcoloValore) : 0;
-  const H39 = isSi(d.bonusFlag) ? n(d.bonusValore) : 0;
-  const H40 = d.tipo === "RESIDENTE" ? 9 * mesi - n(d.canoneRaiGiaPagato) : 0;
+  const H39 =
+    isDomesticEnergyType(d.tipo) && isSi(d.bonusFlag)
+      ? n(d.bonusValore)
+      : 0;
+  const H40 =
+    isDomesticEnergyType(d.tipo) && d.tipo === "RESIDENTE"
+      ? 9 * mesi - n(d.canoneRaiGiaPagato)
+      : 0;
 
   const imponibileIva = H22 + H25 + H24 + H28 + H29 + H30 + H35 + H38;
   const H36 = (imponibileIva * energyVatRate(d.tipo, d.iva)) / 100;
@@ -3252,6 +3258,12 @@ function Energia({
         ) {
           newState.iva = "22";
         }
+
+        if (!isDomesticEnergyType(v)) {
+          newState.canoneRaiGiaPagato = "0";
+          newState.bonusFlag = "NO";
+          newState.bonusValore = "";
+        }
       }
 
       if (k === "mese1") {
@@ -3316,6 +3328,13 @@ function Energia({
         ? "10"
         : "22",
       offerta: nextOffer?.nome || "",
+      ...(!isDomesticEnergyType(tipo)
+        ? {
+            canoneRaiGiaPagato: "0",
+            bonusFlag: "NO",
+            bonusValore: "",
+          }
+        : {}),
     }));
   };
 
@@ -3347,6 +3366,13 @@ function Energia({
       )
         ? "10"
         : "22",
+      ...(!isDomesticEnergyType(nextType)
+        ? {
+            canoneRaiGiaPagato: "0",
+            bonusFlag: "NO",
+            bonusValore: "",
+          }
+        : {}),
     }));
   };
 
@@ -4456,13 +4482,14 @@ Base suggerito
               s.ricalcoloValore,
               (v) => set("ricalcoloValore", v)
             )}
-            {toggleAmount(
-              "Bonus sociale",
-              s.bonusFlag,
-              (v) => set("bonusFlag", v),
-              s.bonusValore,
-              (v) => set("bonusValore", v)
-            )}
+            {isDomesticEnergyType(s.tipo) &&
+              toggleAmount(
+                "Bonus sociale",
+                s.bonusFlag,
+                (v) => set("bonusFlag", v),
+                s.bonusValore,
+                (v) => set("bonusValore", v)
+              )}
             {toggleAmount(
               "Accise manuali",
               s.acciseManualiFlag,
