@@ -6075,7 +6075,7 @@ border: "1px solid #bfd8f6",
   );
 }
 
-function Listini({
+function SystemChargesAdmin({
   dispCpRows,
   dispCpMeta,
   dispCpRefreshing,
@@ -6084,12 +6084,6 @@ function Listini({
   networkTariffMeta,
   networkTariffRefreshing,
   onRefreshNetworkTariffs,
-  energyOffers,
-  setEnergyOffers,
-  gasOffers,
-  setGasOffers,
-  gasAcciseSettings,
-  setGasAcciseSettings,
 }: {
   dispCpRows: DispCpRow[];
   dispCpMeta: DispCapacityMeta;
@@ -6099,201 +6093,10 @@ function Listini({
   networkTariffMeta: NetworkTariffMeta;
   networkTariffRefreshing: boolean;
   onRefreshNetworkTariffs: () => Promise<void>;
-  energyOffers: EnergyOffer[];
-  setEnergyOffers: React.Dispatch<React.SetStateAction<EnergyOffer[]>>;
-  gasOffers: GasOffer[];
-  setGasOffers: React.Dispatch<React.SetStateAction<GasOffer[]>>;
-  gasAcciseSettings: GasAcciseSettings;
-  setGasAcciseSettings: React.Dispatch<React.SetStateAction<GasAcciseSettings>>;
 }) {
-  const cloneEnergyOffers = (rows: EnergyOffer[]) => rows.map((row) => ({ ...row }));
-  const cloneGasOffers = (rows: GasOffer[]) => rows.map((row) => ({ ...row }));
-
   const [dispHistoryYear, setDispHistoryYear] = useState(2026);
   const [networkHistoryYear, setNetworkHistoryYear] = useState(2026);
   const [networkHistoryType, setNetworkHistoryType] = useState("BTA2");
-  const [draftEnergyOffers, setDraftEnergyOffers] = useState<EnergyOffer[]>(() => cloneEnergyOffers(energyOffers));
-  const [draftGasOffers, setDraftGasOffers] = useState<GasOffer[]>(() => cloneGasOffers(gasOffers));
-  const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [draggingEnergyIndex, setDraggingEnergyIndex] = useState<number | null>(null);
-  const [draggingGasIndex, setDraggingGasIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (dirty) return;
-    setDraftEnergyOffers(cloneEnergyOffers(energyOffers));
-    setDraftGasOffers(cloneGasOffers(gasOffers));
-    setDraftGasAcciseSettings({ ...gasAcciseSettings });
-  }, [energyOffers, gasOffers, gasAcciseSettings, dirty]);
-
-  const markDirty = () => setDirty(true);
-
-  const reorderEnergyOffer = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return;
-
-    setDraftEnergyOffers((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-
-    markDirty();
-  };
-
-  const reorderGasOffer = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return;
-
-    setDraftGasOffers((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-
-    markDirty();
-  };
-
-  const updateEnergyOffer = (index: number, key: keyof EnergyOffer, value: string) => {
-    setDraftEnergyOffers((prev) =>
-      prev.map((row, i) =>
-        i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
-      )
-    );
-    markDirty();
-  };
-
-  const updateEnergyOfferProvvigioneTipo = (
-    index: number,
-    provvigioneTipo: ProvvigioniOfferType
-  ) => {
-    setDraftEnergyOffers((prev) =>
-      prev.map((row, i) =>
-        i === index ? { ...row, provvigioneTipo } : row
-      )
-    );
-    markDirty();
-  };
-
-  const updateEnergyOfferVisibility = (index: number, visibile: boolean) => {
-    setDraftEnergyOffers((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, visibile } : row))
-    );
-    markDirty();
-  };
-
-  const updateEnergyOfferCustomerGroup = (
-    index: number,
-    group: EnergyCustomerGroup,
-    checked: boolean
-  ) => {
-    setDraftEnergyOffers((prev) =>
-      prev.map((row, i) => {
-        if (i !== index) return row;
-
-        const current = normalizedEnergyOfferGroups(row);
-        if (!checked && current.length === 1 && current.includes(group)) {
-          return row;
-        }
-
-        const next = checked
-          ? Array.from(new Set([...current, group]))
-          : current.filter((item) => item !== group);
-
-        return {
-          ...row,
-          allowedCustomerGroups: ALL_ENERGY_CUSTOMER_GROUPS.filter((item) =>
-            next.includes(item)
-          ),
-        };
-      })
-    );
-    markDirty();
-  };
-
-  const updateGasOfferProvvigioneTipo = (
-    index: number,
-    provvigioneTipo: ProvvigioniOfferType
-  ) => {
-    setDraftGasOffers((prev) =>
-      prev.map((row, i) =>
-        i === index ? { ...row, provvigioneTipo } : row
-      )
-    );
-    markDirty();
-  };
-
-  const updateGasOfferVisibility = (index: number, visibile: boolean) => {
-    setDraftGasOffers((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, visibile } : row))
-    );
-    markDirty();
-  };
-
-  const updateGasOfferCustomerGroup = (
-    index: number,
-    group: GasCustomerGroup,
-    checked: boolean
-  ) => {
-    setDraftGasOffers((prev) =>
-      prev.map((row, i) => {
-        if (i !== index) return row;
-
-        const current = normalizedGasOfferGroups(row);
-        if (!checked && current.length === 1 && current.includes(group)) {
-          return row;
-        }
-
-        const next = checked
-          ? Array.from(new Set([...current, group]))
-          : current.filter((item) => item !== group);
-
-        return {
-          ...row,
-          allowedCustomerGroups: ALL_GAS_CUSTOMER_GROUPS.filter((item) =>
-            next.includes(item)
-          ),
-        };
-      })
-    );
-    markDirty();
-  };
-
-  const updateGasOffer = (index: number, key: keyof GasOffer, value: string) => {
-    setDraftGasOffers((prev) =>
-      prev.map((row, i) =>
-        i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
-      )
-    );
-    markDirty();
-  };
-
-  const saveListini = async () => {
-    setSaving(true);
-
-    const payload = [
-      { key: "energyOffers", value_json: draftEnergyOffers },
-      { key: "gasOffers", value_json: draftGasOffers },
-      { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
-    ];
-
-    try {
-      await adminUpsertSettings(payload);
-    } catch (error) {
-      setSaving(false);
-      console.error("SAVE LISTINI ERROR:", error);
-      alert("Errore nel salvataggio dei listini");
-      return;
-    }
-    setSaving(false);
-
-    setEnergyOffers(cloneEnergyOffers(draftEnergyOffers));
-    setGasOffers(cloneGasOffers(draftGasOffers));
-    setGasAcciseSettings({ ...draftGasAcciseSettings });
-    setDirty(false);
-    alert("Listini salvati online");
-  };
 
   const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -6306,47 +6109,8 @@ function Listini({
     borderBottom: "1px solid #f1f5f9",
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: 6,
-    borderRadius: 6,
-    border: "1px solid #cbd5e1",
-    boxSizing: "border-box",
-  };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        {dirty && (
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#b45309" }}>
-            Modifiche non salvate
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={saveListini}
-          disabled={saving || !dirty}
-          style={{
-            padding: "10px 18px",
-            borderRadius: 8,
-            border: "none",
-            background: saving || !dirty ? "#cbd5e1" : "#2563eb",
-            color: "white",
-            fontWeight: 800,
-            cursor: saving || !dirty ? "not-allowed" : "pointer",
-          }}
-        >
-          {saving ? "Salvataggio..." : "Salva listini"}
-        </button>
-      </div>
 
       <div
         style={{
@@ -6752,6 +6516,264 @@ function Listini({
             </tbody>
           </table>
         </div>
+      </div>
+
+    </div>
+  );
+}
+
+function Listini({
+  energyOffers,
+  setEnergyOffers,
+  gasOffers,
+  setGasOffers,
+  gasAcciseSettings,
+  setGasAcciseSettings,
+}: {
+  energyOffers: EnergyOffer[];
+  setEnergyOffers: React.Dispatch<React.SetStateAction<EnergyOffer[]>>;
+  gasOffers: GasOffer[];
+  setGasOffers: React.Dispatch<React.SetStateAction<GasOffer[]>>;
+  gasAcciseSettings: GasAcciseSettings;
+  setGasAcciseSettings: React.Dispatch<React.SetStateAction<GasAcciseSettings>>;
+}) {
+  const cloneEnergyOffers = (rows: EnergyOffer[]) => rows.map((row) => ({ ...row }));
+  const cloneGasOffers = (rows: GasOffer[]) => rows.map((row) => ({ ...row }));
+
+  const [draftEnergyOffers, setDraftEnergyOffers] = useState<EnergyOffer[]>(() => cloneEnergyOffers(energyOffers));
+  const [draftGasOffers, setDraftGasOffers] = useState<GasOffer[]>(() => cloneGasOffers(gasOffers));
+  const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draggingEnergyIndex, setDraggingEnergyIndex] = useState<number | null>(null);
+  const [draggingGasIndex, setDraggingGasIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (dirty) return;
+    setDraftEnergyOffers(cloneEnergyOffers(energyOffers));
+    setDraftGasOffers(cloneGasOffers(gasOffers));
+    setDraftGasAcciseSettings({ ...gasAcciseSettings });
+  }, [energyOffers, gasOffers, gasAcciseSettings, dirty]);
+
+  const markDirty = () => setDirty(true);
+
+  const reorderEnergyOffer = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    setDraftEnergyOffers((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+
+    markDirty();
+  };
+
+  const reorderGasOffer = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+
+    setDraftGasOffers((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+
+    markDirty();
+  };
+
+  const updateEnergyOffer = (index: number, key: keyof EnergyOffer, value: string) => {
+    setDraftEnergyOffers((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
+      )
+    );
+    markDirty();
+  };
+
+  const updateEnergyOfferProvvigioneTipo = (
+    index: number,
+    provvigioneTipo: ProvvigioniOfferType
+  ) => {
+    setDraftEnergyOffers((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, provvigioneTipo } : row
+      )
+    );
+    markDirty();
+  };
+
+  const updateEnergyOfferVisibility = (index: number, visibile: boolean) => {
+    setDraftEnergyOffers((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, visibile } : row))
+    );
+    markDirty();
+  };
+
+  const updateEnergyOfferCustomerGroup = (
+    index: number,
+    group: EnergyCustomerGroup,
+    checked: boolean
+  ) => {
+    setDraftEnergyOffers((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+
+        const current = normalizedEnergyOfferGroups(row);
+        if (!checked && current.length === 1 && current.includes(group)) {
+          return row;
+        }
+
+        const next = checked
+          ? Array.from(new Set([...current, group]))
+          : current.filter((item) => item !== group);
+
+        return {
+          ...row,
+          allowedCustomerGroups: ALL_ENERGY_CUSTOMER_GROUPS.filter((item) =>
+            next.includes(item)
+          ),
+        };
+      })
+    );
+    markDirty();
+  };
+
+  const updateGasOfferProvvigioneTipo = (
+    index: number,
+    provvigioneTipo: ProvvigioniOfferType
+  ) => {
+    setDraftGasOffers((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, provvigioneTipo } : row
+      )
+    );
+    markDirty();
+  };
+
+  const updateGasOfferVisibility = (index: number, visibile: boolean) => {
+    setDraftGasOffers((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, visibile } : row))
+    );
+    markDirty();
+  };
+
+  const updateGasOfferCustomerGroup = (
+    index: number,
+    group: GasCustomerGroup,
+    checked: boolean
+  ) => {
+    setDraftGasOffers((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+
+        const current = normalizedGasOfferGroups(row);
+        if (!checked && current.length === 1 && current.includes(group)) {
+          return row;
+        }
+
+        const next = checked
+          ? Array.from(new Set([...current, group]))
+          : current.filter((item) => item !== group);
+
+        return {
+          ...row,
+          allowedCustomerGroups: ALL_GAS_CUSTOMER_GROUPS.filter((item) =>
+            next.includes(item)
+          ),
+        };
+      })
+    );
+    markDirty();
+  };
+
+  const updateGasOffer = (index: number, key: keyof GasOffer, value: string) => {
+    setDraftGasOffers((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, [key]: key === "nome" ? value : n(value) } : row
+      )
+    );
+    markDirty();
+  };
+
+  const saveListini = async () => {
+    setSaving(true);
+
+    const payload = [
+      { key: "energyOffers", value_json: draftEnergyOffers },
+      { key: "gasOffers", value_json: draftGasOffers },
+      { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
+    ];
+
+    try {
+      await adminUpsertSettings(payload);
+    } catch (error) {
+      setSaving(false);
+      console.error("SAVE LISTINI ERROR:", error);
+      alert("Errore nel salvataggio dei listini");
+      return;
+    }
+    setSaving(false);
+
+    setEnergyOffers(cloneEnergyOffers(draftEnergyOffers));
+    setGasOffers(cloneGasOffers(draftGasOffers));
+    setGasAcciseSettings({ ...draftGasAcciseSettings });
+    setDirty(false);
+    alert("Listini salvati online");
+  };
+
+  const thStyle: React.CSSProperties = {
+    textAlign: "left",
+    padding: 10,
+    borderBottom: "1px solid #e2e8f0",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: 10,
+    borderBottom: "1px solid #f1f5f9",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: 6,
+    borderRadius: 6,
+    border: "1px solid #cbd5e1",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        {dirty && (
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#b45309" }}>
+            Modifiche non salvate
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={saveListini}
+          disabled={saving || !dirty}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 8,
+            border: "none",
+            background: saving || !dirty ? "#cbd5e1" : "#2563eb",
+            color: "white",
+            fontWeight: 800,
+            cursor: saving || !dirty ? "not-allowed" : "pointer",
+          }}
+        >
+          {saving ? "Salvataggio..." : "Salva listini"}
+        </button>
       </div>
 
       <div
@@ -9638,8 +9660,8 @@ function AdminDashboard({
         {fullAccess && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
         {fullAccess && (
           <DashboardCard
-            title="IMPOSTAZIONI E DATABASE"
-            description="Apri configurazioni, database e strumenti amministrativi."
+            title="IMPOSTAZIONI LOGIN"
+            description="Gestisci impostazioni e accessi login."
             icon="⚙"
             className="ge-card-settings"
             compact
@@ -10555,12 +10577,12 @@ useEffect(() => {
   );
 }, [adminSession, tab]);
 
-  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingCrm"];
+  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "systemCharges", "recruitingManagement", "recruitingCrm"];
 
   useEffect(() => {
-    if (tab === "recruitingManagement") {
-      setTab("recruitingZones");
-      localStorage.setItem("app_tab", "recruitingZones");
+    if (tab === "recruitingZones") {
+      setTab("recruitingManagement");
+      localStorage.setItem("app_tab", "recruitingManagement");
     }
   }, [tab]);
 
@@ -10626,19 +10648,19 @@ useEffect(() => {
       variant: "agent-report",
     },
     agents: {
-      title: "DATABASE",
-      subtitle: "Gestisci agenti, utenti e configurazioni amministrative.",
+      title: "IMPOSTAZIONI LOGIN",
+      subtitle: "Gestisci utenti, accessi e configurazioni di login.",
       icon: "⚙",
       variant: "database",
     },
     listini: {
-      title: "DATABASE · LISTINI",
+      title: "LISTINI",
       subtitle: "Gestisci listini, offerte e parametri commerciali.",
       icon: "⚙",
       variant: "database",
     },
     punpsvAdmin: {
-      title: "DATABASE · PUN / PSV",
+      title: "PUN / PSV ADMIN",
       subtitle: "Aggiorna i valori PUN, PSV e i riferimenti di mercato.",
       icon: "⚙",
       variant: "database",
@@ -10649,9 +10671,15 @@ useEffect(() => {
       icon: "⚙",
       variant: "database",
     },
+    systemCharges: {
+      title: "DISP/CP MRK + ONERI DI SISTEMA",
+      subtitle: "Consulta e aggiorna dispacciamento, Capacity Market, rete e oneri di sistema.",
+      icon: "⚙",
+      variant: "database",
+    },
     recruitingManagement: {
       title: "GESTIONE AGENTI ATTIVI / ZONE",
-      subtitle: "Configura stati, colori e impostazioni del recruiting.",
+      subtitle: "Gestisci agenti attivi, macroaree e assegnazioni territoriali.",
       icon: "⚙",
       variant: "database",
     },
@@ -10662,7 +10690,7 @@ useEffect(() => {
       variant: "database",
     },
     adminUsers: {
-      title: "DATABASE · ADMIN",
+      title: "IMPOSTAZIONI LOGIN · ADMIN",
       subtitle: "Gestisci gli amministratori della web app.",
       icon: "⚙",
       variant: "database",
@@ -11015,10 +11043,10 @@ const renderAdminContent = () => {
               onClick={openOutlookEmailMatches}
               style={baseBtn}
             >
-              CONTROLLO ABBINAMENTI
+              CONTROLLO ABBINAMENTO EMAIL
             </button>
           )}
-          {hasFullAdminAccess && <button onClick={() => setTab("agents")} style={{ ...baseBtn, ...(databaseAdminTabs.includes(tab) ? activeBtn : {}) }}>DATABASE</button>}
+          {hasFullAdminAccess && <button onClick={() => setTab("agents")} style={{ ...baseBtn, ...(databaseAdminTabs.includes(tab) ? activeBtn : {}) }}>IMPOSTAZIONI LOGIN</button>}
 
 {(agentSession || adminSession) && (
   <button
@@ -11099,14 +11127,25 @@ const renderAdminContent = () => {
           )}
 
           <button
-            onClick={() => setTab("recruitingZones")}
+            onClick={() => setTab("systemCharges")}
             style={{
               ...baseBtn,
               padding: "9px 14px",
-              ...(tab === "recruitingZones" ? activeBtn : {}),
+              ...(tab === "systemCharges" ? activeBtn : {}),
             }}
           >
-            AGENTI / ZONE
+            DISP/CP MRK + ONERI DI SISTEMA
+          </button>
+
+          <button
+            onClick={() => setTab("recruitingManagement")}
+            style={{
+              ...baseBtn,
+              padding: "9px 14px",
+              ...(tab === "recruitingManagement" ? activeBtn : {}),
+            }}
+          >
+            GESTIONE AGENTI ATTIVI / ZONE
           </button>
 
           <button
@@ -11244,8 +11283,8 @@ const renderAdminContent = () => {
         </div>
       )}
 
-      {tab === "listini" && (
-        <Listini
+      {tab === "systemCharges" && (
+        <SystemChargesAdmin
           dispCpRows={dispCpRows}
           dispCpMeta={dispCpMeta}
           dispCpRefreshing={dispCpRefreshing}
@@ -11254,6 +11293,11 @@ const renderAdminContent = () => {
           networkTariffMeta={networkTariffMeta}
           networkTariffRefreshing={networkTariffRefreshing}
           onRefreshNetworkTariffs={() => refreshNetworkTariffs(true)}
+        />
+      )}
+
+      {tab === "listini" && (
+        <Listini
           energyOffers={energyOffers}
           setEnergyOffers={setEnergyOffers}
           gasOffers={gasOffers}
@@ -11879,7 +11923,7 @@ if (!agentSession && !adminSession) {
           {adminSession && hasFullAdminAccess && (
             <button
               type="button"
-              title="IMPOSTAZIONI E DATABASE"
+              title="IMPOSTAZIONI LOGIN"
               aria-label="Apri Impostazioni e Database"
               onClick={openDatabaseSettings}
               style={{
