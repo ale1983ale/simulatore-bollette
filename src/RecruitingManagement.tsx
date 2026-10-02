@@ -15,6 +15,8 @@ type ActiveAgent = {
   phone: string;
   zone: string;
   region: string;
+  dm1: string;
+  dm2: string;
   latitude: number | null;
   longitude: number | null;
 };
@@ -60,6 +62,8 @@ function rowToAgent(row: any): ActiveAgent {
     phone: String(row.phone || ""),
     zone: String(row.zone || ""),
     region: String(row.region || ""),
+    dm1: String(row.dm1 || ""),
+    dm2: String(row.dm2 || ""),
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
   };
@@ -83,6 +87,13 @@ export default function RecruitingManagement() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [zone, setZone] = useState("");
+  const [dm1Filter, setDm1Filter] = useState("");
+  const [dm2Filter, setDm2Filter] = useState("");
+  const [customDmEditor, setCustomDmEditor] = useState<{
+    agentId: string;
+    field: "dm1" | "dm2";
+    value: string;
+  } | null>(null);
 
   const loadAll = async (context?: RecruitingContext) => {
     const active = context || ctx || (await getRecruitingContext());
@@ -98,7 +109,7 @@ export default function RecruitingManagement() {
         .select("macroarea_id,region"),
       active.client
         .from("recruiting_active_agents")
-        .select("id,first_name,last_name,phone,zone,region,latitude,longitude")
+        .select("id,first_name,last_name,phone,zone,region,dm1,dm2,latitude,longitude")
         .order("last_name", { ascending: true })
         .order("first_name", { ascending: true }),
     ]);
@@ -145,6 +156,42 @@ export default function RecruitingManagement() {
     if (!needle) return [...ITALIAN_REGIONS];
     return ITALIAN_REGIONS.filter((region) => region.toLocaleLowerCase("it").includes(needle));
   }, [regionSearch]);
+
+  const dmSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          agents
+            .flatMap((agent) => [agent.dm1, agent.dm2])
+            .map((value) => value.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, "it", { sensitivity: "base" })),
+    [agents]
+  );
+
+  const filteredAgents = useMemo(() => {
+    const dm1Needle = dm1Filter.trim().toLocaleLowerCase("it");
+    const dm2Needle = dm2Filter.trim().toLocaleLowerCase("it");
+
+    return agents.filter((agent) => {
+      if (
+        dm1Needle &&
+        !agent.dm1.toLocaleLowerCase("it").includes(dm1Needle)
+      ) {
+        return false;
+      }
+
+      if (
+        dm2Needle &&
+        !agent.dm2.toLocaleLowerCase("it").includes(dm2Needle)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [agents, dm1Filter, dm2Filter]);
 
   const resetMacroForm = () => {
     setMacroId(null);
@@ -238,6 +285,49 @@ export default function RecruitingManagement() {
       setMessage("Macroarea eliminata.");
     } catch (error: any) {
       setMessage("Errore nell'eliminazione: " + (error?.message || error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveAgentDm = async (
+    agent: ActiveAgent,
+    field: "dm1" | "dm2",
+    value: string
+  ) => {
+    if (!ctx) return;
+
+    const clean = value.trim();
+    setBusy(true);
+    setMessage("");
+
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_active_agents")
+        .update({
+          [field]: clean,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", agent.id)
+        .eq("owner_key", ctx.ownerKey);
+
+      if (error) throw error;
+
+      setAgents((current) =>
+        current.map((item) =>
+          item.id === agent.id
+            ? { ...item, [field]: clean }
+            : item
+        )
+      );
+      setCustomDmEditor(null);
+      setMessage(
+        `${field.toUpperCase()} aggiornato per ${agent.firstName} ${agent.lastName}.`
+      );
+    } catch (error: any) {
+      setMessage(
+        `Errore aggiornamento ${field.toUpperCase()}: ${error?.message || error}`
+      );
     } finally {
       setBusy(false);
     }
@@ -639,11 +729,83 @@ export default function RecruitingManagement() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto", marginTop: 16 }}>
-          <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse" }}>
+        <datalist id="recruiting-dm-suggestions">
+          {dmSuggestions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit,minmax(190px,1fr))",
+            gap: 10,
+            alignItems: "end",
+            marginTop: 16,
+            padding: 12,
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+          }}
+        >
+          <div>
+            <label style={labelStyle}>Filtro DM1</label>
+            <input
+              type="search"
+              list="recruiting-dm-suggestions"
+              value={dm1Filter}
+              onChange={(event) => setDm1Filter(event.target.value)}
+              placeholder="Cerca DM1..."
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Filtro DM2</label>
+            <input
+              type="search"
+              list="recruiting-dm-suggestions"
+              value={dm2Filter}
+              onChange={(event) => setDm2Filter(event.target.value)}
+              placeholder="Cerca DM2..."
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setDm1Filter("");
+                setDm2Filter("");
+              }}
+              style={{
+                ...buttonStyle,
+                background: "#e2e8f0",
+                color: "#0f172a",
+              }}
+            >
+              AZZERA FILTRI
+            </button>
+            <span
+              style={{
+                alignSelf: "center",
+                fontSize: 12,
+                color: "#64748b",
+                fontWeight: 800,
+              }}
+            >
+              {filteredAgents.length} agenti
+            </span>
+          </div>
+        </div>
+
+        <div style={{ overflowX: "auto", marginTop: 12 }}>
+          <table style={{ width: "100%", minWidth: 1040, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
-                {["Nome", "Cognome", "Cellulare", "Zona", "Regione", "Mappa", "Azioni"].map((head) => (
+                {["Nome", "Cognome", "Cellulare", "Zona", "Regione", "DM1", "DM2", "Mappa", "Azioni"].map((head) => (
                   <th key={head} style={{ textAlign: "left", padding: "9px 10px", borderBottom: "1px solid #cbd5e1" }}>
                     {head}
                   </th>
@@ -651,13 +813,144 @@ export default function RecruitingManagement() {
               </tr>
             </thead>
             <tbody>
-              {agents.map((agent) => (
+              {filteredAgents.map((agent) => (
                 <tr key={agent.id}>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.firstName}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.lastName}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.phone || "—"}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.zone || "—"}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.region || "—"}</td>
+
+                  {(["dm1", "dm2"] as const).map((field) => {
+                    const currentValue = agent[field];
+                    const editorOpen =
+                      customDmEditor?.agentId === agent.id &&
+                      customDmEditor?.field === field;
+
+                    return (
+                      <td
+                        key={field}
+                        style={{
+                          padding: "9px 10px",
+                          borderBottom: "1px solid #f1f5f9",
+                          minWidth: 170,
+                          verticalAlign: "top",
+                        }}
+                      >
+                        <select
+                          value={
+                            editorOpen
+                              ? "__ALTRO__"
+                              : currentValue
+                          }
+                          disabled={busy}
+                          onChange={(event) => {
+                            const value = event.target.value;
+
+                            if (value === "__ALTRO__") {
+                              setCustomDmEditor({
+                                agentId: agent.id,
+                                field,
+                                value: currentValue,
+                              });
+                              return;
+                            }
+
+                            void saveAgentDm(agent, field, value);
+                          }}
+                          style={{
+                            ...inputStyle,
+                            minWidth: 160,
+                            padding: "7px 8px",
+                          }}
+                        >
+                          <option value="">—</option>
+                          {dmSuggestions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                          <option value="__ALTRO__">ALTRO</option>
+                        </select>
+
+                        {editorOpen && (
+                          <div
+                            style={{
+                              display: "grid",
+                              gap: 6,
+                              marginTop: 6,
+                            }}
+                          >
+                            <input
+                              autoFocus
+                              list="recruiting-dm-suggestions"
+                              value={customDmEditor.value}
+                              onChange={(event) =>
+                                setCustomDmEditor((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        value: event.target.value,
+                                      }
+                                    : current
+                                )
+                              }
+                              placeholder={`Inserisci ${field.toUpperCase()}`}
+                              style={{
+                                ...inputStyle,
+                                minWidth: 160,
+                                padding: "7px 8px",
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  void saveAgentDm(
+                                    agent,
+                                    field,
+                                    customDmEditor.value
+                                  );
+                                }
+                              }}
+                            />
+                            <div style={{ display: "flex", gap: 5 }}>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void saveAgentDm(
+                                    agent,
+                                    field,
+                                    customDmEditor.value
+                                  )
+                                }
+                                style={{
+                                  ...buttonStyle,
+                                  padding: "5px 8px",
+                                  background: "#16a34a",
+                                  color: "white",
+                                }}
+                              >
+                                Salva
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setCustomDmEditor(null)}
+                                style={{
+                                  ...buttonStyle,
+                                  padding: "5px 8px",
+                                  background: "#e2e8f0",
+                                }}
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 800 }}>
                     <label
                       style={{
@@ -705,10 +998,12 @@ export default function RecruitingManagement() {
                   </td>
                 </tr>
               ))}
-              {!agents.length && (
+              {!filteredAgents.length && (
                 <tr>
-                  <td colSpan={7} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>
-                    Nessun agente attivo inserito.
+                  <td colSpan={9} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>
+                    {agents.length
+                      ? "Nessun agente corrisponde ai filtri DM1 / DM2."
+                      : "Nessun agente attivo inserito."}
                   </td>
                 </tr>
               )}
