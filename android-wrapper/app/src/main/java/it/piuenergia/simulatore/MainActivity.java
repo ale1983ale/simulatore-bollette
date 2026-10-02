@@ -1,11 +1,15 @@
 package it.piuenergia.simulatore;
 
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.ContactsContract;
+import android.provider.MediaStore;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -15,8 +19,11 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.util.Base64;
 
 import org.json.JSONObject;
+
+import java.io.OutputStream;
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -44,13 +51,14 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUserAgentString(
-            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.4"
+            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.5"
         );
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
         webView.addJavascriptInterface(new ContactsBridge(), "AndroidContacts");
+        webView.addJavascriptInterface(new PdfBridge(), "AndroidFiles");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -207,6 +215,127 @@ public class MainActivity extends Activity {
                 fallbackError.printStackTrace();
                 return false;
             }
+        }
+    }
+
+    private Uri savePdfFile(String base64Data, String fileName)
+        throws Exception {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return null;
+        }
+
+        String safeName = fileName == null
+            ? "Preventivo.pdf"
+            : fileName.replaceAll("[\\\\/:*?\"<>|]", "").trim();
+
+        if (safeName.isEmpty()) {
+            safeName = "Preventivo.pdf";
+        }
+
+        if (!safeName.toLowerCase().endsWith(".pdf")) {
+            safeName += ".pdf";
+        }
+
+        byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Downloads.DISPLAY_NAME, safeName);
+        values.put(MediaStore.Downloads.MIME_TYPE, "application/pdf");
+        values.put(
+            MediaStore.Downloads.RELATIVE_PATH,
+            Environment.DIRECTORY_DOWNLOADS + "/Gestione Energia"
+        );
+        values.put(MediaStore.Downloads.IS_PENDING, 1);
+
+        Uri uri = getContentResolver().insert(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            values
+        );
+
+        if (uri == null) {
+            return null;
+        }
+
+        try (OutputStream output =
+            getContentResolver().openOutputStream(uri)) {
+            if (output == null) {
+                getContentResolver().delete(uri, null, null);
+                return null;
+            }
+            output.write(bytes);
+            output.flush();
+        } catch (Exception error) {
+            getContentResolver().delete(uri, null, null);
+            throw error;
+        }
+
+        ContentValues complete = new ContentValues();
+        complete.put(MediaStore.Downloads.IS_PENDING, 0);
+        getContentResolver().update(uri, complete, null, null);
+
+        return uri;
+    }
+
+    private void openPdfExternally(Uri uri) {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, "application/pdf");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        try {
+            startActivity(
+                Intent.createChooser(intent, "Apri PDF")
+            );
+        } catch (Exception error) {
+            Toast.makeText(
+                MainActivity.this,
+                "PDF salvato in Download/Gestione Energia.",
+                Toast.LENGTH_LONG
+            ).show();
+        }
+    }
+
+    private class PdfBridge {
+        @JavascriptInterface
+        public void savePdf(String base64Data, String fileName) {
+            runOnUiThread(() -> {
+                if (!bridgeAllowed()) {
+                    Toast.makeText(
+                        MainActivity.this,
+                        "Impossibile salvare il PDF da questa pagina.",
+                        Toast.LENGTH_LONG
+                    ).show();
+                    return;
+                }
+
+                new Thread(() -> {
+                    try {
+                        Uri uri = savePdfFile(base64Data, fileName);
+
+                        runOnUiThread(() -> {
+                            if (uri == null) {
+                                Toast.makeText(
+                                    MainActivity.this,
+                                    "Salvataggio PDF supportato da Android 10 in poi.",
+                                    Toast.LENGTH_LONG
+                                ).show();
+                                return;
+                            }
+
+                            openPdfExternally(uri);
+                        });
+                    } catch (Exception error) {
+                        error.printStackTrace();
+                        runOnUiThread(() ->
+                            Toast.makeText(
+                                MainActivity.this,
+                                "Errore nel salvataggio del PDF.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        );
+                    }
+                }).start();
+            });
         }
     }
 
