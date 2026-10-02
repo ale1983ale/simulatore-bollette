@@ -3401,7 +3401,24 @@ function Energia({
   };
 
   const printEnergyPdf = () => {
-    const periodo = [s.mese1, s.mese2].filter(Boolean).join(" / ") || "-";
+    const pdfCompetenceMonth = (
+      selectedMonth: string,
+      dispReferenceMonth: string
+    ) =>
+      isFixedCompetenceMonth(selectedMonth)
+        ? dispReferenceMonth || selectedMonth
+        : selectedMonth;
+
+    const periodo =
+      [
+        pdfCompetenceMonth(s.mese1, s.meseRifTabella1),
+        s.mese2
+          ? pdfCompetenceMonth(s.mese2, s.meseRifTabella2)
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" / ") || "-";
+
     const orange = "#f97316";
     const green = "#16a34a";
 
