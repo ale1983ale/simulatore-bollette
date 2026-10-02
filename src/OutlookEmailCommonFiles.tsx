@@ -133,6 +133,7 @@ function readMessage() {
 export default function OutlookEmailCommonFiles() {
   const activeRef = useRef(false);
   const filesRef = useRef<File[]>([]);
+  const pendingFilesRef = useRef<File[]>([]);
   const busyRef = useRef(false);
 
   useEffect(() => {
@@ -179,9 +180,12 @@ export default function OutlookEmailCommonFiles() {
       const download = panel.querySelector<HTMLButtonElement>('[data-common-download="true"]');
       const recipients = readRecipients();
       const fileCount = filesRef.current.length;
-      const detailsText = fileCount
-        ? `${fileCount} ${fileCount === 1 ? "file caricato" : "file caricati"}: ${filesRef.current.map((file) => file.name).join(", ")}. Destinatari: ${recipients.length}.`
-        : `Nessun file caricato. Destinatari disponibili: ${recipients.length}.`;
+      const pendingCount = pendingFilesRef.current.length;
+      const detailsText = pendingCount
+        ? `${pendingCount} ${pendingCount === 1 ? "file selezionato" : "file selezionati"}: ${pendingFilesRef.current.map((file) => file.name).join(", ")}. Premi CARICA per confermare.`
+        : fileCount
+          ? `${fileCount} ${fileCount === 1 ? "file caricato" : "file caricati"}: ${filesRef.current.map((file) => file.name).join(", ")}. Destinatari: ${recipients.length}.`
+          : `Nessun file caricato. Destinatari disponibili: ${recipients.length}.`;
       if (details && details.textContent !== detailsText) details.textContent = detailsText;
       if (download) {
         const enabled = fileCount > 0 && recipients.length > 0 && !busyRef.current;
@@ -250,7 +254,30 @@ export default function OutlookEmailCommonFiles() {
         input.type = "file";
         input.multiple = true;
         input.addEventListener("change", () => {
-          filesRef.current = Array.from(input.files || []);
+          pendingFilesRef.current = Array.from(input.files || []);
+          refreshPanel();
+        });
+
+        const confirm = document.createElement("button");
+        confirm.type = "button";
+        confirm.textContent = "CARICA";
+        confirm.style.marginLeft = "8px";
+        confirm.style.border = "0";
+        confirm.style.borderRadius = "9px";
+        confirm.style.padding = "7px 12px";
+        confirm.style.fontWeight = "800";
+        confirm.style.cursor = "pointer";
+        confirm.style.background = "#2563eb";
+        confirm.style.color = "white";
+        confirm.addEventListener("click", () => {
+          if (!pendingFilesRef.current.length) return;
+          filesRef.current = [...pendingFilesRef.current];
+          pendingFilesRef.current = [];
+          window.dispatchEvent(
+            new CustomEvent("outlook-email-common-files-confirmed", {
+              detail: { files: filesRef.current },
+            })
+          );
           refreshPanel();
         });
 
@@ -279,7 +306,7 @@ export default function OutlookEmailCommonFiles() {
         note.style.fontSize = "12px";
         note.style.color = "#64748b";
 
-        panel.append(text, input, details, download, note);
+        panel.append(text, input, confirm, details, download, note);
         found.row.insertAdjacentElement("afterend", panel);
       }
       return panel;
@@ -289,6 +316,12 @@ export default function OutlookEmailCommonFiles() {
       if (!activeRef.current) return;
       activeRef.current = false;
       filesRef.current = [];
+      pendingFilesRef.current = [];
+      window.dispatchEvent(
+        new CustomEvent("outlook-email-common-files-confirmed", {
+          detail: { files: [] },
+        })
+      );
       restoreOriginal();
       const panel = document.querySelector<HTMLElement>('[data-common-panel="true"]');
       if (panel) panel.style.display = "none";
