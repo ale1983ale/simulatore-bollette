@@ -241,6 +241,30 @@ export default function OutlookEmailPreview() {
   };
 
   useEffect(() => {
+    const onOpenPreview = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ agency?: string; fileName?: string }>
+      ).detail;
+      const fileName = String(detail?.fileName || "").trim();
+      if (!fileName) return;
+      openPreviewRef.current(
+        String(detail?.agency || stripExtension(fileName) || "File"),
+        `✓ ${fileName}`
+      );
+    };
+
+    window.addEventListener(
+      "outlook-email-open-preview",
+      onOpenPreview as EventListener
+    );
+    return () =>
+      window.removeEventListener(
+        "outlook-email-open-preview",
+        onOpenPreview as EventListener
+      );
+  }, []);
+
+  useEffect(() => {
     const onFileChange = (event: Event) => {
       const input = event.target;
       if (!(input instanceof HTMLInputElement) || input.type !== "file") return;
