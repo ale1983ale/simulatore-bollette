@@ -3478,6 +3478,7 @@ function Energia({
 
         <div class="box box-energy">
           <div class="section-title">Dati cliente</div>
+          <div class="bar" style="background:${orange}"></div>
           <div class="grid">
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
@@ -5303,6 +5304,7 @@ function Gas({
 
         <div class="box box-gas">
           <div class="section-title">Dati cliente</div>
+          <div class="bar" style="background:${blue}"></div>
           <div class="grid">
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
