@@ -9989,7 +9989,20 @@ export default function App() {
 
   const openOutlookEmail = () => {
     setAdminMenuOpen(false);
-    window.dispatchEvent(new CustomEvent("open-outlook-email"));
+    window.dispatchEvent(
+      new CustomEvent("open-outlook-email", {
+        detail: { view: "email" },
+      })
+    );
+  };
+
+  const openOutlookEmailMatches = () => {
+    setAdminMenuOpen(false);
+    window.dispatchEvent(
+      new CustomEvent("open-outlook-email", {
+        detail: { view: "matches" },
+      })
+    );
   };
 
   useEffect(() => {
@@ -10998,6 +11011,14 @@ const renderAdminContent = () => {
             </>
           )}
           <button onClick={() => setTab("reportAdmin")} style={{ ...baseBtn, ...(tab === "reportAdmin" ? activeBtn : {}) }}>REPORT ADMIN</button>
+          {hasFullAdminAccess && (
+            <button
+              onClick={openOutlookEmailMatches}
+              style={baseBtn}
+            >
+              CONTROLLO ABBINAMENTI
+            </button>
+          )}
           {hasFullAdminAccess && <button onClick={() => setTab("agents")} style={{ ...baseBtn, ...(databaseAdminTabs.includes(tab) ? activeBtn : {}) }}>DATABASE</button>}
 
 {(agentSession || adminSession) && (
