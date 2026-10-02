@@ -2240,6 +2240,8 @@ function highlightedSelectField(
           gap: 5,
           fontSize: 12,
           fontWeight: 900,
+          lineHeight: "18px",
+          minHeight: 18,
           marginBottom: 4,
           color: "#b91c1c",
         }}
@@ -2253,7 +2255,8 @@ function highlightedSelectField(
         onChange={(e) => setValue(e.target.value)}
         style={{
           width: "100%",
-          padding: 8,
+          height: 38,
+          padding: "0 8px",
           border: "2px solid #ef4444",
           background: "#fff",
           color: "#0f172a",
@@ -2281,8 +2284,12 @@ function offerTypeField(
     <div>
       <div
         style={{
+          display: "flex",
+          alignItems: "center",
           fontSize: 12,
           fontWeight: 900,
+          lineHeight: "18px",
+          minHeight: 18,
           marginBottom: 4,
           color: "#b91c1c",
         }}
@@ -2294,7 +2301,8 @@ function offerTypeField(
         onChange={(e) => setValue(e.target.value)}
         style={{
           width: "100%",
-          padding: 8,
+          height: 38,
+          padding: "0 8px",
           border: "2px solid #ef4444",
           background: "#fff",
           color: "#0f172a",
