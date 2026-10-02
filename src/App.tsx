@@ -2700,7 +2700,10 @@ function calcGas(d: any, punPsvRows: PunPsvRow[], gasOffers: GasOffer[]) {
   const H35 = isSi(d.ricalcoloFlag) ? n(d.ricalcoloValore) : 0;
   const H33 = ((H24 + H29 + H32 + H35) / 100) * n(d.iva);
   const H34 = H32 + H33;
-  const H36 = isSi(d.bonusFlag) ? n(d.bonusValore) : 0;
+  const H36 =
+    d.uso === "DOMESTICO" && isSi(d.bonusFlag)
+      ? n(d.bonusValore)
+      : 0;
   const H37 = H24 + H29 + H34 + H35 - H36;
   const risparmioFattura = isSi(d.confrontoFlag) ? H37 - n(d.confrontoValore) : 0;
   const risparmioAnnuo = isSi(d.confrontoFlag) ? (risparmioFattura / mesi) * 12 : 0;
@@ -4916,6 +4919,12 @@ function Gas({
       offerta: nextOffer.nome,
       uso: nextUso,
       iva: nextUso === "DOMESTICO" ? "10" : "22",
+      ...(nextUso !== "DOMESTICO"
+        ? {
+            bonusFlag: "NO",
+            bonusValore: "",
+          }
+        : {}),
     }));
   }, [
     gasOffers,
@@ -5139,6 +5148,11 @@ function Gas({
 
       if (k === "uso") {
         newState.iva = v === "DOMESTICO" ? "10" : "22";
+
+        if (v !== "DOMESTICO") {
+          newState.bonusFlag = "NO";
+          newState.bonusValore = "";
+        }
       }
 
       if (k === "accisaAgevolata") {
@@ -5210,6 +5224,12 @@ function Gas({
       uso,
       iva: uso === "DOMESTICO" ? "10" : "22",
       offerta: nextOffer?.nome || "",
+      ...(uso !== "DOMESTICO"
+        ? {
+            bonusFlag: "NO",
+            bonusValore: "",
+          }
+        : {}),
     }));
   };
 
@@ -5237,6 +5257,12 @@ function Gas({
       offerta: offerName,
       uso: nextUso,
       iva: nextUso === "DOMESTICO" ? "10" : "22",
+      ...(nextUso !== "DOMESTICO"
+        ? {
+            bonusFlag: "NO",
+            bonusValore: "",
+          }
+        : {}),
     }));
   };
 
@@ -5816,13 +5842,14 @@ border: "1px solid #bfd8f6",
                 s.confrontoValore,
                 (v) => set("confrontoValore", v)
               )}
-              {toggleAmount(
-                "Bonus sociale",
-                s.bonusFlag,
-                (v) => set("bonusFlag", v),
-                s.bonusValore,
-                (v) => set("bonusValore", v)
-              )}
+              {s.uso === "DOMESTICO" &&
+                toggleAmount(
+                  "Bonus sociale",
+                  s.bonusFlag,
+                  (v) => set("bonusFlag", v),
+                  s.bonusValore,
+                  (v) => set("bonusValore", v)
+                )}
               {toggleAmount(
                 "Ricalcoli/Sconti",
                 s.ricalcoloFlag,
