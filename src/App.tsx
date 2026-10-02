@@ -9639,7 +9639,7 @@ function AdminDashboard({
       <div className="ge-dashboard-primary ge-dashboard-primary--admin">
         <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />
         <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />
-        <DashboardCard title="PUN/PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />
+        <DashboardCard title="PUN-PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />
         <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
@@ -9689,7 +9689,7 @@ function AgentDashboard({
 
       <div className="ge-dashboard-secondary ge-dashboard-secondary--agent">
         <DashboardCard
-          title="PUN/PSV"
+          title="PUN-PSV"
           description="Analizza i dati del mercato PUN e PSV."
           icon="📈"
           className="ge-card-pun"
@@ -10154,7 +10154,7 @@ export default function App() {
   const exportPunPsvPdf = async () => {
     const exportPage = punPsvPdfLayoutRef.current;
     if (!exportPage) {
-      alert("Layout PDF PUN/PSV non disponibile");
+      alert("Layout PDF PUN-PSV non disponibile");
       return;
     }
 
@@ -10696,7 +10696,7 @@ useEffect(() => {
       variant: "database",
     },
     punpsvAdmin: {
-      title: "PUN / PSV ADMIN",
+      title: "PUN-PSV ADMIN",
       subtitle: "Aggiorna i valori PUN, PSV e i riferimenti di mercato.",
       icon: "⚙",
       variant: "database",
@@ -11158,7 +11158,7 @@ const renderAdminContent = () => {
                 ...(tab === "punpsvAdmin" ? activeBtn : {}),
               }}
             >
-              PUN / PSV Admin
+              PUN-PSV Admin
             </button>
           )}
 
@@ -11352,7 +11352,7 @@ const renderAdminContent = () => {
             padding: 16,
           }}
         >
-          <h2 style={{ marginTop: 0 }}>PUN / PSV Admin</h2>
+          <h2 style={{ marginTop: 0 }}>PUN-PSV Admin</h2>
 
           <div style={{ marginBottom: 12 }}>
             <select
@@ -11387,7 +11387,7 @@ const renderAdminContent = () => {
       fontWeight: 700,
     }}
   >
-    {savingSettings ? "Salvataggio..." : "Salva PUN / PSV"}
+    {savingSettings ? "Salvataggio..." : "Salva PUN-PSV"}
   </button>
 </div>
 
@@ -11880,7 +11880,7 @@ if (!agentSession && !adminSession) {
               ...(tab === "punpsvPublic" ? activeBtn : {}),
             }}
           >
-            PUN / PSV
+            PUN-PSV
           </button>
 
           <button
@@ -12079,7 +12079,7 @@ if (!agentSession && !adminSession) {
             }}
           >
             <SectionHero
-              title="PUN / PSV"
+              title="PUN-PSV"
               subtitle="Andamento dei principali indici del mercato energetico."
               icon="📈"
               variant="pun"
