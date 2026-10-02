@@ -12291,10 +12291,10 @@ if (!agentSession && !adminSession) {
                       />
 
                       {punCoords.map((p, i) => {
-                        const isLast = i === punCoords.length - 1;
+                        const isSelected = i === selectedChartIndex;
                         return (
                           <g key={i}>
-                            {isLast && (
+                            {isSelected && (
                               <circle
                                 cx={p.x}
                                 cy={p.y}
@@ -12307,10 +12307,10 @@ if (!agentSession && !adminSession) {
                             <circle
                               cx={p.x}
                               cy={p.y}
-                              r={isLast ? 8 : 5.5}
+                              r={isSelected ? 8 : 5.5}
                               fill="#ffffff"
                               stroke="#f97316"
-                              strokeWidth={isLast ? 4 : 2.5}
+                              strokeWidth={isSelected ? 4 : 2.5}
                             />
                           </g>
                         );
@@ -12323,7 +12323,8 @@ if (!agentSession && !adminSession) {
                         y="205"
                         textAnchor="middle"
                         fontSize="15"
-                        fill="#64748b"
+                        fill={i === selectedChartIndex ? "#c2410c" : "#64748b"}
+                        fontWeight={i === selectedChartIndex ? "900" : "500"}
                         >
                         <>
                           <tspan x={p.x} dy="0">
@@ -12464,10 +12465,10 @@ if (!agentSession && !adminSession) {
                       />
 
                       {psvCoords.map((p, i) => {
-                        const isLast = i === psvCoords.length - 1;
+                        const isSelected = i === selectedChartIndex;
                         return (
                           <g key={i}>
-                            {isLast && (
+                            {isSelected && (
                               <circle
                                 cx={p.x}
                                 cy={p.y}
@@ -12480,10 +12481,10 @@ if (!agentSession && !adminSession) {
                             <circle
                               cx={p.x}
                               cy={p.y}
-                              r={isLast ? 8 : 5.5}
+                              r={isSelected ? 8 : 5.5}
                               fill="#ffffff"
                               stroke="#0ea5e9"
-                              strokeWidth={isLast ? 4 : 2.5}
+                              strokeWidth={isSelected ? 4 : 2.5}
                             />
                           </g>
                         );
@@ -12496,7 +12497,8 @@ if (!agentSession && !adminSession) {
                         y="205"
                         textAnchor="middle"
                         fontSize="15"
-                        fill="#64748b"
+                        fill={i === selectedChartIndex ? "#0369a1" : "#64748b"}
+                      fontWeight={i === selectedChartIndex ? "900" : "500"}
                       >
                         <>
                           <tspan x={p.x} dy="0">
@@ -13086,7 +13088,7 @@ if (!agentSession && !adminSession) {
             ? punCoords
             : psvCoords
           ).map((p, i, arr) => {
-            const isLast = i === arr.length - 1;
+            const isSelected = i === selectedChartIndex;
             const value =
               expandedMarketChart === "pun"
                 ? punValues[i]
@@ -13094,7 +13096,7 @@ if (!agentSession && !adminSession) {
 
             return (
               <g key={i}>
-                {isLast && (
+                {isSelected && (
                   <circle
                     cx={p.x}
                     cy={p.y}
@@ -13115,14 +13117,14 @@ if (!agentSession && !adminSession) {
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r={isLast ? 8 : 5.5}
+                  r={isSelected ? 8 : 5.5}
                   fill="#ffffff"
                   stroke={
                     expandedMarketChart === "pun"
                       ? "#f97316"
                       : "#0ea5e9"
                   }
-                  strokeWidth={isLast ? 4 : 2.5}
+                  strokeWidth={isSelected ? 4 : 2.5}
                 />
                 <text
                   x={p.x}
