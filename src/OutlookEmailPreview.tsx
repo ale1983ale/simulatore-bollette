@@ -305,7 +305,9 @@ export default function OutlookEmailPreview() {
         if (headerRow && !headerRow.querySelector('[data-email-preview-header="true"]')) {
           const th = document.createElement("th");
           th.textContent = "Anteprima / Invio";
-          th.style.padding = "8px";
+          th.style.padding = "6px";
+          th.style.width = "18%";
+          th.style.fontSize = "11px";
           th.setAttribute("data-email-preview-header", "true");
           headerRow.appendChild(th);
         }
@@ -334,11 +336,11 @@ export default function OutlookEmailPreview() {
           td.dataset.previewState = previewState;
 
           td.replaceChildren();
-          td.style.padding = "8px";
-          td.style.whiteSpace = "nowrap";
-          td.style.display = "flex";
-          td.style.gap = "6px";
-          td.style.alignItems = "center";
+          td.style.padding = "5px";
+          td.style.whiteSpace = "normal";
+          td.style.display = "";
+          td.style.verticalAlign = "middle";
+          td.style.width = "18%";
 
           if (fileName) {
             const previewButton = document.createElement("button");
@@ -346,9 +348,12 @@ export default function OutlookEmailPreview() {
             previewButton.textContent = "👁 Anteprima";
             previewButton.style.border = "0";
             previewButton.style.borderRadius = "9px";
-            previewButton.style.padding = "7px 10px";
+            previewButton.style.padding = "5px 7px";
             previewButton.style.fontWeight = "700";
+            previewButton.style.fontSize = "11px";
             previewButton.style.cursor = "pointer";
+            previewButton.style.marginRight = "4px";
+            previewButton.style.marginBottom = "3px";
             previewButton.style.background = "#dbeafe";
             previewButton.style.color = "#1d4ed8";
             previewButton.addEventListener("click", () => {
@@ -365,9 +370,11 @@ export default function OutlookEmailPreview() {
             removeButton.textContent = removed ? "↩ Ripristina" : "✕ Rimuovi";
             removeButton.style.border = "0";
             removeButton.style.borderRadius = "9px";
-            removeButton.style.padding = "7px 10px";
+            removeButton.style.padding = "5px 7px";
             removeButton.style.fontWeight = "700";
+            removeButton.style.fontSize = "11px";
             removeButton.style.cursor = "pointer";
+            removeButton.style.marginBottom = "3px";
             removeButton.style.background = removed ? "#dcfce7" : "#fee2e2";
             removeButton.style.color = removed ? "#166534" : "#991b1b";
             removeButton.addEventListener("click", () => {
