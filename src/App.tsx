@@ -10555,7 +10555,14 @@ useEffect(() => {
   );
 }, [adminSession, tab]);
 
-  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingManagement", "recruitingCrm"];
+  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "recruitingZones", "recruitingCrm"];
+
+  useEffect(() => {
+    if (tab === "recruitingManagement") {
+      setTab("recruitingZones");
+      localStorage.setItem("app_tab", "recruitingZones");
+    }
+  }, [tab]);
 
   useEffect(() => {
     // La barra Area Admin può esistere esclusivamente
@@ -10643,7 +10650,7 @@ useEffect(() => {
       variant: "database",
     },
     recruitingManagement: {
-      title: "GESTIONE RECRUITING",
+      title: "GESTIONE AGENTI ATTIVI / ZONE",
       subtitle: "Configura stati, colori e impostazioni del recruiting.",
       icon: "⚙",
       variant: "database",
@@ -11100,17 +11107,6 @@ const renderAdminContent = () => {
             }}
           >
             AGENTI / ZONE
-          </button>
-
-          <button
-            onClick={() => setTab("recruitingManagement")}
-            style={{
-              ...baseBtn,
-              padding: "9px 14px",
-              ...(tab === "recruitingManagement" ? activeBtn : {}),
-            }}
-          >
-            GESTIONE RECRUITING
           </button>
 
           <button
