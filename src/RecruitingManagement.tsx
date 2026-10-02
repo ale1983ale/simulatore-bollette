@@ -884,7 +884,7 @@ export default function RecruitingManagement() {
                             <input
                               autoFocus
                               list="recruiting-dm-suggestions"
-                              value={customDmEditor.value}
+                              value={customDmEditor?.value || ""}
                               onChange={(event) =>
                                 setCustomDmEditor((current) =>
                                   current
@@ -907,7 +907,7 @@ export default function RecruitingManagement() {
                                   void saveAgentDm(
                                     agent,
                                     field,
-                                    customDmEditor.value
+                                    customDmEditor?.value || ""
                                   );
                                 }
                               }}
