@@ -717,6 +717,25 @@ export default function OutlookEmail() {
     return files.filter((_, sourceIndex) => !manualAssignment.usedSources.has(sourceIndex));
   }, [fileMode, files, manualAssignment]);
 
+  const emailMatchedSummary = useMemo(
+    () =>
+      matched
+        .map((row, index) => ({ row, index }))
+        .filter(
+          ({ row }) =>
+            Boolean(row.file) && !isNonAssignedAgent(row)
+        ),
+    [matched]
+  );
+
+  const emailUnmatchedSummary = useMemo(
+    () =>
+      fileMode === "single"
+        ? unassociatedSourceAgencies.map((item) => item.label)
+        : unmatchedManualFiles.map((file) => stripExtension(file.name)),
+    [fileMode, unassociatedSourceAgencies, unmatchedManualFiles]
+  );
+
   const importRecipientsExcel = async (file?: File) => {
     if (!file) return;
     try {
@@ -1139,6 +1158,266 @@ export default function OutlookEmail() {
             </div>
 
             {notice && <div style={{ ...card, marginBottom: 16, background: "#eff6ff", borderColor: "#bfdbfe" }}>{notice}</div>}
+
+            {(files.length > 0 || sourceFile) && (
+              <div
+                style={{
+                  ...card,
+                  marginBottom: 16,
+                  borderColor: "#cbd5e1",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    <strong>RIEPILOGO ABBINAMENTI DEL FILE</strong>
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 13,
+                        color: "#64748b",
+                      }}
+                    >
+                      Verifica chi riceverà il proprio file e quali nominativi
+                      finiranno nel riepilogo NON ASSEGNATI.
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit,minmax(280px,1fr))",
+                    gap: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      border: "1px solid #86efac",
+                      background: "#f0fdf4",
+                      borderRadius: 12,
+                      padding: 12,
+                      minWidth: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <strong style={{ color: "#166534" }}>
+                        ✓ ABBINATI
+                      </strong>
+                      <span
+                        style={{
+                          background: "#16a34a",
+                          color: "white",
+                          borderRadius: 999,
+                          padding: "3px 8px",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {emailMatchedSummary.length}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 7,
+                        maxHeight: 340,
+                        overflowY: "auto",
+                      }}
+                    >
+                      {emailMatchedSummary.map(({ row, index }) => (
+                        <div
+                          key={`matched-summary-${index}`}
+                          style={{
+                            padding: "8px 9px",
+                            borderRadius: 9,
+                            background: "white",
+                            border: "1px solid #dcfce7",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 800,
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            {row.agenzia || row.sourceLabel || "—"}
+                          </div>
+                          <div
+                            style={{
+                              marginTop: 3,
+                              fontSize: 12,
+                              color: "#64748b",
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            {row.file?.name || "File associato"}
+                          </div>
+                          <div
+                            style={{
+                              marginTop: 2,
+                              fontSize: 12,
+                              color:
+                                removedRows.has(index) || !row.email.trim()
+                                  ? "#b91c1c"
+                                  : "#166534",
+                              fontWeight: 700,
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            {removedRows.has(index)
+                              ? "NON INVIATA · rimossa manualmente"
+                              : row.email.trim()
+                                ? row.email
+                                : "EMAIL MANCANTE"}
+                          </div>
+                        </div>
+                      ))}
+
+                      {!emailMatchedSummary.length && (
+                        <div
+                          style={{
+                            padding: 10,
+                            color: "#64748b",
+                            fontSize: 13,
+                          }}
+                        >
+                          Nessun nominativo abbinato.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      border: "1px solid #fdba74",
+                      background: "#fff7ed",
+                      borderRadius: 12,
+                      padding: 12,
+                      minWidth: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <strong style={{ color: "#9a3412" }}>
+                        ⚠ NON ABBINATI
+                      </strong>
+                      <span
+                        style={{
+                          background: "#f97316",
+                          color: "white",
+                          borderRadius: 999,
+                          padding: "3px 8px",
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {emailUnmatchedSummary.length}
+                      </span>
+                    </div>
+
+                    {fileMode === "single" && (
+                      <div
+                        style={{
+                          marginBottom: 10,
+                          padding: "8px 9px",
+                          borderRadius: 9,
+                          background: "white",
+                          border: "1px solid #fed7aa",
+                          fontSize: 12,
+                          color: nonAssignedConfigured
+                            ? "#166534"
+                            : "#b91c1c",
+                          fontWeight: 700,
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {nonAssignedConfigured
+                          ? `Questi nominativi vengono raccolti automaticamente in NON ASSEGNATI.xlsx e inviati a ${nonAssignedAgent?.email || ""}.`
+                          : "Per l'invio automatico dei non abbinati configura il nominativo NON ASSEGNATI con il tuo indirizzo email."}
+                      </div>
+                    )}
+
+                    {fileMode === "separate" && (
+                      <div
+                        style={{
+                          marginBottom: 10,
+                          fontSize: 12,
+                          color: "#9a3412",
+                          fontWeight: 700,
+                        }}
+                      >
+                        Con i file già separati, i file non abbinati non vengono
+                        inviati automaticamente.
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 7,
+                        maxHeight: 340,
+                        overflowY: "auto",
+                      }}
+                    >
+                      {emailUnmatchedSummary.map((label, index) => (
+                        <div
+                          key={`unmatched-summary-${index}-${label}`}
+                          style={{
+                            padding: "8px 9px",
+                            borderRadius: 9,
+                            background: "white",
+                            border: "1px solid #ffedd5",
+                            fontWeight: 800,
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {label}
+                        </div>
+                      ))}
+
+                      {!emailUnmatchedSummary.length && (
+                        <div
+                          style={{
+                            padding: 10,
+                            color: "#166534",
+                            fontSize: 13,
+                            fontWeight: 700,
+                          }}
+                        >
+                          Tutti i nominativi risultano abbinati.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30, flexWrap: "wrap" }}>
               <button onClick={() => { setSubject(""); setBody(""); setNotice(""); }} style={{ ...button, background: "#e2e8f0" }}>Pulisci messaggio</button>
