@@ -31,6 +31,16 @@ import {
   type NetworkTariffMeta,
   type NetworkTariffRow,
 } from "./networkTariffs";
+import {
+  GAS_REGIONS,
+  INITIAL_GAS_NETWORK_TARIFF_ROWS,
+  calculateGasNetworkCharges,
+  fetchGasNetworkTariffRows,
+  gasRegionToAmbito,
+  type GasMeterClass,
+  type GasNetworkTariffMeta,
+  type GasNetworkTariffRow,
+} from "./gasNetworkTariffs";
 import "./dashboard.css";
 
 
@@ -10519,6 +10529,15 @@ const [networkTariffMeta, setNetworkTariffMeta] = useState<NetworkTariffMeta>({
   warnings: [],
 });
 const [networkTariffRefreshing, setNetworkTariffRefreshing] = useState(false);
+const [gasNetworkTariffRows, setGasNetworkTariffRows] = useState<GasNetworkTariffRow[]>(
+  INITIAL_GAS_NETWORK_TARIFF_ROWS
+);
+const [gasNetworkTariffMeta, setGasNetworkTariffMeta] = useState<GasNetworkTariffMeta>({
+  checkedAt: "",
+  sourceStatus: "STORICO LOCALE",
+  warnings: [],
+});
+const [gasNetworkTariffRefreshing, setGasNetworkTariffRefreshing] = useState(false);
 const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
 
 const updateMonthlyRow = (
@@ -10613,7 +10632,7 @@ useEffect(() => {
   );
 }, [adminSession, tab]);
 
-  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "systemCharges", "recruitingManagement", "recruitingCrm"];
+  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "systemCharges", "gasNetworkCharges", "recruitingManagement", "recruitingCrm"];
 
   useEffect(() => {
     if (tab === "recruitingZones") {
@@ -10711,6 +10730,12 @@ useEffect(() => {
       title: "DISP/CP MRK + ONERI DI SISTEMA",
       subtitle: "Consulta e aggiorna dispacciamento, Capacity Market, rete e oneri di sistema.",
       icon: "⚙",
+      variant: "database",
+    },
+    gasNetworkCharges: {
+      title: "RETE + ONERI GAS",
+      subtitle: "Tariffe automatiche Gas per ambito, classe contatore e scaglioni ARERA.",
+      icon: "🔥",
       variant: "database",
     },
     recruitingManagement: {
@@ -10818,6 +10843,41 @@ useEffect(() => {
 
   const timer = window.setInterval(() => {
     void refreshNetworkTariffs(false);
+  }, 6 * 60 * 60 * 1000);
+
+  return () => window.clearInterval(timer);
+}, []);
+
+const refreshGasNetworkTariffs = async (force = false) => {
+  setGasNetworkTariffRefreshing(true);
+  try {
+    const result = await fetchGasNetworkTariffRows(force);
+    setGasNetworkTariffRows(result.rows);
+    setGasNetworkTariffMeta(result.meta);
+    if (force) {
+      const warning = result.meta.warnings.length
+        ? "\n\n" + result.meta.warnings.join("\n")
+        : "";
+      alert("Rete + oneri Gas aggiornati." + warning);
+    }
+  } catch (error: any) {
+    console.error("GAS NETWORK TARIFF UPDATE ERROR:", error);
+    if (force) {
+      alert(
+        "Aggiornamento rete/oneri Gas non riuscito. Rimangono in uso gli ultimi valori validi.\n\n" +
+          (error?.message || error)
+      );
+    }
+  } finally {
+    setGasNetworkTariffRefreshing(false);
+  }
+};
+
+useEffect(() => {
+  void refreshGasNetworkTariffs(false);
+
+  const timer = window.setInterval(() => {
+    void refreshGasNetworkTariffs(false);
   }, 6 * 60 * 60 * 1000);
 
   return () => window.clearInterval(timer);
@@ -11171,6 +11231,17 @@ const renderAdminContent = () => {
             }}
           >
             DISP/CP MRK + ONERI DI SISTEMA
+          </button>
+
+          <button
+            onClick={() => setTab("gasNetworkCharges")}
+            style={{
+              ...baseBtn,
+              padding: "9px 14px",
+              ...(tab === "gasNetworkCharges" ? activeBtn : {}),
+            }}
+          >
+            RETE + ONERI GAS
           </button>
 
           <button
