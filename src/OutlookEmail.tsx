@@ -1003,6 +1003,33 @@ export default function OutlookEmail() {
     setNotice("");
   };
 
+  const openFilePreview = (agency: string, fileName?: string) => {
+    if (!fileName) return;
+    window.dispatchEvent(
+      new CustomEvent("outlook-email-open-preview", {
+        detail: { agency, fileName },
+      })
+    );
+  };
+
+  const toggleMatchedRemoved = (index: number) => {
+    setRemovedRows((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const toggleUnmatchedExcluded = (key: string) => {
+    setExcludedUnmatchedKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const createLocalDrafts = async () => {
     setNotice("");
     if (!subject.trim()) return setNotice("Inserisci l'oggetto della mail.");
@@ -1339,54 +1366,76 @@ export default function OutlookEmail() {
                         overflowY: "auto",
                       }}
                     >
-                      {emailMatchedSummary.map(({ row, index }) => (
-                        <div
-                          key={`matched-summary-${index}`}
-                          style={{
-                            padding: "8px 9px",
-                            borderRadius: 9,
-                            background: "white",
-                            border: "1px solid #dcfce7",
-                          }}
-                        >
+                      {emailMatchedSummary.map(({ row, index }) => {
+                        const removed = removedRows.has(index);
+                        return (
                           <div
+                            key={`matched-summary-${index}`}
                             style={{
-                              fontWeight: 800,
-                              overflowWrap: "anywhere",
+                              padding: "8px 9px",
+                              borderRadius: 9,
+                              background: "white",
+                              border: "1px solid #dcfce7",
+                              opacity: removed ? 0.65 : 1,
                             }}
                           >
-                            {row.agenzia || row.sourceLabel || "—"}
+                            <div style={{ fontWeight: 800, overflowWrap: "anywhere" }}>
+                              {row.agenzia || row.sourceLabel || "—"}
+                            </div>
+                            <div style={{ marginTop: 3, fontSize: 12, color: "#64748b", overflowWrap: "anywhere" }}>
+                              {row.file?.name || "File associato"}
+                            </div>
+                            <div
+                              style={{
+                                marginTop: 2,
+                                fontSize: 12,
+                                color: removed || !row.email.trim() ? "#b91c1c" : "#166534",
+                                fontWeight: 700,
+                                overflowWrap: "anywhere",
+                              }}
+                            >
+                              {removed
+                                ? "NON INVIATA · esclusa manualmente"
+                                : row.email.trim()
+                                  ? row.email
+                                  : "EMAIL MANCANTE"}
+                            </div>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openFilePreview(
+                                    row.agenzia || row.sourceLabel || "File",
+                                    row.file?.name
+                                  )
+                                }
+                                style={{
+                                  ...button,
+                                  padding: "6px 9px",
+                                  background: "#dbeafe",
+                                  color: "#1d4ed8",
+                                  fontSize: 12,
+                                }}
+                              >
+                                👁 Anteprima
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleMatchedRemoved(index)}
+                                style={{
+                                  ...button,
+                                  padding: "6px 9px",
+                                  background: removed ? "#dcfce7" : "#fee2e2",
+                                  color: removed ? "#166534" : "#991b1b",
+                                  fontSize: 12,
+                                }}
+                              >
+                                {removed ? "↩ Ripristina" : "✕ Elimina"}
+                              </button>
+                            </div>
                           </div>
-                          <div
-                            style={{
-                              marginTop: 3,
-                              fontSize: 12,
-                              color: "#64748b",
-                              overflowWrap: "anywhere",
-                            }}
-                          >
-                            {row.file?.name || "File associato"}
-                          </div>
-                          <div
-                            style={{
-                              marginTop: 2,
-                              fontSize: 12,
-                              color:
-                                removedRows.has(index) || !row.email.trim()
-                                  ? "#b91c1c"
-                                  : "#166534",
-                              fontWeight: 700,
-                              overflowWrap: "anywhere",
-                            }}
-                          >
-                            {removedRows.has(index)
-                              ? "NON INVIATA · rimossa manualmente"
-                              : row.email.trim()
-                                ? row.email
-                                : "EMAIL MANCANTE"}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       {!emailMatchedSummary.length && (
                         <div
@@ -1481,21 +1530,127 @@ export default function OutlookEmail() {
                         overflowY: "auto",
                       }}
                     >
-                      {emailUnmatchedSummary.map((label, index) => (
-                        <div
-                          key={`unmatched-summary-${index}-${label}`}
-                          style={{
-                            padding: "8px 9px",
-                            borderRadius: 9,
-                            background: "white",
-                            border: "1px solid #ffedd5",
-                            fontWeight: 800,
-                            overflowWrap: "anywhere",
-                          }}
-                        >
-                          {label}
-                        </div>
-                      ))}
+                      {emailUnmatchedSummary.map((item, index) => {
+                        const excluded = excludedUnmatchedKeys.has(item.key);
+                        const directEmail = unmatchedDirectEmails[item.key] || "";
+                        const directReady = !excluded && isValidEmail(directEmail);
+                        const editingEmail = editingUnmatchedEmailKey === item.key;
+
+                        return (
+                          <div
+                            key={`unmatched-summary-${index}-${item.key}`}
+                            data-email-unmatched-summary="true"
+                            data-email-agency={item.label}
+                            data-email-direct-email={directReady ? directEmail.trim() : ""}
+                            data-email-file-name={item.file?.name || ""}
+                            data-email-removed={excluded ? "true" : "false"}
+                            style={{
+                              padding: "8px 9px",
+                              borderRadius: 9,
+                              background: "white",
+                              border: "1px solid #ffedd5",
+                              overflowWrap: "anywhere",
+                              opacity: excluded ? 0.65 : 1,
+                            }}
+                          >
+                            <div style={{ fontWeight: 800 }}>{item.label}</div>
+
+                            {directReady && (
+                              <div style={{ marginTop: 4, fontSize: 12, color: "#166534", fontWeight: 800 }}>
+                                INVIO DIRETTO · {directEmail.trim()}
+                              </div>
+                            )}
+
+                            {excluded && (
+                              <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c", fontWeight: 800 }}>
+                                NON INVIATA · esclusa manualmente
+                              </div>
+                            )}
+
+                            {!excluded && !directReady && fileMode === "single" && (
+                              <div style={{ marginTop: 4, fontSize: 11, color: "#9a3412", fontWeight: 700 }}>
+                                Destinazione: NON ASSEGNATI
+                              </div>
+                            )}
+
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() => openFilePreview(item.label, item.file?.name)}
+                                disabled={!item.file}
+                                style={{
+                                  ...button,
+                                  padding: "6px 9px",
+                                  background: "#dbeafe",
+                                  color: "#1d4ed8",
+                                  fontSize: 12,
+                                  opacity: item.file ? 1 : 0.5,
+                                }}
+                              >
+                                👁 Anteprima
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleUnmatchedExcluded(item.key)}
+                                style={{
+                                  ...button,
+                                  padding: "6px 9px",
+                                  background: excluded ? "#dcfce7" : "#fee2e2",
+                                  color: excluded ? "#166534" : "#991b1b",
+                                  fontSize: 12,
+                                }}
+                              >
+                                {excluded ? "↩ Ripristina" : "✕ Elimina"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingUnmatchedEmailKey((current) =>
+                                    current === item.key ? null : item.key
+                                  )
+                                }
+                                style={{
+                                  ...button,
+                                  padding: "6px 9px",
+                                  background: directReady ? "#dcfce7" : "#e0e7ff",
+                                  color: directReady ? "#166534" : "#3730a3",
+                                  fontSize: 12,
+                                }}
+                              >
+                                ✉ Email
+                              </button>
+                            </div>
+
+                            {editingEmail && (
+                              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+                                <input
+                                  type="email"
+                                  value={directEmail}
+                                  onChange={(event) =>
+                                    setUnmatchedDirectEmails((current) => ({
+                                      ...current,
+                                      [item.key]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="email destinatario"
+                                  style={{
+                                    ...field,
+                                    padding: "7px 9px",
+                                    fontSize: 12,
+                                    flex: "1 1 220px",
+                                    minWidth: 0,
+                                  }}
+                                />
+                                {!!directEmail.trim() && !isValidEmail(directEmail) && (
+                                  <span style={{ color: "#b91c1c", fontSize: 11, fontWeight: 800 }}>
+                                    Email non valida
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
 
                       {!emailUnmatchedSummary.length && (
                         <div
