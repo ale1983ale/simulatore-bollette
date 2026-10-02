@@ -337,6 +337,8 @@ async function buildNonAssignedWorkbook(
 
 export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
+  const [activeView, setActiveView] =
+    useState<"email" | "matches">("email");
   const [overlayTop, setOverlayTop] = useState(0);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -360,10 +362,26 @@ export default function OutlookEmail() {
   const [removedRows, setRemovedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    const onOpenEmail = () => setOpen(true);
-    window.addEventListener("open-outlook-email", onOpenEmail);
+    const onOpenEmail = (event: Event) => {
+      const requestedView = (
+        event as CustomEvent<{ view?: "email" | "matches" }>
+      ).detail?.view;
+
+      setActiveView(
+        requestedView === "matches" ? "matches" : "email"
+      );
+      setOpen(true);
+    };
+
+    window.addEventListener(
+      "open-outlook-email",
+      onOpenEmail as EventListener
+    );
     return () =>
-      window.removeEventListener("open-outlook-email", onOpenEmail);
+      window.removeEventListener(
+        "open-outlook-email",
+        onOpenEmail as EventListener
+      );
   }, []);
 
   useEffect(() => {
@@ -960,7 +978,20 @@ export default function OutlookEmail() {
   return (
     <>
       {portalHost && createPortal(
-        <button onClick={() => setOpen(true)} style={{ ...button, background: "#2563eb", color: "white", marginRight: 8 }}>✉️ INVIO EMAIL</button>,
+        <button
+          onClick={() => {
+            setActiveView("email");
+            setOpen(true);
+          }}
+          style={{
+            ...button,
+            background: "#2563eb",
+            color: "white",
+            marginRight: 8,
+          }}
+        >
+          ✉️ INVIO EMAIL
+        </button>,
         portalHost
       )}
 
@@ -995,6 +1026,50 @@ export default function OutlookEmail() {
               </div>
               <button onClick={() => setOpen(false)} style={{ ...button, background: "#e2e8f0" }}>Chiudi</button>
             </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                marginBottom: 16,
+                padding: 6,
+                borderRadius: 12,
+                background: "#e2e8f0",
+                width: "fit-content",
+                maxWidth: "100%",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setActiveView("email")}
+                style={{
+                  ...button,
+                  background:
+                    activeView === "email" ? "#2563eb" : "transparent",
+                  color:
+                    activeView === "email" ? "white" : "#0f172a",
+                }}
+              >
+                ✉ INVIO EMAIL
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveView("matches")}
+                style={{
+                  ...button,
+                  background:
+                    activeView === "matches" ? "#7c3aed" : "transparent",
+                  color:
+                    activeView === "matches" ? "white" : "#0f172a",
+                }}
+              >
+                ⇄ CONTROLLO ABBINAMENTI
+              </button>
+            </div>
+
+            {activeView === "email" && (
+              <>
 
             <div style={{ ...card, marginBottom: 16, background: "#ecfdf5", borderColor: "#a7f3d0" }}>
               <strong>✓ Nessun collegamento Outlook richiesto</strong>
@@ -1063,13 +1138,89 @@ export default function OutlookEmail() {
               </div>
             </div>
 
+            {notice && <div style={{ ...card, marginBottom: 16, background: "#eff6ff", borderColor: "#bfdbfe" }}>{notice}</div>}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30, flexWrap: "wrap" }}>
+              <button onClick={() => { setSubject(""); setBody(""); setNotice(""); }} style={{ ...button, background: "#e2e8f0" }}>Pulisci messaggio</button>
+              <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{ ...button, background: "#16a34a", color: "white", opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1 }}>{busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.zip)`}</button>
+            </div>
+              </>
+            )}
+
+            {activeView === "matches" && (
+              <>
+                <div
+                  style={{
+                    ...card,
+                    marginBottom: 16,
+                    background: "#f5f3ff",
+                    borderColor: "#c4b5fd",
+                  }}
+                >
+                  <strong>⇄ Controllo abbinamenti</strong>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      color: "#64748b",
+                      fontSize: 14,
+                    }}
+                  >
+                    Gestisci Agenzia, Email, Allegato previsto e DM. Le modifiche
+                    restano evidenziate finché non premi Salva elenco online.
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 13,
+                      color: dirty ? "#b45309" : "#64748b",
+                      fontWeight: dirty ? 700 : 400,
+                    }}
+                  >
+                    {dirty
+                      ? "Hai modifiche non ancora salvate online."
+                      : savedAt
+                        ? `Ultimo salvataggio: ${new Date(savedAt).toLocaleString("it-IT")}`
+                        : "Nessun salvataggio online rilevato."}
+                  </div>
+                </div>
+
             <div style={{ ...card, marginBottom: 16, overflowX: "auto" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div>
-                  <strong>4. Controllo abbinamenti</strong>
+                  <strong>Controllo abbinamenti</strong>
                   <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>{readyRows.length} email pronte. I nominativi senza file associato vengono esclusi.</div>
                 </div>
-                {renderRecipientEditButtons()}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => void saveRecipients()}
+                    disabled={syncBusy || !dirty}
+                    style={{
+                      ...button,
+                      background:
+                        syncBusy || !dirty ? "#cbd5e1" : "#16a34a",
+                      color: "white",
+                      padding: "7px 11px",
+                      opacity: syncBusy || !dirty ? 0.7 : 1,
+                    }}
+                  >
+                    {syncBusy ? "Salvataggio..." : "Salva elenco online"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void loadSavedRecipients(true)}
+                    disabled={syncBusy}
+                    style={{
+                      ...button,
+                      background: "#e2e8f0",
+                      padding: "7px 11px",
+                      opacity: syncBusy ? 0.6 : 1,
+                    }}
+                  >
+                    Ricarica elenco
+                  </button>
+                  {renderRecipientEditButtons()}
+                </div>
               </div>
 
               <datalist id="outlook-email-dm-options">
@@ -1155,12 +1306,22 @@ export default function OutlookEmail() {
               </div>
             </div>
 
-            {notice && <div style={{ ...card, marginBottom: 16, background: "#eff6ff", borderColor: "#bfdbfe" }}>{notice}</div>}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30, flexWrap: "wrap" }}>
-              <button onClick={() => { setSubject(""); setBody(""); setNotice(""); }} style={{ ...button, background: "#e2e8f0" }}>Pulisci messaggio</button>
-              <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{ ...button, background: "#16a34a", color: "white", opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1 }}>{busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.zip)`}</button>
-            </div>
+
+                {notice && (
+                  <div
+                    style={{
+                      ...card,
+                      marginBottom: 16,
+                      background: "#eff6ff",
+                      borderColor: "#bfdbfe",
+                    }}
+                  >
+                    {notice}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
