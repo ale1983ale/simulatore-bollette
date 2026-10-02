@@ -12663,18 +12663,24 @@ if (!agentSession && !adminSession) {
               </tr>
             </thead>
             <tbody>
-              {tablePunPsvRows.slice(0, 12).map((row, index) => (
+              {tablePunPsvRows.slice(0, 12).map((row, index) => {
+                const isSelected =
+                  normalizeMonthLabel(row.mese) === normalizeMonthLabel(activePunPsvMonth);
+                return (
                 <tr
                   key={row.mese}
+                  onClick={() => selectPunPsvMonth(row.mese)}
+                  title="Seleziona questo mese"
                   style={{
-                    background:
-                      index % 2 === 0
+                    cursor: "pointer",
+                    background: isSelected
+                      ? "#fff3e8"
+                      : index % 2 === 0
                         ? "rgba(255,255,255,.84)"
                         : "rgba(255,247,237,.64)",
-                    boxShadow:
-                      index === 0
-                        ? "inset 0 0 0 2px #f97316, 0 0 12px rgba(249,115,22,.12)"
-                        : "none",
+                    boxShadow: isSelected
+                      ? "inset 0 0 0 2px #f97316, 0 0 12px rgba(249,115,22,.12)"
+                      : "none",
                   }}
                 >
                   <td
@@ -12707,7 +12713,8 @@ if (!agentSession && !adminSession) {
                     </td>
                   ))}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -12823,18 +12830,24 @@ if (!agentSession && !adminSession) {
               </tr>
             </thead>
             <tbody>
-              {tablePunPsvRows.slice(0, 12).map((row, index) => (
+              {tablePunPsvRows.slice(0, 12).map((row, index) => {
+                const isSelected =
+                  normalizeMonthLabel(row.mese) === normalizeMonthLabel(activePunPsvMonth);
+                return (
                 <tr
                   key={row.mese}
+                  onClick={() => selectPunPsvMonth(row.mese)}
+                  title="Seleziona questo mese"
                   style={{
-                    background:
-                      index % 2 === 0
+                    cursor: "pointer",
+                    background: isSelected
+                      ? "#eef9ff"
+                      : index % 2 === 0
                         ? "rgba(255,255,255,.84)"
                         : "rgba(240,249,255,.70)",
-                    boxShadow:
-                      index === 0
-                        ? "inset 0 0 0 2px #0ea5e9, 0 0 12px rgba(14,165,233,.12)"
-                        : "none",
+                    boxShadow: isSelected
+                      ? "inset 0 0 0 2px #0ea5e9, 0 0 12px rgba(14,165,233,.12)"
+                      : "none",
                   }}
                 >
                   <td
@@ -12863,7 +12876,8 @@ if (!agentSession && !adminSession) {
                     {Number(row.psv || 0).toFixed(6)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
