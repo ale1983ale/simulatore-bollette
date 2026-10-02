@@ -94,6 +94,8 @@ export default function RecruitingManagement() {
     field: "dm1" | "dm2";
     value: string;
   } | null>(null);
+  const [dmDirtyAgentIds, setDmDirtyAgentIds] =
+    useState<Set<string>>(new Set());
 
   const loadAll = async (context?: RecruitingContext) => {
     const active = context || ctx || (await getRecruitingContext());
@@ -290,43 +292,65 @@ export default function RecruitingManagement() {
     }
   };
 
-  const saveAgentDm = async (
+  const stageAgentDm = (
     agent: ActiveAgent,
     field: "dm1" | "dm2",
     value: string
   ) => {
-    if (!ctx) return;
-
     const clean = value.trim();
+
+    setAgents((current) =>
+      current.map((item) =>
+        item.id === agent.id
+          ? { ...item, [field]: clean }
+          : item
+      )
+    );
+    setDmDirtyAgentIds((current) => {
+      const next = new Set(current);
+      next.add(agent.id);
+      return next;
+    });
+    setCustomDmEditor(null);
+    setMessage(
+      `${field.toUpperCase()} modificato. Premi SALVA MODIFICHE per confermare.`
+    );
+  };
+
+  const saveDmChanges = async () => {
+    if (!ctx || dmDirtyAgentIds.size === 0) return;
+
+    const rowsToSave = agents.filter((agent) =>
+      dmDirtyAgentIds.has(agent.id)
+    );
+
     setBusy(true);
     setMessage("");
 
     try {
-      const { error } = await ctx.client
-        .from("recruiting_active_agents")
-        .update({
-          [field]: clean,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", agent.id)
-        .eq("owner_key", ctx.ownerKey);
+      for (const agent of rowsToSave) {
+        const { error } = await ctx.client
+          .from("recruiting_active_agents")
+          .update({
+            dm1: agent.dm1.trim(),
+            dm2: agent.dm2.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", agent.id)
+          .eq("owner_key", ctx.ownerKey);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
-      setAgents((current) =>
-        current.map((item) =>
-          item.id === agent.id
-            ? { ...item, [field]: clean }
-            : item
-        )
-      );
+      setDmDirtyAgentIds(new Set());
       setCustomDmEditor(null);
       setMessage(
-        `${field.toUpperCase()} aggiornato per ${agent.firstName} ${agent.lastName}.`
+        `Modifiche DM1 / DM2 salvate per ${rowsToSave.length} ${rowsToSave.length === 1 ? "agente" : "agenti"}.`
       );
     } catch (error: any) {
       setMessage(
-        `Errore aggiornamento ${field.toUpperCase()}: ${error?.message || error}`
+        "Errore nel salvataggio DM1 / DM2: " +
+          (error?.message || error)
       );
     } finally {
       setBusy(false);
@@ -776,6 +800,32 @@ export default function RecruitingManagement() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
+              disabled={busy || dmDirtyAgentIds.size === 0}
+              onClick={() => void saveDmChanges()}
+              style={{
+                ...buttonStyle,
+                background:
+                  busy || dmDirtyAgentIds.size === 0
+                    ? "#cbd5e1"
+                    : "#16a34a",
+                color: "white",
+                cursor:
+                  busy || dmDirtyAgentIds.size === 0
+                    ? "not-allowed"
+                    : "pointer",
+                opacity:
+                  busy || dmDirtyAgentIds.size === 0 ? 0.7 : 1,
+              }}
+            >
+              {busy
+                ? "SALVATAGGIO..."
+                : dmDirtyAgentIds.size
+                  ? `SALVA MODIFICHE (${dmDirtyAgentIds.size})`
+                  : "SALVA MODIFICHE"}
+            </button>
+
+            <button
+              type="button"
               onClick={() => {
                 setDm1Filter("");
                 setDm2Filter("");
@@ -814,7 +864,14 @@ export default function RecruitingManagement() {
             </thead>
             <tbody>
               {filteredAgents.map((agent) => (
-                <tr key={agent.id}>
+                <tr
+                  key={agent.id}
+                  style={{
+                    background: dmDirtyAgentIds.has(agent.id)
+                      ? "#f0fdf4"
+                      : "transparent",
+                  }}
+                >
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.firstName}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.lastName}</td>
                   <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.phone || "—"}</td>
@@ -856,7 +913,7 @@ export default function RecruitingManagement() {
                               return;
                             }
 
-                            void saveAgentDm(agent, field, value);
+                            stageAgentDm(agent, field, value);
                           }}
                           style={{
                             ...inputStyle,
@@ -904,7 +961,7 @@ export default function RecruitingManagement() {
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") {
                                   event.preventDefault();
-                                  void saveAgentDm(
+                                  stageAgentDm(
                                     agent,
                                     field,
                                     customDmEditor?.value || ""
@@ -930,7 +987,7 @@ export default function RecruitingManagement() {
                                   color: "white",
                                 }}
                               >
-                                Salva
+                                OK
                               </button>
                               <button
                                 type="button"
@@ -1009,6 +1066,41 @@ export default function RecruitingManagement() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: 12,
+          }}
+        >
+          <button
+            type="button"
+            disabled={busy || dmDirtyAgentIds.size === 0}
+            onClick={() => void saveDmChanges()}
+            style={{
+              ...buttonStyle,
+              background:
+                busy || dmDirtyAgentIds.size === 0
+                  ? "#cbd5e1"
+                  : "#16a34a",
+              color: "white",
+              cursor:
+                busy || dmDirtyAgentIds.size === 0
+                  ? "not-allowed"
+                  : "pointer",
+              opacity:
+                busy || dmDirtyAgentIds.size === 0 ? 0.7 : 1,
+              minWidth: 180,
+            }}
+          >
+            {busy
+              ? "SALVATAGGIO..."
+              : dmDirtyAgentIds.size
+                ? `SALVA MODIFICHE (${dmDirtyAgentIds.size})`
+                : "SALVA MODIFICHE"}
+          </button>
         </div>
       </div>
     </div>
