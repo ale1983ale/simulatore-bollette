@@ -5243,30 +5243,37 @@ function Gas({
   const gasReferenceRows = useMemo(() => {
     const selectedPeriods = [s.periodo1, s.periodo2, s.periodo3, s.periodo4];
     const periodCount = gasMonths(s.fatturazione);
+    const fixedReference =
+      punPsvRows.find(
+        (row) =>
+          row.mese ===
+          (s.uso === "DOMESTICO"
+            ? "FISSO DOMESTICO"
+            : "FISSO BUSINESS")
+      ) || null;
 
     return selectedPeriods
       .slice(0, periodCount)
       .map((selectedPeriod, index) => {
         if (!selectedPeriod) return null;
 
-        if (selectedPeriod === "FISSO AD HOC") {
+        if (gasFixedMode) {
           return {
-            label: `Mese ${index + 1} · FISSO AD HOC`,
-            value: `Prezzo fisso ${referencePriceFormat(r.spreadEff)} €/Smc`,
+            label: `Mese ${index + 1} · ${selectedPeriod}`,
+            value: isFixedDedicatedOffer(s.offerta)
+              ? `Prezzo fisso ${referencePriceFormat(r.spreadEff)} €/Smc`
+              : fixedReference
+                ? `Prezzo fisso ${referencePriceFormat(n(fixedReference.psv))} €/Smc`
+                : "-",
           };
         }
 
         const source = punPsvRows.find((row) => row.mese === selectedPeriod);
-        const isFixed =
-          selectedPeriod === "FISSO DOMESTICO" ||
-          selectedPeriod === "FISSO BUSINESS";
 
         return {
           label: `Mese ${index + 1} · ${selectedPeriod}`,
           value: source
-            ? isFixed
-              ? `Prezzo fisso ${referencePriceFormat(n(source.psv))} €/Smc`
-              : `PSV ${referencePriceFormat(n(source.psv))} €/Smc`
+            ? `PSV ${referencePriceFormat(n(source.psv))} €/Smc`
             : "-",
         };
       })
@@ -5277,24 +5284,17 @@ function Gas({
     s.periodo3,
     s.periodo4,
     s.fatturazione,
+    s.uso,
+    s.offerta,
+    gasFixedMode,
     punPsvRows,
     r.spreadEff,
   ]);
 
-  const gasMonthOptions = gasFixedMode
-    ? [
-        s.uso === "DOMESTICO"
-          ? "FISSO DOMESTICO"
-          : "FISSO BUSINESS",
-        "FISSO AD HOC",
-      ]
-    : mesiOrdinati
-        .filter(
-          (m) =>
-            !isFixedCompetenceMonth(m.mese) &&
-            Boolean(m.psv && m.psv !== 0)
-        )
-        .map((m) => m.mese);
+  const gasMonthOptions = mesiOrdinati
+    .filter((m) => !isFixedCompetenceMonth(m.mese))
+    .filter((m) => gasFixedMode || Boolean(m.psv && m.psv !== 0))
+    .map((m) => m.mese);
 
   const gasSecondaryMonthOptions =
     gasMonthOptions;
@@ -5318,23 +5318,6 @@ function Gas({
           v === "SI"
             ? String(gasAcciseSettings.agevolata)
             : String(gasAcciseSettings.nonAgevolata);
-      }
-
-      if (k === "periodo1") {
-        const nextFixedMode =
-          isFixedCompetenceMonth(v);
-
-        (
-          ["periodo2", "periodo3", "periodo4"] as const
-        ).forEach((key) => {
-          if (
-            newState[key] &&
-            isFixedCompetenceMonth(newState[key]) !==
-              nextFixedMode
-          ) {
-            newState[key] = "";
-          }
-        });
       }
 
       return newState;
