@@ -11972,6 +11972,15 @@ const renderAdminContent = () => {
         />
       )}
 
+      {tab === "gasNetworkCharges" && (
+        <GasNetworkChargesAdmin
+          rows={gasNetworkTariffRows}
+          meta={gasNetworkTariffMeta}
+          refreshing={gasNetworkTariffRefreshing}
+          onRefresh={() => refreshGasNetworkTariffs(true)}
+        />
+      )}
+
       {tab === "listini" && (
         <Listini
           energyOffers={energyOffers}
