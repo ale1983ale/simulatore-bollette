@@ -945,7 +945,7 @@ export default function OutlookEmail() {
       const unmatched = sourceAgencies.filter((_, index) => !nowAssignment.usedSources.has(index));
       const unmatchedNeedsAttention = unmatched.length > 0 && !nonAssignedConfigured;
       if (!unmatchedNeedsAttention && !splitWarnings.length) return;
-      const lines = ["CONTROLLO ABBINAMENTI", ""];
+      const lines = ["CONTROLLO ABBINAMENTO EMAIL", ""];
       if (unmatchedNeedsAttention) {
         lines.push(`${unmatched.length} agenzie del file non sono associate a un nominativo. Aggiungi il nominativo “NON ASSEGNATI” con la tua email per riceverle in un unico file:`, ...unmatched.slice(0, 15).map((item) => `• ${item.label}`));
         if (unmatched.length > 15) lines.push(`• ...e altre ${unmatched.length - 15}`);
@@ -1212,7 +1212,7 @@ export default function OutlookEmail() {
                     activeView === "matches" ? "white" : "#0f172a",
                 }}
               >
-                ⇄ CONTROLLO ABBINAMENTI
+                ⇄ CONTROLLO ABBINAMENTO EMAIL
               </button>
             </div>
 
@@ -1730,7 +1730,7 @@ export default function OutlookEmail() {
                     borderColor: "#c4b5fd",
                   }}
                 >
-                  <strong>⇄ Controllo abbinamenti</strong>
+                  <strong>⇄ Controllo abbinamento email</strong>
                   <div
                     style={{
                       marginTop: 6,
@@ -1760,7 +1760,7 @@ export default function OutlookEmail() {
             <div style={{ ...card, marginBottom: 16, overflowX: "hidden", padding: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div>
-                  <strong>Controllo abbinamenti</strong>
+                  <strong>Controllo abbinamento email</strong>
                   <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>{readyRows.length} email pronte. I nominativi senza file associato vengono esclusi.</div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
