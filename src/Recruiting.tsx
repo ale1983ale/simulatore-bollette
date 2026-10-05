@@ -1396,6 +1396,7 @@ export default function Recruiting({
   const [editRegion, setEditRegion] = useState("");
   const [editSectorEnergy, setEditSectorEnergy] = useState(true);
   const [editSectorOther, setEditSectorOther] = useState("");
+  const [editSectorCustom, setEditSectorCustom] = useState("");
   const [editCompanyChoice, setEditCompanyChoice] = useState("");
   const [editCompanyName, setEditCompanyName] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -2360,6 +2361,7 @@ export default function Recruiting({
     setEditRegion(selectedCandidate.region);
     setEditSectorEnergy(selectedCandidate.sectorEnergy);
     setEditSectorOther(selectedCandidate.sectorOther);
+    setEditSectorCustom("");
     setEditCompanyChoice(selectedCandidate.companyName || "");
     setEditCompanyName("");
     setEditPhone(selectedCandidate.phone);
@@ -3891,7 +3893,9 @@ export default function Recruiting({
 
     const resolvedNewSector = newSectorEnergy
       ? ""
-      : (newSectorOther || newSectorChoice).trim();
+      : newSectorChoice === "__ALTRO__"
+        ? newSectorOther.trim()
+        : newSectorChoice.trim();
 
     const resolvedNewCompany = newSectorEnergy
       ? (newCompanyName || newCompanyChoice).trim()
@@ -4016,7 +4020,11 @@ export default function Recruiting({
 
     const nextName = editName.trim().toLocaleUpperCase("it");
     const nextZone = editZone.trim().toLocaleUpperCase("it");
-    const nextSectorOther = editSectorEnergy ? "" : editSectorOther.trim();
+    const nextSectorOther = editSectorEnergy
+      ? ""
+      : editSectorOther === "__ALTRO__"
+        ? editSectorCustom.trim()
+        : editSectorOther.trim();
     const nextPhone = editPhone.trim();
     const nextEmail = editEmail.trim();
     const nextReferrer =
@@ -6964,21 +6972,40 @@ export default function Recruiting({
                   ) : (
                     <div>
                       <label style={labelStyle}>Settore attuale</label>
-                      <input
-                        list="recruiting-sector-options"
-                        value={newSectorOther || newSectorChoice}
+                      <select
+                        value={newSectorChoice}
                         onChange={(e) => {
-                          setNewSectorOther(e.target.value);
-                          setNewSectorChoice("");
+                          setNewSectorChoice(e.target.value);
+                          setNewSectorOther("");
                         }}
-                        placeholder="Scrivi o seleziona un settore"
                         style={inputStyle}
-                      />
-                      <datalist id="recruiting-sector-options">
+                      >
+                        <option value="">SELEZIONA SETTORE...</option>
                         {existingOtherSectors.map((sector) => (
-                          <option key={sector} value={sector} />
+                          <option key={sector} value={sector}>
+                            {sector}
+                          </option>
                         ))}
-                      </datalist>
+                        <option value="__ALTRO__">
+                          ALTRO / NUOVO SETTORE
+                        </option>
+                      </select>
+
+                      {newSectorChoice === "__ALTRO__" && (
+                        <input
+                          value={newSectorOther}
+                          onChange={(e) =>
+                            setNewSectorOther(e.target.value)
+                          }
+                          placeholder="Scrivi il nuovo settore"
+                          autoFocus
+                          style={{
+                            ...inputStyle,
+                            marginTop: 8,
+                          }}
+                        />
+                      )}
+
                       <div
                         style={{
                           marginTop: 4,
@@ -6986,7 +7013,7 @@ export default function Recruiting({
                           fontSize: 11,
                         }}
                       >
-                        Puoi scegliere un settore esistente oppure scriverne uno nuovo.
+                        Scegli un settore dall'elenco oppure usa ALTRO / NUOVO SETTORE.
                       </div>
                     </div>
                   )}
@@ -8701,6 +8728,7 @@ export default function Recruiting({
                               setEditRegion(selectedCandidate.region);
                               setEditSectorEnergy(selectedCandidate.sectorEnergy);
                               setEditSectorOther(selectedCandidate.sectorOther);
+                              setEditSectorCustom("");
                               setEditCompanyChoice(selectedCandidate.companyName || "");
                               setEditCompanyName("");
                               setEditPhone(selectedCandidate.phone);
@@ -9047,20 +9075,43 @@ export default function Recruiting({
                               <label style={labelStyle}>
                                 Settore attuale
                               </label>
-                              <input
-                                list="recruiting-sector-options-edit"
+                              <select
                                 value={editSectorOther}
-                                onChange={(e) =>
-                                  setEditSectorOther(e.target.value)
-                                }
-                                placeholder="Scrivi o seleziona il settore"
+                                onChange={(e) => {
+                                  setEditSectorOther(e.target.value);
+                                  if (e.target.value !== "__ALTRO__") {
+                                    setEditSectorCustom("");
+                                  }
+                                }}
                                 style={inputStyle}
-                              />
-                              <datalist id="recruiting-sector-options-edit">
+                              >
+                                <option value="">
+                                  SELEZIONA SETTORE...
+                                </option>
                                 {existingOtherSectors.map((sector) => (
-                                  <option key={sector} value={sector} />
+                                  <option key={sector} value={sector}>
+                                    {sector}
+                                  </option>
                                 ))}
-                              </datalist>
+                                <option value="__ALTRO__">
+                                  ALTRO / NUOVO SETTORE
+                                </option>
+                              </select>
+
+                              {editSectorOther === "__ALTRO__" && (
+                                <input
+                                  value={editSectorCustom}
+                                  onChange={(e) =>
+                                    setEditSectorCustom(e.target.value)
+                                  }
+                                  placeholder="Scrivi il nuovo settore"
+                                  autoFocus
+                                  style={{
+                                    ...inputStyle,
+                                    marginTop: 8,
+                                  }}
+                                />
+                              )}
                             </div>
                           )}
 
