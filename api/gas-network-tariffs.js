@@ -19,8 +19,7 @@ const GAS_PCS_GJ_PER_SMC = 0.03852;
 
 function qtEuroPerGJForMonth(month) {
   if (month <= 3) return 2.513485;
-  if (month <= 9) return 1.931333;
-  return 2.727133;
+  return 1.931333;
 }
 
 function qtEuroPerSmcForMonth(month) {
@@ -180,7 +179,7 @@ export default async function handler(req, res) {
     assumptions: {
       year: 2026,
       gs: "0 per DOMESTICO; componente ordinaria per BUSINESS",
-      trasporto: "QTt incluso: gen-mar 2,513485 €/GJ; apr-set 1,931333 €/GJ; ott-dic 2,727133 €/GJ",
+      trasporto: "QTt incluso: gen-mar 2,513485 €/GJ; da aprile 1,931333 €/GJ",
     },
   });
 }
