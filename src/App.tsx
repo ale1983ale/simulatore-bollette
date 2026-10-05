@@ -1578,7 +1578,7 @@ function SavedSimulationsModal({
             style={{
               display: "grid",
               gridTemplateColumns:
-                "minmax(0,1.4fr) minmax(180px,1fr) auto",
+                "repeat(auto-fit, minmax(180px, 1fr))",
               gap: 8,
               alignItems: "end",
               marginBottom: 12,
