@@ -283,29 +283,50 @@ function variableRateForAnnualConsumption(
   }
 
   const sorted = [...rows].sort((a, b) => a.scaglione - b.scaglione);
+  let remaining = annual;
+  let totalCost = 0;
+  let highestScaglione = 0;
 
-  const row =
-    sorted.find((item, index) => {
-      const aboveLower =
-        index === 0 ? annual >= item.daSmc : annual > item.daSmc;
-      const belowUpper =
-        item.aSmc == null ? true : annual <= item.aSmc;
-      return aboveLower && belowUpper;
-    }) || sorted[sorted.length - 1];
+  for (const row of sorted) {
+    if (remaining <= 0) break;
 
-  const rate =
-    String(uso || "").toUpperCase() === "DOMESTICO"
-      ? row.quotaVariabileDomestico
-      : row.quotaVariabileBusiness;
+    const upper = row.aSmc;
+    const width =
+      upper == null
+        ? remaining
+        : Math.max(0, upper - row.daSmc);
+
+    const volume =
+      upper == null
+        ? remaining
+        : Math.min(remaining, width);
+
+    if (volume <= 0) continue;
+
+    const rate =
+      String(uso || "").toUpperCase() === "DOMESTICO"
+        ? row.quotaVariabileDomestico
+        : row.quotaVariabileBusiness;
+
+    totalCost += volume * rate;
+    remaining -= volume;
+    highestScaglione = row.scaglione;
+  }
+
+  const highestRow =
+    sorted.find((row) => row.scaglione === highestScaglione) ||
+    sorted[sorted.length - 1];
 
   const label =
-    row.aSmc == null
-      ? `oltre ${row.daSmc.toLocaleString("it-IT")} Smc`
-      : `${Math.floor(row.daSmc + (row.scaglione === 1 ? 0 : 1)).toLocaleString("it-IT")}–${row.aSmc.toLocaleString("it-IT")} Smc`;
+    highestScaglione <= 1
+      ? "1 · 0–120 Smc"
+      : highestRow?.aSmc == null
+        ? `progressivo 1–${highestScaglione} · oltre ${highestRow.daSmc.toLocaleString("it-IT")} Smc`
+        : `progressivo 1–${highestScaglione} · fino a ${highestRow.aSmc.toLocaleString("it-IT")} Smc`;
 
   return {
-    rate,
-    scaglione: row.scaglione,
+    rate: annual > 0 ? totalCost / annual : 0,
+    scaglione: highestScaglione,
     label,
   };
 }
