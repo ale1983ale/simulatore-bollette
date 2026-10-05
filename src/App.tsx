@@ -1343,6 +1343,41 @@ function SavedSimulationsModal({
     null
   );
   const [deletingAll, setDeletingAll] = useState(false);
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [agentFilter, setAgentFilter] = useState("");
+
+  const agentFilterOptions = useMemo(
+    () =>
+      uniqueAgentOptions(
+        items.map((item) => String(item.agent_name || ""))
+      ),
+    [items]
+  );
+
+  const filteredItems = useMemo(() => {
+    const customerNeedle = customerFilter
+      .trim()
+      .toLocaleLowerCase("it-IT");
+
+    return items.filter((item) => {
+      const customerMatches =
+        !customerNeedle ||
+        String(item.name || "")
+          .toLocaleLowerCase("it-IT")
+          .includes(customerNeedle);
+
+      const itemAgent = String(item.agent_name || "").trim();
+      const agentMatches =
+        !agentFilter ||
+        (agentFilter === "__NO_AGENT__"
+          ? !itemAgent
+          : itemAgent.localeCompare(agentFilter, "it", {
+              sensitivity: "base",
+            }) === 0);
+
+      return customerMatches && agentMatches;
+    });
+  }, [items, customerFilter, agentFilter]);
 
   const reloadSavedSimulations = async () => {
     setLoading(true);
@@ -1365,6 +1400,8 @@ function SavedSimulationsModal({
 
   useEffect(() => {
     if (!open) return;
+    setCustomerFilter("");
+    setAgentFilter("");
     void reloadSavedSimulations();
   }, [open, type]);
 
@@ -1536,6 +1573,124 @@ function SavedSimulationsModal({
           </div>
         </div>
 
+        {!loading && !error && items.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "minmax(0,1.4fr) minmax(180px,1fr) auto",
+              gap: 8,
+              alignItems: "end",
+              marginBottom: 12,
+              padding: 10,
+              border: "1px solid #e2e8f0",
+              borderRadius: 12,
+              background: "#f8fafc",
+            }}
+          >
+            <label
+              style={{
+                display: "grid",
+                gap: 5,
+                fontWeight: 800,
+                color: "#334155",
+                fontSize: 12,
+              }}
+            >
+              Nome cliente
+              <input
+                value={customerFilter}
+                onChange={(event) =>
+                  setCustomerFilter(event.target.value)
+                }
+                placeholder="Cerca per nome cliente..."
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 9,
+                  padding: "8px 10px",
+                  background: "white",
+                  fontSize: 14,
+                }}
+              />
+            </label>
+
+            <label
+              style={{
+                display: "grid",
+                gap: 5,
+                fontWeight: 800,
+                color: "#334155",
+                fontSize: 12,
+              }}
+            >
+              Agente associato
+              <select
+                value={agentFilter}
+                onChange={(event) =>
+                  setAgentFilter(event.target.value)
+                }
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 9,
+                  padding: "8px 10px",
+                  background: "white",
+                  fontSize: 14,
+                }}
+              >
+                <option value="">TUTTI GLI AGENTI</option>
+                <option value="__NO_AGENT__">SENZA AGENTE</option>
+                {agentFilterOptions.map((agent) => (
+                  <option key={agent} value={agent}>
+                    {agent}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              disabled={!customerFilter && !agentFilter}
+              onClick={() => {
+                setCustomerFilter("");
+                setAgentFilter("");
+              }}
+              style={{
+                border: "1px solid #dc2626",
+                background: "white",
+                color: "#b91c1c",
+                borderRadius: 9,
+                padding: "8px 11px",
+                minHeight: 37,
+                fontWeight: 900,
+                cursor:
+                  !customerFilter && !agentFilter
+                    ? "default"
+                    : "pointer",
+                opacity:
+                  !customerFilter && !agentFilter ? 0.45 : 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              AZZERA FILTRI
+            </button>
+
+            <div
+              style={{
+                gridColumn: "1 / -1",
+                fontSize: 11,
+                color: "#64748b",
+                fontWeight: 700,
+              }}
+            >
+              Visualizzate {filteredItems.length} di {items.length} simulazioni
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ padding: 22, color: "#64748b" }}>
             Caricamento...
@@ -1556,9 +1711,20 @@ function SavedSimulationsModal({
           <div style={{ padding: 22, color: "#64748b" }}>
             Nessuna simulazione salvata.
           </div>
+        ) : filteredItems.length === 0 ? (
+          <div
+            style={{
+              padding: 22,
+              color: "#64748b",
+              textAlign: "center",
+              fontWeight: 700,
+            }}
+          >
+            Nessuna simulazione corrisponde ai filtri selezionati.
+          </div>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <div
                 key={item.id}
                 style={{
