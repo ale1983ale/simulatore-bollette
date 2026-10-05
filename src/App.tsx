@@ -3802,10 +3802,10 @@ function Energia({
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
             <div class="offer-pair">
-              <div><div class="label">Tipo</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
+              <div><div class="label">TIPOLOGIA OFFERTA</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
               <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
             </div>
-            <div><div class="label">Tipologia</div><div class="value">${energyPdfTipologia(s.tipo)}</div></div>
+            <div><div class="label">TIPOLOGIA CLIENTE</div><div class="value">${energyPdfTipologia(s.tipo)}</div></div>
             <div><div class="label">Fatturazione</div><div class="value">${s.fatturazione || "-"}</div></div>
             ${String(s.pod || "").trim()
               ? `<div><div class="label">POD</div><div class="value">${s.pod}</div></div>`
@@ -4162,7 +4162,7 @@ return (
             {field("Numero POD", s.numeroPod, (v) => set("numeroPod", v), "number")}
             {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), energyBilling)}
             {highlightedSelectField(
-              "Tipo",
+              "TIPOLOGIA CLIENTE",
               s.tipo,
               handleEnergyTypeChange,
               compatibleEnergyTypeOptions,
@@ -5642,7 +5642,7 @@ function Gas({
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
             <div class="offer-pair">
-              <div><div class="label">Tipo</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
+              <div><div class="label">TIPOLOGIA OFFERTA</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
               <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
             </div>
             <div><div class="label">Uso</div><div class="value">${s.uso || "-"}</div></div>
