@@ -18,6 +18,7 @@ export type GasNetworkTariffRow = {
   gsBusiness: number;
   re: number;
   rs: number;
+  qtTrasporto: number;
   quotaVariabileDomestico: number;
   quotaVariabileBusiness: number;
   status: string;
@@ -38,11 +39,15 @@ export type GasNetworkCalculation = {
   quotaConsumiRete: number;
   quotaFissaRete: number;
   totaleReteOneri: number;
+  scaglioneApplicato: number;
+  scaglioneLabel: string;
   periodi: Array<{
     mese: string;
     consumo: number;
     quotaVariabile: number;
     quotaFissa: number;
+    aliquotaVariabile: number;
+    scaglione: number;
   }>;
   reason?: string;
 };
@@ -173,6 +178,17 @@ const GS = [0.003907,0.003907,0.003907,0.003907,0.003907,0.003907,0.001826,0.001
 const RE = [0.029417,0.029417,0.029417,0.029417,0.029417,0.029417,0.015611,0.015611];
 const RS = [0.002788,0.002788,0.002788,0.002788,0.002788,0.002788,0.001409,0.001409];
 const UG2_FIXED_ANNUAL = -21.63;
+const GAS_PCS_GJ_PER_SMC = 0.03852;
+
+function qtEuroPerGJForMonth(month: number) {
+  if (month <= 3) return 2.513485;
+  if (month <= 9) return 1.931333;
+  return 2.727133;
+}
+
+function qtEuroPerSmcForMonth(month: number) {
+  return qtEuroPerGJForMonth(month) * GAS_PCS_GJ_PER_SMC;
+}
 
 export const GAS_REGIONS = Object.keys(REGION_TO_AMBITO);
 
@@ -198,6 +214,7 @@ export function buildInitialGasNetworkTariffRows(): GasNetworkTariffRow[] {
     for (const [ambito, config] of Object.entries(AMBITI_2026)) {
       for (const classeContatore of ["G4-G6","G10-G40","OLTRE G40"] as GasMeterClass[]) {
         const meterIndex = meterClassIndex(classeContatore);
+        const qtTrasporto = qtEuroPerSmcForMonth(month);
         const quotaFissaAnnua =
           config.fixedDistribution[meterIndex] +
           config.fixedMeasure[meterIndex] +
@@ -214,7 +231,8 @@ export function buildInitialGasNetworkTariffRows(): GasNetworkTariffRow[] {
             UG1[index] +
             UG3[index] +
             RE[index] +
-            RS[index];
+            RS[index] +
+            qtTrasporto;
 
           rows.push({
             mese: `${MONTHS[month - 1]} ${year}`,
@@ -234,10 +252,11 @@ export function buildInitialGasNetworkTariffRows(): GasNetworkTariffRow[] {
             gsBusiness: round6(GS[index]),
             re: round6(RE[index]),
             rs: round6(RS[index]),
+            qtTrasporto: round6(qtTrasporto),
             quotaVariabileDomestico: round6(baseVariable),
             quotaVariabileBusiness: round6(baseVariable + GS[index]),
             status: "STORICO UFFICIALE 2026",
-            source: "ARERA 574/2025/R/gas + 588/2025/R/com + 126/2025/R/gas",
+            source: "ARERA 574/2025/R/gas + 588/2025/R/com + 126/2025/R/gas + 98/2026/R/com + 343/2026/R/com",
           });
         });
       }
@@ -254,37 +273,42 @@ export function normalizeGasNetworkMonth(value: string) {
   return String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
 }
 
-function weightedVariableRate(
+function variableRateForAnnualConsumption(
   rows: GasNetworkTariffRow[],
   annualConsumption: number,
   uso: string
 ) {
   const annual = Math.max(0, Number(annualConsumption || 0));
-  if (!annual || !rows.length) return 0;
-
-  const sorted = [...rows].sort((a, b) => a.scaglione - b.scaglione);
-  let totalCost = 0;
-  let remaining = annual;
-
-  for (const row of sorted) {
-    if (remaining <= 0) break;
-    const upper = row.aSmc;
-    const width =
-      upper == null
-        ? remaining
-        : Math.max(0, upper - row.daSmc);
-    const volume = upper == null
-      ? remaining
-      : Math.min(remaining, width);
-    const rate =
-      String(uso || "").toUpperCase() === "DOMESTICO"
-        ? row.quotaVariabileDomestico
-        : row.quotaVariabileBusiness;
-    totalCost += volume * rate;
-    remaining -= volume;
+  if (!annual || !rows.length) {
+    return { rate: 0, scaglione: 0, label: "-" };
   }
 
-  return annual > 0 ? totalCost / annual : 0;
+  const sorted = [...rows].sort((a, b) => a.scaglione - b.scaglione);
+
+  const row =
+    sorted.find((item, index) => {
+      const aboveLower =
+        index === 0 ? annual >= item.daSmc : annual > item.daSmc;
+      const belowUpper =
+        item.aSmc == null ? true : annual <= item.aSmc;
+      return aboveLower && belowUpper;
+    }) || sorted[sorted.length - 1];
+
+  const rate =
+    String(uso || "").toUpperCase() === "DOMESTICO"
+      ? row.quotaVariabileDomestico
+      : row.quotaVariabileBusiness;
+
+  const label =
+    row.aSmc == null
+      ? `oltre ${row.daSmc.toLocaleString("it-IT")} Smc`
+      : `${Math.floor(row.daSmc + (row.scaglione === 1 ? 0 : 1)).toLocaleString("it-IT")}–${row.aSmc.toLocaleString("it-IT")} Smc`;
+
+  return {
+    rate,
+    scaglione: row.scaglione,
+    label,
+  };
 }
 
 export function calculateGasNetworkCharges(args: {
@@ -308,6 +332,8 @@ export function calculateGasNetworkCharges(args: {
       quotaConsumiRete: 0,
       quotaFissaRete: 0,
       totaleReteOneri: 0,
+      scaglioneApplicato: 0,
+      scaglioneLabel: "-",
       periodi: [],
       reason: "REGIONE NON VALIDA",
     };
@@ -322,6 +348,8 @@ export function calculateGasNetworkCharges(args: {
       quotaConsumiRete: 0,
       quotaFissaRete: 0,
       totaleReteOneri: 0,
+      scaglioneApplicato: 0,
+      scaglioneLabel: "-",
       periodi: [],
       reason: "SELEZIONA I MESI DELLA FATTURA",
     };
@@ -331,6 +359,8 @@ export function calculateGasNetworkCharges(args: {
   let variableTotal = 0;
   let fixedTotal = 0;
   let weightedRateSum = 0;
+  let scaglioneApplicato = 0;
+  let scaglioneLabel = "-";
 
   for (const period of periods) {
     const month = normalizeGasNetworkMonth(period.mese);
@@ -350,16 +380,21 @@ export function calculateGasNetworkCharges(args: {
         quotaConsumiRete: 0,
         quotaFissaRete: 0,
         totaleReteOneri: 0,
+        scaglioneApplicato: 0,
+        scaglioneLabel: "-",
         periodi: resultPeriods,
         reason: `TARIFFA AUTOMATICA NON DISPONIBILE PER ${month}`,
       };
     }
 
-    const rate = weightedVariableRate(
+    const rateInfo = variableRateForAnnualConsumption(
       monthRows,
       annualConsumption,
       args.uso
     );
+    const rate = rateInfo.rate;
+    scaglioneApplicato = rateInfo.scaglione;
+    scaglioneLabel = rateInfo.label;
     const variable = Math.max(0, Number(period.consumo || 0)) * rate;
     const fixed = Number(monthRows[0].quotaFissaAnnua || 0) / 12;
 
@@ -372,6 +407,8 @@ export function calculateGasNetworkCharges(args: {
       consumo: Math.max(0, Number(period.consumo || 0)),
       quotaVariabile: round6(variable),
       quotaFissa: round6(fixed),
+      aliquotaVariabile: round6(rate),
+      scaglione: rateInfo.scaglione,
     });
   }
 
@@ -385,6 +422,8 @@ export function calculateGasNetworkCharges(args: {
     quotaConsumiRete: round6(variableTotal),
     quotaFissaRete: round6(fixedTotal),
     totaleReteOneri: round6(variableTotal + fixedTotal),
+    scaglioneApplicato,
+    scaglioneLabel,
     periodi: resultPeriods,
   };
 }
@@ -433,6 +472,7 @@ export async function fetchGasNetworkTariffRows(force = false): Promise<{
         gsBusiness: Number(row.gsBusiness || 0),
         re: Number(row.re || 0),
         rs: Number(row.rs || 0),
+        qtTrasporto: Number(row.qtTrasporto || 0),
         quotaVariabileDomestico: Number(row.quotaVariabileDomestico || 0),
         quotaVariabileBusiness: Number(row.quotaVariabileBusiness || 0),
       }))
