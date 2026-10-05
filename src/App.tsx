@@ -2962,12 +2962,17 @@ function calcGas(
   const consumoAnnuoStimato =
     mesi > 0 ? (consumoTotale * 12) / mesi : 0;
 
+  const consumoAnnuoRiferimento =
+    n(d.consumoAnnuoRete) > 0
+      ? n(d.consumoAnnuoRete)
+      : consumoAnnuoStimato;
+
   const gasNetworkAuto = calculateGasNetworkCharges({
     rows: gasNetworkTariffRows,
     regione: d.regione || "UMBRIA",
     classeContatore: (d.classeContatore || "G4-G6") as GasMeterClass,
     uso: d.uso || "DOMESTICO",
-    annualConsumption: consumoAnnuoStimato,
+    annualConsumption: consumoAnnuoRiferimento,
     periods: selectedPeriods,
   });
 
@@ -3041,6 +3046,8 @@ function calcGas(
     quotaFissaEff,
     consumoTotale,
     consumoAnnuoStimato,
+    consumoAnnuoRiferimento,
+    consumoAnnuoReteManuale: n(d.consumoAnnuoRete) > 0,
     accisaCoeff,
     p1,
     p2,
@@ -5063,6 +5070,7 @@ function Gas({
     reteMode: "AUTO",
     regione: "UMBRIA",
     classeContatore: "G4-G6",
+    consumoAnnuoRete: "",
     quotaVariabileAggiuntiva: "",
     quotaFissaAggiuntiva: "",
     accisaAgevolata: "NO",
@@ -6121,7 +6129,7 @@ border: "1px solid #bfd8f6",
             }}
           >
             <span>Rete + oneri Gas</span>
-            <HelpHint text="In Automatico il periodo viene preso direttamente dai mesi selezionati nei consumi. Il calcolo usa Regione → Ambito tariffario, classe del contatore e scaglioni ARERA. In Manuale restano disponibili i campi liberi." />
+            <HelpHint text="In Automatico il periodo viene preso direttamente dai mesi selezionati nei consumi. Il calcolo usa Regione → Ambito tariffario, classe del contatore, consumo annuo di riferimento, scaglione ARERA e include anche il trasporto QT. In Manuale restano disponibili i campi liberi." />
           </span>,
           <>
             <div
@@ -6201,7 +6209,7 @@ border: "1px solid #bfd8f6",
                     display: "grid",
                     gridTemplateColumns: isMobile
                       ? "1fr"
-                      : "repeat(4,minmax(0,1fr))",
+                      : "repeat(auto-fit,minmax(160px,1fr))",
                     gap: 12,
                     marginBottom: 12,
                   }}
@@ -6219,6 +6227,49 @@ border: "1px solid #bfd8f6",
                     (v) => set("classeContatore", v),
                     ["G4-G6", "G10-G40", "OLTRE G40"]
                   )}
+
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: "#334155",
+                        marginBottom: 5,
+                      }}
+                    >
+                      Consumo annuo di riferimento
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={s.consumoAnnuoRete || ""}
+                      onChange={(e) =>
+                        set("consumoAnnuoRete", e.target.value)
+                      }
+                      placeholder={`AUTO ${numFormat(r.consumoAnnuoStimato, 0)} Smc`}
+                      style={{
+                        width: "100%",
+                        height: 38,
+                        boxSizing: "border-box",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: 8,
+                        padding: "0 9px",
+                        background: "#fff",
+                        color: "#0f172a",
+                        fontWeight: 800,
+                      }}
+                    />
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 10,
+                        color: "#64748b",
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      Se disponibile, usa il consumo annuo riportato in bolletta.
+                    </div>
+                  </div>
 
                   <div
                     style={{
@@ -6312,7 +6363,7 @@ border: "1px solid #bfd8f6",
                   }}
                 >
                   {r.networkAutoAvailable
-                    ? `Calcolo automatico ARERA · consumo annuo stimato ${numFormat(r.consumoAnnuoStimato, 0)} Smc · ${gasMonths(s.fatturazione)} ${gasMonths(s.fatturazione) === 1 ? "mese" : "mesi"} di competenza.`
+                    ? `Calcolo automatico ARERA · consumo annuo di riferimento ${numFormat(r.consumoAnnuoRiferimento, 0)} Smc ${r.consumoAnnuoReteManuale ? "(manuale)" : "(stimato)"} · scaglione ${r.gasNetworkAuto.scaglioneLabel || "-"} · QT trasporto incluso · ${gasMonths(s.fatturazione)} ${gasMonths(s.fatturazione) === 1 ? "mese" : "mesi"} di competenza.`
                     : `Automatico non disponibile: ${r.gasNetworkAuto.reason || "dati mancanti"}. In questo caso vengono mantenuti i valori manuali.`}
                 </div>
               </>
@@ -7216,6 +7267,7 @@ function GasNetworkChargesAdmin({
               <th style={thStyle}>GS business</th>
               <th style={thStyle}>RE</th>
               <th style={thStyle}>RS</th>
+              <th style={thStyle}>QT trasporto</th>
               <th style={thStyle}>Tot. domestico €/Smc</th>
               <th style={thStyle}>Tot. business €/Smc</th>
             </tr>
@@ -7239,6 +7291,7 @@ function GasNetworkChargesAdmin({
                 <td style={tdStyle}>{row.gsBusiness.toFixed(6)}</td>
                 <td style={tdStyle}>{row.re.toFixed(6)}</td>
                 <td style={tdStyle}>{row.rs.toFixed(6)}</td>
+                <td style={tdStyle}>{row.qtTrasporto.toFixed(6)}</td>
                 <td style={{ ...tdStyle, fontWeight: 900 }}>
                   {row.quotaVariabileDomestico.toFixed(6)}
                 </td>
@@ -7259,10 +7312,10 @@ function GasNetworkChargesAdmin({
           lineHeight: 1.4,
         }}
       >
-        Fonti: deliberazioni ARERA 574/2025/R/gas, 588/2025/R/com e
-        126/2025/R/gas. La componente GS è esclusa per uso domestico.
-        Il trasporto QTt non è incluso in questa prima automazione
-        Rete + Oneri Gas.
+        Fonti: deliberazioni ARERA 574/2025/R/gas, 588/2025/R/com,
+        126/2025/R/gas, 98/2026/R/com e 343/2026/R/com. La componente
+        GS è esclusa per uso domestico. Il trasporto QTt è incluso
+        automaticamente in base al mese di competenza.
       </div>
     </div>
   );
