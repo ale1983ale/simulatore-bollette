@@ -15,6 +15,17 @@ const GS = [0.003907,0.003907,0.003907,0.003907,0.003907,0.003907,0.001826,0.001
 const RE = [0.029417,0.029417,0.029417,0.029417,0.029417,0.029417,0.015611,0.015611];
 const RS = [0.002788,0.002788,0.002788,0.002788,0.002788,0.002788,0.001409,0.001409];
 const UG2_FIXED_ANNUAL = -21.63;
+const GAS_PCS_GJ_PER_SMC = 0.03852;
+
+function qtEuroPerGJForMonth(month) {
+  if (month <= 3) return 2.513485;
+  if (month <= 9) return 1.931333;
+  return 2.727133;
+}
+
+function qtEuroPerSmcForMonth(month) {
+  return qtEuroPerGJForMonth(month) * GAS_PCS_GJ_PER_SMC;
+}
 
 const AMBITI = {
   "NORD OCCIDENTALE": {
@@ -72,6 +83,7 @@ function buildRows() {
   for (let month = 1; month <= 12; month += 1) {
     for (const [ambito, cfg] of Object.entries(AMBITI)) {
       classes.forEach((classeContatore, meterIndex) => {
+        const qtTrasporto = qtEuroPerSmcForMonth(month);
         const quotaFissaAnnua =
           cfg.fixedDistribution[meterIndex] +
           cfg.fixedMeasure[meterIndex] +
@@ -88,7 +100,8 @@ function buildRows() {
             UG1[index] +
             UG3[index] +
             RE[index] +
-            RS[index];
+            RS[index] +
+            qtTrasporto;
 
           rows.push({
             mese: `${MONTHS[month - 1]} 2026`,
@@ -108,10 +121,11 @@ function buildRows() {
             gsBusiness: round6(GS[index]),
             re: round6(RE[index]),
             rs: round6(RS[index]),
+            qtTrasporto: round6(qtTrasporto),
             quotaVariabileDomestico: round6(baseVariable),
             quotaVariabileBusiness: round6(baseVariable + GS[index]),
             status: "STORICO UFFICIALE 2026",
-            source: "ARERA 574/2025/R/gas + 588/2025/R/com + 126/2025/R/gas",
+            source: "ARERA 574/2025/R/gas + 588/2025/R/com + 126/2025/R/gas + 98/2026/R/com + 343/2026/R/com",
           });
         });
       });
@@ -125,6 +139,7 @@ const SOURCE_URLS = [
   "https://www.arera.it/atti-e-provvedimenti/dettaglio/25/574-25",
   "https://www.arera.it/fileadmin/allegati/docs/25/588-2025-R-com.pdf",
   "https://www.arera.it/atti-e-provvedimenti/dettaglio/25/126-25",
+  "https://www.arera.it/atti-e-provvedimenti/dettaglio/26/98-26",
   "https://www.arera.it/atti-e-provvedimenti/dettaglio/26/343-26",
 ];
 
@@ -165,7 +180,7 @@ export default async function handler(req, res) {
     assumptions: {
       year: 2026,
       gs: "0 per DOMESTICO; componente ordinaria per BUSINESS",
-      trasporto: "non incluso in questa prima sezione rete/oneri",
+      trasporto: "QTt incluso: gen-mar 2,513485 €/GJ; apr-set 1,931333 €/GJ; ott-dic 2,727133 €/GJ",
     },
   });
 }
