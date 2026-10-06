@@ -4,6 +4,24 @@ import { supabaseAnonKey, supabaseUrl } from "./supabase";
 const CRM_SYNC_ENDPOINT =
   `${supabaseUrl}/functions/v1/recruiting-crm-sync`;
 
+function notifyCrmConnectionProblem(message: string) {
+  if (typeof window === "undefined") return;
+  if (
+    /login|session|auth|credenzial|password|unauthor|forbidden|scad|expired/i.test(
+      message
+    )
+  ) {
+    window.dispatchEvent(
+      new CustomEvent("ge:integration-disconnected", {
+        detail: {
+          service: "crm",
+          message,
+        },
+      })
+    );
+  }
+}
+
 export type RecruitingCrmStatus = {
   configured: boolean;
   status: string;
@@ -38,10 +56,11 @@ async function callCrm(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(
+    const message =
       data?.error ||
-        "Errore durante la comunicazione con il CRM +Energia."
-    );
+      "Errore durante la comunicazione con il CRM +Energia.";
+    notifyCrmConnectionProblem(String(message));
+    throw new Error(message);
   }
 
   return data;
