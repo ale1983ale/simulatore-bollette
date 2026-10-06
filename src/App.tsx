@@ -11025,24 +11025,44 @@ export default function App() {
   const psvChartRef = useRef<HTMLDivElement>(null);
   const punPsvTableRef = useRef<HTMLDivElement>(null);
   const punPsvPdfLayoutRef = useRef<HTMLDivElement>(null);
+  const [punPsvPdfMode, setPunPsvPdfMode] =
+    useState<"both" | "pun" | "psv">("both");
 
-  const exportPunPsvPdf = async () => {
+  const waitForPunPsvPdfMode = async (
+    mode: "both" | "pun" | "psv"
+  ) => {
+    setPunPsvPdfMode(mode);
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => resolve());
+      });
+    });
+  };
+
+  const capturePunPsvPdfPage = async (
+    mode: "both" | "pun" | "psv"
+  ) => {
+    await waitForPunPsvPdfMode(mode);
+
     const exportPage = punPsvPdfLayoutRef.current;
     if (!exportPage) {
-      alert("Layout PDF PUN-PSV non disponibile");
-      return;
+      throw new Error("Layout PDF PUN-PSV non disponibile");
     }
 
+    return html2canvas(exportPage, {
+      scale: 1.55,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: 1400,
+      windowHeight: 990,
+    });
+  };
+
+  const exportPunPsvPdf = async () => {
     try {
-      const canvas = await html2canvas(exportPage, {
-        scale: 1.55,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: 1400,
-        windowHeight: 990,
-      });
+      const canvas = await capturePunPsvPdfPage("both");
 
       const pdf = new jsPDF({
         orientation: "landscape",
@@ -11064,6 +11084,57 @@ export default function App() {
     } catch (error) {
       console.error("PUN PSV PDF ERROR:", error);
       alert("Errore esportazione PDF");
+    } finally {
+      setPunPsvPdfMode("both");
+    }
+  };
+
+  const exportPunPsvThreePagePdf = async () => {
+    try {
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const modes: Array<"both" | "pun" | "psv"> = [
+        "both",
+        "pun",
+        "psv",
+      ];
+
+      for (let index = 0; index < modes.length; index += 1) {
+        const canvas = await capturePunPsvPdfPage(modes[index]);
+        const img = canvas.toDataURL("image/jpeg", 0.95);
+
+        if (index > 0) {
+          pdf.addPage("a4", "landscape");
+        }
+
+        pdf.addImage(
+          img,
+          "JPEG",
+          0,
+          0,
+          pageWidth,
+          pageHeight
+        );
+      }
+
+      const meseNome = String(activePunPsvMonth || "PUN-PSV")
+        .replace(/\s+/g, "-")
+        .toUpperCase();
+
+      pdf.save(
+        `Report-PUN-PSV-3-Pagine-${meseNome}.pdf`
+      );
+    } catch (error) {
+      console.error("PUN PSV 3 PAGE PDF ERROR:", error);
+      alert("Errore esportazione PDF a 3 pagine");
+    } finally {
+      setPunPsvPdfMode("both");
     }
   };
 
@@ -13113,6 +13184,22 @@ if (!agentSession && !adminSession) {
                 >
                   PDF
                 </button>
+
+                <button
+                  type="button"
+                  onClick={exportPunPsvThreePagePdf}
+                  style={{
+                    background: "#0f172a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "10px 18px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  PDF 3 PAGINE
+                </button>
               </div>
             </div>
         
@@ -14222,14 +14309,20 @@ if (!agentSession && !adminSession) {
         textAlign: "center",
       }}
     >
-      Andamento PUN e PSV {latestPunPsvMonthLabel}
+      {punPsvPdfMode === "pun"
+        ? "Andamento PUN"
+        : punPsvPdfMode === "psv"
+        ? "Andamento PSV"
+        : "Andamento PUN e PSV"}{" "}
+      {latestPunPsvMonthLabel}
     </div>
   </div>
 
   <div
     style={{
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      gridTemplateColumns:
+        punPsvPdfMode === "both" ? "1fr 1fr" : "1fr",
       gap: 18,
       height: 438,
       marginTop: 8,
@@ -14238,6 +14331,7 @@ if (!agentSession && !adminSession) {
   >
     <div
       style={{
+        display: punPsvPdfMode === "psv" ? "none" : "block",
         borderRadius: 16,
         overflow: "hidden",
         border: "1px solid rgba(249,115,22,.22)",
@@ -14352,6 +14446,7 @@ if (!agentSession && !adminSession) {
 
     <div
       style={{
+        display: punPsvPdfMode === "pun" ? "none" : "block",
         borderRadius: 16,
         overflow: "hidden",
         border: "1px solid rgba(14,165,233,.22)",
@@ -14451,7 +14546,8 @@ if (!agentSession && !adminSession) {
   <div
     style={{
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      gridTemplateColumns:
+        punPsvPdfMode === "both" ? "1fr 1fr" : "1fr",
       gap: 18,
       height: 392,
       marginTop: 18,
@@ -14459,6 +14555,7 @@ if (!agentSession && !adminSession) {
   >
     <div
       style={{
+        display: punPsvPdfMode === "psv" ? "none" : "block",
         borderRadius: 16,
         padding: "13px 15px 8px",
         border: "1px solid rgba(249,115,22,.22)",
@@ -14507,6 +14604,7 @@ if (!agentSession && !adminSession) {
 
     <div
       style={{
+        display: punPsvPdfMode === "pun" ? "none" : "block",
         borderRadius: 16,
         padding: "13px 15px 8px",
         border: "1px solid rgba(14,165,233,.22)",
