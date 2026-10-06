@@ -1306,7 +1306,7 @@ export default function Recruiting({
   const [excludedStatusFilters, setExcludedStatusFilters] = useState<CandidateStatus[]>([]);
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
-  const [favoriteFilter, setFavoriteFilter] = useState<"" | "SI" | "NO">("");
+  const [favoriteFilter, setFavoriteFilter] = useState<"" | "SI">("");
   const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
     useState(false);
   const [regionFilterMenuOpen, setRegionFilterMenuOpen] = useState(false);
@@ -2799,7 +2799,6 @@ export default function Recruiting({
       }
 
       if (favoriteFilter === "SI" && !candidate.isFavorite) return false;
-      if (favoriteFilter === "NO" && candidate.isFavorite) return false;
 
       const calledByMe = calledByMeCandidateIds.has(candidate.id);
       if (calledByMeFilter === "SI" && !calledByMe) return false;
@@ -7315,23 +7314,6 @@ export default function Recruiting({
               </div>
 
               <div>
-                <label style={labelStyle}>Preferiti</label>
-                <select
-                  value={favoriteFilter}
-                  onChange={(e) =>
-                    setFavoriteFilter(
-                      e.target.value as "" | "SI" | "NO"
-                    )
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Tutti</option>
-                  <option value="SI">Solo preferiti</option>
-                  <option value="NO">Non preferiti</option>
-                </select>
-              </div>
-
-              <div>
                 <label style={labelStyle}>Regione · MULTISELEZIONE</label>
                 <div
                   ref={regionFilterMenuRef}
@@ -7907,26 +7889,83 @@ export default function Recruiting({
               <div className="recruiting-contact-list-header">
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 9,
-                    flexWrap: "wrap",
+                    display: "grid",
+                    gap: 7,
+                    justifyItems: "start",
                   }}
                 >
-                  <h3 style={{ marginTop: 0, marginBottom: 0 }}>
-                    Lista nominativi
-                  </h3>
-                  <span
+                  <div
                     style={{
-                      color: "#dc2626",
-                      fontSize: 17,
-                      fontWeight: 950,
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 9,
+                      flexWrap: "wrap",
                     }}
                   >
-                    {hasActiveContactFilters
-                      ? `${filteredCandidates.length} SU ${candidates.length}`
-                      : candidates.length}
-                  </span>
+                    <h3 style={{ marginTop: 0, marginBottom: 0 }}>
+                      Lista nominativi
+                    </h3>
+                    <span
+                      style={{
+                        color: "#dc2626",
+                        fontSize: 17,
+                        fontWeight: 950,
+                      }}
+                    >
+                      {hasActiveContactFilters
+                        ? `${filteredCandidates.length} SU ${candidates.length}`
+                        : candidates.length}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    title={
+                      favoriteFilter === "SI"
+                        ? "Mostra tutti i nominativi"
+                        : "Mostra solo i preferiti"
+                    }
+                    aria-label={
+                      favoriteFilter === "SI"
+                        ? "Mostra tutti i nominativi"
+                        : "Mostra solo i preferiti"
+                    }
+                    aria-pressed={favoriteFilter === "SI"}
+                    onClick={() =>
+                      setFavoriteFilter((current) =>
+                        current === "SI" ? "" : "SI"
+                      )
+                    }
+                    style={{
+                      width: 36,
+                      height: 36,
+                      padding: 0,
+                      borderRadius: 999,
+                      border:
+                        favoriteFilter === "SI"
+                          ? "2px solid #f59e0b"
+                          : "1px solid #cbd5e1",
+                      background:
+                        favoriteFilter === "SI"
+                          ? "#fef3c7"
+                          : "#ffffff",
+                      color:
+                        favoriteFilter === "SI"
+                          ? "#d97706"
+                          : "#94a3b8",
+                      fontSize: 22,
+                      lineHeight: 1,
+                      cursor: "pointer",
+                      display: "grid",
+                      placeItems: "center",
+                      boxShadow:
+                        favoriteFilter === "SI"
+                          ? "0 0 0 3px rgba(245,158,11,.12)"
+                          : "0 2px 7px rgba(15,23,42,.06)",
+                    }}
+                  >
+                    {favoriteFilter === "SI" ? "★" : "☆"}
+                  </button>
                 </div>
 
                 <div className="recruiting-contact-list-controls">
