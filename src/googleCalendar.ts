@@ -4,6 +4,24 @@ import { supabaseAnonKey, supabaseUrl } from "./supabase";
 const GOOGLE_CALENDAR_ENDPOINT =
   `${supabaseUrl}/functions/v1/google-calendar-oauth`;
 
+function notifyGoogleConnectionProblem(message: string) {
+  if (typeof window === "undefined") return;
+  if (
+    /expired|revoked|invalid_grant|refresh token|non è collegato|ricollega|unauthor/i.test(
+      message
+    )
+  ) {
+    window.dispatchEvent(
+      new CustomEvent("ge:integration-disconnected", {
+        detail: {
+          service: "google",
+          message,
+        },
+      })
+    );
+  }
+}
+
 export type GoogleCalendarStatus = {
   configured: boolean;
   connected: boolean;
@@ -54,10 +72,11 @@ async function callGoogleCalendar(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(
+    const message =
       data?.error ||
-        "Errore durante la comunicazione con Google Calendar."
-    );
+      "Errore durante la comunicazione con Google Calendar.";
+    notifyGoogleConnectionProblem(String(message));
+    throw new Error(message);
   }
 
   return data;
