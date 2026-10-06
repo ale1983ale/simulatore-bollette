@@ -1156,6 +1156,15 @@ function getMonthCells(monthKey: string) {
   return cells;
 }
 
+function isGoogleCalendarReconnectError(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : String(error || "");
+
+  return /token has been expired or revoked|invalid_grant|refresh token|token.*revoked|token.*expired/i.test(
+    message
+  );
+}
+
 function googleCalendarMonthRange(monthKey: string) {
   const cells = getMonthCells(monthKey);
   const firstKey = cells[0]?.dateKey || `${monthKey}-01`;
@@ -2198,7 +2207,19 @@ export default function Recruiting({
       );
     } catch (error: any) {
       console.error("GOOGLE COMPLETE CALENDAR ERROR:", error);
-      setGoogleExternalError(error?.message || String(error));
+
+      if (isGoogleCalendarReconnectError(error)) {
+        setGoogleCalendarConnected(false);
+        setGoogleCalendarNeedsReconnect(true);
+        setGooglePanelOpen(true);
+        setShowFullGoogleCalendar(false);
+        setGoogleExternalEvents([]);
+        setGoogleExternalError(
+          "Autorizzazione Google scaduta o revocata. Premi RICOLLEGA GOOGLE."
+        );
+      } else {
+        setGoogleExternalError(error?.message || String(error));
+      }
     } finally {
       setGoogleExternalLoading(false);
     }
@@ -2228,10 +2249,19 @@ export default function Recruiting({
       );
       await loadAll(ctx || undefined);
     } catch (error: any) {
-      setMessage(
-        "Errore durante la sincronizzazione Google Calendar: " +
-          (error?.message || error)
-      );
+      if (isGoogleCalendarReconnectError(error)) {
+        setGoogleCalendarConnected(false);
+        setGoogleCalendarNeedsReconnect(true);
+        setGooglePanelOpen(true);
+        setMessage(
+          "Autorizzazione Google scaduta o revocata. Premi RICOLLEGA GOOGLE."
+        );
+      } else {
+        setMessage(
+          "Errore durante la sincronizzazione Google Calendar: " +
+            (error?.message || error)
+        );
+      }
     } finally {
       setGoogleCalendarBusy(false);
     }
@@ -2249,10 +2279,20 @@ export default function Recruiting({
       return true;
     } catch (error: any) {
       console.error("GOOGLE CALENDAR EVENT SYNC ERROR:", error);
-      setMessage(
-        "Attività salvata nella webapp, ma Google Calendar non si è sincronizzato: " +
-          (error?.message || error)
-      );
+
+      if (isGoogleCalendarReconnectError(error)) {
+        setGoogleCalendarConnected(false);
+        setGoogleCalendarNeedsReconnect(true);
+        setGooglePanelOpen(true);
+        setMessage(
+          "Attività salvata nella webapp. Autorizzazione Google scaduta o revocata: premi RICOLLEGA GOOGLE."
+        );
+      } else {
+        setMessage(
+          "Attività salvata nella webapp, ma Google Calendar non si è sincronizzato: " +
+            (error?.message || error)
+        );
+      }
       return false;
     }
   };
