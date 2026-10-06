@@ -1307,6 +1307,8 @@ export default function Recruiting({
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
   const [favoriteFilter, setFavoriteFilter] = useState<"" | "SI">("");
+  const [lockedCandidateOrder, setLockedCandidateOrder] =
+    useState<string[] | null>(null);
   const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
     useState(false);
   const [regionFilterMenuOpen, setRegionFilterMenuOpen] = useState(false);
@@ -2872,6 +2874,16 @@ export default function Recruiting({
       }
 
       return a.fullName.localeCompare(b.fullName, "it");
+    }).sort((a, b) => {
+      if (!lockedCandidateOrder?.length) return 0;
+
+      const aIndex = lockedCandidateOrder.indexOf(a.id);
+      const bIndex = lockedCandidateOrder.indexOf(b.id);
+
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
     });
   }, [
     candidates,
@@ -2893,7 +2905,34 @@ export default function Recruiting({
     favoriteFilter,
     calledByMeFilter,
     calledByMeCandidateIds,
+    lockedCandidateOrder,
   ]);
+
+  useEffect(() => {
+    setLockedCandidateOrder(null);
+  }, [
+    candidateSortMode,
+    nameFilter,
+    zoneFilter,
+    phoneFilter,
+    regionFilters,
+    sectorFilter,
+    sectorOtherFilter,
+    companyFilter,
+    referrerFilter,
+    contactScope,
+    statusFilter,
+    excludedStatusFilters,
+    forwardedToFilter,
+    favoriteFilter,
+    calledByMeFilter,
+  ]);
+
+  const lockCurrentCandidateListOrder = () => {
+    setLockedCandidateOrder(
+      filteredCandidates.map((candidate) => candidate.id)
+    );
+  };
 
   const hasActiveContactFilters = Boolean(
     nameFilter.trim() ||
@@ -4212,6 +4251,7 @@ export default function Recruiting({
       return;
     }
 
+    lockCurrentCandidateListOrder();
     setBusy(true);
     try {
       const { error } = await ctx.client.from("recruiting_notes").insert({
@@ -4263,6 +4303,7 @@ export default function Recruiting({
     const nextStatus =
       noteStatusDraft || previousStatus;
 
+    lockCurrentCandidateListOrder();
     setBusy(true);
 
     let insertedNoteId = "";
@@ -4392,6 +4433,7 @@ export default function Recruiting({
       return;
     }
 
+    lockCurrentCandidateListOrder();
     setBusy(true);
     try {
       const { error } = await ctx.client
@@ -4421,6 +4463,7 @@ export default function Recruiting({
 
   const deleteNote = async (note: ContactNote) => {
     if (!ctx || !window.confirm("Eliminare questa nota?")) return;
+    lockCurrentCandidateListOrder();
     const { error } = await ctx.client.from("recruiting_notes").delete().eq("id", note.id);
     if (error) {
       setMessage("Errore nell'eliminazione della nota: " + error.message);
