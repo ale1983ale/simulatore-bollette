@@ -4,6 +4,24 @@ import { supabaseAnonKey, supabaseUrl } from "./supabase";
 const PERFORMA_SYNC_ENDPOINT =
   `${supabaseUrl}/functions/v1/recruiting-performa-sync`;
 
+function notifyPerformaConnectionProblem(message: string) {
+  if (typeof window === "undefined") return;
+  if (
+    /reauth|login|session|auth|token|credenzial|password|unauthor|forbidden|scad|expired/i.test(
+      message
+    )
+  ) {
+    window.dispatchEvent(
+      new CustomEvent("ge:integration-disconnected", {
+        detail: {
+          service: "performa",
+          message,
+        },
+      })
+    );
+  }
+}
+
 export type RecruitingPerformaStatus = {
   configured: boolean;
   connected: boolean;
@@ -42,10 +60,11 @@ async function callPerforma(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(
+    const message =
       data?.error ||
-        "Errore durante la comunicazione con Performa Recruit."
-    );
+      "Errore durante la comunicazione con Performa Recruit.";
+    notifyPerformaConnectionProblem(String(message));
+    throw new Error(message);
   }
 
   return data;
