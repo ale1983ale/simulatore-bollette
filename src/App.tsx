@@ -4467,6 +4467,80 @@ Base suggerito
         </>
       )}
 
+      {isMobile && (
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: 14,
+          }}
+        >
+          <div
+          style={{
+          border:
+          Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
+          ? "2px solid #f97316"
+          : "3px solid #dc2626",
+          borderRadius: 12,
+          padding: 10,
+          background:
+          Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
+          ? "#fff7ed"
+          : "#fff1f2",
+          boxShadow:
+          Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
+          ? "0 0 0 2px rgba(249,115,22,.08)"
+          : "0 0 0 3px rgba(220,38,38,.10)",
+          }}
+          >
+          {Number(String(s.potenzaImpegnata || "").replace(",", ".")) <= 0 && (
+          <div
+          style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 8,
+          padding: "5px 9px",
+          borderRadius: 999,
+          background: "#dc2626",
+          color: "#fff",
+          fontSize: 11,
+          fontWeight: 950,
+          letterSpacing: ".02em",
+          }}
+          >
+          ⚠ INSERISCI LA POTENZA
+          </div>
+          )}
+          
+          {field(
+          s.fatturazione === "MULTI POD MENSILE" ||
+          s.fatturazione === "MULTI POD BIMESTRALE"
+          ? "Potenza totale fatturata (kW)"
+          : "Potenza fatturata (kW)",
+          s.potenzaImpegnata || "",
+          (v) => set("potenzaImpegnata", v),
+          "number"
+          )}
+          
+          {Number(String(s.potenzaImpegnata || "").replace(",", ".")) <= 0 && (
+          <div
+          style={{
+          marginTop: 7,
+          fontSize: 12,
+          lineHeight: 1.35,
+          color: "#991b1b",
+          fontWeight: 850,
+          }}
+          >
+          Dato necessario per calcolare correttamente la quota potenza rete.
+          </div>
+          )}
+          </div>
+        </div>
+      )}
+
       {sectionCard(
         "rete",
         <span
@@ -4561,68 +4635,70 @@ Base suggerito
                   gap: 12,
                 }}
               >
-                <div
-                  style={{
-                    border:
-                      Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
-                        ? "2px solid #f97316"
-                        : "3px solid #dc2626",
-                    borderRadius: 12,
-                    padding: 10,
-                    background:
-                      Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
-                        ? "#fff7ed"
-                        : "#fff1f2",
-                    boxShadow:
-                      Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
-                        ? "0 0 0 2px rgba(249,115,22,.08)"
-                        : "0 0 0 3px rgba(220,38,38,.10)",
-                  }}
-                >
-                  {Number(String(s.potenzaImpegnata || "").replace(",", ".")) <= 0 && (
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        marginBottom: 8,
-                        padding: "5px 9px",
-                        borderRadius: 999,
-                        background: "#dc2626",
-                        color: "#fff",
-                        fontSize: 11,
-                        fontWeight: 950,
-                        letterSpacing: ".02em",
-                      }}
-                    >
-                      ⚠ INSERISCI LA POTENZA
-                    </div>
-                  )}
-
-                  {field(
-                    s.fatturazione === "MULTI POD MENSILE" ||
-                    s.fatturazione === "MULTI POD BIMESTRALE"
-                      ? "Potenza totale fatturata (kW)"
-                      : "Potenza fatturata (kW)",
-                    s.potenzaImpegnata || "",
-                    (v) => set("potenzaImpegnata", v),
-                    "number"
-                  )}
-
-                  {Number(String(s.potenzaImpegnata || "").replace(",", ".")) <= 0 && (
-                    <div
-                      style={{
-                        marginTop: 7,
-                        fontSize: 12,
-                        lineHeight: 1.35,
-                        color: "#991b1b",
-                        fontWeight: 850,
-                      }}
-                    >
-                      Dato necessario per calcolare correttamente la quota potenza rete.
-                    </div>
-                  )}
-                </div>
+                {!isMobile && (
+                  <div
+                    style={{
+                      border:
+                        Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
+                          ? "2px solid #f97316"
+                          : "3px solid #dc2626",
+                      borderRadius: 12,
+                      padding: 10,
+                      background:
+                        Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
+                          ? "#fff7ed"
+                          : "#fff1f2",
+                      boxShadow:
+                        Number(String(s.potenzaImpegnata || "").replace(",", ".")) > 0
+                          ? "0 0 0 2px rgba(249,115,22,.08)"
+                          : "0 0 0 3px rgba(220,38,38,.10)",
+                    }}
+                  >
+                    {Number(String(s.potenzaImpegnata || "").replace(",", ".")) <= 0 && (
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          marginBottom: 8,
+                          padding: "5px 9px",
+                          borderRadius: 999,
+                          background: "#dc2626",
+                          color: "#fff",
+                          fontSize: 11,
+                          fontWeight: 950,
+                          letterSpacing: ".02em",
+                        }}
+                      >
+                        ⚠ INSERISCI LA POTENZA
+                      </div>
+                    )}
+  
+                    {field(
+                      s.fatturazione === "MULTI POD MENSILE" ||
+                      s.fatturazione === "MULTI POD BIMESTRALE"
+                        ? "Potenza totale fatturata (kW)"
+                        : "Potenza fatturata (kW)",
+                      s.potenzaImpegnata || "",
+                      (v) => set("potenzaImpegnata", v),
+                      "number"
+                    )}
+  
+                    {Number(String(s.potenzaImpegnata || "").replace(",", ".")) <= 0 && (
+                      <div
+                        style={{
+                          marginTop: 7,
+                          fontSize: 12,
+                          lineHeight: 1.35,
+                          color: "#991b1b",
+                          fontWeight: 850,
+                        }}
+                      >
+                        Dato necessario per calcolare correttamente la quota potenza rete.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {[
                   ["Quota consumi rete", r.H25],
