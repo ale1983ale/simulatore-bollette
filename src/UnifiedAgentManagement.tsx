@@ -1218,11 +1218,43 @@ export default function UnifiedAgentManagement({
             flex-direction: column;
             gap: 10px;
           }
+          .uam-top-grid,
           .uam-responsive-grid {
             grid-template-columns: 1fr !important;
           }
           .uam-agent-open-card {
             padding: 12px !important;
+          }
+          .uam-mobile-list .uam-agent-open-card {
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            padding: 4px 2px 10px !important;
+          }
+          .ge-admin-responsive-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .ge-admin-password-table {
+            display: block !important;
+            min-width: 0 !important;
+            width: 100% !important;
+          }
+          .ge-admin-password-table thead {
+            display: none !important;
+          }
+          .ge-admin-password-table tbody,
+          .ge-admin-password-table tr,
+          .ge-admin-password-table td {
+            display: block !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .ge-admin-password-table tr {
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 10px !important;
+            margin-bottom: 10px !important;
+            padding: 8px !important;
           }
           #ge-admin-users-manager .ge-table-shell {
             overflow: visible !important;
@@ -1345,6 +1377,7 @@ export default function UnifiedAgentManagement({
         </div>
 
         <div
+          className="uam-top-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "minmax(220px, 420px) auto",
