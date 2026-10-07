@@ -238,6 +238,8 @@ type ActiveAgent = {
   phone: string;
   zone: string;
   region: string;
+  dmReference: string;
+  createdAt: string;
   latitude: number | null;
   longitude: number | null;
 };
@@ -1110,6 +1112,8 @@ function activeAgentFromRow(row: any): ActiveAgent {
     phone: String(row.phone || ""),
     zone: String(row.zone || ""),
     region: String(row.region || ""),
+    dmReference: String(row.dm_reference || row.dm1 || row.dm2 || ""),
+    createdAt: String(row.created_at || ""),
     latitude: row.latitude === null || row.latitude === undefined ? null : Number(row.latitude),
     longitude: row.longitude === null || row.longitude === undefined ? null : Number(row.longitude),
   };
@@ -1516,6 +1520,8 @@ export default function Recruiting({
     useState({ done: 0, total: 0 });
   const [mapMode, setMapMode] = useState<"italy" | "region" | "macroarea">("italy");
   const [mapRegion, setMapRegion] = useState<string>("Umbria");
+  const [mapDmFilters, setMapDmFilters] = useState<string[]>(["ALESSIO CEDRONI"]);
+  const [focusedMapAgentId, setFocusedMapAgentId] = useState<string | null>(null);
   const [mapMacroareaId, setMapMacroareaId] = useState("");
   const [mapReturnView, setMapReturnView] = useState<{
     mode: "italy" | "macroarea";
@@ -1532,6 +1538,8 @@ export default function Recruiting({
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
+  const agentMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const agentHighlightTimerRef = useRef<number | null>(null);
   const regionsLayerRef = useRef<L.GeoJSON | null>(null);
   const provincesLayerRef = useRef<L.GeoJSON | null>(null);
   const candidateMapGeocodingRef = useRef(false);
@@ -1693,8 +1701,8 @@ export default function Recruiting({
         .select("macroarea_id,region"),
       active.client
         .from("recruiting_active_agents")
-        .select("id,first_name,last_name,phone,zone,region,latitude,longitude")
-        .order("last_name", { ascending: true }),
+        .select("id,first_name,last_name,phone,zone,region,dm_reference,dm1,dm2,created_at,latitude,longitude")
+        .order("created_at", { ascending: true }),
       active.client
         .from("recruiting_statuses")
         .select("code,label,color_key,sort_order")
@@ -5375,6 +5383,11 @@ export default function Recruiting({
       mapRef.current = null;
     }
     markersRef.current = null;
+    agentMarkersRef.current.clear();
+    if (agentHighlightTimerRef.current !== null) {
+      window.clearTimeout(agentHighlightTimerRef.current);
+      agentHighlightTimerRef.current = null;
+    }
     regionsLayerRef.current = null;
     provincesLayerRef.current = null;
   };
@@ -5643,14 +5656,103 @@ export default function Recruiting({
     return [] as string[];
   }, [mapMode, mapRegion, mapMacroareaId, macroareas]);
 
+  const mapDmOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          activeAgents
+            .map((agent) => agent.dmReference.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) =>
+        a.localeCompare(b, "it", { sensitivity: "base" })
+      ),
+    [activeAgents]
+  );
+
   const visibleMapAgents = useMemo(() => {
-    return activeAgents.filter((agent) => {
-      if (agent.latitude === null || agent.longitude === null) return false;
-      if (mapMode === "italy") return true;
-      const region = normalizeItalianRegion(agent.region || agent.zone);
-      return visibleMapRegions.includes(region);
+    return activeAgents
+      .filter((agent) => {
+        if (agent.latitude === null || agent.longitude === null) return false;
+
+        if (
+          mapDmFilters.length > 0 &&
+          !mapDmFilters.includes(agent.dmReference.trim())
+        ) {
+          return false;
+        }
+
+        if (mapMode === "italy") return true;
+        const region = normalizeItalianRegion(agent.region || agent.zone);
+        return visibleMapRegions.includes(region);
+      })
+      .sort((a, b) => {
+        const aTime = a.createdAt
+          ? new Date(a.createdAt).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        const bTime = b.createdAt
+          ? new Date(b.createdAt).getTime()
+          : Number.MAX_SAFE_INTEGER;
+
+        if (aTime !== bTime) return aTime - bTime;
+        return a.id.localeCompare(b.id);
+      });
+  }, [activeAgents, mapMode, visibleMapRegions, mapDmFilters]);
+
+  const focusMapAgent = (agent: ActiveAgent) => {
+    if (
+      agent.latitude === null ||
+      agent.longitude === null ||
+      !mapRef.current
+    ) {
+      return;
+    }
+
+    setFocusedMapAgentId(agent.id);
+
+    const map = mapRef.current;
+    const targetZoom = Math.max(
+      map.getZoom(),
+      mapMode === "region" ? 9 : 8
+    );
+
+    map.flyTo([agent.latitude, agent.longitude], targetZoom, {
+      animate: true,
+      duration: 0.65,
     });
-  }, [activeAgents, mapMode, visibleMapRegions]);
+
+    mapElementRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    const marker = agentMarkersRef.current.get(agent.id);
+    if (!marker) return;
+
+    window.setTimeout(() => {
+      marker.openPopup();
+
+      const markerElement = marker.getElement();
+      const badge = markerElement?.querySelector("div") as HTMLElement | null;
+      if (!badge) return;
+
+      badge.style.transition =
+        "transform .18s ease, box-shadow .18s ease";
+      badge.style.transform = "scale(1.28)";
+      badge.style.boxShadow =
+        "0 0 0 6px rgba(249,115,22,.24), 0 4px 14px rgba(15,23,42,.34)";
+
+      if (agentHighlightTimerRef.current !== null) {
+        window.clearTimeout(agentHighlightTimerRef.current);
+      }
+
+      agentHighlightTimerRef.current = window.setTimeout(() => {
+        badge.style.transform = "";
+        badge.style.boxShadow = "0 2px 8px rgba(0,0,0,.28)";
+        agentHighlightTimerRef.current = null;
+      }, 1800);
+    }, 380);
+  };
 
   const mapStatusFilteredCandidates = useMemo(
     () =>
@@ -5924,6 +6026,7 @@ export default function Recruiting({
     const map = mapRef.current;
     const markerLayer = markersRef.current;
     markerLayer?.clearLayers();
+    agentMarkersRef.current.clear();
 
     if (regionsLayerRef.current) {
       regionsLayerRef.current.removeFrom(map);
@@ -5987,8 +6090,10 @@ export default function Recruiting({
             layer.bindTooltip(provinceLabel, {
               permanent: mapMode === "region",
               direction: "center",
-              opacity: mapMode === "region" ? 0.9 : 0.98,
+              opacity: mapMode === "region" ? 0.42 : 0.5,
               interactive: false,
+              pane: "overlayPane",
+              className: "recruiting-map-province-label",
             });
 
             layer.on("mouseover", () => {
@@ -6028,8 +6133,10 @@ export default function Recruiting({
         layer.bindTooltip(regionName, {
           permanent: true,
           direction: "center",
-          opacity: 0.95,
+          opacity: 0.38,
           interactive: false,
+          pane: "overlayPane",
+          className: "recruiting-map-region-label",
         });
 
         if (mapMode === "italy" || mapMode === "macroarea") {
@@ -6076,7 +6183,7 @@ export default function Recruiting({
           className: "",
           html: `<div style="white-space:nowrap;font-size:${
             mapMode === "region" ? 11 : 9
-          }px;font-weight:${city.primary ? 900 : 700};color:#0f172a;text-shadow:0 1px 0 #fff,1px 0 0 #fff,-1px 0 0 #fff,0 -1px 0 #fff;">• ${escapeHtml(
+          }px;font-weight:${city.primary ? 900 : 700};color:rgba(51,65,85,.42);opacity:.62;text-shadow:0 1px 0 rgba(255,255,255,.65);">• ${escapeHtml(
             city.name
           )}</div>`,
           iconSize: [90, 18],
@@ -6086,7 +6193,7 @@ export default function Recruiting({
           icon: cityIcon,
           interactive: false,
           keyboard: false,
-          zIndexOffset: -50,
+          zIndexOffset: -500,
         }).addTo(markerLayer!);
       });
 
@@ -6208,6 +6315,7 @@ export default function Recruiting({
       popup.appendChild(actions);
       marker.bindPopup(popup);
       marker.addTo(markerLayer!);
+      agentMarkersRef.current.set(agent.id, marker);
     });
 
     if (mapView === "candidates") {
@@ -6569,6 +6677,21 @@ export default function Recruiting({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%", minWidth: 0 }}>
       <style>{`
+        .leaflet-tooltip.recruiting-map-province-label,
+        .leaflet-tooltip.recruiting-map-region-label {
+          background: rgba(255, 255, 255, 0.48);
+          border-color: rgba(100, 116, 139, 0.16);
+          box-shadow: none;
+          color: rgba(51, 65, 85, 0.52);
+          font-weight: 650;
+          pointer-events: none;
+        }
+
+        .leaflet-tooltip.recruiting-map-province-label::before,
+        .leaflet-tooltip.recruiting-map-region-label::before {
+          opacity: 0.18;
+        }
+
         .recruiting-contact-layout {
           display: grid;
           grid-template-columns: minmax(290px, 38%) minmax(0, 1fr);
@@ -11198,6 +11321,7 @@ export default function Recruiting({
                   onChange={(e) => {
                     setMapReturnView(null);
                     setFocusedCandidateMap(null);
+                    setFocusedMapAgentId(null);
                     setMapMode(e.target.value as "italy" | "region" | "macroarea");
                   }}
                   style={inputStyle}
@@ -11230,6 +11354,127 @@ export default function Recruiting({
                   </select>
                 </div>
               )}
+
+              <div style={{ position: "relative" }}>
+                <label style={labelStyle}>DM · MULTISELEZIONE</label>
+                <details
+                  style={{
+                    position: "relative",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 9,
+                    background: "white",
+                  }}
+                >
+                  <summary
+                    style={{
+                      minHeight: 40,
+                      boxSizing: "border-box",
+                      padding: "9px 34px 9px 11px",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      fontWeight: 800,
+                      listStylePosition: "inside",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {mapDmFilters.length
+                      ? mapDmFilters.join(", ")
+                      : "TUTTI I DM"}
+                  </summary>
+                  <div
+                    style={{
+                      position: "absolute",
+                      zIndex: 1400,
+                      top: "calc(100% + 5px)",
+                      left: 0,
+                      minWidth: "100%",
+                      width: "max-content",
+                      maxWidth: "min(360px,90vw)",
+                      maxHeight: 260,
+                      overflowY: "auto",
+                      padding: 8,
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 10,
+                      background: "white",
+                      boxShadow: "0 12px 30px rgba(15,23,42,.18)",
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        padding: "7px 8px",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        fontWeight: 900,
+                        background:
+                          mapDmFilters.length === 0 ? "#f1f5f9" : "white",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={mapDmFilters.length === 0}
+                        onChange={() => {
+                          setFocusedMapAgentId(null);
+                          setMapDmFilters([]);
+                        }}
+                      />
+                      TUTTI I DM
+                    </label>
+
+                    {mapDmOptions.map((dm) => (
+                      <label
+                        key={dm}
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "center",
+                          padding: "7px 8px",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          background: mapDmFilters.includes(dm)
+                            ? "#fff7ed"
+                            : "white",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={mapDmFilters.includes(dm)}
+                          onChange={(event) => {
+                            setFocusedMapAgentId(null);
+                            setMapDmFilters((current) => {
+                              if (event.target.checked) {
+                                return current.includes(dm)
+                                  ? current
+                                  : [...current, dm];
+                              }
+                              return current.filter(
+                                (item) => item !== dm
+                              );
+                            });
+                          }}
+                        />
+                        {dm.toLocaleUpperCase("it")}
+                      </label>
+                    ))}
+
+                    {!mapDmOptions.length && (
+                      <div
+                        style={{
+                          padding: "8px",
+                          color: "#64748b",
+                          fontSize: 12,
+                        }}
+                      >
+                        Nessun DM di riferimento presente.
+                      </div>
+                    )}
+                  </div>
+                </details>
+              </div>
 
               {mapView === "candidates" && (
                 <>
@@ -11515,11 +11760,36 @@ export default function Recruiting({
                 {visibleMapAgents.map((agent) => (
                   <div
                     key={agent.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => focusMapAgent(agent)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        focusMapAgent(agent);
+                      }
+                    }}
+                    title="Vai a questo agente sulla mappa"
                     style={{
-                      border: "1px solid #fed7aa",
-                      background: "#fff7ed",
+                      border:
+                        focusedMapAgentId === agent.id
+                          ? "3px solid #f97316"
+                          : "1px solid #fed7aa",
+                      background:
+                        focusedMapAgentId === agent.id
+                          ? "#ffedd5"
+                          : "#fff7ed",
                       borderRadius: 9,
-                      padding: 10,
+                      padding:
+                        focusedMapAgentId === agent.id ? 8 : 10,
+                      cursor: "pointer",
+                      boxShadow:
+                        focusedMapAgentId === agent.id
+                          ? "0 0 0 3px rgba(249,115,22,.12)"
+                          : "none",
                     }}
                   >
                     <strong>
@@ -11618,11 +11888,32 @@ export default function Recruiting({
                     {visibleMapAgents.map((agent) => (
                       <div
                         key={agent.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => focusMapAgent(agent)}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === "Enter" ||
+                            event.key === " "
+                          ) {
+                            event.preventDefault();
+                            focusMapAgent(agent);
+                          }
+                        }}
+                        title="Vai a questo agente sulla mappa"
                         style={{
-                          border: "1px solid #fed7aa",
-                          background: "#fff7ed",
+                          border:
+                            focusedMapAgentId === agent.id
+                              ? "3px solid #f97316"
+                              : "1px solid #fed7aa",
+                          background:
+                            focusedMapAgentId === agent.id
+                              ? "#ffedd5"
+                              : "#fff7ed",
                           borderRadius: 9,
-                          padding: 10,
+                          padding:
+                            focusedMapAgentId === agent.id ? 8 : 10,
+                          cursor: "pointer",
                         }}
                       >
                         <strong>
