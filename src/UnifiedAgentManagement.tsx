@@ -44,6 +44,12 @@ type RecruitingAgent = {
   longitude: number | null;
 };
 
+type Macroarea = {
+  id: string;
+  name: string;
+  regions: string[];
+};
+
 type EditDraft = {
   username: string;
   password: string;
@@ -196,15 +202,18 @@ export default function UnifiedAgentManagement({
   adminProfile,
   onOpenEmailMatches,
   onOpenZones,
+  onOpenAdminManagement,
 }: {
   adminProfile: AdminProfile | null;
   onOpenEmailMatches: () => void;
   onOpenZones: () => void;
+  onOpenAdminManagement: () => void;
 }) {
   const [loginAgents, setLoginAgents] = useState<SafeAgentRecord[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
   const [recruitingAgents, setRecruitingAgents] = useState<RecruitingAgent[]>([]);
+  const [macroareas, setMacroareas] = useState<Macroarea[]>([]);
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -225,24 +234,54 @@ export default function UnifiedAgentManagement({
       const context = await getRecruitingContext();
       setCtx(context);
 
-      const [loginRows, emailRows, recruitingResult, adminRows] =
-        await Promise.all([
-          adminAgentList("ALL"),
-          loadEmailRecipients(),
-          context.client
-            .from("recruiting_active_agents")
-            .select(
-              "id,first_name,last_name,phone,zone,region,dm_reference,dm1,dm2,latitude,longitude"
-            )
-            .order("last_name", { ascending: true })
-            .order("first_name", { ascending: true }),
-          adminProfile?.role === "super_admin"
-            ? adminListUsers()
-            : Promise.resolve([]),
-        ]);
+      const [
+        loginRows,
+        emailRows,
+        recruitingResult,
+        adminRows,
+        macroResult,
+        macroRegionsResult,
+      ] = await Promise.all([
+        adminAgentList("ALL"),
+        loadEmailRecipients(),
+        context.client
+          .from("recruiting_active_agents")
+          .select(
+            "id,first_name,last_name,phone,zone,region,dm_reference,dm1,dm2,latitude,longitude"
+          )
+          .order("last_name", { ascending: true })
+          .order("first_name", { ascending: true }),
+        adminProfile?.role === "super_admin"
+          ? adminListUsers()
+          : Promise.resolve([]),
+        context.client
+          .from("recruiting_macroareas")
+          .select("id,name")
+          .order("name", { ascending: true }),
+        context.client
+          .from("recruiting_macroarea_regions")
+          .select("macroarea_id,region"),
+      ]);
 
       if (recruitingResult.error) throw recruitingResult.error;
+      if (macroResult.error) throw macroResult.error;
+      if (macroRegionsResult.error) throw macroRegionsResult.error;
 
+      const macroRegionMap = new Map<string, string[]>();
+      (macroRegionsResult.data || []).forEach((row: any) => {
+        const macroId = String(row.macroarea_id);
+        const list = macroRegionMap.get(macroId) || [];
+        list.push(String(row.region || ""));
+        macroRegionMap.set(macroId, list);
+      });
+
+      setMacroareas(
+        (macroResult.data || []).map((row: any) => ({
+          id: String(row.id),
+          name: String(row.name || ""),
+          regions: macroRegionMap.get(String(row.id)) || [],
+        }))
+      );
       setLoginAgents(loginRows || []);
       setRecipients(emailRows || []);
       setAdmins(adminRows || []);
@@ -309,6 +348,36 @@ export default function UnifiedAgentManagement({
     });
     return map;
   }, [recruitingAgents]);
+
+  const dmSuggestions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            ...recruitingAgents.map((item) => item.dm_reference),
+            ...recipients.map((item) => item.dm),
+          ]
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) =>
+        a.localeCompare(b, "it", { sensitivity: "base" })
+      ),
+    [recruitingAgents, recipients]
+  );
+
+  const macroareaByRegion = useMemo(() => {
+    const map = new Map<string, string>();
+    macroareas.forEach((macro) => {
+      macro.regions.forEach((region) => {
+        const normalized = normalizeItalianRegion(region);
+        if (normalized && !map.has(normalized)) {
+          map.set(normalized, macro.name);
+        }
+      });
+    });
+    return map;
+  }, [macroareas]);
 
   const rows = useMemo(
     () =>
