@@ -10813,6 +10813,41 @@ function ReportAdmin({
               const isOpen =
                 expandedReportAgentId === group.agentId;
 
+              const agentSummaryReports = summaryReports.filter(
+                (report) =>
+                  Number(report.agent_id) === group.agentId
+              );
+
+              const agentSummaryTotals =
+                agentSummaryReports.reduce(
+                  (acc, report) => {
+                    acc.contracts_energia += Number(
+                      report.contracts_energia || 0
+                    );
+                    acc.consumi_energia += Number(
+                      report.consumi_energia || 0
+                    );
+                    acc.contracts_gas += Number(
+                      report.contracts_gas || 0
+                    );
+                    acc.consumi_gas += Number(
+                      report.consumi_gas || 0
+                    );
+                    return acc;
+                  },
+                  {
+                    contracts_energia: 0,
+                    consumi_energia: 0,
+                    contracts_gas: 0,
+                    consumi_gas: 0,
+                  }
+                );
+
+              const agentSummaryLabel =
+                mode === "CURRENT"
+                  ? "RIEPILOGO PRODUZIONE IN CORSO"
+                  : "RIEPILOGO PERIODO SCELTO";
+
               return (
                 <div
                   key={group.agentId}
@@ -10976,6 +11011,123 @@ function ReportAdmin({
                             </tr>
                           </thead>
                           <tbody>
+                            <tr
+                              style={{
+                                background: "#f8fafc",
+                                fontWeight: 900,
+                                borderBottom:
+                                  "2px solid #cbd5e1",
+                              }}
+                            >
+                              <td
+                                data-label="Data"
+                                className="ge-date-cell"
+                                style={{
+                                  textAlign: "center",
+                                  color: "#0f2d69",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 900,
+                                    lineHeight: 1.15,
+                                  }}
+                                >
+                                  {agentSummaryLabel}
+                                </div>
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    fontSize: 10,
+                                    color: "#64748b",
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  {summaryPeriodLabel}
+                                </div>
+                              </td>
+
+                              <td
+                                data-label="Contratti energia"
+                                className="ge-number-cell"
+                                style={{
+                                  textAlign: "center",
+                                  background: "#ffedd5",
+                                  color: "#9a3412",
+                                  fontWeight: 900,
+                                }}
+                              >
+                                {agentSummaryTotals.contracts_energia}
+                              </td>
+
+                              <td
+                                data-label="Consumi energia"
+                                className="ge-number-cell"
+                                style={{
+                                  textAlign: "center",
+                                  background: "#ffedd5",
+                                  color: "#9a3412",
+                                  fontWeight: 900,
+                                }}
+                              >
+                                {numFormat(
+                                  agentSummaryTotals.consumi_energia,
+                                  2
+                                )}
+                              </td>
+
+                              <td
+                                data-label="Contratti gas"
+                                className="ge-number-cell"
+                                style={{
+                                  textAlign: "center",
+                                  background: "#dbeafe",
+                                  color: "#1d4ed8",
+                                  fontWeight: 900,
+                                }}
+                              >
+                                {agentSummaryTotals.contracts_gas}
+                              </td>
+
+                              <td
+                                data-label="Consumi gas"
+                                className="ge-number-cell"
+                                style={{
+                                  textAlign: "center",
+                                  background: "#dbeafe",
+                                  color: "#1d4ed8",
+                                  fontWeight: 900,
+                                }}
+                              >
+                                {numFormat(
+                                  agentSummaryTotals.consumi_gas,
+                                  2
+                                )}
+                              </td>
+
+                              <td
+                                data-label="Note"
+                                className="ge-note-cell"
+                                style={{
+                                  textAlign: "center",
+                                  color: "#64748b",
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                TOTALE
+                              </td>
+
+                              <td
+                                data-label="Azioni"
+                                className="ge-action-cell"
+                                style={{ textAlign: "center" }}
+                              >
+                                —
+                              </td>
+                            </tr>
+
                             {group.reports.map((r, i) => (
                               <tr key={r.id || i}>
                                 <td
