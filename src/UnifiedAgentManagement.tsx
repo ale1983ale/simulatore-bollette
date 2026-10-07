@@ -250,40 +250,26 @@ export default function UnifiedAgentManagement({
   const [editDmCustomOpen, setEditDmCustomOpen] =
     useState(false);
 
-  const archivedDiscrepancyStorageKey =
-    `uam_archived_discrepancies:${adminProfile?.id || "default"}`;
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(
-        archivedDiscrepancyStorageKey
-      );
-      const parsed = raw ? JSON.parse(raw) : [];
-      setArchivedDiscrepancyKeys(
-        new Set(
-          Array.isArray(parsed)
-            ? parsed.map((value) => String(value))
-            : []
-        )
-      );
-    } catch {
-      setArchivedDiscrepancyKeys(new Set());
-    }
-    setArchivedAlertsOpen(false);
-  }, [archivedDiscrepancyStorageKey]);
-
-  const persistArchivedDiscrepancies = (
-    next: Set<string>
+  const loadArchivedDiscrepancies = async (
+    context?: RecruitingContext
   ) => {
-    setArchivedDiscrepancyKeys(next);
-    try {
-      localStorage.setItem(
-        archivedDiscrepancyStorageKey,
-        JSON.stringify(Array.from(next))
-      );
-    } catch {
-      // L'archivio resta comunque valido nella sessione corrente.
-    }
+    const active =
+      context || ctx || (await getRecruitingContext());
+
+    const { data, error } = await active.client
+      .from("recruiting_agent_discrepancy_archives")
+      .select("alert_key")
+      .eq("owner_key", active.ownerKey);
+
+    if (error) throw error;
+
+    setArchivedDiscrepancyKeys(
+      new Set(
+        (data || [])
+          .map((row: any) => String(row.alert_key || ""))
+          .filter(Boolean)
+      )
+    );
   };
 
   const loadAll = async () => {
@@ -301,6 +287,7 @@ export default function UnifiedAgentManagement({
         adminRows,
         macroResult,
         macroRegionsResult,
+        archivedResult,
       ] = await Promise.all([
         adminAgentList("ALL"),
         loadEmailRecipients(),
@@ -321,11 +308,16 @@ export default function UnifiedAgentManagement({
         context.client
           .from("recruiting_macroarea_regions")
           .select("macroarea_id,region"),
+        context.client
+          .from("recruiting_agent_discrepancy_archives")
+          .select("alert_key")
+          .eq("owner_key", context.ownerKey),
       ]);
 
       if (recruitingResult.error) throw recruitingResult.error;
       if (macroResult.error) throw macroResult.error;
       if (macroRegionsResult.error) throw macroRegionsResult.error;
+      if (archivedResult.error) throw archivedResult.error;
 
       const macroRegionMap = new Map<string, string[]>();
       (macroRegionsResult.data || []).forEach((row: any) => {
@@ -345,6 +337,13 @@ export default function UnifiedAgentManagement({
       setLoginAgents(loginRows || []);
       setRecipients(emailRows || []);
       setAdmins(adminRows || []);
+      setArchivedDiscrepancyKeys(
+        new Set(
+          (archivedResult.data || [])
+            .map((row: any) => String(row.alert_key || ""))
+            .filter(Boolean)
+        )
+      );
       setRecruitingAgents(
         (recruitingResult.data || []).map((row: any) => ({
           id: String(row.id),
@@ -380,6 +379,45 @@ export default function UnifiedAgentManagement({
   useEffect(() => {
     void loadAll();
   }, [adminProfile?.id, adminProfile?.role]);
+
+  useEffect(() => {
+    if (!adminProfile?.id) return;
+
+    const refreshArchives = () => {
+      void loadArchivedDiscrepancies().catch((error) => {
+        console.warn(
+          "ARCHIVED AGENT ALERTS SYNC ERROR:",
+          error
+        );
+      });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshArchives();
+      }
+    };
+
+    window.addEventListener("focus", refreshArchives);
+    document.addEventListener(
+      "visibilitychange",
+      onVisibility
+    );
+
+    const timer = window.setInterval(
+      refreshArchives,
+      30000
+    );
+
+    return () => {
+      window.removeEventListener("focus", refreshArchives);
+      document.removeEventListener(
+        "visibilitychange",
+        onVisibility
+      );
+      window.clearInterval(timer);
+    };
+  }, [adminProfile?.id, ctx]);
 
   const applyCreatePrefill = (prefill: {
     source?: CreateSource;
