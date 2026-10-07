@@ -23,6 +23,7 @@ import RecruitingManagement from "./RecruitingManagement";
 import Provvigioni, { type ProvvigioniPrefill } from "./Provvigioni";
 import Personale from "./Personale";
 import DriveArchive from "./DriveArchive";
+import ReportNotificationPanel from "./ReportNotificationPanel";
 import { getRecruitingContext } from "./recruitingClient";
 import {
   INITIAL_AUTO_DISP_CP_ROWS,
@@ -10052,6 +10053,8 @@ function ReportAdmin({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<"ALL" | "MINE" | "OTHERS">("ALL");
+  const [reportAdminView, setReportAdminView] =
+    useState<"REPORT" | "NOTIFY">("REPORT");
 
   const loadAgents = async () => {
     try {
@@ -10167,6 +10170,88 @@ function ReportAdmin({
       : `ID ${agentId}`;
   };
 
+  const reportAdminTabs = (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        padding: 6,
+        borderRadius: 12,
+        background: "#e2e8f0",
+        width: "fit-content",
+        maxWidth: "100%",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setReportAdminView("REPORT")}
+        style={{
+          border: 0,
+          borderRadius: 9,
+          padding: "9px 13px",
+          fontWeight: 900,
+          cursor: "pointer",
+          background:
+            reportAdminView === "REPORT"
+              ? "#0f172a"
+              : "transparent",
+          color:
+            reportAdminView === "REPORT"
+              ? "white"
+              : "#0f172a",
+        }}
+      >
+        REPORT ADMIN
+      </button>
+      <button
+        type="button"
+        onClick={() => setReportAdminView("NOTIFY")}
+        style={{
+          border: 0,
+          borderRadius: 9,
+          padding: "9px 13px",
+          fontWeight: 900,
+          cursor: "pointer",
+          background:
+            reportAdminView === "NOTIFY"
+              ? "#16a34a"
+              : "transparent",
+          color:
+            reportAdminView === "NOTIFY"
+              ? "white"
+              : "#0f172a",
+        }}
+      >
+        🔔 INVIO NOTIFICA REPORT
+      </button>
+    </div>
+  );
+
+  if (reportAdminView === "NOTIFY") {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: 16,
+          }}
+        >
+          {reportAdminTabs}
+        </div>
+        <ReportNotificationPanel />
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div
@@ -10177,7 +10262,9 @@ function ReportAdmin({
           padding: 16,
         }}
       >
-        <h2 style={{ marginTop: 0 }}>Report Admin</h2>
+        {reportAdminTabs}
+
+        <h2 style={{ marginTop: 16 }}>Report Admin</h2>
 
         {adminProfile?.role === "super_admin" && (
           <div style={{ marginBottom: 12 }}>
