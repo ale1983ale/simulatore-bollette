@@ -64,10 +64,13 @@ type EditDraft = {
   showOnMap: boolean;
 };
 
+type CreateSource = "login" | "email" | "map";
+
 type CreateDraft = EditDraft & {
   nome: string;
   cognome: string;
   emailAttachment: string;
+  insertLogin: boolean;
   insertEmailMatching: boolean;
   insertActiveAgent: boolean;
 };
@@ -86,6 +89,7 @@ const EMPTY_CREATE_DRAFT: CreateDraft = {
   dm: "",
   showOnMap: false,
   emailAttachment: "",
+  insertLogin: true,
   insertEmailMatching: false,
   insertActiveAgent: false,
 };
@@ -231,6 +235,8 @@ export default function UnifiedAgentManagement({
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createSource, setCreateSource] =
+    useState<CreateSource>("login");
   const [createDraft, setCreateDraft] = useState<CreateDraft>({
     ...EMPTY_CREATE_DRAFT,
   });
@@ -349,31 +355,49 @@ export default function UnifiedAgentManagement({
 
     try {
       const prefill = JSON.parse(raw) as {
+        source?: CreateSource;
         fullName?: string;
+        firstName?: string;
+        lastName?: string;
         phone?: string;
         email?: string;
+        emailAttachment?: string;
+        dm?: string;
         zone?: string;
         region?: string;
         provinceCode?: string;
+        showOnMap?: boolean;
+        reportNotify?: boolean;
       };
 
-      const fullName = String(prefill.fullName || "")
+      const rawFullName = String(
+        prefill.fullName ||
+          `${prefill.firstName || ""} ${prefill.lastName || ""}`
+      )
         .trim()
         .replace(/\s+/g, " ")
         .toLocaleUpperCase("it");
-      const parts = fullName.split(" ").filter(Boolean);
+      const parts = rawFullName.split(" ").filter(Boolean);
       const nome = parts.shift() || "";
       const cognome = parts.join(" ");
+      const source: CreateSource =
+        prefill.source === "email" || prefill.source === "map"
+          ? prefill.source
+          : "login";
 
       setExpandedId(null);
       setDraft(null);
       setCreateOpen(true);
+      setCreateSource(source);
       setCreateDmCustomOpen(false);
       setCreateDraft({
         ...EMPTY_CREATE_DRAFT,
         nome,
         cognome,
         email: String(prefill.email || "").trim(),
+        emailAttachment: String(
+          prefill.emailAttachment || ""
+        ).trim(),
         phone: String(prefill.phone || "").trim(),
         zone: String(
           prefill.zone ||
@@ -382,14 +406,22 @@ export default function UnifiedAgentManagement({
         )
           .trim()
           .toLocaleUpperCase("it"),
-        insertEmailMatching: Boolean(
-          String(prefill.email || "").trim()
-        ),
-        insertActiveAgent: Boolean(
-          String(prefill.phone || "").trim() ||
-            String(prefill.zone || "").trim() ||
-            String(prefill.region || "").trim()
-        ),
+        dm: String(prefill.dm || "")
+          .trim()
+          .toLocaleUpperCase("it"),
+        reportNotify: prefill.reportNotify === true,
+        showOnMap: prefill.showOnMap === true,
+        insertLogin: source === "login",
+        insertEmailMatching:
+          source === "email" ||
+          Boolean(String(prefill.email || "").trim()),
+        insertActiveAgent:
+          source === "map" ||
+          Boolean(
+            String(prefill.phone || "").trim() ||
+              String(prefill.zone || "").trim() ||
+              String(prefill.region || "").trim()
+          ),
         ownerAdminId: adminProfile?.id || "",
       });
       setNotice(
@@ -1538,6 +1570,7 @@ export default function UnifiedAgentManagement({
                   if (!current) {
                     setExpandedId(null);
                     setDraft(null);
+                    setCreateSource("login");
                     setCreateDmCustomOpen(false);
                     setCreateDraft({
                       ...EMPTY_CREATE_DRAFT,
