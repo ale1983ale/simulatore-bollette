@@ -14416,7 +14416,6 @@ const renderAdminContent = () => {
         <div style={{ width: "100%", minWidth: 0 }}>
           <UnifiedAgentManagement
             adminProfile={adminProfile}
-            onOpenLoginSettings={() => setTab("agents")}
             onOpenEmailMatches={openOutlookEmailMatches}
             onOpenZones={() => setTab("recruitingManagement")}
           />
