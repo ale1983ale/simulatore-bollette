@@ -355,6 +355,9 @@ export default function UnifiedAgentManagement({
     provinceCode?: string;
     showOnMap?: boolean;
     reportNotify?: boolean;
+    insertLogin?: boolean;
+    insertEmailMatching?: boolean;
+    insertActiveAgent?: boolean;
   }) => {
     const rawFullName = String(
       prefill.fullName ||
@@ -398,17 +401,24 @@ export default function UnifiedAgentManagement({
         .toLocaleUpperCase("it"),
       reportNotify: prefill.reportNotify === true,
       showOnMap: prefill.showOnMap === true,
-      insertLogin: source === "login",
+      insertLogin:
+        prefill.insertLogin === undefined
+          ? source === "login"
+          : prefill.insertLogin,
       insertEmailMatching:
-        source === "email" ||
-        Boolean(String(prefill.email || "").trim()),
+        prefill.insertEmailMatching === undefined
+          ? source === "email" ||
+            Boolean(String(prefill.email || "").trim())
+          : prefill.insertEmailMatching,
       insertActiveAgent:
-        source === "map" ||
-        Boolean(
-          String(prefill.phone || "").trim() ||
-            String(prefill.zone || "").trim() ||
-            String(prefill.region || "").trim()
-        ),
+        prefill.insertActiveAgent === undefined
+          ? source === "map" ||
+            Boolean(
+              String(prefill.phone || "").trim() ||
+                String(prefill.zone || "").trim() ||
+                String(prefill.region || "").trim()
+            )
+          : prefill.insertActiveAgent,
       ownerAdminId: adminProfile?.id || "",
     });
 
@@ -612,52 +622,220 @@ export default function UnifiedAgentManagement({
     ]
   );
 
-  const unmatchedRecruitingAgents = useMemo(() => {
-    const loginNames = new Set(
-      loginAgents.map((agent) =>
-        normalizeName(`${agent.nome} ${agent.cognome}`)
-      )
-    );
-    const loginIds = new Set(
-      loginAgents
-        .map((agent) => Number(agent.id || 0))
-        .filter((id) => id > 0)
-    );
+  const branchDiscrepancies = useMemo(() => {
+    type BranchRecord = {
+      key: string;
+      fullName: string;
+      login: SafeAgentRecord | null;
+      email: EmailRecipient | null;
+      recruiting: RecruitingAgent | null;
+      missing: Array<"login" | "email" | "map">;
+    };
 
-    return recruitingAgents
-      .filter((agent) => {
-        const key = normalizeName(
-          `${agent.first_name} ${agent.last_name}`
-        );
+    const records = new Map<string, BranchRecord>();
+    const loginKeyById = new Map<number, string>();
+    const loginKeyByName = new Map<string, string>();
 
-        if (loginNames.has(key)) return false;
+    loginAgents.forEach((agent) => {
+      const id = Number(agent.id || 0);
+      const fullName = `${agent.nome || ""} ${agent.cognome || ""}`
+        .trim()
+        .toLocaleUpperCase("it");
+      const nameKey = normalizeName(fullName);
+      const key = id > 0 ? `login:${id}` : `name:${nameKey}`;
 
-        const recipient = emailByName.get(key);
-        if (
-          recipient?.agent_id &&
-          loginIds.has(Number(recipient.agent_id))
-        ) {
-          return false;
+      records.set(key, {
+        key,
+        fullName,
+        login: agent,
+        email: null,
+        recruiting: null,
+        missing: [],
+      });
+
+      if (id > 0) loginKeyById.set(id, key);
+      if (nameKey) loginKeyByName.set(nameKey, key);
+    });
+
+    recipients.forEach((recipient) => {
+      const nameKey = normalizeName(recipient.agenzia);
+      const linkedById =
+        recipient.agent_id &&
+        loginKeyById.get(Number(recipient.agent_id));
+      const linkedByName = loginKeyByName.get(nameKey);
+      const key =
+        linkedById ||
+        linkedByName ||
+        (nameKey ? `name:${nameKey}` : "");
+
+      if (!key) return;
+
+      const existing = records.get(key);
+      if (existing) {
+        existing.email = recipient;
+        if (!existing.fullName) {
+          existing.fullName = String(recipient.agenzia || "")
+            .trim()
+            .toLocaleUpperCase("it");
         }
+        return;
+      }
 
-        return true;
+      // Una riga email senza Login e senza Agente Attivo non viene
+      // considerata automaticamente un agente: può essere un semplice
+      // destinatario email.
+    });
+
+    recruitingAgents.forEach((agent) => {
+      const fullName = `${agent.first_name || ""} ${agent.last_name || ""}`
+        .trim()
+        .toLocaleUpperCase("it");
+      const nameKey = normalizeName(fullName);
+
+      let key = loginKeyByName.get(nameKey) || "";
+
+      if (!key) {
+        const recipient = emailByName.get(nameKey);
+        if (recipient?.agent_id) {
+          key =
+            loginKeyById.get(Number(recipient.agent_id)) || "";
+        }
+      }
+
+      if (!key) key = `name:${nameKey}`;
+
+      const existing = records.get(key);
+      if (existing) {
+        existing.recruiting = agent;
+        if (!existing.email) {
+          existing.email = emailByName.get(nameKey) || null;
+        }
+        if (!existing.fullName) existing.fullName = fullName;
+        return;
+      }
+
+      records.set(key, {
+        key,
+        fullName,
+        login: null,
+        email: emailByName.get(nameKey) || null,
+        recruiting: agent,
+        missing: [],
+      });
+    });
+
+    return Array.from(records.values())
+      .map((record) => {
+        const missing: Array<"login" | "email" | "map"> = [];
+        if (!record.login) missing.push("login");
+        if (!record.email) missing.push("email");
+        if (!record.recruiting) missing.push("map");
+        return { ...record, missing };
       })
+      .filter((record) => record.missing.length > 0)
       .sort((a, b) =>
-        `${a.first_name} ${a.last_name}`.localeCompare(
-          `${b.first_name} ${b.last_name}`,
-          "it",
-          { sensitivity: "base" }
-        )
+        a.fullName.localeCompare(b.fullName, "it", {
+          sensitivity: "base",
+        })
       );
-  }, [loginAgents, recruitingAgents, emailByName]);
+  }, [
+    loginAgents,
+    recipients,
+    recruitingAgents,
+    emailByName,
+  ]);
 
-  const unmatchedRecruitingCount = unmatchedRecruitingAgents.length;
+  const discrepancyByLoginId = useMemo(() => {
+    const map = new Map<number, (typeof branchDiscrepancies)[number]>();
+    branchDiscrepancies.forEach((item) => {
+      const id = Number(item.login?.id || 0);
+      if (id > 0) map.set(id, item);
+    });
+    return map;
+  }, [branchDiscrepancies]);
 
-  const openUnmatchedRecruitingAgent = (agent: RecruitingAgent) => {
-    const label = `${agent.first_name || ""} ${agent.last_name || ""}`
-      .trim()
-      .toLocaleUpperCase("it");
-    onOpenEmailMatches(label);
+  const openDiscrepancy = (
+    item: (typeof branchDiscrepancies)[number],
+    preferred?: "login" | "email" | "map"
+  ) => {
+    const target = preferred || item.missing[0];
+
+    if (item.login) {
+      const id = Number(item.login.id);
+      const row = {
+        agent: item.login,
+        fullName: item.fullName,
+        email: item.email,
+        recruiting: item.recruiting,
+      };
+
+      setSearch("");
+      setCreateOpen(false);
+      setExpandedId(id);
+      setEditDmCustomOpen(false);
+      setDraft({
+        username: item.login.username || "",
+        password: item.login.password || "",
+        ownerAdminId: item.login.owner_admin_id || "",
+        email: item.email?.email || "",
+        reportNotify: item.email?.report_notify === true,
+        provvigioniVisible:
+          item.login.provvigioni_visible === true,
+        phone: item.recruiting?.phone || "",
+        zone: item.recruiting?.zone || "",
+        dm:
+          item.recruiting?.dm_reference ||
+          item.email?.dm ||
+          "",
+        showOnMap:
+          item.recruiting?.latitude !== null &&
+          item.recruiting?.latitude !== undefined &&
+          item.recruiting?.longitude !== null &&
+          item.recruiting?.longitude !== undefined,
+      });
+
+      window.setTimeout(() => {
+        const section = document.querySelector(
+          `[data-uam-agent-section="${target}"][data-uam-agent-id="${id}"]`
+        ) as HTMLElement | null;
+
+        const rowElement = document.querySelector(
+          `[data-uam-agent-row="${id}"]`
+        ) as HTMLElement | null;
+
+        (section || rowElement)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 180);
+
+      return;
+    }
+
+    const source: CreateSource = item.email ? "email" : "map";
+
+    applyCreatePrefill({
+      source,
+      fullName: item.fullName,
+      email: item.email?.email || "",
+      emailAttachment: item.email?.allegato || "",
+      dm:
+        item.recruiting?.dm_reference ||
+        item.email?.dm ||
+        "",
+      phone: item.recruiting?.phone || "",
+      zone: item.recruiting?.zone || "",
+      region: item.recruiting?.region || "",
+      reportNotify: item.email?.report_notify === true,
+      showOnMap:
+        item.recruiting?.latitude !== null &&
+        item.recruiting?.latitude !== undefined &&
+        item.recruiting?.longitude !== null &&
+        item.recruiting?.longitude !== undefined,
+      insertLogin: true,
+      insertEmailMatching: Boolean(item.email),
+      insertActiveAgent: Boolean(item.recruiting),
+    });
   };
 
   const openRow = (row: (typeof rows)[number]) => {
@@ -1713,7 +1891,11 @@ export default function UnifiedAgentManagement({
           </button>
         </div>
 
-        <section style={{ padding: "14px 0", borderBottom: "1px solid #cbd5e1" }}>
+        <section
+          data-uam-agent-section="login"
+          data-uam-agent-id={row.agent.id}
+          style={{ padding: "14px 0", borderBottom: "1px solid #cbd5e1" }}
+        >
           <div style={{ fontWeight: 950, color: "#0f2d69", marginBottom: 10 }}>
             🔐 LOGIN
           </div>
@@ -1798,7 +1980,11 @@ export default function UnifiedAgentManagement({
           </div>
         </section>
 
-        <section style={{ padding: "14px 0", borderBottom: "1px solid #cbd5e1" }}>
+        <section
+          data-uam-agent-section="email"
+          data-uam-agent-id={row.agent.id}
+          style={{ padding: "14px 0", borderBottom: "1px solid #cbd5e1" }}
+        >
           <div style={{ fontWeight: 950, color: "#0369a1", marginBottom: 10 }}>✉️ ABBINAMENTI</div>
           <div
             className="uam-responsive-grid"
@@ -1867,7 +2053,11 @@ export default function UnifiedAgentManagement({
           </label>
         </section>
 
-        <section style={{ padding: "14px 0" }}>
+        <section
+          data-uam-agent-section="map"
+          data-uam-agent-id={row.agent.id}
+          style={{ padding: "14px 0" }}
+        >
           <div style={{ fontWeight: 950, color: "#c2410c", marginBottom: 10 }}>📍 MACROAREE / MAPPA</div>
           <div
             className="uam-responsive-grid"
@@ -2121,61 +2311,106 @@ export default function UnifiedAgentManagement({
           </button>
         </div>
 
-        {unmatchedRecruitingCount > 0 && (
+        {branchDiscrepancies.length > 0 && (
           <div
             style={{
               marginTop: 10,
-              padding: "10px 12px",
-              borderRadius: 9,
+              padding: "11px 12px",
+              borderRadius: 10,
               background: "#fff7ed",
-              border: "1px solid #fed7aa",
+              border: "2px solid #fb923c",
               color: "#9a3412",
               fontSize: 12,
               fontWeight: 800,
             }}
           >
-            <div>
-              {unmatchedRecruitingCount} agenti presenti in Gestione Zone
-              non hanno ancora una corrispondenza esatta con un account Login.
+            <div style={{ fontSize: 13, fontWeight: 950 }}>
+              ⚠️ {branchDiscrepancies.length} AGENTI NON SONO ALLINEATI IN TUTTI E 3 I RAMI
+            </div>
+            <div style={{ marginTop: 4, color: "#7c2d12" }}>
+              LOGIN · ABBINAMENTO EMAIL · MAPPE / AGENTI ATTIVI
             </div>
 
             <div
               style={{
                 display: "flex",
-                flexWrap: "wrap",
+                flexDirection: "column",
                 gap: 7,
-                marginTop: 9,
+                marginTop: 10,
               }}
             >
-              {unmatchedRecruitingAgents.map((agent) => {
-                const label = `${agent.first_name || ""} ${agent.last_name || ""}`
-                  .trim()
-                  .toLocaleUpperCase("it");
-
-                return (
+              {branchDiscrepancies.map((item) => (
+                <div
+                  key={item.key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    flexWrap: "wrap",
+                    background: "white",
+                    border: "1px solid #fed7aa",
+                    borderRadius: 9,
+                    padding: "7px 8px",
+                  }}
+                >
                   <button
-                    key={agent.id}
                     type="button"
-                    onClick={() => openUnmatchedRecruitingAgent(agent)}
+                    onClick={() => openDiscrepancy(item)}
                     style={{
                       ...buttonStyle,
-                      padding: "6px 9px",
-                      background: "white",
+                      padding: "5px 8px",
+                      background: "#fff7ed",
                       color: "#9a3412",
-                      border: "1px solid #fdba74",
                       textDecoration: "underline",
                     }}
-                    title="Apri il nominativo nel Controllo Abbinamenti e imposta il Login di riferimento"
+                    title="Apri direttamente la prima scheda mancante"
                   >
-                    {label || "AGENTE SENZA NOME"} →
+                    {item.fullName || "AGENTE SENZA NOME"} →
                   </button>
-                );
-              })}
+
+                  {item.missing.map((branch) => (
+                    <button
+                      key={branch}
+                      type="button"
+                      onClick={() => openDiscrepancy(item, branch)}
+                      style={{
+                        ...buttonStyle,
+                        padding: "4px 7px",
+                        fontSize: 10,
+                        background:
+                          branch === "login"
+                            ? "#dcfce7"
+                            : branch === "email"
+                              ? "#e0f2fe"
+                              : "#ffedd5",
+                        color:
+                          branch === "login"
+                            ? "#166534"
+                            : branch === "email"
+                              ? "#075985"
+                              : "#9a3412",
+                        border:
+                          branch === "login"
+                            ? "1px solid #86efac"
+                            : branch === "email"
+                              ? "1px solid #7dd3fc"
+                              : "1px solid #fdba74",
+                      }}
+                    >
+                      MANCA{" "}
+                      {branch === "login"
+                        ? "LOGIN"
+                        : branch === "email"
+                          ? "ABBINAMENTO EMAIL"
+                          : "MAPPE / AGENTI ATTIVI"}
+                    </button>
+                  ))}
+                </div>
+              ))}
             </div>
 
             <div style={{ marginTop: 8, fontWeight: 700 }}>
-              Clicca un nome per aprire direttamente il nominativo nel
-              CONTROLLO ABBINAMENTI e impostare il LOGIN DI RIFERIMENTO.
+              Clicca il nome oppure direttamente il ramo mancante per aprire la scheda da compilare.
             </div>
           </div>
         )}
@@ -2480,14 +2715,25 @@ export default function UnifiedAgentManagement({
                   row.recruiting?.dm_reference ||
                   row.email?.dm ||
                   "";
+                const discrepancy =
+                  discrepancyByLoginId.get(id) || null;
 
                 return (
                   <React.Fragment key={id}>
                     <tr
+                      data-uam-agent-row={id}
                       onClick={() => openRow(row)}
                       style={{
-                        background: isOpen ? "#f8fbff" : "white",
+                        background: isOpen
+                          ? "#f8fbff"
+                          : discrepancy
+                            ? "#fff7ed"
+                            : "white",
                         cursor: "pointer",
+                        outline: discrepancy
+                          ? "2px solid #fdba74"
+                          : "none",
+                        outlineOffset: "-2px",
                       }}
                       title="Clicca per aprire tutte le impostazioni dell'agente"
                     >
@@ -2501,6 +2747,37 @@ export default function UnifiedAgentManagement({
                         }}
                       >
                         {row.fullName.toUpperCase()}
+                        {discrepancy && (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              display: "flex",
+                              gap: 4,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {discrepancy.missing.map((branch) => (
+                              <span
+                                key={branch}
+                                style={{
+                                  fontSize: 9,
+                                  padding: "2px 4px",
+                                  borderRadius: 5,
+                                  background: "#ffedd5",
+                                  color: "#9a3412",
+                                  fontWeight: 950,
+                                }}
+                              >
+                                MANCA{" "}
+                                {branch === "login"
+                                  ? "LOGIN"
+                                  : branch === "email"
+                                    ? "EMAIL"
+                                    : "MAPPA"}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         {row.agent.username || "-"}
@@ -2645,14 +2922,21 @@ export default function UnifiedAgentManagement({
             row.recruiting?.dm_reference ||
             row.email?.dm ||
             "";
+          const discrepancy =
+            discrepancyByLoginId.get(id) || null;
 
           return (
             <div
               key={id}
+              data-uam-agent-row={id}
               style={{
-                border: isOpen ? "3px solid #2563eb" : "1px solid #cbd5e1",
+                border: isOpen
+                  ? "3px solid #2563eb"
+                  : discrepancy
+                    ? "3px solid #fb923c"
+                    : "1px solid #cbd5e1",
                 borderRadius: 14,
-                background: "white",
+                background: discrepancy ? "#fff7ed" : "white",
                 overflow: "hidden",
                 maxWidth: "100%",
               }}
@@ -2671,9 +2955,42 @@ export default function UnifiedAgentManagement({
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                  <strong style={{ color: "#0f2d69", fontSize: 16 }}>
-                    {row.fullName.toUpperCase()}
-                  </strong>
+                  <div>
+                    <strong style={{ color: "#0f2d69", fontSize: 16 }}>
+                      {row.fullName.toUpperCase()}
+                    </strong>
+                    {discrepancy && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 4,
+                          marginTop: 4,
+                        }}
+                      >
+                        {discrepancy.missing.map((branch) => (
+                          <span
+                            key={branch}
+                            style={{
+                              fontSize: 9,
+                              padding: "2px 4px",
+                              borderRadius: 5,
+                              background: "#ffedd5",
+                              color: "#9a3412",
+                              fontWeight: 950,
+                            }}
+                          >
+                            MANCA{" "}
+                            {branch === "login"
+                              ? "LOGIN"
+                              : branch === "email"
+                                ? "EMAIL"
+                                : "MAPPA"}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <span style={{ background: isOpen ? "#dbeafe" : "#e2e8f0", borderRadius: 9, padding: "6px 9px", fontWeight: 900 }}>
                     {isOpen ? "CHIUDI" : "APRI"}
                   </span>
