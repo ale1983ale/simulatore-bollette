@@ -452,12 +452,26 @@ select optgroup {
   }
 }
 
+.ge-main-nav__label-mobile {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .ge-main-nav {
     display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px !important;
+    grid-template-columns:
+      minmax(0, 1.08fr)
+      minmax(0, .72fr)
+      minmax(0, .95fr)
+      minmax(0, .72fr)
+      minmax(0, .88fr)
+      minmax(0, .86fr)
+      minmax(0, .92fr)
+      34px
+      34px;
+    gap: 4px !important;
     align-items: stretch !important;
+    margin-bottom: 10px !important;
   }
 
   .ge-main-nav__primary,
@@ -466,37 +480,42 @@ select optgroup {
   }
 
   .ge-main-nav button {
-    width: 100%;
-    min-width: 0;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 36px !important;
+    height: 36px !important;
     margin: 0 !important;
-    padding: 10px 6px !important;
-    font-size: 12px;
-    white-space: nowrap;
+    padding: 6px 3px !important;
+    font-size: 9px !important;
+    line-height: 1 !important;
+    border-radius: 8px !important;
+    white-space: nowrap !important;
   }
 
-  .ge-main-nav__actions button:last-child {
-    font-size: 20px !important;
-    line-height: 1 !important;
+  .ge-main-nav__label-desktop {
+    display: none !important;
+  }
+
+  .ge-main-nav__label-mobile {
+    display: inline !important;
   }
 
   .ge-main-nav__reload,
   .ge-main-nav__settings {
-    grid-column: 4 !important;
-    grid-row: 2 !important;
-    width: calc(50% - 2px) !important;
-    min-width: 0 !important;
-    height: 38px !important;
+    grid-column: auto !important;
+    grid-row: auto !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 36px !important;
     padding: 0 !important;
+    justify-self: stretch !important;
     font-size: 17px !important;
     line-height: 1 !important;
   }
 
-  .ge-main-nav__reload {
-    justify-self: start !important;
-  }
-
-  .ge-main-nav__settings {
-    justify-self: end !important;
+  .ge-main-nav__actions button:last-child {
+    font-size: 17px !important;
+    line-height: 1 !important;
   }
 
   .ge-brand {
