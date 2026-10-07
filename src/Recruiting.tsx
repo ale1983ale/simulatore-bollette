@@ -6360,13 +6360,24 @@ export default function Recruiting({
       );
       sheetButton.onclick = () => {
         map.closePopup();
-        if (linkedCandidate) {
-          openFullContactDetails(linkedCandidate.id);
-        } else {
-          setMessage(
-            `Non trovo una scheda contatto collegata a ${agent.firstName} ${agent.lastName}.`
-          );
-        }
+
+        window.dispatchEvent(
+          new CustomEvent("open-agent-management-record", {
+            detail: {
+              recruitingAgentId: agent.id,
+              fullName: `${agent.firstName} ${agent.lastName}`
+                .trim()
+                .toLocaleUpperCase("it"),
+              phone: agent.phone || "",
+              zone: agent.zone || "",
+              region: agent.region || "",
+              dm: agent.dmReference || "",
+              showOnMap:
+                agent.latitude !== null &&
+                agent.longitude !== null,
+            },
+          })
+        );
       };
       actions.appendChild(sheetButton);
 
