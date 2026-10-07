@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  adminAgentCreate,
   adminAgentList,
   adminAgentSetProvvigioniVisibility,
   adminAgentUpdate,
@@ -53,6 +54,25 @@ type EditDraft = {
   phone: string;
   zone: string;
   dm: string;
+};
+
+type CreateDraft = EditDraft & {
+  nome: string;
+  cognome: string;
+};
+
+const EMPTY_CREATE_DRAFT: CreateDraft = {
+  nome: "",
+  cognome: "",
+  username: "",
+  password: "",
+  ownerAdminId: "",
+  email: "",
+  reportNotify: false,
+  provvigioniVisible: false,
+  phone: "",
+  zone: "",
+  dm: "",
 };
 
 const cardStyle: React.CSSProperties = {
@@ -174,12 +194,10 @@ async function saveEmailRecipients(recipients: EmailRecipient[]) {
 
 export default function UnifiedAgentManagement({
   adminProfile,
-  onOpenLoginSettings,
   onOpenEmailMatches,
   onOpenZones,
 }: {
   adminProfile: AdminProfile | null;
-  onOpenLoginSettings: () => void;
   onOpenEmailMatches: () => void;
   onOpenZones: () => void;
 }) {
@@ -194,6 +212,10 @@ export default function UnifiedAgentManagement({
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<CreateDraft>({
+    ...EMPTY_CREATE_DRAFT,
+  });
 
   const loadAll = async () => {
     setLoading(true);
@@ -520,6 +542,189 @@ export default function UnifiedAgentManagement({
     }
   };
 
+  const createAgent = async () => {
+    const nome = createDraft.nome.trim();
+    const cognome = createDraft.cognome.trim();
+    const username = createDraft.username.trim();
+    const password = createDraft.password.trim();
+    const email = createDraft.email.trim();
+    const canonicalName = `${nome} ${cognome}`.trim();
+
+    if (!nome || !cognome || !username || !password) {
+      setNotice("Per creare un agente servono nome, cognome, username e password.");
+      return;
+    }
+
+    if (createDraft.reportNotify && !email) {
+      setNotice("Per attivare REPORT devi inserire anche l'email dell'agente.");
+      return;
+    }
+
+    const ownerAdminId =
+      adminProfile?.role === "super_admin"
+        ? createDraft.ownerAdminId === ""
+          ? null
+          : Number(createDraft.ownerAdminId)
+        : adminProfile?.id
+          ? Number(adminProfile.id)
+          : null;
+
+    if (!ownerAdminId) {
+      setNotice("Seleziona l'admin associato all'agente.");
+      return;
+    }
+
+    setBusy(true);
+    setNotice("");
+
+    try {
+      const created = await adminAgentCreate({
+        nome,
+        cognome,
+        username,
+        password,
+        ownerAdminId,
+      });
+
+      let agentId = Number(
+        (created as any)?.id ||
+          (created as any)?.agent_id ||
+          (created as any)?.agentId ||
+          0
+      );
+
+      if (!agentId) {
+        const refreshedAgents = await adminAgentList("ALL");
+        const createdAgent = (refreshedAgents || []).find(
+          (item) =>
+            String(item.username || "").trim().toLocaleLowerCase("it") ===
+            username.toLocaleLowerCase("it")
+        );
+        agentId = Number(createdAgent?.id || 0);
+      }
+
+      if (!agentId) {
+        throw new Error(
+          "Account creato, ma non è stato possibile recuperare il suo ID."
+        );
+      }
+
+      if (
+        adminProfile?.role === "super_admin" &&
+        createDraft.provvigioniVisible
+      ) {
+        await adminAgentSetProvvigioniVisibility(agentId, true);
+      }
+
+      const nextRecipients = recipients.map((item) => ({ ...item }));
+      let recipientIndex = nextRecipients.findIndex(
+        (item) =>
+          Number(item.agent_id || 0) === agentId ||
+          normalizeName(item.agenzia) === normalizeName(canonicalName)
+      );
+
+      const previousRecipient =
+        recipientIndex >= 0 ? nextRecipients[recipientIndex] : null;
+
+      const nextRecipient: EmailRecipient = {
+        agenzia: canonicalName,
+        email,
+        allegato: previousRecipient?.allegato || "",
+        dm: createDraft.dm.trim(),
+        report_notify: createDraft.reportNotify,
+        agent_id: agentId,
+      };
+
+      if (recipientIndex >= 0) {
+        nextRecipients[recipientIndex] = nextRecipient;
+      } else if (
+        nextRecipient.email ||
+        nextRecipient.dm ||
+        nextRecipient.report_notify
+      ) {
+        nextRecipients.push(nextRecipient);
+      }
+
+      if (
+        recipientIndex >= 0 ||
+        nextRecipient.email ||
+        nextRecipient.dm ||
+        nextRecipient.report_notify
+      ) {
+        await saveEmailRecipients(nextRecipients);
+      }
+
+      if (
+        ctx &&
+        (createDraft.phone.trim() ||
+          createDraft.zone.trim() ||
+          createDraft.dm.trim())
+      ) {
+        const existingRecruiting =
+          recruitingByName.get(normalizeName(canonicalName)) || null;
+
+        let latitude = existingRecruiting?.latitude ?? null;
+        let longitude = existingRecruiting?.longitude ?? null;
+        let region = existingRecruiting?.region || "";
+
+        if (createDraft.zone.trim()) {
+          const geo = await geocodeItalianZone(createDraft.zone.trim());
+          const normalizedRegion = normalizeItalianRegion(
+            geo.region || createDraft.zone.trim()
+          );
+          latitude = geo.latitude;
+          longitude = geo.longitude;
+          if (ITALIAN_REGIONS.includes(normalizedRegion as any)) {
+            region = normalizedRegion;
+          }
+        }
+
+        const payload = {
+          owner_key: ctx.ownerKey,
+          first_name: nome,
+          last_name: cognome,
+          phone: createDraft.phone.trim(),
+          zone: createDraft.zone.trim(),
+          region,
+          dm_reference: createDraft.dm.trim(),
+          latitude,
+          longitude,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (existingRecruiting?.id) {
+          const { error } = await ctx.client
+            .from("recruiting_active_agents")
+            .update(payload)
+            .eq("id", existingRecruiting.id)
+            .eq("owner_key", ctx.ownerKey);
+          if (error) throw error;
+        } else {
+          const { error } = await ctx.client
+            .from("recruiting_active_agents")
+            .insert(payload);
+          if (error) throw error;
+        }
+      }
+
+      setCreateDraft({ ...EMPTY_CREATE_DRAFT });
+      setCreateOpen(false);
+      setNotice(
+        `${canonicalName}: agente creato con tutte le impostazioni associate.`
+      );
+      await loadAll();
+    } catch (error: any) {
+      console.error(error);
+      setNotice(
+        "Errore nella creazione dell'agente: " +
+          (error?.message || error)
+      );
+      await loadAll();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <div style={cardStyle}>Caricamento Gestione Agenti...</div>;
   }
@@ -545,18 +750,38 @@ export default function UnifiedAgentManagement({
                 fontSize: 13,
               }}
             >
-              Una riga unica per accesso, email/report, zona, DM e
-              provvigioni.
+              Clicca un agente per aprire tutte le sue impostazioni. Nuovi
+              agenti e modifiche si gestiscono interamente da questa pagina.
             </div>
           </div>
 
           <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
             <button
               type="button"
-              onClick={onOpenLoginSettings}
-              style={{ ...buttonStyle, background: "#e2e8f0" }}
+              onClick={() => {
+                setCreateOpen((current) => {
+                  const next = !current;
+                  if (!current) {
+                    setExpandedId(null);
+                    setDraft(null);
+                    setCreateDraft({
+                      ...EMPTY_CREATE_DRAFT,
+                      ownerAdminId:
+                        adminProfile?.role === "super_admin"
+                          ? adminProfile?.id || ""
+                          : adminProfile?.id || "",
+                    });
+                  }
+                  return next;
+                });
+              }}
+              style={{
+                ...buttonStyle,
+                background: createOpen ? "#dcfce7" : "#16a34a",
+                color: createOpen ? "#166534" : "white",
+              }}
             >
-              ACCESSI / NUOVO AGENTE
+              {createOpen ? "CHIUDI NUOVO AGENTE" : "+ NUOVO AGENTE"}
             </button>
             <button
               type="button"
@@ -640,6 +865,242 @@ export default function UnifiedAgentManagement({
         )}
       </div>
 
+      {createOpen && (
+        <div style={{ ...cardStyle, border: "2px solid #86efac" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 14,
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0, color: "#166534" }}>Nuovo agente</h3>
+              <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
+                Compila tutto qui: anagrafica, accesso, contatti, zona, Report e
+                Provvigioni.
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
+              gap: 10,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                NOME *
+              </div>
+              <input
+                value={createDraft.nome}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, nome: e.target.value })
+                }
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                COGNOME *
+              </div>
+              <input
+                value={createDraft.cognome}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, cognome: e.target.value })
+                }
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                USERNAME *
+              </div>
+              <input
+                value={createDraft.username}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, username: e.target.value })
+                }
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                PASSWORD *
+              </div>
+              <input
+                type="password"
+                value={createDraft.password}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, password: e.target.value })
+                }
+                style={inputStyle}
+              />
+            </div>
+
+            {adminProfile?.role === "super_admin" && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                  ADMIN ASSOCIATO *
+                </div>
+                <select
+                  value={createDraft.ownerAdminId}
+                  onChange={(e) =>
+                    setCreateDraft({
+                      ...createDraft,
+                      ownerAdminId: e.target.value
+                        ? Number(e.target.value)
+                        : "",
+                    })
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Seleziona...</option>
+                  {admins.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {String(
+                        `${item.nome || ""} ${item.cognome || ""}`
+                      ).trim() || item.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                EMAIL
+              </div>
+              <input
+                type="email"
+                value={createDraft.email}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, email: e.target.value })
+                }
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                CELLULARE
+              </div>
+              <input
+                value={createDraft.phone}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, phone: e.target.value })
+                }
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                ZONA
+              </div>
+              <input
+                value={createDraft.zone}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, zone: e.target.value })
+                }
+                placeholder="Es. Perugia"
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                DM DI RIFERIMENTO
+              </div>
+              <input
+                value={createDraft.dm}
+                onChange={(e) =>
+                  setCreateDraft({ ...createDraft, dm: e.target.value })
+                }
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 18,
+              flexWrap: "wrap",
+              alignItems: "center",
+              marginTop: 14,
+            }}
+          >
+            <label
+              style={{
+                display: "inline-flex",
+                gap: 7,
+                alignItems: "center",
+                fontWeight: 900,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={createDraft.reportNotify}
+                onChange={(e) =>
+                  setCreateDraft({
+                    ...createDraft,
+                    reportNotify: e.target.checked,
+                  })
+                }
+              />
+              REPORT ATTIVO
+            </label>
+
+            {adminProfile?.role === "super_admin" && (
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 7,
+                  alignItems: "center",
+                  fontWeight: 900,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={createDraft.provvigioniVisible}
+                  onChange={(e) =>
+                    setCreateDraft({
+                      ...createDraft,
+                      provvigioniVisible: e.target.checked,
+                    })
+                  }
+                />
+                PROVVIGIONI
+              </label>
+            )}
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void createAgent()}
+              style={{
+                ...buttonStyle,
+                marginLeft: "auto",
+                background: busy ? "#94a3b8" : "#16a34a",
+                color: "white",
+                minWidth: 190,
+              }}
+            >
+              {busy ? "SALVATAGGIO..." : "CREA E SALVA AGENTE"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <table
@@ -698,9 +1159,12 @@ export default function UnifiedAgentManagement({
                 return (
                   <React.Fragment key={id}>
                     <tr
+                      onClick={() => openRow(row)}
                       style={{
                         background: isOpen ? "#f8fbff" : "white",
+                        cursor: "pointer",
                       }}
+                      title="Clicca per aprire tutte le impostazioni dell'agente"
                     >
                       <td
                         style={{
@@ -774,7 +1238,10 @@ export default function UnifiedAgentManagement({
                       <td style={{ padding: "7px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         <button
                           type="button"
-                          onClick={() => openRow(row)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openRow(row);
+                          }}
                           style={{
                             ...buttonStyle,
                             padding: "7px 10px",
@@ -785,7 +1252,7 @@ export default function UnifiedAgentManagement({
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {isOpen ? "CHIUDI" : "MODIFICA"}
+                          {isOpen ? "CHIUDI" : "APRI"}
                         </button>
                       </td>
                     </tr>
@@ -947,20 +1414,22 @@ export default function UnifiedAgentManagement({
                               REPORT ATTIVO
                             </label>
 
-                            <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900 }}>
-                              <input
-                                type="checkbox"
-                                checked={draft.provvigioniVisible}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    provvigioniVisible:
-                                      e.target.checked,
-                                  })
-                                }
-                              />
-                              PROVVIGIONI
-                            </label>
+                            {adminProfile?.role === "super_admin" && (
+                              <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={draft.provvigioniVisible}
+                                  onChange={(e) =>
+                                    setDraft({
+                                      ...draft,
+                                      provvigioniVisible:
+                                        e.target.checked,
+                                    })
+                                  }
+                                />
+                                PROVVIGIONI
+                              </label>
+                            )}
 
                             <button
                               type="button"
