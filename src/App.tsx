@@ -9991,6 +9991,22 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
                         textAlign: "left",
                         padding: 8,
                         borderBottom: "1px solid #e2e8f0",
+                        background:
+                          h === "Contratti energia" ||
+                          h === "Consumi energia"
+                            ? "#ffedd5"
+                            : h === "Contratti gas" ||
+                                h === "Consumi gas"
+                              ? "#dbeafe"
+                              : undefined,
+                        color:
+                          h === "Contratti energia" ||
+                          h === "Consumi energia"
+                            ? "#9a3412"
+                            : h === "Contratti gas" ||
+                                h === "Consumi gas"
+                              ? "#1d4ed8"
+                              : undefined,
                       }}
                     >
                       {h}
@@ -10004,16 +10020,32 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
                     <td data-label="Data" className="ge-date-cell">
                       {formatReportDate(r.report_date)}
                     </td>
-                    <td data-label="Contratti energia" className="ge-number-cell">
+                    <td
+                      data-label="Contratti energia"
+                      className="ge-number-cell"
+                      style={{ background: "#fff7ed" }}
+                    >
                       {r.contracts_energia}
                     </td>
-                    <td data-label="Consumi energia" className="ge-number-cell">
+                    <td
+                      data-label="Consumi energia"
+                      className="ge-number-cell"
+                      style={{ background: "#fff7ed" }}
+                    >
                       {numFormat(r.consumi_energia, 2)}
                     </td>
-                    <td data-label="Contratti gas" className="ge-number-cell">
+                    <td
+                      data-label="Contratti gas"
+                      className="ge-number-cell"
+                      style={{ background: "#eff6ff" }}
+                    >
                       {r.contracts_gas}
                     </td>
-                    <td data-label="Consumi gas" className="ge-number-cell">
+                    <td
+                      data-label="Consumi gas"
+                      className="ge-number-cell"
+                      style={{ background: "#eff6ff" }}
+                    >
                       {numFormat(r.consumi_gas, 2)}
                     </td>
                     <td data-label="Note" className="ge-note-cell">
@@ -10842,6 +10874,22 @@ function ReportAdmin({
                                     padding: 8,
                                     borderBottom:
                                       "1px solid #e2e8f0",
+                                    background:
+                                      h === "Contratti energia" ||
+                                      h === "Consumi energia"
+                                        ? "#ffedd5"
+                                        : h === "Contratti gas" ||
+                                            h === "Consumi gas"
+                                          ? "#dbeafe"
+                                          : undefined,
+                                    color:
+                                      h === "Contratti energia" ||
+                                      h === "Consumi energia"
+                                        ? "#9a3412"
+                                        : h === "Contratti gas" ||
+                                            h === "Consumi gas"
+                                          ? "#1d4ed8"
+                                          : undefined,
                                   }}
                                 >
                                   {h}
@@ -10864,14 +10912,20 @@ function ReportAdmin({
                                 <td
                                   data-label="Contratti energia"
                                   className="ge-number-cell"
-                                  style={{ textAlign: "center" }}
+                                  style={{
+                                    textAlign: "center",
+                                    background: "#fff7ed",
+                                  }}
                                 >
                                   {r.contracts_energia}
                                 </td>
                                 <td
                                   data-label="Consumi energia"
                                   className="ge-number-cell"
-                                  style={{ textAlign: "center" }}
+                                  style={{
+                                    textAlign: "center",
+                                    background: "#fff7ed",
+                                  }}
                                 >
                                   {numFormat(
                                     r.consumi_energia,
@@ -10881,14 +10935,20 @@ function ReportAdmin({
                                 <td
                                   data-label="Contratti gas"
                                   className="ge-number-cell"
-                                  style={{ textAlign: "center" }}
+                                  style={{
+                                    textAlign: "center",
+                                    background: "#eff6ff",
+                                  }}
                                 >
                                   {r.contracts_gas}
                                 </td>
                                 <td
                                   data-label="Consumi gas"
                                   className="ge-number-cell"
-                                  style={{ textAlign: "center" }}
+                                  style={{
+                                    textAlign: "center",
+                                    background: "#eff6ff",
+                                  }}
                                 >
                                   {numFormat(
                                     r.consumi_gas,
