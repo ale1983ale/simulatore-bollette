@@ -418,6 +418,22 @@ export default function RecruitingManagement() {
     setAgentShowOnMap(false);
   };
 
+  const openUnifiedAgentFromMap = () => {
+    window.dispatchEvent(
+      new CustomEvent("open-unified-agent-create", {
+        detail: {
+          source: "map",
+          firstName: firstName.trim().toLocaleUpperCase("it"),
+          lastName: lastName.trim().toLocaleUpperCase("it"),
+          phone: phone.trim(),
+          zone: zone.trim().toLocaleUpperCase("it"),
+          dm: agentDm.trim().toLocaleUpperCase("it"),
+          showOnMap: agentShowOnMap,
+        },
+      })
+    );
+  };
+
   const saveAgent = async () => {
     if (!ctx) return;
     if (!firstName.trim() || !lastName.trim()) {
@@ -925,7 +941,11 @@ export default function RecruitingManagement() {
             <button
               type="button"
               disabled={busy}
-              onClick={() => void saveAgent()}
+              onClick={() =>
+                agentId
+                  ? void saveAgent()
+                  : openUnifiedAgentFromMap()
+              }
               style={{ ...buttonStyle, background: "#f97316", color: "white", opacity: busy ? 0.6 : 1 }}
             >
               {agentId ? "Salva agente" : "Aggiungi agente"}
