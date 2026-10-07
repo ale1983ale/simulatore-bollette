@@ -304,13 +304,62 @@ export default function ReportNotificationPanel({
               {eligible.length} agenti abilitati
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onOpenMatches}
-            style={{ ...button, background: "#ede9fe", color: "#5b21b6" }}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
           >
-            Gestisci flag REPORT
-          </button>
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedEmails(
+                  new Set(
+                    eligible.map((agent) =>
+                      agent.email.trim().toLowerCase()
+                    )
+                  )
+                )
+              }
+              disabled={!eligible.length}
+              style={{
+                ...button,
+                background: "#dcfce7",
+                color: "#166534",
+                opacity: eligible.length ? 1 : 0.6,
+              }}
+            >
+              SELEZIONA TUTTI
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedEmails(new Set())}
+              disabled={!selectedEmails.size}
+              style={{
+                ...button,
+                background: "#fee2e2",
+                color: "#991b1b",
+                opacity: selectedEmails.size ? 1 : 0.6,
+              }}
+            >
+              DESELEZIONA TUTTI
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenMatches}
+              style={{
+                ...button,
+                background: "#ede9fe",
+                color: "#5b21b6",
+              }}
+            >
+              Gestisci flag REPORT
+            </button>
+          </div>
         </div>
 
         <div
