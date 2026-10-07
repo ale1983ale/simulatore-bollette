@@ -20,6 +20,7 @@ import {
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
+import UnifiedAgentManagement from "./UnifiedAgentManagement";
 import Provvigioni, { type ProvvigioniPrefill } from "./Provvigioni";
 import Personale from "./Personale";
 import DriveArchive from "./DriveArchive";
@@ -12924,7 +12925,7 @@ export default function App() {
     setAdminMenuOpen(false);
 
     window.requestAnimationFrame(() => {
-      setTab("agents");
+      setTab("agentManagement");
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   };
@@ -13632,6 +13633,7 @@ useEffect(() => {
   ];
 
   const databaseAdminTabs = [
+    "agentManagement",
     "agents",
     ...pricingCostTabs,
     "recruitingManagement",
@@ -13706,9 +13708,15 @@ useEffect(() => {
       icon: "▤",
       variant: "agent-report",
     },
+    agentManagement: {
+      title: "GESTIONE AGENTI",
+      subtitle: "Unifica accessi, email, Report, provvigioni, DM e zone in una sola anagrafica.",
+      icon: "👥",
+      variant: "database",
+    },
     agents: {
-      title: "IMPOSTAZIONI LOGIN",
-      subtitle: "Gestisci utenti, accessi e configurazioni di login.",
+      title: "IMPOSTAZIONI LOGIN · AVANZATE",
+      subtitle: "Gestione avanzata degli account e creazione nuovi accessi.",
       icon: "⚙",
       variant: "database",
     },
@@ -14191,24 +14199,16 @@ const renderAdminContent = () => {
           }}
         >
           <button
-            onClick={() => setTab("agents")}
+            onClick={() => setTab("agentManagement")}
             style={{
               ...baseBtn,
               padding: "9px 14px",
-              ...(tab === "agents" ? activeBtn : {}),
+              ...(["agentManagement", "agents", "recruitingManagement"].includes(tab)
+                ? activeBtn
+                : {}),
             }}
           >
-            IMPOSTAZIONI LOGIN
-          </button>
-
-          <button
-            onClick={openOutlookEmailMatches}
-            style={{
-              ...baseBtn,
-              padding: "9px 14px",
-            }}
-          >
-            CONTROLLO ABBINAMENTO EMAIL
+            GESTIONE AGENTI
           </button>
 
           <button
@@ -14228,17 +14228,6 @@ const renderAdminContent = () => {
             }}
           >
             LISTINI E COSTI
-          </button>
-
-          <button
-            onClick={() => setTab("recruitingManagement")}
-            style={{
-              ...baseBtn,
-              padding: "9px 14px",
-              ...(tab === "recruitingManagement" ? activeBtn : {}),
-            }}
-          >
-            GESTIONE AGENTI ATTIVI / ZONE
           </button>
 
           <button
@@ -14420,6 +14409,17 @@ const renderAdminContent = () => {
       {tab === "recruitingWaiting" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <Recruiting initialSection="hr_notes" />
+        </div>
+      )}
+
+      {tab === "agentManagement" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <UnifiedAgentManagement
+            adminProfile={adminProfile}
+            onOpenLoginSettings={() => setTab("agents")}
+            onOpenEmailMatches={openOutlookEmailMatches}
+            onOpenZones={() => setTab("recruitingManagement")}
+          />
         </div>
       )}
 
