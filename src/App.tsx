@@ -8870,6 +8870,112 @@ function LoginView({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const resetToken =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get(
+          "agent-reset"
+        ) || ""
+      : "";
+  const [resetProfile, setResetProfile] = useState<{
+    id: number;
+    nome: string;
+    cognome: string;
+    username: string;
+  } | null>(null);
+  const [resetLoading, setResetLoading] = useState(
+    Boolean(resetToken)
+  );
+  const [resetError, setResetError] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetSaving, setResetSaving] = useState(false);
+
+  useEffect(() => {
+    if (!resetToken) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      setResetLoading(true);
+      setResetError("");
+
+      try {
+        const profile =
+          await getAgentPasswordResetProfile(resetToken);
+
+        if (cancelled) return;
+
+        if (!profile) {
+          setResetProfile(null);
+          setResetError(
+            "Il link per impostare la password non è valido o è scaduto."
+          );
+        } else {
+          setResetProfile(profile);
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setResetError(
+            error?.message ||
+              "Non riesco a verificare il link."
+          );
+        }
+      } finally {
+        if (!cancelled) setResetLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resetToken]);
+
+  const handlePasswordReset = async () => {
+    if (!resetToken || !resetProfile) return;
+
+    if (newPassword.length < 8) {
+      setResetError(
+        "La nuova password deve contenere almeno 8 caratteri."
+      );
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setResetError("Le due password non coincidono.");
+      return;
+    }
+
+    setResetSaving(true);
+    setResetError("");
+
+    try {
+      await completeAgentPasswordReset(
+        resetToken,
+        newPassword
+      );
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete("agent-reset");
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`
+      );
+
+      alert(
+        "Password impostata correttamente. Ora puoi accedere con il tuo username."
+      );
+      window.location.replace("/");
+    } catch (error: any) {
+      setResetError(
+        error?.message ||
+          "Errore durante l'impostazione della password."
+      );
+    } finally {
+      setResetSaving(false);
+    }
+  };
+
   const handleLogin = async () => {
     setLoading(true);
     setErrorMsg("");
@@ -8917,6 +9023,164 @@ function LoginView({
 
     setLoading(false);
   };
+
+  if (resetToken) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginTop: 40,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 460,
+            background: "white",
+            border: "1px solid #e2e8f0",
+            borderRadius: 16,
+            padding: 24,
+            boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+          }}
+        >
+          <h2 style={{ margin: 0 }}>
+            Credenziali Area Report
+          </h2>
+
+          {resetLoading ? (
+            <div style={{ color: "#475569" }}>
+              Verifica del link in corso...
+            </div>
+          ) : resetProfile ? (
+            <>
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  color: "#1e3a8a",
+                }}
+              >
+                <div style={{ fontWeight: 800 }}>
+                  {resetProfile.nome} {resetProfile.cognome}
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  Username:{" "}
+                  <strong>{resetProfile.username}</strong>
+                </div>
+              </div>
+
+              <input
+                type="password"
+                placeholder="Nuova password"
+                value={newPassword}
+                onChange={(event) =>
+                  setNewPassword(event.target.value)
+                }
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  border: "1px solid #cbd5e1",
+                  fontSize: 14,
+                }}
+              />
+
+              <input
+                type="password"
+                placeholder="Ripeti nuova password"
+                value={confirmPassword}
+                onChange={(event) =>
+                  setConfirmPassword(event.target.value)
+                }
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  border: "1px solid #cbd5e1",
+                  fontSize: 14,
+                }}
+              />
+
+              <div
+                style={{
+                  color: "#64748b",
+                  fontSize: 12,
+                }}
+              >
+                La password deve contenere almeno 8 caratteri.
+              </div>
+
+              {resetError && (
+                <div
+                  style={{
+                    color: "#b91c1c",
+                    fontSize: 13,
+                    fontWeight: 700,
+                  }}
+                >
+                  {resetError}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() =>
+                  void handlePasswordReset()
+                }
+                disabled={resetSaving}
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  border: 0,
+                  background: "#f97316",
+                  color: "white",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                {resetSaving
+                  ? "SALVATAGGIO..."
+                  : "IMPOSTA PASSWORD"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  color: "#b91c1c",
+                  fontWeight: 700,
+                }}
+              >
+                {resetError ||
+                  "Link non valido o scaduto."}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  window.location.replace("/")
+                }
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  border: 0,
+                  background: "#0f172a",
+                  color: "white",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                VAI AL LOGIN
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
