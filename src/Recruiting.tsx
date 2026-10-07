@@ -6231,8 +6231,10 @@ export default function Recruiting({
       agentLocationGroups.set(locationKey, group);
     });
 
-    const agentMarkerPositions = new Map<string, L.LatLng>();
-    const currentMapZoom = map.getZoom();
+    const agentVisualOffsets = new Map<
+      string,
+      { x: number; y: number }
+    >();
 
     agentLocationGroups.forEach((group) => {
       const sortedGroup = [...group].sort((a, b) =>
@@ -6244,87 +6246,64 @@ export default function Recruiting({
       );
 
       if (sortedGroup.length === 1) {
-        const onlyAgent = sortedGroup[0];
-        if (
-          onlyAgent.latitude !== null &&
-          onlyAgent.longitude !== null
-        ) {
-          agentMarkerPositions.set(
-            onlyAgent.id,
-            L.latLng(onlyAgent.latitude, onlyAgent.longitude)
-          );
-        }
+        agentVisualOffsets.set(sortedGroup[0].id, {
+          x: 0,
+          y: 0,
+        });
         return;
       }
 
-      const validAgents = sortedGroup.filter(
-        (agent) =>
-          agent.latitude !== null &&
-          agent.longitude !== null
-      );
-
-      if (!validAgents.length) return;
-
-      const centerLat =
-        validAgents.reduce(
-          (sum, agent) => sum + Number(agent.latitude),
-          0
-        ) / validAgents.length;
-      const centerLng =
-        validAgents.reduce(
-          (sum, agent) => sum + Number(agent.longitude),
-          0
-        ) / validAgents.length;
-
-      const centerPoint = map.project(
-        L.latLng(centerLat, centerLng),
-        currentMapZoom
-      );
-
-      validAgents.forEach((agent, index) => {
+      sortedGroup.forEach((agent, index) => {
         const ring = Math.floor(index / 8);
         const ringStart = ring * 8;
         const itemsInRing = Math.min(
           8,
-          validAgents.length - ringStart
+          sortedGroup.length - ringStart
         );
         const indexInRing = index - ringStart;
-        const radiusPx = 28 + ring * 24;
+
+        const minRadiusForSpacing =
+          (itemsInRing * 36) / (2 * Math.PI);
+        const radiusPx =
+          Math.max(22, minRadiusForSpacing) + ring * 38;
         const angle =
           -Math.PI / 2 +
           (Math.PI * 2 * indexInRing) / itemsInRing;
 
-        const markerPoint = L.point(
-          centerPoint.x + Math.cos(angle) * radiusPx,
-          centerPoint.y + Math.sin(angle) * radiusPx
-        );
-
-        agentMarkerPositions.set(
-          agent.id,
-          map.unproject(markerPoint, currentMapZoom)
-        );
+        agentVisualOffsets.set(agent.id, {
+          x: Math.round(Math.cos(angle) * radiusPx),
+          y: Math.round(Math.sin(angle) * radiusPx),
+        });
       });
     });
 
     mapAgentsToRender.forEach((agent) => {
       if (agent.latitude === null || agent.longitude === null) return;
       const initials = `${agent.firstName.charAt(0)}${agent.lastName.charAt(0)}`.toUpperCase() || "A";
+      const visualOffset =
+        agentVisualOffsets.get(agent.id) || { x: 0, y: 0 };
+
       const icon = L.divIcon({
         className: "",
-        html: `<div style="width:32px;height:32px;border-radius:999px;background:#f97316;color:white;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;">${escapeHtml(initials)}</div>`,
+        html: `<div style="width:32px;height:32px;border-radius:999px;background:#f97316;color:white;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;transform:translate(${visualOffset.x}px,${visualOffset.y}px);transform-origin:center;position:relative;z-index:2;pointer-events:auto;">${escapeHtml(initials)}</div>`,
         iconSize: [32, 32],
         iconAnchor: [16, 16],
       });
 
-      const markerPosition =
-        agentMarkerPositions.get(agent.id) ||
-        L.latLng(agent.latitude, agent.longitude);
-
-      const marker = L.marker(markerPosition, { icon });
-      marker.bindTooltip(escapeHtml(`${agent.firstName} ${agent.lastName}`), {
-        direction: "top",
-        offset: [0, -14],
-      });
+      const marker = L.marker(
+        [agent.latitude, agent.longitude],
+        { icon }
+      );
+      marker.bindTooltip(
+        escapeHtml(`${agent.firstName} ${agent.lastName}`),
+        {
+          direction: "top",
+          offset: [
+            visualOffset.x,
+            visualOffset.y - 14,
+          ],
+        }
+      );
       const normalizedAgentPhone = String(agent.phone || "").replace(/\D/g, "");
       const normalizedAgentName = normalizePlaceName(
         `${agent.firstName} ${agent.lastName}`
@@ -6426,7 +6405,12 @@ export default function Recruiting({
       }
 
       popup.appendChild(actions);
-      marker.bindPopup(popup);
+      marker.bindPopup(popup, {
+        offset: [
+          visualOffset.x,
+          visualOffset.y - 14,
+        ],
+      });
       marker.addTo(markerLayer!);
       agentMarkersRef.current.set(agent.id, marker);
     });
