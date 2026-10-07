@@ -3,12 +3,14 @@ import { createPortal } from "react-dom";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { supabaseAnonKey, supabaseUrl } from "./supabase";
+import ReportNotificationPanel from "./ReportNotificationPanel";
 
 type AgentRow = {
   agenzia: string;
   email: string;
   allegato: string;
   dm: string;
+  report_notify?: boolean;
 };
 
 type PreparedRow = AgentRow & {
@@ -341,7 +343,7 @@ async function buildNonAssignedWorkbook(
 export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
   const [activeView, setActiveView] =
-    useState<"email" | "matches">("email");
+    useState<"email" | "matches" | "report">("email");
   const [overlayTop, setOverlayTop] = useState(0);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -373,11 +375,15 @@ export default function OutlookEmail() {
   useEffect(() => {
     const onOpenEmail = (event: Event) => {
       const requestedView = (
-        event as CustomEvent<{ view?: "email" | "matches" }>
+        event as CustomEvent<{ view?: "email" | "matches" | "report" }>
       ).detail?.view;
 
       setActiveView(
-        requestedView === "matches" ? "matches" : "email"
+        requestedView === "matches"
+          ? "matches"
+          : requestedView === "report"
+            ? "report"
+            : "email"
       );
       setOpen(true);
     };
@@ -566,6 +572,7 @@ export default function OutlookEmail() {
           email: String(item?.email || ""),
           allegato: String(item?.allegato || ""),
           dm: String(item?.dm || ""),
+          report_notify: item?.report_notify === true,
         }))
         .filter(
           (item) =>
@@ -592,6 +599,7 @@ export default function OutlookEmail() {
         email: agent.email.trim(),
         allegato: agent.allegato.trim(),
         dm: agent.dm.trim(),
+        report_notify: agent.report_notify === true,
       }));
       const now = new Date().toISOString();
       const response = await fetch(`${supabaseUrl}/rest/v1/email_recipient_lists?on_conflict=owner_key`, {
@@ -729,6 +737,7 @@ export default function OutlookEmail() {
           email: (unmatchedDirectEmails[source.key] || "").trim(),
           allegato: source.fileName,
           dm: "",
+          report_notify: false,
           file: generatedByAgency.get(source.key) || null,
           sourceLabel: source.label,
         }))
@@ -748,6 +757,7 @@ export default function OutlookEmail() {
           email: (unmatchedDirectEmails[source.key] || "").trim(),
           allegato: source.fileName,
           dm: "",
+          report_notify: false,
           file: sourceIndex >= 0 ? files[sourceIndex] || null : null,
           sourceLabel: source.label,
         };
@@ -853,6 +863,18 @@ export default function OutlookEmail() {
           email: String(row.EMAIL ?? row.Email ?? row.email ?? "").trim(),
           allegato: String(row.ALLEGATO ?? row.Allegato ?? row.allegato ?? "").trim(),
           dm: String(row.DM ?? row.Dm ?? row.dm ?? "").trim(),
+          report_notify: ["SI", "SÌ", "TRUE", "1", "X", "YES"].includes(
+            String(
+              row.REPORT ??
+                row.Report ??
+                row.report ??
+                row.REPORT_NOTIFY ??
+                row.report_notify ??
+                ""
+            )
+              .trim()
+              .toUpperCase()
+          ),
         }))
         .filter(
           (row) => row.agenzia || row.email || row.allegato || row.dm
@@ -988,8 +1010,16 @@ export default function OutlookEmail() {
     }
   };
 
-  const updateAgent = (index: number, fieldName: keyof AgentRow, value: string) => {
-    setAgents((current) => current.map((agent, i) => (i === index ? { ...agent, [fieldName]: value } : agent)));
+  const updateAgent = (
+    index: number,
+    fieldName: keyof AgentRow,
+    value: AgentRow[keyof AgentRow]
+  ) => {
+    setAgents((current) =>
+      current.map((agent, i) =>
+        i === index ? { ...agent, [fieldName]: value } : agent
+      )
+    );
     setDirty(true);
   };
 
@@ -1002,7 +1032,7 @@ export default function OutlookEmail() {
   const addAgent = () => {
     setAgents((current) => [
       ...current,
-      { agenzia: "", email: "", allegato: "", dm: "" },
+      { agenzia: "", email: "", allegato: "", dm: "", report_notify: false },
     ]);
     setEditingRecipients(true);
     setDirty(true);
@@ -1225,6 +1255,19 @@ export default function OutlookEmail() {
                 }}
               >
                 ⇄ CONTROLLO ABBINAMENTO EMAIL
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveView("report")}
+                style={{
+                  ...button,
+                  background:
+                    activeView === "report" ? "#16a34a" : "transparent",
+                  color:
+                    activeView === "report" ? "white" : "#0f172a",
+                }}
+              >
+                🔔 INVIO NOTIFICA REPORT
               </button>
             </div>
 
@@ -1711,6 +1754,14 @@ export default function OutlookEmail() {
               </>
             )}
 
+            {activeView === "report" && (
+              <ReportNotificationPanel
+                agents={agents}
+                dirty={dirty}
+                onOpenMatches={() => setActiveView("matches")}
+              />
+            )}
+
             {activeView === "matches" && (
               <>
                 <div style={{ ...card, marginBottom: 16 }}>
@@ -1802,6 +1853,9 @@ export default function OutlookEmail() {
                       <th style={{ padding: 5, width: "12%" }}>Azioni</th>
                     )}
                     <th style={{ padding: 5, width: "8%" }}>DM</th>
+                    <th style={{ padding: 5, width: "7%", textAlign: "center" }}>
+                      REPORT
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1847,9 +1901,20 @@ export default function OutlookEmail() {
                           row.dm || "—"
                         )}
                       </td>
+                      <td style={{ padding: 5, textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={agents[index]?.report_notify === true}
+                          onChange={(e) =>
+                            updateAgent(index, "report_notify", e.target.checked)
+                          }
+                          aria-label={`Abilita notifica Report per ${row.agenzia || row.email || "agente"}`}
+                          title="Partecipa agli invii Notifica Report"
+                        />
+                      </td>
                     </tr>
                   ))}
-                  {!matched.length && <tr><td colSpan={editingRecipients ? 6 : 5} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>Nessun nominativo presente.</td></tr>}
+                  {!matched.length && <tr><td colSpan={editingRecipients ? 7 : 6} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>Nessun nominativo presente.</td></tr>}
                 </tbody>
               </table>
 
