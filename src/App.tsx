@@ -5,6 +5,18 @@ import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
 import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminSetFullAccess, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
+import {
+  agentLogin,
+  ensureAgentSession,
+  agentLogout,
+  adminAgentList,
+  adminAgentCreate,
+  adminAgentUpdate,
+  adminAgentDelete,
+  adminAgentSetProvvigioniVisibility,
+  getAgentPasswordResetProfile,
+  completeAgentPasswordReset,
+} from "./agentSecurity";
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
@@ -89,7 +101,8 @@ type Agent = {
   nome: string;
   cognome: string;
   username: string;
-  password: string;
+  password?: string;
+  password_configured?: boolean;
   owner_auth_id?: string;
   owner_admin_id?: number;
   provvigioni_visible?: boolean;
@@ -8194,25 +8207,15 @@ function AgentsAdmin({
   const loadAgents = async () => {
     setLoading(true);
 
-    let query = supabase
-      .from("agents")
-      .select("*")
-      .order("nome", { ascending: true });
-
-    if (adminProfile?.role !== "super_admin") {
-      query = query.eq("owner_admin_id", adminProfile?.id);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
+    try {
+      const data = await adminAgentList("ALL");
+      setAgents((data as Agent[]) || []);
+    } catch (error) {
       console.error("LOAD AGENTS ERROR:", error);
       setAgents([]);
-    } else {
-      setAgents((data as Agent[]) || []);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -8266,23 +8269,25 @@ function AgentsAdmin({
 
     setSaving(true);
 
-    const { error } = await supabase.from("agents").insert([
-      {
+    try {
+      await adminAgentCreate({
         nome: nome.trim(),
         cognome: cognome.trim(),
         username: username.trim(),
         password: password.trim(),
-        owner_admin_id: ownerAdminIdToSave,
-      },
-    ]);
-
-    setSaving(false);
-
-    if (error) {
+        ownerAdminId: ownerAdminIdToSave,
+      });
+    } catch (error: any) {
+      setSaving(false);
       console.error("SAVE AGENT ERROR:", error);
-      alert("Errore salvataggio agente: " + (error.message || JSON.stringify(error)));
+      alert(
+        "Errore salvataggio agente: " +
+          (error?.message || JSON.stringify(error))
+      );
       return;
     }
+
+    setSaving(false);
 
     alert("Agente salvato");
     setNome("");
@@ -8303,15 +8308,15 @@ function AgentsAdmin({
   ) => {
     if (!agentId || adminProfile?.role !== "super_admin") return;
 
-    const { error } = await supabase
-      .from("agents")
-      .update({ provvigioni_visible: visible })
-      .eq("id", agentId);
-
-    if (error) {
+    try {
+      await adminAgentSetProvvigioniVisibility(
+        agentId,
+        visible
+      );
+    } catch (error: any) {
       alert(
         "Errore aggiornamento visibilità Provvigione: " +
-          error.message
+          (error?.message || error)
       );
       return;
     }
@@ -8331,16 +8336,13 @@ function AgentsAdmin({
     const ok = window.confirm("Vuoi eliminare questo agente?");
     if (!ok) return;
 
-    let query = supabase.from("agents").delete().eq("id", agentId);
-
-    if (adminProfile?.role !== "super_admin") {
-      query = query.eq("owner_admin_id", adminProfile?.id);
-    }
-
-    const { error } = await query;
-
-    if (error) {
-      alert("Errore eliminazione agente: " + error.message);
+    try {
+      await adminAgentDelete(agentId);
+    } catch (error: any) {
+      alert(
+        "Errore eliminazione agente: " +
+          (error?.message || error)
+      );
       return;
     }
 
@@ -8350,38 +8352,34 @@ function AgentsAdmin({
   const updateAgent = async () => {
     if (!editingAgent?.id) return;
   
-    if (!editUsername.trim() || !editPassword.trim()) {
-      alert("Inserisci username e password");
+    if (!editUsername.trim()) {
+      alert("Inserisci lo username");
       return;
     }
-  
-    const updatePayload: any = {
-      username: editUsername.trim(),
-      password: editPassword.trim(),
-    };
-  
-    if (adminProfile?.role === "super_admin") {
-      if (!editOwnerAdminId) {
-        alert("Seleziona l'admin proprietario");
-        return;
-      }
-  
-      updatePayload.owner_admin_id = Number(editOwnerAdminId);
+
+    if (
+      adminProfile?.role === "super_admin" &&
+      !editOwnerAdminId
+    ) {
+      alert("Seleziona l'admin proprietario");
+      return;
     }
-  
-    let query = supabase
-      .from("agents")
-      .update(updatePayload)
-      .eq("id", editingAgent.id);
-  
-    if (adminProfile?.role !== "super_admin") {
-      query = query.eq("owner_admin_id", adminProfile?.id);
-    }
-  
-    const { error } = await query;
-  
-    if (error) {
-      alert("Errore modifica: " + error.message);
+
+    try {
+      await adminAgentUpdate({
+        id: editingAgent.id,
+        username: editUsername.trim(),
+        password: editPassword.trim() || undefined,
+        ownerAdminId:
+          adminProfile?.role === "super_admin"
+            ? Number(editOwnerAdminId)
+            : undefined,
+      });
+    } catch (error: any) {
+      alert(
+        "Errore modifica: " +
+          (error?.message || error)
+      );
       return;
     }
   
@@ -8610,8 +8608,17 @@ function AgentsAdmin({
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       {a.username}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                      {a.password}
+                    <td
+                      style={{
+                        padding: 8,
+                        borderBottom: "1px solid #f1f5f9",
+                        color: "#166534",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {a.password_configured !== false
+                        ? "🔒 PROTETTA"
+                        : "—"}
                     </td>
   
                     {adminProfile?.role === "super_admin" && (
@@ -8665,7 +8672,7 @@ function AgentsAdmin({
                           onClick={() => {
                             setEditingAgent(a);
                             setEditUsername(a.username || "");
-                            setEditPassword(a.password || "");
+                            setEditPassword("");
                             setEditOwnerAdminId(a.owner_admin_id || "");
                           }}
                           style={{
@@ -8753,9 +8760,11 @@ function AgentsAdmin({
   
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                Password
+                Nuova password
               </div>
               <input
+                type="password"
+                placeholder="Lascia vuoto per non cambiarla"
                 value={editPassword}
                 onChange={(e) => setEditPassword(e.target.value)}
                 style={{
@@ -8889,24 +8898,17 @@ function LoginView({
         setAgentSession(null);
         onLoginSuccess();
       } else {
-        const { data, error } = await supabase
-          .from("agents")
-          .select("*")
-          .ilike("username", user)
-          .eq("password", pass)
-          .maybeSingle();
+        const data = await agentLogin(user, pass);
 
-        if (error || !data) {
+        if (!data) {
           setErrorMsg("Credenziali agente non valide");
           setLoading(false);
           return;
         }
 
-        localStorage.setItem("agent_session", JSON.stringify(data));
         setAgentSession(data);
         setSession(null);
         setAdminProfile(null);
-        localStorage.setItem("agent_session", JSON.stringify(data));
         onLoginSuccess();
       }
     } catch (err) {
@@ -9442,30 +9444,13 @@ function ReportAdmin({
   const [ownerFilter, setOwnerFilter] = useState<"ALL" | "MINE" | "OTHERS">("ALL");
 
   const loadAgents = async () => {
-    let query = supabase
-      .from("agents")
-      .select("*")
-      .order("nome", { ascending: true });
-
-    if (adminProfile?.role !== "super_admin") {
-      query = query.eq("owner_admin_id", adminProfile?.id);
-    } else {
-      if (ownerFilter === "MINE") {
-        query = query.eq("owner_admin_id", adminProfile?.id);
-      } else if (ownerFilter === "OTHERS") {
-        query = query.neq("owner_admin_id", adminProfile?.id);
-      }
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
+    try {
+      const data = await adminAgentList(ownerFilter);
+      setAgents(data || []);
+    } catch (error) {
       console.error("LOAD AGENTS ERROR:", error);
       setAgents([]);
-      return;
     }
-
-    setAgents(data || []);
   };
 
   const loadReports = async (agentId?: number | null) => {
@@ -10957,30 +10942,13 @@ export default function App() {
         setAdminProfile(null);
       }
 
-      const agentSaved = localStorage.getItem("agent_session");
-      if (agentSaved) {
-        try {
-          const savedAgent = JSON.parse(agentSaved);
-
-          if (savedAgent?.id) {
-            const { data: freshAgent } = await supabase
-              .from("agents")
-              .select("*")
-              .eq("id", savedAgent.id)
-              .maybeSingle();
-
-            const agent = freshAgent || savedAgent;
-            setAgentSession(agent);
-            localStorage.setItem(
-              "agent_session",
-              JSON.stringify(agent)
-            );
-          } else {
-            setAgentSession(savedAgent);
-          }
-        } catch {
-          localStorage.removeItem("agent_session");
-        }
+      try {
+        const agent = await ensureAgentSession();
+        setAgentSession(agent);
+      } catch (error) {
+        console.error("AGENT SESSION RESTORE ERROR:", error);
+        localStorage.removeItem("agent_session");
+        setAgentSession(null);
       }
     })();
   }, []);
@@ -12731,6 +12699,8 @@ if (!agentSession && !adminSession) {
               cursor: "pointer",
             }}
             onClick={() => {
+              void adminLogout();
+              void agentLogout();
               localStorage.removeItem("admin_session");
               localStorage.removeItem("agent_session");
               setAdminSession(null);
