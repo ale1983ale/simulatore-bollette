@@ -1573,7 +1573,7 @@ export default function UnifiedAgentManagement({
             )}
             <button
               type="button"
-              onClick={onOpenEmailMatches}
+              onClick={() => onOpenEmailMatches()}
               style={{ ...buttonStyle, background: "#e0f2fe" }}
             >
               ABBINAMENTI GLOBALI
