@@ -14418,7 +14418,48 @@ const renderAdminContent = () => {
             adminProfile={adminProfile}
             onOpenEmailMatches={openOutlookEmailMatches}
             onOpenZones={() => setTab("recruitingManagement")}
+            onOpenAdminManagement={() => {
+              const section = document.getElementById(
+                "ge-admin-users-manager"
+              ) as HTMLDetailsElement | null;
+              if (!section) return;
+              section.open = true;
+              window.requestAnimationFrame(() => {
+                section.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              });
+            }}
           />
+
+          {adminProfile?.role === "super_admin" && (
+            <details
+              id="ge-admin-users-manager"
+              style={{
+                marginTop: 14,
+                background: "#faf5ff",
+                border: "1px solid #ddd6fe",
+                borderRadius: 12,
+                overflow: "hidden",
+              }}
+            >
+              <summary
+                style={{
+                  cursor: "pointer",
+                  padding: "13px 16px",
+                  fontWeight: 950,
+                  color: "#5b21b6",
+                  userSelect: "none",
+                }}
+              >
+                👤 GESTIONE ADMIN · CREA E MODIFICA AMMINISTRATORI
+              </summary>
+              <div style={{ padding: "0 12px 12px" }}>
+                <AdminUsersManager adminProfile={adminProfile} />
+              </div>
+            </details>
+          )}
         </div>
       )}
 
