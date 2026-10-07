@@ -1,4 +1,4 @@
-const CACHE_NAME = "simulatore-bollette-pwa-v5";
+const CACHE_NAME = "simulatore-bollette-pwa-v6";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest?v=3",
