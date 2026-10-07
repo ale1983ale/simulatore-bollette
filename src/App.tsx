@@ -13924,6 +13924,7 @@ const renderAdminContent = () => {
 
       {hasFullAdminAccess && databaseAdminTabs.includes(tab) && (
         <div
+          className="ge-database-nav"
           style={{
             display: "flex",
             gap: 8,
