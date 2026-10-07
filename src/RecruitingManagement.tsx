@@ -87,6 +87,8 @@ export default function RecruitingManagement() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [zone, setZone] = useState("");
+  const [agentDm, setAgentDm] = useState("");
+  const [agentShowOnMap, setAgentShowOnMap] = useState(false);
   const [dmReferenceFilter, setDmReferenceFilter] = useState("");
   const [customDmEditor, setCustomDmEditor] = useState<{
     agentId: string;
@@ -356,6 +358,8 @@ export default function RecruitingManagement() {
     setLastName("");
     setPhone("");
     setZone("");
+    setAgentDm("");
+    setAgentShowOnMap(false);
   };
 
   const saveAgent = async () => {
@@ -364,25 +368,79 @@ export default function RecruitingManagement() {
       setMessage("Inserisci nome e cognome dell'agente.");
       return;
     }
-    if (!zone.trim()) {
-      setMessage("Inserisci la zona dell'agente.");
+    if (agentShowOnMap && !zone.trim()) {
+      setMessage(
+        "Per attivare MOSTRA IN MAPPA devi prima inserire la zona dell'agente."
+      );
       return;
     }
 
     setBusy(true);
-    setMessage("Geolocalizzo la zona...");
+    setMessage(
+      zone.trim()
+        ? "Aggiorno zona e dati agente..."
+        : "Aggiorno dati agente..."
+    );
+
     try {
-      const geo = await geocodeItalianZone(zone.trim());
-      const region = normalizeItalianRegion(geo.region || zone.trim());
+      const currentAgent = agentId
+        ? agents.find((item) => item.id === agentId) || null
+        : null;
+
+      let region = currentAgent?.region || "";
+      let latitude = agentShowOnMap
+        ? currentAgent?.latitude ?? null
+        : null;
+      let longitude = agentShowOnMap
+        ? currentAgent?.longitude ?? null
+        : null;
+
+      const zoneChanged =
+        zone.trim() !== String(currentAgent?.zone || "").trim();
+
+      if (zone.trim() && (zoneChanged || agentShowOnMap)) {
+        const geo = await geocodeItalianZone(zone.trim());
+        const normalizedRegion = normalizeItalianRegion(
+          geo.region || zone.trim()
+        );
+
+        region = ITALIAN_REGIONS.includes(normalizedRegion as any)
+          ? normalizedRegion
+          : region;
+
+        if (agentShowOnMap) {
+          if (
+            geo.latitude === null ||
+            geo.longitude === null ||
+            !Number.isFinite(geo.latitude) ||
+            !Number.isFinite(geo.longitude)
+          ) {
+            throw new Error(
+              "Non riesco a posizionare l'agente sulla mappa. Indica una città o località più precisa."
+            );
+          }
+          latitude = geo.latitude;
+          longitude = geo.longitude;
+        } else {
+          latitude = null;
+          longitude = null;
+        }
+      } else if (!zone.trim()) {
+        region = "";
+        latitude = null;
+        longitude = null;
+      }
+
       const payload = {
         owner_key: ctx.ownerKey,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         phone: phone.trim(),
         zone: zone.trim(),
-        region: ITALIAN_REGIONS.includes(region as any) ? region : "",
-        latitude: geo.latitude,
-        longitude: geo.longitude,
+        region,
+        dm_reference: agentDm.trim(),
+        latitude,
+        longitude,
         updated_at: new Date().toISOString(),
       };
 
@@ -390,7 +448,8 @@ export default function RecruitingManagement() {
         const { error } = await ctx.client
           .from("recruiting_active_agents")
           .update(payload)
-          .eq("id", agentId);
+          .eq("id", agentId)
+          .eq("owner_key", ctx.ownerKey);
         if (error) throw error;
       } else {
         const { error } = await ctx.client
@@ -400,28 +459,42 @@ export default function RecruitingManagement() {
       }
 
       await loadAll(ctx);
+      const savedName = `${firstName.trim()} ${lastName.trim()}`.trim();
       resetAgentForm();
 
       setMessage(
-        geo.latitude !== null && geo.longitude !== null
-          ? "Agente attivo salvato e posizionato sulla cartina."
-          : "Agente salvato, ma la zona non è stata geolocalizzata. Modifica la zona con una città o località più precisa."
+        agentShowOnMap
+          ? `${savedName}: modifiche salvate e agente visibile sulla mappa.`
+          : `${savedName}: modifiche salvate. Agente non mostrato sulla mappa.`
       );
     } catch (error: any) {
       console.error(error);
-      setMessage("Errore nel salvataggio dell'agente: " + (error?.message || error));
+      setMessage(
+        "Errore nel salvataggio dell'agente: " +
+          (error?.message || error)
+      );
     } finally {
       setBusy(false);
     }
   };
 
   const editAgent = (agent: ActiveAgent) => {
+    if (agentId === agent.id) {
+      resetAgentForm();
+      return;
+    }
+
     setAgentId(agent.id);
     setFirstName(agent.firstName);
     setLastName(agent.lastName);
     setPhone(agent.phone);
     setZone(agent.zone);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setAgentDm(agent.dmReference);
+    setAgentShowOnMap(
+      agent.latitude !== null &&
+        agent.longitude !== null
+    );
+    setMessage("");
   };
 
   const toggleAgentOnMap = async (
@@ -550,6 +623,23 @@ export default function RecruitingManagement() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <style>{`
+        .rm-mobile-agents { display: none; }
+        .rm-desktop-agents { display: block; }
+        @media (max-width: 800px) {
+          .rm-desktop-agents { display: none !important; }
+          .rm-mobile-agents {
+            display: flex !important;
+            flex-direction: column;
+            gap: 10px;
+          }
+          .rm-inline-edit-grid,
+          .rm-agent-top-grid,
+          .rm-macro-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
           type="button"
@@ -578,7 +668,7 @@ export default function RecruitingManagement() {
         </div>
       )}
 
-      <div style={{ ...cardStyle, display: "grid", gridTemplateColumns: "minmax(280px,420px) 1fr", gap: 18 }}>
+      <div className="rm-macro-grid" style={{ ...cardStyle, display: "grid", gridTemplateColumns: "minmax(280px,420px) 1fr", gap: 18 }}>
         <div>
           <h3 style={{ marginTop: 0 }}>{macroId ? "Modifica macroarea" : "Nuova macroarea"}</h3>
 
@@ -701,6 +791,7 @@ export default function RecruitingManagement() {
         </div>
 
         <div
+          className="rm-agent-top-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
@@ -728,6 +819,35 @@ export default function RecruitingManagement() {
               placeholder="Es. Perugia"
               style={inputStyle}
             />
+          </div>
+          <div>
+            <label style={labelStyle}>DM di Riferimento</label>
+            <input
+              list="recruiting-dm-suggestions"
+              value={agentDm}
+              onChange={(e) => setAgentDm(e.target.value)}
+              placeholder="Seleziona o scrivi un DM"
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Mappa</label>
+            <label
+              style={{
+                minHeight: 40,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontWeight: 800,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={agentShowOnMap}
+                onChange={(e) => setAgentShowOnMap(e.target.checked)}
+              />
+              MOSTRA IN MAPPA
+            </label>
           </div>
           <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
             <button
@@ -833,7 +953,7 @@ export default function RecruitingManagement() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto", marginTop: 12 }}>
+        <div className="rm-desktop-agents" style={{ overflowX: "auto", marginTop: 12 }}>
           <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
@@ -845,185 +965,338 @@ export default function RecruitingManagement() {
               </tr>
             </thead>
             <tbody>
-              {filteredAgents.map((agent) => (
-                <tr
-                  key={agent.id}
-                  style={{
-                    background: dmDirtyAgentIds.has(agent.id)
-                      ? "#f0fdf4"
-                      : "transparent",
-                  }}
-                >
-                  <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.firstName}</td>
-                  <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.lastName}</td>
-                  <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.phone || "—"}</td>
-                  <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.zone || "—"}</td>
-                  <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.region || "—"}</td>
+              {filteredAgents.map((agent) => {
+                const isEditing = agentId === agent.id;
+                const isOnMap =
+                  agent.latitude !== null &&
+                  agent.longitude !== null;
 
-                  <td
-                    style={{
-                      padding: "9px 10px",
-                      borderBottom: "1px solid #f1f5f9",
-                      minWidth: 190,
-                      verticalAlign: "top",
-                    }}
-                  >
-                    <select
-                      value={
-                        customDmEditor?.agentId === agent.id
-                          ? "__ALTRO__"
-                          : agent.dmReference
-                      }
-                      disabled={busy}
-                      onChange={(event) => {
-                        const value = event.target.value;
-
-                        if (value === "__ALTRO__") {
-                          setCustomDmEditor({
-                            agentId: agent.id,
-                            value: agent.dmReference,
-                          });
-                          return;
-                        }
-
-                        stageAgentDm(agent, value);
-                      }}
+                return (
+                  <React.Fragment key={agent.id}>
+                    <tr
                       style={{
-                        ...inputStyle,
-                        minWidth: 180,
-                        padding: "7px 8px",
+                        background: isEditing
+                          ? "#eff6ff"
+                          : dmDirtyAgentIds.has(agent.id)
+                            ? "#f0fdf4"
+                            : "transparent",
                       }}
                     >
-                      <option value="">—</option>
-                      {dmSuggestions.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                      <option value="__ALTRO__">ALTRO</option>
-                    </select>
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.firstName}</td>
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.lastName}</td>
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.phone || "—"}</td>
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.zone || "—"}</td>
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.region || "—"}</td>
 
-                    {customDmEditor?.agentId === agent.id && (
-                      <div
+                      <td
                         style={{
-                          display: "grid",
-                          gap: 6,
-                          marginTop: 6,
+                          padding: "9px 10px",
+                          borderBottom: "1px solid #f1f5f9",
+                          minWidth: 190,
+                          verticalAlign: "top",
                         }}
                       >
-                        <input
-                          autoFocus
-                          list="recruiting-dm-suggestions"
-                          value={customDmEditor?.value || ""}
-                          onChange={(event) =>
-                            setCustomDmEditor((current) =>
-                              current
-                                ? {
-                                    ...current,
-                                    value: event.target.value,
-                                  }
-                                : current
-                            )
+                        <select
+                          value={
+                            customDmEditor?.agentId === agent.id
+                              ? "__ALTRO__"
+                              : agent.dmReference
                           }
-                          placeholder="Inserisci DM di Riferimento"
+                          disabled={busy}
+                          onChange={(event) => {
+                            const value = event.target.value;
+
+                            if (value === "__ALTRO__") {
+                              setCustomDmEditor({
+                                agentId: agent.id,
+                                value: agent.dmReference,
+                              });
+                              return;
+                            }
+
+                            stageAgentDm(agent, value);
+                          }}
                           style={{
                             ...inputStyle,
                             minWidth: 180,
                             padding: "7px 8px",
                           }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              stageAgentDm(
-                                agent,
-                                customDmEditor?.value || ""
-                              );
-                            }
-                          }}
-                        />
-                        <div style={{ display: "flex", gap: 5 }}>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              stageAgentDm(
-                                agent,
-                                customDmEditor?.value || ""
-                              )
-                            }
-                            style={{
-                              ...buttonStyle,
-                              padding: "5px 8px",
-                              background: "#16a34a",
-                              color: "white",
-                            }}
-                          >
-                            OK
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => setCustomDmEditor(null)}
-                            style={{
-                              ...buttonStyle,
-                              padding: "5px 8px",
-                              background: "#e2e8f0",
-                            }}
-                          >
-                            Annulla
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </td>
+                        >
+                          <option value="">—</option>
+                          {dmSuggestions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                          <option value="__ALTRO__">ALTRO</option>
+                        </select>
 
-                  <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 800 }}>
-                    <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        cursor: busy ? "not-allowed" : "pointer",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={
-                          agent.latitude !== null &&
-                          agent.longitude !== null
-                        }
-                        disabled={busy}
-                        onChange={(event) =>
-                          void toggleAgentOnMap(
-                            agent,
-                            event.target.checked
-                          )
-                        }
-                        style={{
-                          width: 18,
-                          height: 18,
-                          cursor: busy ? "not-allowed" : "pointer",
-                        }}
-                      />
-                      <span>
-                        {agent.latitude !== null &&
-                        agent.longitude !== null
-                          ? "Mostra"
-                          : "Non mostrare"}
-                      </span>
-                    </label>
-                  </td>
-                  <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
-                    <button type="button" onClick={() => editAgent(agent)} style={{ ...buttonStyle, padding: "6px 9px", marginRight: 6, background: "#e0f2fe" }}>
-                      Modifica
-                    </button>
-                    <button type="button" onClick={() => void deleteAgent(agent)} style={{ ...buttonStyle, padding: "6px 9px", background: "#fee2e2", color: "#991b1b" }}>
-                      Elimina
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                        {customDmEditor?.agentId === agent.id && (
+                          <div style={{ display: "grid", gap: 6, marginTop: 6 }}>
+                            <input
+                              autoFocus
+                              list="recruiting-dm-suggestions"
+                              value={customDmEditor?.value || ""}
+                              onChange={(event) =>
+                                setCustomDmEditor((current) =>
+                                  current
+                                    ? { ...current, value: event.target.value }
+                                    : current
+                                )
+                              }
+                              placeholder="Inserisci DM di Riferimento"
+                              style={{
+                                ...inputStyle,
+                                minWidth: 180,
+                                padding: "7px 8px",
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  stageAgentDm(
+                                    agent,
+                                    customDmEditor?.value || ""
+                                  );
+                                }
+                              }}
+                            />
+                            <div style={{ display: "flex", gap: 5 }}>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  stageAgentDm(
+                                    agent,
+                                    customDmEditor?.value || ""
+                                  )
+                                }
+                                style={{
+                                  ...buttonStyle,
+                                  padding: "5px 8px",
+                                  background: "#16a34a",
+                                  color: "white",
+                                }}
+                              >
+                                OK
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setCustomDmEditor(null)}
+                                style={{
+                                  ...buttonStyle,
+                                  padding: "5px 8px",
+                                  background: "#e2e8f0",
+                                }}
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 800 }}>
+                        <label
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            cursor: busy ? "not-allowed" : "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isOnMap}
+                            disabled={busy}
+                            onChange={(event) => {
+                              if (event.target.checked && !agent.zone.trim()) {
+                                editAgent(agent);
+                                setAgentShowOnMap(true);
+                                setMessage(
+                                  "Inserisci la ZONA nella modifica aperta e premi SALVA AGENTE per mostrarlo sulla mappa."
+                                );
+                                return;
+                              }
+                              void toggleAgentOnMap(
+                                agent,
+                                event.target.checked
+                              );
+                            }}
+                            style={{
+                              width: 18,
+                              height: 18,
+                              cursor: busy ? "not-allowed" : "pointer",
+                            }}
+                          />
+                          <span>{isOnMap ? "Mostra" : "Non mostrare"}</span>
+                        </label>
+                      </td>
+
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                        <button
+                          type="button"
+                          onClick={() => editAgent(agent)}
+                          style={{
+                            ...buttonStyle,
+                            padding: "6px 9px",
+                            marginRight: 6,
+                            background: isEditing ? "#dbeafe" : "#e0f2fe",
+                          }}
+                        >
+                          {isEditing ? "Chiudi modifica" : "Modifica"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteAgent(agent)}
+                          style={{
+                            ...buttonStyle,
+                            padding: "6px 9px",
+                            background: "#fee2e2",
+                            color: "#991b1b",
+                          }}
+                        >
+                          Elimina
+                        </button>
+                      </td>
+                    </tr>
+
+                    {isEditing && (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          style={{
+                            padding: 12,
+                            background: "#eff6ff",
+                            borderBottom: "2px solid #93c5fd",
+                          }}
+                        >
+                          <div
+                            style={{
+                              border: "2px solid #2563eb",
+                              borderRadius: 12,
+                              padding: 12,
+                              background: "white",
+                            }}
+                          >
+                            <div
+                              className="rm-inline-edit-grid"
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  "repeat(auto-fit,minmax(170px,1fr))",
+                                gap: 10,
+                              }}
+                            >
+                              <div>
+                                <label style={labelStyle}>Nome</label>
+                                <input
+                                  value={firstName}
+                                  onChange={(e) => setFirstName(e.target.value)}
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Cognome</label>
+                                <input
+                                  value={lastName}
+                                  onChange={(e) => setLastName(e.target.value)}
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Cellulare</label>
+                                <input
+                                  value={phone}
+                                  onChange={(e) => setPhone(e.target.value)}
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Zona</label>
+                                <input
+                                  value={zone}
+                                  onChange={(e) => setZone(e.target.value)}
+                                  placeholder="Es. Perugia"
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div>
+                                <label style={labelStyle}>DM di Riferimento</label>
+                                <input
+                                  list="recruiting-dm-suggestions"
+                                  value={agentDm}
+                                  onChange={(e) => setAgentDm(e.target.value)}
+                                  placeholder="Seleziona o scrivi un DM"
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Mappa</label>
+                                <label
+                                  style={{
+                                    minHeight: 40,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    fontWeight: 900,
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={agentShowOnMap}
+                                    onChange={(e) =>
+                                      setAgentShowOnMap(e.target.checked)
+                                    }
+                                    style={{ width: 18, height: 18 }}
+                                  />
+                                  {agentShowOnMap
+                                    ? "MOSTRA IN MAPPA"
+                                    : "NON MOSTRARE IN MAPPA"}
+                                </label>
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 8,
+                                flexWrap: "wrap",
+                                marginTop: 12,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={resetAgentForm}
+                                style={{
+                                  ...buttonStyle,
+                                  background: "#e2e8f0",
+                                }}
+                              >
+                                ANNULLA
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void saveAgent()}
+                                style={{
+                                  ...buttonStyle,
+                                  background: busy ? "#94a3b8" : "#16a34a",
+                                  color: "white",
+                                }}
+                              >
+                                {busy ? "SALVATAGGIO..." : "SALVA AGENTE"}
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
               {!filteredAgents.length && (
                 <tr>
                   <td colSpan={8} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>
@@ -1035,6 +1308,125 @@ export default function RecruitingManagement() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="rm-mobile-agents" style={{ marginTop: 12 }}>
+          {filteredAgents.map((agent) => {
+            const isEditing = agentId === agent.id;
+            const isOnMap =
+              agent.latitude !== null &&
+              agent.longitude !== null;
+
+            return (
+              <div
+                key={agent.id}
+                style={{
+                  border: isEditing
+                    ? "2px solid #2563eb"
+                    : "1px solid #cbd5e1",
+                  borderRadius: 12,
+                  padding: 12,
+                  background: isEditing ? "#eff6ff" : "white",
+                }}
+              >
+                <div style={{ fontWeight: 950, color: "#0f2d69" }}>
+                  {agent.firstName} {agent.lastName}
+                </div>
+                <div style={{ display: "grid", gap: 4, marginTop: 8, fontSize: 13 }}>
+                  <div><strong>Cellulare:</strong> {agent.phone || "—"}</div>
+                  <div><strong>Zona:</strong> {agent.zone || "—"}</div>
+                  <div><strong>Regione:</strong> {agent.region || "—"}</div>
+                  <div><strong>DM:</strong> {agent.dmReference || "—"}</div>
+                  <div><strong>Mappa:</strong> {isOnMap ? "MOSTRA" : "NON MOSTRARE"}</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => editAgent(agent)}
+                    style={{
+                      ...buttonStyle,
+                      background: isEditing ? "#dbeafe" : "#e0f2fe",
+                    }}
+                  >
+                    {isEditing ? "CHIUDI MODIFICA" : "MODIFICA"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deleteAgent(agent)}
+                    style={{
+                      ...buttonStyle,
+                      background: "#fee2e2",
+                      color: "#991b1b",
+                    }}
+                  >
+                    ELIMINA
+                  </button>
+                </div>
+
+                {isEditing && (
+                  <div
+                    className="rm-inline-edit-grid"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr",
+                      gap: 10,
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: "1px solid #bfdbfe",
+                    }}
+                  >
+                    <div>
+                      <label style={labelStyle}>Nome</label>
+                      <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cognome</label>
+                      <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cellulare</label>
+                      <input value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Zona</label>
+                      <input value={zone} onChange={(e) => setZone(e.target.value)} placeholder="Es. Perugia" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>DM di Riferimento</label>
+                      <input
+                        list="recruiting-dm-suggestions"
+                        value={agentDm}
+                        onChange={(e) => setAgentDm(e.target.value)}
+                        placeholder="Seleziona o scrivi un DM"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 900 }}>
+                      <input
+                        type="checkbox"
+                        checked={agentShowOnMap}
+                        onChange={(e) => setAgentShowOnMap(e.target.checked)}
+                      />
+                      {agentShowOnMap ? "MOSTRA IN MAPPA" : "NON MOSTRARE IN MAPPA"}
+                    </label>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void saveAgent()}
+                      style={{
+                        ...buttonStyle,
+                        background: busy ? "#94a3b8" : "#16a34a",
+                        color: "white",
+                      }}
+                    >
+                      {busy ? "SALVATAGGIO..." : "SALVA AGENTE"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div
