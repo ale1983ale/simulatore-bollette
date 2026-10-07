@@ -14,9 +14,6 @@ import {
   adminAgentUpdate,
   adminAgentDelete,
   adminAgentSetProvvigioniVisibility,
-  getAgentPasswordResetProfile,
-  completeAgentPasswordReset,
-  changeAgentPassword,
 } from "./agentSecurity";
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
@@ -8872,169 +8869,6 @@ function LoginView({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [changeNewPassword, setChangeNewPassword] = useState("");
-  const [changeConfirmPassword, setChangeConfirmPassword] = useState("");
-  const [changeBusy, setChangeBusy] = useState(false);
-  const [changeMessage, setChangeMessage] = useState("");
-
-  const resetToken =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get(
-          "agent-reset"
-        ) || ""
-      : "";
-  const [resetProfile, setResetProfile] = useState<{
-    id: number;
-    nome: string;
-    cognome: string;
-    username: string;
-  } | null>(null);
-  const [resetLoading, setResetLoading] = useState(
-    Boolean(resetToken)
-  );
-  const [resetError, setResetError] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [resetSaving, setResetSaving] = useState(false);
-
-  useEffect(() => {
-    if (!resetToken) return;
-
-    let cancelled = false;
-
-    void (async () => {
-      setResetLoading(true);
-      setResetError("");
-
-      try {
-        const profile =
-          await getAgentPasswordResetProfile(resetToken);
-
-        if (cancelled) return;
-
-        if (!profile) {
-          setResetProfile(null);
-          setResetError(
-            "Il link per impostare la password non è valido o è scaduto."
-          );
-        } else {
-          setResetProfile(profile);
-        }
-      } catch (error: any) {
-        if (!cancelled) {
-          setResetError(
-            error?.message ||
-              "Non riesco a verificare il link."
-          );
-        }
-      } finally {
-        if (!cancelled) setResetLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [resetToken]);
-
-  const handlePasswordReset = async () => {
-    if (!resetToken || !resetProfile) return;
-
-    if (newPassword.length < 8) {
-      setResetError(
-        "La nuova password deve contenere almeno 8 caratteri."
-      );
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setResetError("Le due password non coincidono.");
-      return;
-    }
-
-    setResetSaving(true);
-    setResetError("");
-
-    try {
-      await completeAgentPasswordReset(
-        resetToken,
-        newPassword
-      );
-
-      const url = new URL(window.location.href);
-      url.searchParams.delete("agent-reset");
-      window.history.replaceState(
-        window.history.state,
-        "",
-        `${url.pathname}${url.search}${url.hash}`
-      );
-
-      alert(
-        "Password impostata correttamente. Ora puoi accedere con il tuo username."
-      );
-      window.location.replace("/");
-    } catch (error: any) {
-      setResetError(
-        error?.message ||
-          "Errore durante l'impostazione della password."
-      );
-    } finally {
-      setResetSaving(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    const user = username.trim().toLowerCase();
-    const current = password;
-    const next = changeNewPassword;
-
-    setChangeMessage("");
-    setErrorMsg("");
-
-    if (!user || !current) {
-      setErrorMsg(
-        "Inserisci username e password attuale."
-      );
-      return;
-    }
-
-    if (next.length < 8) {
-      setErrorMsg(
-        "La nuova password deve contenere almeno 8 caratteri."
-      );
-      return;
-    }
-
-    if (next !== changeConfirmPassword) {
-      setErrorMsg("Le due nuove password non coincidono.");
-      return;
-    }
-
-    setChangeBusy(true);
-
-    try {
-      await changeAgentPassword({
-        username: user,
-        currentPassword: current,
-        newPassword: next,
-      });
-
-      setPassword("");
-      setChangeNewPassword("");
-      setChangeConfirmPassword("");
-      setShowChangePassword(false);
-      setChangeMessage(
-        "Password cambiata. Ora accedi con la nuova password."
-      );
-    } catch (error: any) {
-      setErrorMsg(
-        error?.message || "Errore cambio password."
-      );
-    } finally {
-      setChangeBusy(false);
-    }
-  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -9078,169 +8912,12 @@ function LoginView({
         onLoginSuccess();
       }
     } catch (err) {
+      console.error("LOGIN ERROR:", err);
       setErrorMsg("Errore durante il login");
     }
 
     setLoading(false);
   };
-
-  if (resetToken) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginTop: 40,
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 460,
-            background: "white",
-            border: "1px solid #e2e8f0",
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-          }}
-        >
-          <h2 style={{ margin: 0 }}>
-            Credenziali Area Report
-          </h2>
-
-          {resetLoading ? (
-            <div style={{ color: "#475569" }}>
-              Verifica del link in corso...
-            </div>
-          ) : resetProfile ? (
-            <>
-              <div
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  background: "#eff6ff",
-                  border: "1px solid #bfdbfe",
-                  color: "#1e3a8a",
-                }}
-              >
-                <div style={{ fontWeight: 800 }}>
-                  {resetProfile.nome} {resetProfile.cognome}
-                </div>
-                <div style={{ marginTop: 4 }}>
-                  Username:{" "}
-                  <strong>{resetProfile.username}</strong>
-                </div>
-              </div>
-
-              <input
-                type="password"
-                placeholder="Nuova password"
-                value={newPassword}
-                onChange={(event) =>
-                  setNewPassword(event.target.value)
-                }
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  border: "1px solid #cbd5e1",
-                  fontSize: 14,
-                }}
-              />
-
-              <input
-                type="password"
-                placeholder="Ripeti nuova password"
-                value={confirmPassword}
-                onChange={(event) =>
-                  setConfirmPassword(event.target.value)
-                }
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  border: "1px solid #cbd5e1",
-                  fontSize: 14,
-                }}
-              />
-
-              <div
-                style={{
-                  color: "#64748b",
-                  fontSize: 12,
-                }}
-              >
-                La password deve contenere almeno 8 caratteri.
-              </div>
-
-              {resetError && (
-                <div
-                  style={{
-                    color: "#b91c1c",
-                    fontSize: 13,
-                    fontWeight: 700,
-                  }}
-                >
-                  {resetError}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() =>
-                  void handlePasswordReset()
-                }
-                disabled={resetSaving}
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  border: 0,
-                  background: "#f97316",
-                  color: "white",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                {resetSaving
-                  ? "SALVATAGGIO..."
-                  : "IMPOSTA PASSWORD"}
-              </button>
-            </>
-          ) : (
-            <>
-              <div
-                style={{
-                  color: "#b91c1c",
-                  fontWeight: 700,
-                }}
-              >
-                {resetError ||
-                  "Link non valido o scaduto."}
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  window.location.replace("/")
-                }
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  border: 0,
-                  background: "#0f172a",
-                  color: "white",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                VAI AL LOGIN
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -9274,13 +8951,15 @@ function LoginView({
             onClick={() => {
               setMode("agent");
               setErrorMsg("");
-              setChangeMessage("");
             }}
             style={{
               flex: 1,
               padding: "8px 10px",
               borderRadius: 10,
-              border: mode === "agent" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+              border:
+                mode === "agent"
+                  ? "1px solid #0f172a"
+                  : "1px solid #cbd5e1",
               background: mode === "agent" ? "#0f172a" : "white",
               color: mode === "agent" ? "white" : "#0f172a",
               cursor: "pointer",
@@ -9295,14 +8974,15 @@ function LoginView({
             onClick={() => {
               setMode("admin");
               setErrorMsg("");
-              setChangeMessage("");
-              setShowChangePassword(false);
             }}
             style={{
               flex: 1,
               padding: "8px 10px",
               borderRadius: 10,
-              border: mode === "admin" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+              border:
+                mode === "admin"
+                  ? "1px solid #0f172a"
+                  : "1px solid #cbd5e1",
               background: mode === "admin" ? "#0f172a" : "white",
               color: mode === "admin" ? "white" : "#0f172a",
               cursor: "pointer",
@@ -9330,6 +9010,9 @@ function LoginView({
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleLogin();
+          }}
           style={{
             padding: 12,
             borderRadius: 10,
@@ -9338,100 +9021,12 @@ function LoginView({
           }}
         />
 
-        {mode === "agent" && showChangePassword && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid #fed7aa",
-              background: "#fff7ed",
-            }}
-          >
-            <div style={{ fontWeight: 800 }}>
-              Cambia password
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "#7c2d12",
-              }}
-            >
-              Usa nei campi sopra il tuo username e la password attuale.
-            </div>
-            <input
-              type="password"
-              placeholder="Nuova password"
-              value={changeNewPassword}
-              onChange={(event) =>
-                setChangeNewPassword(event.target.value)
-              }
-              style={{
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #cbd5e1",
-                fontSize: 14,
-              }}
-            />
-            <input
-              type="password"
-              placeholder="Ripeti nuova password"
-              value={changeConfirmPassword}
-              onChange={(event) =>
-                setChangeConfirmPassword(event.target.value)
-              }
-              style={{
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #cbd5e1",
-                fontSize: 14,
-              }}
-            />
-            <button
-              type="button"
-              disabled={changeBusy}
-              onClick={() => void handleChangePassword()}
-              style={{
-                padding: 11,
-                borderRadius: 9,
-                border: 0,
-                background: "#f97316",
-                color: "white",
-                fontWeight: 900,
-                cursor: changeBusy ? "wait" : "pointer",
-              }}
-            >
-              {changeBusy
-                ? "SALVATAGGIO..."
-                : "SALVA NUOVA PASSWORD"}
-            </button>
-          </div>
-        )}
-
         {errorMsg && (
           <div style={{ color: "red", fontSize: 13 }}>{errorMsg}</div>
         )}
 
-        {changeMessage && (
-          <div
-            style={{
-              color: "#166534",
-              background: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-              borderRadius: 9,
-              padding: 9,
-              fontSize: 13,
-              fontWeight: 700,
-            }}
-          >
-            {changeMessage}
-          </div>
-        )}
-
         <button
-          onClick={handleLogin}
+          onClick={() => void handleLogin()}
           disabled={loading}
           style={{
             marginTop: 6,
@@ -9446,30 +9041,6 @@ function LoginView({
         >
           {loading ? "Accesso..." : "Entra"}
         </button>
-
-        {mode === "agent" && (
-          <button
-            type="button"
-            onClick={() => {
-              setShowChangePassword((current) => !current);
-              setErrorMsg("");
-              setChangeMessage("");
-            }}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid #cbd5e1",
-              background: "white",
-              color: "#0f172a",
-              cursor: "pointer",
-              fontWeight: 800,
-            }}
-          >
-            {showChangePassword
-              ? "ANNULLA CAMBIO PASSWORD"
-              : "CAMBIA PASSWORD"}
-          </button>
-        )}
       </div>
     </div>
   );
