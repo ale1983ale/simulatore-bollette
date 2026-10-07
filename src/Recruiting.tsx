@@ -1213,6 +1213,7 @@ export default function Recruiting({
   hideNavigation = false,
   onOpenContact,
   onOpenAppointment,
+  onAddToAgents,
 }: {
   initialSection?: RecruitingSection;
   contactScope?: RecruitingContactScope;
@@ -1226,6 +1227,16 @@ export default function Recruiting({
     crmEventId: string,
     mode: "view" | "reschedule"
   ) => void;
+  onAddToAgents?: (candidate: {
+    id: string;
+    fullName: string;
+    phone: string;
+    email: string;
+    operationalZone: string;
+    provinceCode: string;
+    region: string;
+    contactScope: "internal" | "external";
+  }) => void;
 }) {
   const [ctx, setCtx] = useState<RecruitingContext | null>(null);
   const [section, setSection] = useState<RecruitingSection>(
@@ -9009,6 +9020,26 @@ export default function Recruiting({
                           }}
                         >
                           📇 AGGIUNGI A RUBRICA
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => onAddToAgents?.(selectedCandidate)}
+                          disabled={!onAddToAgents}
+                          style={{
+                            ...buttonStyle,
+                            padding: "7px 10px",
+                            background: "#f3e8ff",
+                            color: "#6b21a8",
+                            border: "1px solid #c084fc",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: onAddToAgents ? 1 : 0.55,
+                          }}
+                          title="Crea un nuovo agente usando i dati di questo contatto"
+                        >
+                          👤 AGGIUNGI AD AGENTI
                         </button>
 
                         <button
