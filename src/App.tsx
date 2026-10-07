@@ -13370,7 +13370,19 @@ useEffect(() => {
   );
 }, [adminSession, tab]);
 
-  const databaseAdminTabs = ["agents", "listini", "punpsvAdmin", "systemCharges", "gasNetworkCharges", "recruitingManagement", "recruitingCrm"];
+  const pricingCostTabs = [
+    "listini",
+    "punpsvAdmin",
+    "systemCharges",
+    "gasNetworkCharges",
+  ];
+
+  const databaseAdminTabs = [
+    "agents",
+    ...pricingCostTabs,
+    "recruitingManagement",
+    "recruitingCrm",
+  ];
 
   useEffect(() => {
     if (tab === "recruitingZones") {
@@ -13496,7 +13508,15 @@ useEffect(() => {
     },
   };
 
-  const currentAdminSection = adminSectionMeta[tab];
+  const currentAdminSection = pricingCostTabs.includes(tab)
+    ? {
+        title: "LISTINI E COSTI",
+        subtitle:
+          "Gestisci listini, prezzi di mercato e componenti di costo Energia e Gas.",
+        icon: "⚙",
+        variant: "database",
+      }
+    : adminSectionMeta[tab];
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = adminProfile?.role === "super_admin";
   const canUseProvvigioni =
@@ -13936,52 +13956,23 @@ const renderAdminContent = () => {
             Agent Admin
           </button>
 
-          {adminProfile?.role === "super_admin" && (
-            <button
-              onClick={() => setTab("listini")}
-              style={{
-                ...baseBtn,
-                padding: "9px 14px",
-                ...(tab === "listini" ? activeBtn : {}),
-              }}
-            >
-              Listini
-            </button>
-          )}
-
-          {adminProfile?.role === "super_admin" && (
-            <button
-              onClick={() => setTab("punpsvAdmin")}
-              style={{
-                ...baseBtn,
-                padding: "9px 14px",
-                ...(tab === "punpsvAdmin" ? activeBtn : {}),
-              }}
-            >
-              PUN-PSV Admin
-            </button>
-          )}
-
           <button
-            onClick={() => setTab("systemCharges")}
+            onClick={() =>
+              setTab(
+                adminProfile?.role === "super_admin"
+                  ? "listini"
+                  : "systemCharges"
+              )
+            }
             style={{
               ...baseBtn,
               padding: "9px 14px",
-              ...(tab === "systemCharges" ? activeBtn : {}),
+              ...(pricingCostTabs.includes(tab)
+                ? activeBtn
+                : {}),
             }}
           >
-            DISP/CP MRK + ONERI DI SISTEMA
-          </button>
-
-          <button
-            onClick={() => setTab("gasNetworkCharges")}
-            style={{
-              ...baseBtn,
-              padding: "9px 14px",
-              ...(tab === "gasNetworkCharges" ? activeBtn : {}),
-            }}
-          >
-            RETE + ONERI GAS
+            LISTINI E COSTI
           </button>
 
           <button
@@ -14007,6 +13998,81 @@ const renderAdminContent = () => {
           </button>
         </div>
       )}
+
+      {hasFullAdminAccess &&
+        pricingCostTabs.includes(tab) && (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              alignItems: "center",
+              background: "#ffffff",
+              border: "1px solid #dbeafe",
+              borderRadius: 12,
+              padding: 10,
+              marginTop: -6,
+              boxShadow:
+                "0 5px 16px rgba(15,23,42,.04)",
+            }}
+          >
+            {adminProfile?.role === "super_admin" && (
+              <button
+                onClick={() => setTab("listini")}
+                style={{
+                  ...baseBtn,
+                  padding: "8px 13px",
+                  ...(tab === "listini"
+                    ? activeBtn
+                    : {}),
+                }}
+              >
+                LISTINI
+              </button>
+            )}
+
+            {adminProfile?.role === "super_admin" && (
+              <button
+                onClick={() => setTab("punpsvAdmin")}
+                style={{
+                  ...baseBtn,
+                  padding: "8px 13px",
+                  ...(tab === "punpsvAdmin"
+                    ? activeBtn
+                    : {}),
+                }}
+              >
+                PUN-PSV ADMIN
+              </button>
+            )}
+
+            <button
+              onClick={() => setTab("systemCharges")}
+              style={{
+                ...baseBtn,
+                padding: "8px 13px",
+                ...(tab === "systemCharges"
+                  ? activeBtn
+                  : {}),
+              }}
+            >
+              DISP/CP MRK + ONERI DI SISTEMA
+            </button>
+
+            <button
+              onClick={() => setTab("gasNetworkCharges")}
+              style={{
+                ...baseBtn,
+                padding: "8px 13px",
+                ...(tab === "gasNetworkCharges"
+                  ? activeBtn
+                  : {}),
+              }}
+            >
+              RETE + ONERI GAS
+            </button>
+          </div>
+        )}
 
       {tab !== "dashboard" && currentAdminSection && (
         <SectionHero
