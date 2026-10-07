@@ -8494,17 +8494,54 @@ function AgentsAdmin({
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
               Password
             </div>
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 8,
-                border: "1px solid #cbd5e1",
-                borderRadius: 8,
-                boxSizing: "border-box",
-              }}
-            />
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: 8,
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setPassword(generateLoginPassword())}
+                style={{
+                  padding: "7px 9px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "#f8fafc",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                }}
+              >
+                GENERA
+              </button>
+              <button
+                type="button"
+                disabled={!password}
+                onClick={() => {
+                  if (!password) return;
+                  void navigator.clipboard
+                    .writeText(password)
+                    .then(() => alert("Password copiata"));
+                }}
+                style={{
+                  padding: "7px 9px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "#f8fafc",
+                  cursor: password ? "pointer" : "not-allowed",
+                  fontWeight: 800,
+                }}
+              >
+                COPIA
+              </button>
+            </div>
           </div>
   
           {adminProfile?.role === "super_admin" && (
@@ -8643,9 +8680,25 @@ function AgentsAdmin({
                         fontWeight: 800,
                       }}
                     >
-                      {a.password_configured !== false
-                        ? "🔒 REIMPOSTABILE"
-                        : "—"}
+                      {a.password_configured !== false ? (
+                        <div>
+                          <div>🔒 IMPOSTATA</div>
+                          <div
+                            style={{
+                              marginTop: 3,
+                              fontSize: 11,
+                              color: "#64748b",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {formatPasswordChangeDate(
+                              a.password_changed_at
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
   
                     {adminProfile?.role === "super_admin" && (
@@ -8804,6 +8857,23 @@ function AgentsAdmin({
                     boxSizing: "border-box",
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditPassword(generateLoginPassword())
+                  }
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff7ed",
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    color: "#c2410c",
+                  }}
+                >
+                  GENERA
+                </button>
                 <button
                   type="button"
                   disabled={!editPassword}
@@ -10515,18 +10585,58 @@ function AdminUsersManager({
             }}
           />
 
-          <input
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Password"
-            style={{
-              width: "100%",
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid #cbd5e1",
-              boxSizing: "border-box",
-            }}
-          />
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Password"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid #cbd5e1",
+                boxSizing: "border-box",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() =>
+                setNewPassword(generateLoginPassword())
+              }
+              style={{
+                padding: "8px 9px",
+                borderRadius: 9,
+                border: "1px solid #cbd5e1",
+                background: "#fff7ed",
+                cursor: "pointer",
+                fontWeight: 800,
+                color: "#c2410c",
+              }}
+            >
+              GENERA
+            </button>
+            <button
+              type="button"
+              disabled={!newPassword}
+              onClick={() => {
+                if (!newPassword) return;
+                void navigator.clipboard
+                  .writeText(newPassword)
+                  .then(() => alert("Password copiata"));
+              }}
+              style={{
+                padding: "8px 9px",
+                borderRadius: 9,
+                border: "1px solid #cbd5e1",
+                background: "#f8fafc",
+                cursor: newPassword ? "pointer" : "not-allowed",
+                fontWeight: 800,
+              }}
+            >
+              COPIA
+            </button>
+          </div>
         </div>
 
         <div style={{ height: 12 }} />
@@ -10620,9 +10730,29 @@ function AdminUsersManager({
                       style={{
                         padding: "12px 8px",
                         borderBottom: "1px solid #f1f5f9",
+                        color: "#166534",
+                        fontWeight: 800,
                       }}
                     >
-                      {a.password}
+                      {a.password_configured !== false ? (
+                        <div>
+                          <div>🔒 IMPOSTATA</div>
+                          <div
+                            style={{
+                              marginTop: 3,
+                              fontSize: 11,
+                              color: "#64748b",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {formatPasswordChangeDate(
+                              a.password_changed_at
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
 
                     <td
@@ -10796,20 +10926,73 @@ function AdminUsersManager({
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Password
               </div>
-              <input
-                type="password"
-                value={editAdminPassword}
-                onChange={(e) => setEditAdminPassword(e.target.value)}
-                placeholder="Lascia vuoto per mantenere la password attuale"
-                autoComplete="new-password"
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text"
+                  value={editAdminPassword}
+                  onChange={(e) =>
+                    setEditAdminPassword(e.target.value)
+                  }
+                  placeholder="Lascia vuoto per mantenere la password attuale"
+                  autoComplete="off"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: 10,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditAdminPassword(generateLoginPassword())
+                  }
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff7ed",
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    color: "#c2410c",
+                  }}
+                >
+                  GENERA
+                </button>
+                <button
+                  type="button"
+                  disabled={!editAdminPassword}
+                  onClick={() => {
+                    if (!editAdminPassword) return;
+                    void navigator.clipboard
+                      .writeText(editAdminPassword)
+                      .then(() => alert("Password copiata"));
+                  }}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                    background: "#f8fafc",
+                    cursor: editAdminPassword
+                      ? "pointer"
+                      : "not-allowed",
+                    fontWeight: 800,
+                  }}
+                >
+                  COPIA
+                </button>
+              </div>
+              <div
                 style={{
-                  width: "100%",
-                  padding: 10,
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 8,
-                  boxSizing: "border-box",
+                  marginTop: 6,
+                  color: "#64748b",
+                  fontSize: 12,
                 }}
-              />
+              >
+                La nuova password è visibile solo mentre la stai impostando.
+              </div>
             </div>
 
             <div
