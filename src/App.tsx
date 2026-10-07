@@ -15216,7 +15216,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               ...(tab === "energia" ? activeBtn : {}),
             }}
           >
-            Energia
+            <span className="ge-main-nav__label-desktop">Energia</span>
+            <span className="ge-main-nav__label-mobile">ENERGIA</span>
           </button>
 
           <button
@@ -15226,7 +15227,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               ...(tab === "gas" ? activeBtn : {}),
             }}
           >
-            Gas
+            <span className="ge-main-nav__label-desktop">Gas</span>
+            <span className="ge-main-nav__label-mobile">GAS</span>
           </button>
 
           <button
@@ -15236,7 +15238,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               ...(tab === "report" ? activeBtn : {}),
             }}
           >
-            Report
+            <span className="ge-main-nav__label-desktop">Report</span>
+            <span className="ge-main-nav__label-mobile">REPORT</span>
           </button>
 
           <button
@@ -15246,7 +15249,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               ...(tab === "punpsvPublic" ? activeBtn : {}),
             }}
           >
-            PUN-PSV
+            <span className="ge-main-nav__label-desktop">PUN-PSV</span>
+            <span className="ge-main-nav__label-mobile">PUN</span>
           </button>
 
           <button
@@ -15256,7 +15260,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               ...(tab === "ateco" ? activeBtn : {}),
             }}
           >
-            ATECO
+            <span className="ge-main-nav__label-desktop">ATECO</span>
+            <span className="ge-main-nav__label-mobile">ATECO</span>
           </button>
 
           <button
@@ -15266,7 +15271,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               ...(tab === "driveArchive" ? activeBtn : {}),
             }}
           >
-            ARCHIVIO
+            <span className="ge-main-nav__label-desktop">ARCHIVIO</span>
+            <span className="ge-main-nav__label-mobile">ARCH.</span>
           </button>
 
         </div>
@@ -15293,7 +15299,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                   : {}),
               }}
             >
-              Area Admin
+              <span className="ge-main-nav__label-desktop">Area Admin</span>
+              <span className="ge-main-nav__label-mobile">ADMIN</span>
             </button>
           )}
 
