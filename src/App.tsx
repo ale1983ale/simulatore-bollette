@@ -10082,7 +10082,7 @@ function ReportAdmin({
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] =
-    useState<"CURRENT" | "PERIODO">("CURRENT");
+    useState<"CURRENT" | "PREVIOUS" | "PERIODO">("CURRENT");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<"ALL" | "MINE" | "OTHERS">("ALL");
@@ -10187,11 +10187,37 @@ function ReportAdmin({
   const productionStartYmd = toLocalYmd(productionStart);
   const productionTodayYmd = toLocalYmd(productionToday);
 
+  const previousProductionEnd = new Date(
+    productionToday.getFullYear(),
+    productionToday.getMonth() -
+      (productionToday.getDate() < 12 ? 1 : 0),
+    11
+  );
+
+  const previousProductionStart = new Date(
+    previousProductionEnd.getFullYear(),
+    previousProductionEnd.getMonth() - 1,
+    11
+  );
+
+  const previousProductionStartYmd =
+    toLocalYmd(previousProductionStart);
+  const previousProductionEndYmd =
+    toLocalYmd(previousProductionEnd);
+
   const currentProductionReports = reports.filter((report) => {
     const reportDate = String(report.report_date || "");
     return (
       reportDate >= productionStartYmd &&
       reportDate <= productionTodayYmd
+    );
+  });
+
+  const previousProductionReports = reports.filter((report) => {
+    const reportDate = String(report.report_date || "");
+    return (
+      reportDate >= previousProductionStartYmd &&
+      reportDate <= previousProductionEndYmd
     );
   });
 
@@ -10206,7 +10232,9 @@ function ReportAdmin({
   const summaryReports =
     mode === "CURRENT"
       ? currentProductionReports
-      : selectedPeriodReports;
+      : mode === "PREVIOUS"
+        ? previousProductionReports
+        : selectedPeriodReports;
 
   const totals = summaryReports.reduce(
     (acc, r) => {
@@ -10229,6 +10257,11 @@ function ReportAdmin({
       productionTodayYmd
     )}`;
 
+  const previousProductionPeriodLabel =
+    `${formatReportDate(
+      previousProductionStartYmd
+    )} – ${formatReportDate(previousProductionEndYmd)}`;
+
   const selectedPeriodLabel =
     dateFrom || dateTo
       ? `${dateFrom ? formatReportDate(dateFrom) : "INIZIO"} – ${
@@ -10239,7 +10272,9 @@ function ReportAdmin({
   const summaryPeriodLabel =
     mode === "CURRENT"
       ? productionPeriodLabel
-      : selectedPeriodLabel;
+      : mode === "PREVIOUS"
+        ? previousProductionPeriodLabel
+        : selectedPeriodLabel;
 
   const getAgentName = (agentId: number) => {
     const agent = agents.find((a) => a.id === agentId);
@@ -10427,7 +10462,10 @@ function ReportAdmin({
                 value={mode}
                 onChange={(e) =>
                   setMode(
-                    e.target.value as "CURRENT" | "PERIODO"
+                    e.target.value as
+                      | "CURRENT"
+                      | "PREVIOUS"
+                      | "PERIODO"
                   )
                 }
                 style={{
@@ -10438,6 +10476,9 @@ function ReportAdmin({
               >
                 <option value="CURRENT">
                   PRODUZIONE IN CORSO
+                </option>
+                <option value="PREVIOUS">
+                  PRODUZIONE PRECEDENTE
                 </option>
                 <option value="PERIODO">
                   PERIODO SCELTO
@@ -10532,7 +10573,9 @@ function ReportAdmin({
           >
             {mode === "CURRENT"
               ? "RIEPILOGO PRODUZIONE IN CORSO"
-              : "RIEPILOGO PERIODO SCELTO"}
+              : mode === "PREVIOUS"
+                ? "RIEPILOGO PRODUZIONE PRECEDENTE"
+                : "RIEPILOGO PERIODO SCELTO"}
           </h3>
 
           <div
@@ -10846,7 +10889,9 @@ function ReportAdmin({
               const agentSummaryLabel =
                 mode === "CURRENT"
                   ? "RIEPILOGO PRODUZIONE IN CORSO"
-                  : "RIEPILOGO PERIODO SCELTO";
+                  : mode === "PREVIOUS"
+                    ? "RIEPILOGO PRODUZIONE PRECEDENTE"
+                    : "RIEPILOGO PERIODO SCELTO";
 
               return (
                 <div
