@@ -424,7 +424,7 @@ export default function OutlookEmail() {
     const positionOverlay = () => {
       const visibleShells = Array.from(
         document.querySelectorAll(
-          ".ge-brand-shell, .ge-main-nav, .ge-admin-nav"
+          ".ge-brand-shell, .ge-main-nav, .ge-admin-nav, .ge-database-nav"
         )
       ).filter(
         (node) =>
@@ -449,7 +449,7 @@ export default function OutlookEmail() {
       if (!target) return;
 
       const navigationTarget = target.closest(
-        ".ge-brand-shell, .ge-main-nav, .ge-admin-nav"
+        ".ge-brand-shell, .ge-main-nav, .ge-admin-nav, .ge-database-nav"
       );
       if (!navigationTarget) return;
 
