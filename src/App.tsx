@@ -10397,26 +10397,238 @@ function ReportAdmin({
           )}
         </div>
 
-        <h3 style={{ marginTop: 0 }}>Riepilogo totali</h3>
+        <h3
+          style={{
+            marginTop: 0,
+            marginBottom: 14,
+            fontSize: 22,
+            color: "#0f172a",
+          }}
+        >
+          Riepilogo totali
+        </h3>
+
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-            gap: 12,
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+            gap: 16,
           }}
         >
-          {previewBox(
-            <>{row("Contratti energia", String(totals.contracts_energia), true)}</>
-          )}
-          {previewBox(
-            <>{row("Consumi energia", numFormat(totals.consumi_energia, 2), true)}</>
-          )}
-          {previewBox(
-            <>{row("Contratti gas", String(totals.contracts_gas), true)}</>
-          )}
-          {previewBox(
-            <>{row("Consumi gas", numFormat(totals.consumi_gas, 2), true)}</>
-          )}
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #fed7aa",
+              borderRadius: 18,
+              overflow: "hidden",
+              boxShadow: "0 8px 24px rgba(249,115,22,.10)",
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                background:
+                  "linear-gradient(135deg, #f97316 0%, #fb923c 100%)",
+                color: "white",
+                padding: "13px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: 9,
+                fontWeight: 900,
+                fontSize: 19,
+                letterSpacing: ".3px",
+              }}
+            >
+              <span style={{ fontSize: 23 }}>⚡</span>
+              LUCE
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(145px, 1fr))",
+                gap: 10,
+                padding: 12,
+              }}
+            >
+              <div
+                style={{
+                  background: "#fff7ed",
+                  border: "1px solid #fed7aa",
+                  borderRadius: 13,
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    color: "#9a3412",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: ".35px",
+                  }}
+                >
+                  Contratti energia
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    color: "#7c2d12",
+                    fontSize: "clamp(26px, 3vw, 34px)",
+                    lineHeight: 1,
+                    fontWeight: 900,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {String(totals.contracts_energia)}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: "#fff7ed",
+                  border: "1px solid #fed7aa",
+                  borderRadius: 13,
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    color: "#9a3412",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: ".35px",
+                  }}
+                >
+                  Consumi energia
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    color: "#7c2d12",
+                    fontSize: "clamp(24px, 3vw, 34px)",
+                    lineHeight: 1,
+                    fontWeight: 900,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {numFormat(totals.consumi_energia, 2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #bfdbfe",
+              borderRadius: 18,
+              overflow: "hidden",
+              boxShadow: "0 8px 24px rgba(37,99,235,.10)",
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                background:
+                  "linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)",
+                color: "white",
+                padding: "13px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: 9,
+                fontWeight: 900,
+                fontSize: 19,
+                letterSpacing: ".3px",
+              }}
+            >
+              <span style={{ fontSize: 23 }}>🔥</span>
+              GAS
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(145px, 1fr))",
+                gap: 10,
+                padding: 12,
+              }}
+            >
+              <div
+                style={{
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 13,
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    color: "#1d4ed8",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: ".35px",
+                  }}
+                >
+                  Contratti gas
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    color: "#1e3a8a",
+                    fontSize: "clamp(26px, 3vw, 34px)",
+                    lineHeight: 1,
+                    fontWeight: 900,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {String(totals.contracts_gas)}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 13,
+                  padding: 14,
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    color: "#1d4ed8",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: ".35px",
+                  }}
+                >
+                  Consumi gas
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    color: "#1e3a8a",
+                    fontSize: "clamp(24px, 3vw, 34px)",
+                    lineHeight: 1,
+                    fontWeight: 900,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {numFormat(totals.consumi_gas, 2)}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
