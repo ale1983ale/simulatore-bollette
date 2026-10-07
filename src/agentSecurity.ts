@@ -16,6 +16,7 @@ export type SafeAgentRecord = {
   nome: string;
   cognome: string;
   username: string;
+  password?: string;
   owner_admin_id?: number | null;
   provvigioni_visible?: boolean;
   password_configured?: boolean;
