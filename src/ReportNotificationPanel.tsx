@@ -223,7 +223,7 @@ export default function ReportNotificationPanel({
         subject: subject.trim(),
         body: body.trim(),
         selected_emails: selected.map((agent) => agent.email.trim()),
-        include_credentials: false,
+        include_credentials: true,
       });
 
       setNotice(
@@ -276,9 +276,10 @@ export default function ReportNotificationPanel({
       >
         <strong>🔔 Invio Notifica Report</strong>
         <div style={{ marginTop: 6, color: "#475569", fontSize: 14 }}>
-          La mail viene inviata agli agenti con flag REPORT attivo e contiene il
-          pulsante <strong>COMPILA IL REPORT</strong>, che apre direttamente
-          l'area Report della webapp.
+          La mail viene inviata agli agenti con flag REPORT attivo e contiene
+          sempre lo <strong>username</strong>, il pulsante
+          <strong> IMPOSTA / CAMBIA PASSWORD</strong> e il pulsante
+          <strong> COMPILA IL REPORT</strong>.
         </div>
         {dirty && (
           <div style={{ marginTop: 10, color: "#b45309", fontWeight: 800 }}>
