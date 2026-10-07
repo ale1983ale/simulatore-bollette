@@ -1983,53 +1983,35 @@ export default function OutlookEmail() {
                         />
                       </td>
                       <td style={{ padding: 5 }}>
-                        {editingRecipients ? (
-                          <select
-                            value={agents[index]?.agent_id ?? ""}
-                            onChange={(event) =>
-                              updateAgent(
-                                index,
-                                "agent_id",
-                                event.target.value
-                                  ? Number(event.target.value)
-                                  : null
-                              )
-                            }
-                            style={{
-                              ...smallField,
-                              minWidth: 0,
-                            }}
-                          >
-                            <option value="">
-                              NON ASSOCIATO
+                        <select
+                          value={agents[index]?.agent_id ?? ""}
+                          onChange={(event) =>
+                            updateAgent(
+                              index,
+                              "agent_id",
+                              event.target.value
+                                ? Number(event.target.value)
+                                : null
+                            )
+                          }
+                          style={{
+                            ...smallField,
+                            minWidth: 0,
+                            background: agents[index]?.agent_id
+                              ? "#f0fdf4"
+                              : "#fff7ed",
+                          }}
+                        >
+                          <option value="">NON ASSOCIATO</option>
+                          {reportAccounts.map((account) => (
+                            <option
+                              key={account.id}
+                              value={account.id}
+                            >
+                              {`${account.nome} ${account.cognome} · ${account.username}`}
                             </option>
-                            {reportAccounts.map((account) => (
-                              <option
-                                key={account.id}
-                                value={account.id}
-                              >
-                                {`${account.nome} ${account.cognome} · ${account.username}`}
-                              </option>
-                            ))}
-                          </select>
-                        ) : agents[index]?.agent_id ? (
-                          (() => {
-                            const account = reportAccounts.find(
-                              (item) =>
-                                Number(item.id) ===
-                                Number(agents[index]?.agent_id)
-                            );
-                            return account
-                              ? `${account.nome} ${account.cognome} · ${account.username}`
-                              : `ID ${agents[index]?.agent_id}`;
-                          })()
-                        ) : agents[index]?.report_notify ? (
-                          <strong style={{ color: "#b91c1c" }}>
-                            NON ASSOCIATO
-                          </strong>
-                        ) : (
-                          "—"
-                        )}
+                          ))}
+                        </select>
                       </td>
                     </tr>
                   ))}
