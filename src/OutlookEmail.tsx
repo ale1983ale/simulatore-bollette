@@ -659,9 +659,21 @@ export default function OutlookEmail() {
 
     if (targetIndex < 0) {
       setEditingRecipients(true);
+      setAgents((current) => [
+        ...current,
+        {
+          agenzia: targetMatchAgency.toLocaleUpperCase("it"),
+          email: "",
+          allegato: "",
+          dm: "",
+          report_notify: false,
+          agent_id: null,
+        },
+      ]);
+      setDirty(true);
       setNotice(
         targetMatchAgency.toLocaleUpperCase("it") +
-          ": nominativo non trovato nell'elenco abbinamenti. Aggiungilo all'elenco e poi imposta il LOGIN DI RIFERIMENTO."
+          ": riga preparata. Seleziona il LOGIN DI RIFERIMENTO e poi premi SALVA ELENCO ONLINE."
       );
       return;
     }
