@@ -2229,8 +2229,21 @@ export default function UnifiedAgentManagement({
           id="uam-new-agent-form"
           style={{
             ...cardStyle,
-            border: "3px solid #16a34a",
-            background: "#f8fff9",
+            border:
+              createSource === "login"
+                ? "3px solid #16a34a"
+                : createSource === "email"
+                  ? "3px solid #0ea5e9"
+                  : "3px solid #f97316",
+            background:
+              createSource === "login"
+                ? "#f8fff9"
+                : createSource === "email"
+                  ? "#f8fcff"
+                  : "#fffaf5",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
           }}
         >
           <div
@@ -2240,638 +2253,185 @@ export default function UnifiedAgentManagement({
               alignItems: "center",
               gap: 12,
               flexWrap: "wrap",
-              marginBottom: 14,
             }}
           >
             <div>
-              <h3 style={{ margin: 0, color: "#166534" }}>
+              <h3
+                style={{
+                  margin: 0,
+                  color:
+                    createSource === "login"
+                      ? "#166534"
+                      : createSource === "email"
+                        ? "#0369a1"
+                        : "#c2410c",
+                }}
+              >
                 NUOVO AGENTE
               </h3>
               <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
-                Crea prima il Login e scegli se inserire nello stesso salvataggio
-                anche Abbinamento Email e Agenti Attivi / Mappe.
+                {createSource === "login"
+                  ? "Stai creando l'agente dalla scheda Login."
+                  : createSource === "email"
+                    ? "Stai creando l'agente da Abbinamento Email."
+                    : "Stai creando l'agente da Mappe / Agenti Attivi."}
+                {" "}La scheda di partenza resta principale; sotto puoi aggiungere le altre due.
               </div>
             </div>
           </div>
 
-          <section
-            style={{
-              background: "white",
-              border: "1px solid #bbf7d0",
-              borderRadius: 12,
-              padding: 14,
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 950,
-                color: "#166534",
-                marginBottom: 10,
-              }}
-            >
-              🔐 LOGIN
-            </div>
-
-            <div
-              className="uam-responsive-grid"
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit,minmax(190px,1fr))",
-                gap: 10,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                  NOME *
-                </div>
-                <input
-                  value={createDraft.nome}
-                  onChange={(e) =>
-                    setCreateDraft({
-                      ...createDraft,
-                      nome: e.target.value.toLocaleUpperCase("it"),
-                    })
-                  }
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                  COGNOME *
-                </div>
-                <input
-                  value={createDraft.cognome}
-                  onChange={(e) =>
-                    setCreateDraft({
-                      ...createDraft,
-                      cognome: e.target.value.toLocaleUpperCase("it"),
-                    })
-                  }
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                  USERNAME *
-                </div>
-                <input
-                  value={createDraft.username}
-                  onChange={(e) =>
-                    setCreateDraft({
-                      ...createDraft,
-                      username: e.target.value,
-                    })
-                  }
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                  PASSWORD *
-                </div>
-                <input
-                  type="text"
-                  value={createDraft.password}
-                  onChange={(e) =>
-                    setCreateDraft({
-                      ...createDraft,
-                      password: e.target.value,
-                    })
-                  }
-                  style={inputStyle}
-                />
-              </div>
-
-              {adminProfile?.role === "super_admin" && (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    ADMIN ASSOCIATO *
-                  </div>
-                  <select
-                    value={createDraft.ownerAdminId}
-                    onChange={(e) =>
-                      setCreateDraft({
-                        ...createDraft,
-                        ownerAdminId: e.target.value
-                          ? Number(e.target.value)
-                          : "",
-                      })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="">Seleziona...</option>
-                    {admins.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {String(
-                          `${item.nome || ""} ${item.cognome || ""}`
-                        ).trim() || item.username}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {adminProfile?.role === "super_admin" && (
-              <label
-                style={{
-                  display: "inline-flex",
-                  gap: 7,
-                  alignItems: "center",
-                  fontWeight: 900,
-                  marginTop: 12,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={createDraft.provvigioniVisible}
-                  onChange={(e) =>
-                    setCreateDraft({
-                      ...createDraft,
-                      provvigioniVisible: e.target.checked,
-                    })
-                  }
-                />
-                ACCESSO PROVVIGIONI
-              </label>
-            )}
-          </section>
+          {createSource === "login" &&
+            renderCreateLoginSection(true)}
+          {createSource === "email" &&
+            renderCreateEmailSection(true)}
+          {createSource === "map" &&
+            renderCreateMapSection(true)}
 
           <div
             style={{
               display: "grid",
               gridTemplateColumns:
-                "repeat(auto-fit,minmax(min(100%,360px),1fr))",
-              gap: 12,
-              marginTop: 14,
+                "repeat(auto-fit,minmax(min(100%,320px),1fr))",
+              gap: 10,
             }}
           >
-            <button
-              type="button"
-              onClick={() =>
-                setCreateDraft({
-                  ...createDraft,
-                  insertEmailMatching:
-                    !createDraft.insertEmailMatching,
-                })
-              }
-              style={{
-                ...buttonStyle,
-                textAlign: "left",
-                padding: "14px 16px",
-                background: createDraft.insertEmailMatching
-                  ? "#e0f2fe"
-                  : "white",
-                color: "#075985",
-                border: createDraft.insertEmailMatching
-                  ? "2px solid #38bdf8"
-                  : "2px solid #bae6fd",
-              }}
-            >
-              <div
+            {createSource !== "login" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setCreateDraft({
+                    ...createDraft,
+                    insertLogin: !createDraft.insertLogin,
+                  })
+                }
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 9,
+                  ...buttonStyle,
+                  textAlign: "left",
+                  padding: "13px 15px",
+                  background: createDraft.insertLogin
+                    ? "#dcfce7"
+                    : "white",
+                  color: "#166534",
+                  border: createDraft.insertLogin
+                    ? "2px solid #22c55e"
+                    : "2px solid #bbf7d0",
                 }}
               >
-                <input
-                  type="checkbox"
-                  readOnly
-                  checked={createDraft.insertEmailMatching}
-                />
-                <span>INSERISCI ABBINAMENTO EMAIL</span>
-              </div>
-              <div
-                style={{
-                  marginTop: 5,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#64748b",
-                }}
-              >
-                {createDraft.insertEmailMatching
-                  ? "Campi aperti sotto"
-                  : "Clicca per compilare i dati della scheda Abbinamenti"}
-              </div>
-            </button>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={createDraft.insertLogin}
+                  />
+                  <span>INSERISCI LOGIN</span>
+                </div>
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={() =>
-                setCreateDraft({
-                  ...createDraft,
-                  insertActiveAgent:
-                    !createDraft.insertActiveAgent,
-                })
-              }
-              style={{
-                ...buttonStyle,
-                textAlign: "left",
-                padding: "14px 16px",
-                background: createDraft.insertActiveAgent
-                  ? "#fff7ed"
-                  : "white",
-                color: "#9a3412",
-                border: createDraft.insertActiveAgent
-                  ? "2px solid #fb923c"
-                  : "2px solid #fed7aa",
-              }}
-            >
-              <div
+            {createSource !== "email" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setCreateDraft({
+                    ...createDraft,
+                    insertEmailMatching:
+                      !createDraft.insertEmailMatching,
+                  })
+                }
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 9,
+                  ...buttonStyle,
+                  textAlign: "left",
+                  padding: "13px 15px",
+                  background: createDraft.insertEmailMatching
+                    ? "#e0f2fe"
+                    : "white",
+                  color: "#075985",
+                  border: createDraft.insertEmailMatching
+                    ? "2px solid #38bdf8"
+                    : "2px solid #bae6fd",
                 }}
               >
-                <input
-                  type="checkbox"
-                  readOnly
-                  checked={createDraft.insertActiveAgent}
-                />
-                <span>INSERISCI IN MAPPE / AGENTI ATTIVI</span>
-              </div>
-              <div
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={createDraft.insertEmailMatching}
+                  />
+                  <span>INSERISCI ABBINAMENTO EMAIL</span>
+                </div>
+              </button>
+            )}
+
+            {createSource !== "map" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setCreateDraft({
+                    ...createDraft,
+                    insertActiveAgent:
+                      !createDraft.insertActiveAgent,
+                  })
+                }
                 style={{
-                  marginTop: 5,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#64748b",
+                  ...buttonStyle,
+                  textAlign: "left",
+                  padding: "13px 15px",
+                  background: createDraft.insertActiveAgent
+                    ? "#fff7ed"
+                    : "white",
+                  color: "#9a3412",
+                  border: createDraft.insertActiveAgent
+                    ? "2px solid #fb923c"
+                    : "2px solid #fed7aa",
                 }}
               >
-                {createDraft.insertActiveAgent
-                  ? "Campi aperti sotto"
-                  : "Clicca per compilare i dati di Agenti attivi / Mappe"}
-              </div>
-            </button>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={createDraft.insertActiveAgent}
+                  />
+                  <span>INSERISCI IN MAPPE / AGENTI ATTIVI</span>
+                </div>
+              </button>
+            )}
           </div>
 
-          {createDraft.insertEmailMatching && (
-            <section
-              style={{
-                marginTop: 12,
-                background: "#f0f9ff",
-                border: "2px solid #7dd3fc",
-                borderRadius: 12,
-                padding: 14,
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 950,
-                  color: "#0369a1",
-                  marginBottom: 10,
-                }}
-              >
-                ✉️ ABBINAMENTO EMAIL
-              </div>
+          {createSource !== "login" &&
+            createDraft.insertLogin &&
+            renderCreateLoginSection(false)}
 
-              <div
-                className="uam-responsive-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit,minmax(210px,1fr))",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    AGENZIA
-                  </div>
-                  <div
-                    style={{
-                      ...inputStyle,
-                      minHeight: 38,
-                      background: "#f8fafc",
-                      fontWeight: 900,
-                    }}
-                  >
-                    {`${createDraft.nome} ${createDraft.cognome}`.trim() ||
-                      "NOME AGENTE"}
-                  </div>
-                </div>
+          {createSource !== "email" &&
+            createDraft.insertEmailMatching &&
+            renderCreateEmailSection(false)}
 
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    EMAIL
-                  </div>
-                  <input
-                    type="email"
-                    value={createDraft.email}
-                    onChange={(e) =>
-                      setCreateDraft({
-                        ...createDraft,
-                        email: e.target.value,
-                      })
-                    }
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    ALLEGATO PREVISTO
-                  </div>
-                  <input
-                    value={createDraft.emailAttachment}
-                    onChange={(e) =>
-                      setCreateDraft({
-                        ...createDraft,
-                        emailAttachment: e.target.value,
-                      })
-                    }
-                    placeholder="Es. NOMEFILE.xlsx"
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    DM
-                  </div>
-                  <select
-                    value={
-                      createDmCustomOpen
-                        ? "__NEW_DM__"
-                        : createDraft.dm
-                    }
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === "__NEW_DM__") {
-                        setCreateDmCustomOpen(true);
-                        setCreateDraft({
-                          ...createDraft,
-                          dm: "",
-                        });
-                        return;
-                      }
-                      setCreateDmCustomOpen(false);
-                      setCreateDraft({
-                        ...createDraft,
-                        dm: value,
-                      });
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="">SELEZIONA DM...</option>
-                    {dmSuggestions.map((dm) => (
-                      <option key={dm} value={dm}>
-                        {dm.toLocaleUpperCase("it")}
-                      </option>
-                    ))}
-                    <option value="__NEW_DM__">
-                      ALTRO / NUOVO DM
-                    </option>
-                  </select>
-                  {createDmCustomOpen && (
-                    <input
-                      autoFocus
-                      value={createDraft.dm}
-                      onChange={(e) =>
-                        setCreateDraft({
-                          ...createDraft,
-                          dm: e.target.value.toLocaleUpperCase("it"),
-                        })
-                      }
-                      placeholder="INSERISCI NUOVO DM"
-                      style={{ ...inputStyle, marginTop: 7 }}
-                    />
-                  )}
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    LOGIN DI RIFERIMENTO
-                  </div>
-                  <div
-                    style={{
-                      ...inputStyle,
-                      minHeight: 38,
-                      background: "#ecfdf5",
-                      color: "#166534",
-                      fontWeight: 900,
-                    }}
-                  >
-                    {createDraft.username
-                      ? `${createDraft.nome} ${createDraft.cognome}`.trim() +
-                        " · " +
-                        createDraft.username
-                      : "VERRÀ COLLEGATO AL NUOVO LOGIN"}
-                  </div>
-                </div>
-              </div>
-
-              <label
-                style={{
-                  display: "inline-flex",
-                  gap: 7,
-                  alignItems: "center",
-                  fontWeight: 900,
-                  marginTop: 12,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={createDraft.reportNotify}
-                  onChange={(e) =>
-                    setCreateDraft({
-                      ...createDraft,
-                      reportNotify: e.target.checked,
-                    })
-                  }
-                />
-                REPORT ATTIVO
-              </label>
-            </section>
-          )}
-
-          {createDraft.insertActiveAgent && (
-            <section
-              style={{
-                marginTop: 12,
-                background: "#fff7ed",
-                border: "2px solid #fdba74",
-                borderRadius: 12,
-                padding: 14,
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 950,
-                  color: "#c2410c",
-                  marginBottom: 10,
-                }}
-              >
-                📍 MAPPE / AGENTI ATTIVI
-              </div>
-
-              <div
-                className="uam-responsive-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit,minmax(210px,1fr))",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    CELLULARE
-                  </div>
-                  <input
-                    value={createDraft.phone}
-                    onChange={(e) =>
-                      setCreateDraft({
-                        ...createDraft,
-                        phone: e.target.value,
-                      })
-                    }
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    ZONA
-                  </div>
-                  <input
-                    value={createDraft.zone}
-                    onChange={(e) =>
-                      setCreateDraft({
-                        ...createDraft,
-                        zone: e.target.value.toLocaleUpperCase("it"),
-                      })
-                    }
-                    placeholder="Es. PERUGIA"
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    REGIONE
-                  </div>
-                  <div
-                    style={{
-                      ...inputStyle,
-                      minHeight: 38,
-                      background: "#f8fafc",
-                      color: "#64748b",
-                    }}
-                  >
-                    AUTOMATICA DALLA ZONA
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    MACROAREA
-                  </div>
-                  <div
-                    style={{
-                      ...inputStyle,
-                      minHeight: 38,
-                      background: "#fffaf0",
-                      color: "#9a3412",
-                      fontWeight: 800,
-                    }}
-                  >
-                    AUTOMATICA DALLA REGIONE
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                    DM DI RIFERIMENTO
-                  </div>
-                  <select
-                    value={
-                      createDmCustomOpen
-                        ? "__NEW_DM__"
-                        : createDraft.dm
-                    }
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === "__NEW_DM__") {
-                        setCreateDmCustomOpen(true);
-                        setCreateDraft({
-                          ...createDraft,
-                          dm: "",
-                        });
-                        return;
-                      }
-                      setCreateDmCustomOpen(false);
-                      setCreateDraft({
-                        ...createDraft,
-                        dm: value,
-                      });
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="">SELEZIONA DM...</option>
-                    {dmSuggestions.map((dm) => (
-                      <option key={dm} value={dm}>
-                        {dm.toLocaleUpperCase("it")}
-                      </option>
-                    ))}
-                    <option value="__NEW_DM__">
-                      ALTRO / NUOVO DM
-                    </option>
-                  </select>
-                  {createDmCustomOpen && (
-                    <input
-                      autoFocus
-                      value={createDraft.dm}
-                      onChange={(e) =>
-                        setCreateDraft({
-                          ...createDraft,
-                          dm: e.target.value.toLocaleUpperCase("it"),
-                        })
-                      }
-                      placeholder="INSERISCI NUOVO DM"
-                      style={{ ...inputStyle, marginTop: 7 }}
-                    />
-                  )}
-                </div>
-              </div>
-
-              <label
-                style={{
-                  display: "inline-flex",
-                  gap: 8,
-                  alignItems: "center",
-                  fontWeight: 900,
-                  marginTop: 12,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={createDraft.showOnMap}
-                  onChange={(e) =>
-                    setCreateDraft({
-                      ...createDraft,
-                      showOnMap: e.target.checked,
-                    })
-                  }
-                />
-                {createDraft.showOnMap
-                  ? "MOSTRA IN MAPPA"
-                  : "NON MOSTRARE IN MAPPA"}
-              </label>
-            </section>
-          )}
+          {createSource !== "map" &&
+            createDraft.insertActiveAgent &&
+            renderCreateMapSection(false)}
 
           <div
             style={{
               display: "flex",
               justifyContent: "flex-end",
-              marginTop: 14,
+              paddingTop: 4,
             }}
           >
             <button
@@ -2880,7 +2440,7 @@ export default function UnifiedAgentManagement({
               onClick={() => void createAgent()}
               style={{
                 ...buttonStyle,
-                width: "min(280px,100%)",
+                width: "min(300px,100%)",
                 background: busy ? "#94a3b8" : "#16a34a",
                 color: "white",
                 fontSize: 15,
