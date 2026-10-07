@@ -10081,7 +10081,8 @@ function ReportAdmin({
   const [reports, setReports] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"ALL" | "PERIODO">("ALL");
+  const [mode, setMode] =
+    useState<"CURRENT" | "PERIODO">("CURRENT");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<"ALL" | "MINE" | "OTHERS">("ALL");
@@ -10168,20 +10169,6 @@ function ReportAdmin({
     await loadReports(selectedAgentId);
   };
 
-  const filteredReports =
-    mode === "ALL"
-      ? reports
-      : reports.filter((r) => {
-          if (!r.report_date) return false;
-
-          const d = r.report_date;
-
-          if (dateFrom && d < dateFrom) return false;
-          if (dateTo && d > dateTo) return false;
-
-          return true;
-        });
-
   const productionToday = new Date();
   const productionStart = new Date(
     productionToday.getFullYear(),
@@ -10200,7 +10187,7 @@ function ReportAdmin({
   const productionStartYmd = toLocalYmd(productionStart);
   const productionTodayYmd = toLocalYmd(productionToday);
 
-  const productionReports = reports.filter((report) => {
+  const currentProductionReports = reports.filter((report) => {
     const reportDate = String(report.report_date || "");
     return (
       reportDate >= productionStartYmd &&
@@ -10208,7 +10195,20 @@ function ReportAdmin({
     );
   });
 
-  const totals = productionReports.reduce(
+  const selectedPeriodReports = reports.filter((report) => {
+    const reportDate = String(report.report_date || "");
+    if (!reportDate) return false;
+    if (dateFrom && reportDate < dateFrom) return false;
+    if (dateTo && reportDate > dateTo) return false;
+    return true;
+  });
+
+  const summaryReports =
+    mode === "CURRENT"
+      ? currentProductionReports
+      : selectedPeriodReports;
+
+  const totals = summaryReports.reduce(
     (acc, r) => {
       acc.contracts_energia += Number(r.contracts_energia || 0);
       acc.consumi_energia += Number(r.consumi_energia || 0);
@@ -10229,6 +10229,18 @@ function ReportAdmin({
       productionTodayYmd
     )}`;
 
+  const selectedPeriodLabel =
+    dateFrom || dateTo
+      ? `${dateFrom ? formatReportDate(dateFrom) : "INIZIO"} – ${
+          dateTo ? formatReportDate(dateTo) : "OGGI"
+        }`
+      : "SELEZIONA IL PERIODO";
+
+  const summaryPeriodLabel =
+    mode === "CURRENT"
+      ? productionPeriodLabel
+      : selectedPeriodLabel;
+
   const getAgentName = (agentId: number) => {
     const agent = agents.find((a) => a.id === agentId);
     return agent
@@ -10237,7 +10249,7 @@ function ReportAdmin({
   };
 
   const groupedReportAgents = Array.from(
-    filteredReports.reduce((map, report) => {
+    reports.reduce((map, report) => {
       const agentId = Number(report.agent_id);
       const current = map.get(agentId) || [];
       current.push(report);
@@ -10409,19 +10421,27 @@ function ReportAdmin({
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                Modalità
+                Attuale produzione
               </div>
               <select
                 value={mode}
-                onChange={(e) => setMode(e.target.value as any)}
+                onChange={(e) =>
+                  setMode(
+                    e.target.value as "CURRENT" | "PERIODO"
+                  )
+                }
                 style={{
                   padding: 8,
                   borderRadius: 8,
                   border: "1px solid #cbd5e1",
                 }}
               >
-                <option value="ALL">TOTALE</option>
-                <option value="PERIODO">PERIODO SCELTO</option>
+                <option value="CURRENT">
+                  PRODUZIONE IN CORSO
+                </option>
+                <option value="PERIODO">
+                  PERIODO SCELTO
+                </option>
               </select>
             </div>
 
@@ -10510,7 +10530,9 @@ function ReportAdmin({
               color: "#0f172a",
             }}
           >
-            RIEPILOGO PRODUZIONE IN CORSO
+            {mode === "CURRENT"
+              ? "RIEPILOGO PRODUZIONE IN CORSO"
+              : "RIEPILOGO PERIODO SCELTO"}
           </h3>
 
           <div
@@ -10525,7 +10547,7 @@ function ReportAdmin({
               whiteSpace: "nowrap",
             }}
           >
-            {productionPeriodLabel}
+            {summaryPeriodLabel}
           </div>
         </div>
 
