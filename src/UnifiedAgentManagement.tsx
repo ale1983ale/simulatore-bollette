@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   adminAgentCreate,
+  adminAgentDelete,
   adminAgentList,
   adminAgentSetProvvigioniVisibility,
   adminAgentUpdate,
@@ -60,6 +61,7 @@ type EditDraft = {
   phone: string;
   zone: string;
   dm: string;
+  showOnMap: boolean;
 };
 
 type CreateDraft = EditDraft & {
@@ -79,6 +81,7 @@ const EMPTY_CREATE_DRAFT: CreateDraft = {
   phone: "",
   zone: "",
   dm: "",
+  showOnMap: false,
 };
 
 const cardStyle: React.CSSProperties = {
@@ -453,7 +456,7 @@ export default function UnifiedAgentManagement({
     setExpandedId(id);
     setDraft({
       username: row.agent.username || "",
-      password: "",
+      password: row.agent.password || "",
       ownerAdminId: row.agent.owner_admin_id || "",
       email: row.email?.email || "",
       reportNotify: row.email?.report_notify === true,
@@ -464,6 +467,11 @@ export default function UnifiedAgentManagement({
         row.recruiting?.dm_reference ||
         row.email?.dm ||
         "",
+      showOnMap:
+        row.recruiting?.latitude !== null &&
+        row.recruiting?.latitude !== undefined &&
+        row.recruiting?.longitude !== null &&
+        row.recruiting?.longitude !== undefined,
     });
   };
 
@@ -480,7 +488,11 @@ export default function UnifiedAgentManagement({
       await adminAgentUpdate({
         id: agentId,
         username: draft.username.trim(),
-        password: draft.password.trim() || undefined,
+        password:
+          draft.password.trim() &&
+          draft.password.trim() !== String(row.agent.password || "").trim()
+            ? draft.password.trim()
+            : undefined,
         ownerAdminId:
           draft.ownerAdminId === ""
             ? null
@@ -541,29 +553,64 @@ export default function UnifiedAgentManagement({
           Boolean(currentRecruiting) ||
           Boolean(draft.phone.trim()) ||
           Boolean(draft.zone.trim()) ||
-          Boolean(draft.dm.trim());
+          Boolean(draft.dm.trim()) ||
+          draft.showOnMap;
 
         if (needsRecruiting) {
-          let latitude = currentRecruiting?.latitude ?? null;
-          let longitude = currentRecruiting?.longitude ?? null;
+          let latitude = draft.showOnMap
+            ? currentRecruiting?.latitude ?? null
+            : null;
+          let longitude = draft.showOnMap
+            ? currentRecruiting?.longitude ?? null
+            : null;
           let region = currentRecruiting?.region || "";
 
-          if (
-            draft.zone.trim() &&
+          if (draft.showOnMap && !draft.zone.trim()) {
+            throw new Error(
+              "Per mostrare l'agente sulla mappa devi indicare una zona."
+            );
+          }
+
+          const zoneChanged =
             draft.zone.trim() !==
-              String(currentRecruiting?.zone || "").trim()
-          ) {
+            String(currentRecruiting?.zone || "").trim();
+
+          const needsGeocode =
+            Boolean(draft.zone.trim()) &&
+            (zoneChanged ||
+              (draft.showOnMap &&
+                (latitude === null || longitude === null)));
+
+          if (needsGeocode) {
             const geo = await geocodeItalianZone(draft.zone.trim());
             const normalizedRegion = normalizeItalianRegion(
               geo.region || draft.zone.trim()
             );
-            latitude = geo.latitude;
-            longitude = geo.longitude;
             region = ITALIAN_REGIONS.includes(
               normalizedRegion as any
             )
               ? normalizedRegion
               : region;
+
+            if (draft.showOnMap) {
+              if (
+                geo.latitude === null ||
+                geo.longitude === null ||
+                !Number.isFinite(geo.latitude) ||
+                !Number.isFinite(geo.longitude)
+              ) {
+                throw new Error(
+                  "Non riesco a posizionare l'agente sulla mappa. Indica una città o località più precisa."
+                );
+              }
+              latitude = geo.latitude;
+              longitude = geo.longitude;
+            }
+          }
+
+          if (!draft.showOnMap) {
+            latitude = null;
+            longitude = null;
           }
 
           const payload = {
@@ -626,6 +673,11 @@ export default function UnifiedAgentManagement({
 
     if (createDraft.reportNotify && !email) {
       setNotice("Per attivare REPORT devi inserire anche l'email dell'agente.");
+      return;
+    }
+
+    if (createDraft.showOnMap && !createDraft.zone.trim()) {
+      setNotice("Per mostrare il nuovo agente sulla mappa devi indicare una zona.");
       return;
     }
 
@@ -741,10 +793,26 @@ export default function UnifiedAgentManagement({
           const normalizedRegion = normalizeItalianRegion(
             geo.region || createDraft.zone.trim()
           );
-          latitude = geo.latitude;
-          longitude = geo.longitude;
           if (ITALIAN_REGIONS.includes(normalizedRegion as any)) {
             region = normalizedRegion;
+          }
+
+          if (createDraft.showOnMap) {
+            if (
+              geo.latitude === null ||
+              geo.longitude === null ||
+              !Number.isFinite(geo.latitude) ||
+              !Number.isFinite(geo.longitude)
+            ) {
+              throw new Error(
+                "Non riesco a posizionare il nuovo agente sulla mappa. Indica una città o località più precisa."
+              );
+            }
+            latitude = geo.latitude;
+            longitude = geo.longitude;
+          } else {
+            latitude = null;
+            longitude = null;
           }
         }
 
@@ -794,12 +862,400 @@ export default function UnifiedAgentManagement({
     }
   };
 
+  const removeFromZones = async (row: (typeof rows)[number]) => {
+    if (!ctx || !row.recruiting?.id) return;
+
+    const ok = window.confirm(
+      `Rimuovere ${row.fullName} da Agenti attivi / Macroaree / Mappa? L'account login rimarrà attivo.`
+    );
+    if (!ok) return;
+
+    setBusy(true);
+    setNotice("");
+    try {
+      const { error } = await ctx.client
+        .from("recruiting_active_agents")
+        .delete()
+        .eq("id", row.recruiting.id)
+        .eq("owner_key", ctx.ownerKey);
+
+      if (error) throw error;
+
+      setNotice(
+        `${row.fullName}: rimosso da Agenti attivi / Macroaree / Mappa.`
+      );
+      setExpandedId(null);
+      setDraft(null);
+      await loadAll();
+    } catch (error: any) {
+      setNotice(
+        "Errore nella rimozione da Macroaree / Mappa: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteLoginAccount = async (row: (typeof rows)[number]) => {
+    const agentId = Number(row.agent.id);
+    if (!agentId) return;
+
+    const ok = window.confirm(
+      `Eliminare l'account login di ${row.fullName}? I dati di Macroaree / Mappa non vengono eliminati automaticamente.`
+    );
+    if (!ok) return;
+
+    setBusy(true);
+    setNotice("");
+    try {
+      await adminAgentDelete(agentId);
+      setNotice(`${row.fullName}: account login eliminato.`);
+      setExpandedId(null);
+      setDraft(null);
+      await loadAll();
+    } catch (error: any) {
+      setNotice(
+        "Errore nell'eliminazione dell'account: " +
+          (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const renderAgentEditor = (row: (typeof rows)[number]) => {
+    if (!draft || expandedId !== Number(row.agent.id)) return null;
+
+    const region = row.recruiting?.region || "";
+    const macroarea = region
+      ? macroareaByRegion.get(normalizeItalianRegion(region)) || ""
+      : "";
+    const mapActive =
+      row.recruiting?.latitude !== null &&
+      row.recruiting?.latitude !== undefined &&
+      row.recruiting?.longitude !== null &&
+      row.recruiting?.longitude !== undefined;
+
+    return (
+      <div
+        className="uam-agent-open-card"
+        style={{
+          border: "3px solid #2563eb",
+          borderRadius: 16,
+          background: "#f8fbff",
+          padding: 16,
+          boxShadow: "0 8px 24px rgba(37,99,235,.10)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+            paddingBottom: 12,
+            borderBottom: "2px solid #bfdbfe",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 950, color: "#0f2d69" }}>
+              {row.fullName.toUpperCase()}
+            </div>
+            <div style={{ marginTop: 3, fontSize: 12, color: "#64748b" }}>
+              Login, abbinamenti, Macroaree e Mappa
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => openRow(row)}
+            style={{ ...buttonStyle, background: "#dbeafe", color: "#1d4ed8" }}
+          >
+            CHIUDI
+          </button>
+        </div>
+
+        <section style={{ padding: "14px 0", borderBottom: "1px solid #cbd5e1" }}>
+          <div style={{ fontWeight: 950, color: "#0f2d69", marginBottom: 10 }}>
+            🔐 LOGIN
+          </div>
+          <div
+            className="uam-responsive-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+              gap: 10,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>USERNAME</div>
+              <input
+                value={draft.username}
+                onChange={(e) => setDraft({ ...draft, username: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>PASSWORD</div>
+              <input
+                type="text"
+                value={draft.password}
+                onChange={(e) => setDraft({ ...draft, password: e.target.value })}
+                placeholder={
+                  row.agent.password_configured !== false
+                    ? "DA RIPRISTINARE"
+                    : "—"
+                }
+                style={inputStyle}
+              />
+            </div>
+            {adminProfile?.role === "super_admin" && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>ADMIN ASSOCIATO</div>
+                <select
+                  value={draft.ownerAdminId}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      ownerAdminId: e.target.value ? Number(e.target.value) : "",
+                    })
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Nessuno</option>
+                  {admins.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {String(`${item.nome || ""} ${item.cognome || ""}`).trim() || item.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+            {adminProfile?.role === "super_admin" && (
+              <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900 }}>
+                <input
+                  type="checkbox"
+                  checked={draft.provvigioniVisible}
+                  onChange={(e) => setDraft({ ...draft, provvigioniVisible: e.target.checked })}
+                />
+                ACCESSO PROVVIGIONI
+              </label>
+            )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void deleteLoginAccount(row)}
+              style={{
+                ...buttonStyle,
+                marginLeft: "auto",
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fecaca",
+              }}
+            >
+              ELIMINA ACCOUNT LOGIN
+            </button>
+          </div>
+        </section>
+
+        <section style={{ padding: "14px 0", borderBottom: "1px solid #cbd5e1" }}>
+          <div style={{ fontWeight: 950, color: "#0369a1", marginBottom: 10 }}>✉️ ABBINAMENTI</div>
+          <div
+            className="uam-responsive-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+              gap: 10,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>EMAIL</div>
+              <input
+                type="email"
+                value={draft.email}
+                onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>DM DI RIFERIMENTO</div>
+              <input
+                list="unified-dm-suggestions"
+                value={draft.dm}
+                onChange={(e) => setDraft({ ...draft, dm: e.target.value })}
+                placeholder="Scegli un DM esistente o scrivine uno nuovo"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+          <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900, marginTop: 12 }}>
+            <input
+              type="checkbox"
+              checked={draft.reportNotify}
+              onChange={(e) => setDraft({ ...draft, reportNotify: e.target.checked })}
+            />
+            REPORT ATTIVO
+          </label>
+        </section>
+
+        <section style={{ padding: "14px 0" }}>
+          <div style={{ fontWeight: 950, color: "#c2410c", marginBottom: 10 }}>📍 MACROAREE / MAPPA</div>
+          <div
+            className="uam-responsive-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+              gap: 10,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>CELLULARE</div>
+              <input
+                value={draft.phone}
+                onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>ZONA</div>
+              <input
+                value={draft.zone}
+                onChange={(e) => setDraft({ ...draft, zone: e.target.value })}
+                placeholder="Es. Perugia"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>REGIONE</div>
+              <div style={{ ...inputStyle, minHeight: 38, background: "#f8fafc" }}>
+                {region || "Automatica dalla zona"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>MACROAREA</div>
+              <div style={{ ...inputStyle, minHeight: 38, background: "#fff7ed", color: "#9a3412", fontWeight: 800 }}>
+                {macroarea || (region ? "Nessuna macroarea associata" : "Automatica dalla regione")}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 900 }}>
+              <input
+                type="checkbox"
+                checked={draft.showOnMap}
+                onChange={(e) => setDraft({ ...draft, showOnMap: e.target.checked })}
+                style={{ width: 18, height: 18 }}
+              />
+              {draft.showOnMap ? "MOSTRA IN MAPPA" : "NON MOSTRARE IN MAPPA"}
+            </label>
+            <span style={{ fontSize: 12, color: "#64748b" }}>
+              Stato attuale: {mapActive ? "visibile sulla mappa" : "non visibile sulla mappa"}
+            </span>
+            {row.recruiting && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void removeFromZones(row)}
+                style={{
+                  ...buttonStyle,
+                  marginLeft: "auto",
+                  background: "#fff7ed",
+                  color: "#9a3412",
+                  border: "1px solid #fed7aa",
+                }}
+              >
+                RIMUOVI DA AGENTI ATTIVI / MAPPA
+              </button>
+            )}
+          </div>
+
+          {row.recruiting &&
+            row.recruiting.latitude !== null &&
+            row.recruiting.longitude !== null && (
+              <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+                Coordinate: {row.recruiting.latitude}, {row.recruiting.longitude}
+              </div>
+            )}
+        </section>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 14, borderTop: "2px solid #bfdbfe" }}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void saveRow(row)}
+            style={{
+              ...buttonStyle,
+              width: "min(260px,100%)",
+              background: busy ? "#94a3b8" : "#16a34a",
+              color: "white",
+              fontSize: 15,
+            }}
+          >
+            {busy ? "SALVATAGGIO..." : "SALVA TUTTO"}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return <div style={cardStyle}>Caricamento Gestione Agenti...</div>;
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <style>{`
+        .uam-mobile-list { display: none; }
+        .uam-desktop-table { display: block; }
+        @media (max-width: 800px) {
+          .uam-desktop-table { display: none !important; }
+          .uam-mobile-list {
+            display: flex !important;
+            flex-direction: column;
+            gap: 10px;
+          }
+          .uam-responsive-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .uam-agent-open-card {
+            padding: 12px !important;
+          }
+          #ge-admin-users-manager .ge-table-shell {
+            overflow: visible !important;
+          }
+          #ge-admin-users-manager .ge-list-table {
+            display: block !important;
+            min-width: 0 !important;
+            width: 100% !important;
+          }
+          #ge-admin-users-manager .ge-list-table thead {
+            display: none !important;
+          }
+          #ge-admin-users-manager .ge-list-table tbody,
+          #ge-admin-users-manager .ge-list-table tr,
+          #ge-admin-users-manager .ge-list-table td {
+            display: block !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          #ge-admin-users-manager .ge-list-table tr {
+            border: 2px solid #ddd6fe !important;
+            border-radius: 12px !important;
+            margin-bottom: 10px !important;
+            padding: 8px !important;
+            background: white !important;
+          }
+          #ge-admin-users-manager .ge-list-table td {
+            border-bottom: 1px solid #f1f5f9 !important;
+            padding: 9px 8px !important;
+          }
+        }
+      `}</style>
+
       <datalist id="unified-dm-suggestions">
         {dmSuggestions.map((dm) => (
           <option key={dm} value={dm} />
@@ -975,6 +1431,7 @@ export default function UnifiedAgentManagement({
           </div>
 
           <div
+            className="uam-responsive-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
@@ -1025,7 +1482,7 @@ export default function UnifiedAgentManagement({
                 PASSWORD *
               </div>
               <input
-                type="password"
+                type="text"
                 value={createDraft.password}
                 onChange={(e) =>
                   setCreateDraft({ ...createDraft, password: e.target.value })
@@ -1121,6 +1578,33 @@ export default function UnifiedAgentManagement({
                 Puoi selezionare un suggerimento oppure digitare un nuovo DM.
               </div>
             </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                MAPPA
+              </div>
+              <label
+                style={{
+                  minHeight: 38,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontWeight: 900,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={createDraft.showOnMap}
+                  onChange={(e) =>
+                    setCreateDraft({
+                      ...createDraft,
+                      showOnMap: e.target.checked,
+                    })
+                  }
+                />
+                MOSTRA IN MAPPA
+              </label>
+            </div>
           </div>
 
           <div
@@ -1194,13 +1678,13 @@ export default function UnifiedAgentManagement({
         </div>
       )}
 
-      <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+      <div className="uam-desktop-table" style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
           <table
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              minWidth: 1120,
+              minWidth: 1220,
             }}
           >
             <thead>
@@ -1208,6 +1692,7 @@ export default function UnifiedAgentManagement({
                 {[
                   "AGENTE",
                   "LOGIN",
+                  "PASSWORD",
                   "ADMIN",
                   "EMAIL",
                   "REPORT",
@@ -1272,6 +1757,19 @@ export default function UnifiedAgentManagement({
                       </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         {row.agent.username || "-"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 9px",
+                          borderBottom: "1px solid #f1f5f9",
+                          color: "#166534",
+                          fontWeight: 800,
+                        }}
+                      >
+                        {row.agent.password ||
+                          (row.agent.password_configured !== false
+                            ? "DA RIPRISTINARE"
+                            : "—")}
                       </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         {admin
@@ -1353,357 +1851,14 @@ export default function UnifiedAgentManagement({
                     {isOpen && draft && (
                       <tr>
                         <td
-                          colSpan={11}
+                          colSpan={12}
                           style={{
                             padding: 14,
-                            background: "#f8fbff",
-                            borderBottom: "2px solid #bfdbfe",
+                            background: "#eef6ff",
+                            borderBottom: "2px solid #93c5fd",
                           }}
                         >
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 12,
-                            }}
-                          >
-                            <section
-                              style={{
-                                background: "white",
-                                border: "1px solid #cbd5e1",
-                                borderRadius: 12,
-                                padding: 14,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontWeight: 950,
-                                  fontSize: 13,
-                                  color: "#0f2d69",
-                                  marginBottom: 10,
-                                }}
-                              >
-                                🔐 LOGIN
-                              </div>
-
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns:
-                                    "repeat(auto-fit,minmax(210px,1fr))",
-                                  gap: 10,
-                                }}
-                              >
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    USERNAME
-                                  </div>
-                                  <input
-                                    value={draft.username}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        username: e.target.value,
-                                      })
-                                    }
-                                    style={inputStyle}
-                                  />
-                                </div>
-
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    NUOVA PASSWORD
-                                  </div>
-                                  <input
-                                    type="password"
-                                    value={draft.password}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        password: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Lascia vuoto per non cambiarla"
-                                    style={inputStyle}
-                                  />
-                                </div>
-
-                                {adminProfile?.role === "super_admin" && (
-                                  <div>
-                                    <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                      ADMIN ASSOCIATO
-                                    </div>
-                                    <select
-                                      value={draft.ownerAdminId}
-                                      onChange={(e) =>
-                                        setDraft({
-                                          ...draft,
-                                          ownerAdminId: e.target.value
-                                            ? Number(e.target.value)
-                                            : "",
-                                        })
-                                      }
-                                      style={inputStyle}
-                                    >
-                                      <option value="">Nessuno</option>
-                                      {admins.map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                          {String(
-                                            `${item.nome || ""} ${item.cognome || ""}`
-                                          ).trim() || item.username}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                )}
-                              </div>
-
-                              {adminProfile?.role === "super_admin" && (
-                                <label
-                                  style={{
-                                    display: "inline-flex",
-                                    gap: 7,
-                                    alignItems: "center",
-                                    fontWeight: 900,
-                                    marginTop: 12,
-                                  }}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={draft.provvigioniVisible}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        provvigioniVisible: e.target.checked,
-                                      })
-                                    }
-                                  />
-                                  ACCESSO PROVVIGIONI
-                                </label>
-                              )}
-                            </section>
-
-                            <section
-                              style={{
-                                background: "white",
-                                border: "1px solid #bae6fd",
-                                borderRadius: 12,
-                                padding: 14,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontWeight: 950,
-                                  fontSize: 13,
-                                  color: "#0369a1",
-                                  marginBottom: 10,
-                                }}
-                              >
-                                ✉️ ABBINAMENTI
-                              </div>
-
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns:
-                                    "repeat(auto-fit,minmax(210px,1fr))",
-                                  gap: 10,
-                                }}
-                              >
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    EMAIL
-                                  </div>
-                                  <input
-                                    type="email"
-                                    value={draft.email}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        email: e.target.value,
-                                      })
-                                    }
-                                    style={inputStyle}
-                                  />
-                                </div>
-
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    DM DI RIFERIMENTO
-                                  </div>
-                                  <input
-                                    list="unified-dm-suggestions"
-                                    value={draft.dm}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        dm: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Scegli un DM o scrivine uno nuovo"
-                                    style={inputStyle}
-                                  />
-                                </div>
-                              </div>
-
-                              <label
-                                style={{
-                                  display: "inline-flex",
-                                  gap: 7,
-                                  alignItems: "center",
-                                  fontWeight: 900,
-                                  marginTop: 12,
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={draft.reportNotify}
-                                  onChange={(e) =>
-                                    setDraft({
-                                      ...draft,
-                                      reportNotify: e.target.checked,
-                                    })
-                                  }
-                                />
-                                REPORT ATTIVO
-                              </label>
-                            </section>
-
-                            <section
-                              style={{
-                                background: "white",
-                                border: "1px solid #fed7aa",
-                                borderRadius: 12,
-                                padding: 14,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontWeight: 950,
-                                  fontSize: 13,
-                                  color: "#c2410c",
-                                  marginBottom: 10,
-                                }}
-                              >
-                                📍 MACROAREE
-                              </div>
-
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns:
-                                    "repeat(auto-fit,minmax(210px,1fr))",
-                                  gap: 10,
-                                }}
-                              >
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    CELLULARE
-                                  </div>
-                                  <input
-                                    value={draft.phone}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        phone: e.target.value,
-                                      })
-                                    }
-                                    style={inputStyle}
-                                  />
-                                </div>
-
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    ZONA
-                                  </div>
-                                  <input
-                                    value={draft.zone}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        zone: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Es. Perugia"
-                                    style={inputStyle}
-                                  />
-                                </div>
-
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    REGIONE
-                                  </div>
-                                  <div
-                                    style={{
-                                      ...inputStyle,
-                                      minHeight: 38,
-                                      background: "#f8fafc",
-                                      color: "#334155",
-                                    }}
-                                  >
-                                    {row.recruiting?.region || "Automatica dalla zona"}
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                                    MACROAREA
-                                  </div>
-                                  <div
-                                    style={{
-                                      ...inputStyle,
-                                      minHeight: 38,
-                                      background: "#fff7ed",
-                                      color: "#9a3412",
-                                      fontWeight: 800,
-                                    }}
-                                  >
-                                    {row.recruiting?.region
-                                      ? macroareaByRegion.get(
-                                          normalizeItalianRegion(
-                                            row.recruiting.region
-                                          )
-                                        ) || "Nessuna macroarea associata"
-                                      : "Si aggiorna dopo il salvataggio della zona"}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div
-                                style={{
-                                  marginTop: 8,
-                                  fontSize: 11,
-                                  color: "#64748b",
-                                }}
-                              >
-                                La regione e la macroarea vengono ricalcolate
-                                automaticamente quando modifichi la zona.
-                              </div>
-                            </section>
-
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "flex-end",
-                                gap: 10,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void saveRow(row)}
-                                style={{
-                                  ...buttonStyle,
-                                  background: busy ? "#94a3b8" : "#16a34a",
-                                  color: "white",
-                                  minWidth: 190,
-                                }}
-                              >
-                                {busy ? "SALVATAGGIO..." : "SALVA TUTTO"}
-                              </button>
-                            </div>
-                          </div>
+                          {renderAgentEditor(row)}
                         </td>
                       </tr>
                     )}
@@ -1714,7 +1869,7 @@ export default function UnifiedAgentManagement({
               {!rows.length && (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={12}
                     style={{
                       padding: 20,
                       textAlign: "center",
@@ -1729,6 +1884,102 @@ export default function UnifiedAgentManagement({
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="uam-mobile-list">
+        {rows.map((row) => {
+          const id = Number(row.agent.id);
+          const isOpen = expandedId === id;
+          const admin = admins.find(
+            (item) =>
+              Number(item.id) === Number(row.agent.owner_admin_id || 0)
+          );
+          const dm =
+            row.recruiting?.dm_reference ||
+            row.email?.dm ||
+            "";
+
+          return (
+            <div
+              key={id}
+              style={{
+                border: isOpen ? "3px solid #2563eb" : "1px solid #cbd5e1",
+                borderRadius: 14,
+                background: "white",
+                overflow: "hidden",
+                maxWidth: "100%",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => openRow(row)}
+                style={{
+                  width: "100%",
+                  border: 0,
+                  background: isOpen ? "#eff6ff" : "white",
+                  padding: 13,
+                  textAlign: "left",
+                  cursor: "pointer",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                  <strong style={{ color: "#0f2d69", fontSize: 16 }}>
+                    {row.fullName.toUpperCase()}
+                  </strong>
+                  <span style={{ background: isOpen ? "#dbeafe" : "#e2e8f0", borderRadius: 9, padding: "6px 9px", fontWeight: 900 }}>
+                    {isOpen ? "CHIUDI" : "APRI"}
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 5, marginTop: 10, fontSize: 13, color: "#334155", overflowWrap: "anywhere" }}>
+                  <div><strong>Login:</strong> {row.agent.username || "—"}</div>
+                  <div>
+                    <strong>Password:</strong>{" "}
+                    <span style={{ color: "#166534", fontWeight: 800 }}>
+                      {row.agent.password ||
+                        (row.agent.password_configured !== false
+                          ? "DA RIPRISTINARE"
+                          : "—")}
+                    </span>
+                  </div>
+                  <div>
+                    <strong>Admin:</strong>{" "}
+                    {admin
+                      ? String(`${admin.nome || ""} ${admin.cognome || ""}`).trim() || admin.username
+                      : "—"}
+                  </div>
+                  <div><strong>Email:</strong> {row.email?.email || "—"}</div>
+                  <div><strong>Cellulare:</strong> {row.recruiting?.phone || "—"}</div>
+                  <div><strong>Zona:</strong> {row.recruiting?.zone || "—"}</div>
+                  <div><strong>DM:</strong> {dm || "—"}</div>
+                  <div><strong>Report:</strong> {row.email?.report_notify ? "ATTIVO" : "NON ATTIVO"}</div>
+                  <div>
+                    <strong>Mappa:</strong>{" "}
+                    {row.recruiting?.latitude !== null &&
+                    row.recruiting?.latitude !== undefined &&
+                    row.recruiting?.longitude !== null &&
+                    row.recruiting?.longitude !== undefined
+                      ? "MOSTRA"
+                      : "NON MOSTRARE"}
+                  </div>
+                </div>
+              </button>
+
+              {isOpen && draft && (
+                <div style={{ padding: 10, maxWidth: "100%", boxSizing: "border-box" }}>
+                  {renderAgentEditor(row)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {!rows.length && (
+          <div style={{ ...cardStyle, textAlign: "center", color: "#64748b", fontWeight: 800 }}>
+            Nessun agente trovato.
+          </div>
+        )}
       </div>
     </div>
   );
