@@ -10886,12 +10886,13 @@ function ReportAdmin({
                   }
                 );
 
-              const agentSummaryLabel =
-                mode === "CURRENT"
-                  ? "RIEPILOGO PRODUZIONE IN CORSO"
-                  : mode === "PREVIOUS"
-                    ? "RIEPILOGO PRODUZIONE PRECEDENTE"
-                    : "RIEPILOGO PERIODO SCELTO";
+              const agentDetailReports = [
+                ...agentSummaryReports,
+              ].sort((a, b) =>
+                String(b.report_date || "").localeCompare(
+                  String(a.report_date || "")
+                )
+              );
 
               return (
                 <div
@@ -10924,59 +10925,187 @@ function ReportAdmin({
                         ? "#eff6ff"
                         : "#f8fafc",
                       cursor: "pointer",
-                      padding: "12px 14px",
-                      display: "grid",
-                      gridTemplateColumns:
-                        "minmax(0,1fr) auto auto auto",
-                      gap: 14,
+                      padding: "11px 12px",
+                      display: "flex",
+                      gap: 12,
                       alignItems: "center",
+                      flexWrap: "wrap",
                       textAlign: "left",
                       color: "#0f172a",
                     }}
                   >
                     <div
                       style={{
+                        flex: "1 1 220px",
+                        minWidth: 180,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          color: "#0f2d69",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {getAgentName(group.agentId)}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 4,
+                          color: "#64748b",
+                          fontSize: 11,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {summaryPeriodLabel}
+                        {" · "}
+                        {agentDetailReports.length} REPORT
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        flex: "4 1 620px",
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(120px, 1fr))",
+                        gap: 7,
                         minWidth: 0,
-                        fontWeight: 900,
-                        color: "#0f2d69",
-                        overflowWrap: "anywhere",
                       }}
                     >
-                      {getAgentName(group.agentId)}
+                      <div
+                        style={{
+                          padding: "7px 9px",
+                          borderRadius: 9,
+                          background: "#fff7ed",
+                          border: "1px solid #fed7aa",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "#9a3412",
+                            fontWeight: 900,
+                          }}
+                        >
+                          CONTRATTI LUCE
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 3,
+                            color: "#7c2d12",
+                            fontWeight: 900,
+                            fontSize: 16,
+                          }}
+                        >
+                          {agentSummaryTotals.contracts_energia}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          padding: "7px 9px",
+                          borderRadius: 9,
+                          background: "#fff7ed",
+                          border: "1px solid #fed7aa",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "#9a3412",
+                            fontWeight: 900,
+                          }}
+                        >
+                          CONSUMI LUCE
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 3,
+                            color: "#7c2d12",
+                            fontWeight: 900,
+                            fontSize: 16,
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {numFormat(
+                            agentSummaryTotals.consumi_energia,
+                            2
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          padding: "7px 9px",
+                          borderRadius: 9,
+                          background: "#eff6ff",
+                          border: "1px solid #bfdbfe",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "#1d4ed8",
+                            fontWeight: 900,
+                          }}
+                        >
+                          CONTRATTI GAS
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 3,
+                            color: "#1e3a8a",
+                            fontWeight: 900,
+                            fontSize: 16,
+                          }}
+                        >
+                          {agentSummaryTotals.contracts_gas}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          padding: "7px 9px",
+                          borderRadius: 9,
+                          background: "#eff6ff",
+                          border: "1px solid #bfdbfe",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 10,
+                            color: "#1d4ed8",
+                            fontWeight: 900,
+                          }}
+                        >
+                          CONSUMI GAS
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 3,
+                            color: "#1e3a8a",
+                            fontWeight: 900,
+                            fontSize: 16,
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {numFormat(
+                            agentSummaryTotals.consumi_gas,
+                            2
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <div
                       style={{
-                        whiteSpace: "nowrap",
-                        fontSize: 13,
-                        color: "#475569",
-                      }}
-                    >
-                      Ultimo:{" "}
-                      <strong>
-                        {formatReportDate(
-                          group.latestReportDate
-                        )}
-                      </strong>
-                    </div>
-
-                    <div
-                      style={{
-                        minWidth: 34,
-                        padding: "4px 8px",
-                        borderRadius: 999,
-                        background: "#dbeafe",
-                        color: "#1d4ed8",
+                        width: 28,
                         textAlign: "center",
-                        fontWeight: 900,
-                        fontSize: 12,
-                      }}
-                    >
-                      {group.reports.length}
-                    </div>
-
-                    <div
-                      style={{
                         fontSize: 18,
                         fontWeight: 900,
                         color: "#2563eb",
@@ -11009,7 +11138,7 @@ function ReportAdmin({
                           letterSpacing: ".35px",
                         }}
                       >
-                        Storico di {getAgentName(group.agentId)}
+                        DETTAGLIO {getAgentName(group.agentId)} · {summaryPeriodLabel}
                       </div>
 
                       <div className="ge-table-shell">
@@ -11056,124 +11185,22 @@ function ReportAdmin({
                             </tr>
                           </thead>
                           <tbody>
-                            <tr
-                              style={{
-                                background: "#f8fafc",
-                                fontWeight: 900,
-                                borderBottom:
-                                  "2px solid #cbd5e1",
-                              }}
-                            >
-                              <td
-                                data-label="Data"
-                                className="ge-date-cell"
-                                style={{
-                                  textAlign: "center",
-                                  color: "#0f2d69",
-                                }}
-                              >
-                                <div
+                            {agentDetailReports.length === 0 ? (
+                              <tr>
+                                <td
+                                  colSpan={7}
                                   style={{
-                                    fontSize: 11,
-                                    fontWeight: 900,
-                                    lineHeight: 1.15,
-                                  }}
-                                >
-                                  {agentSummaryLabel}
-                                </div>
-                                <div
-                                  style={{
-                                    marginTop: 4,
-                                    fontSize: 10,
+                                    padding: 16,
+                                    textAlign: "center",
                                     color: "#64748b",
                                     fontWeight: 800,
                                   }}
                                 >
-                                  {summaryPeriodLabel}
-                                </div>
-                              </td>
-
-                              <td
-                                data-label="Contratti energia"
-                                className="ge-number-cell"
-                                style={{
-                                  textAlign: "center",
-                                  background: "#ffedd5",
-                                  color: "#9a3412",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                {agentSummaryTotals.contracts_energia}
-                              </td>
-
-                              <td
-                                data-label="Consumi energia"
-                                className="ge-number-cell"
-                                style={{
-                                  textAlign: "center",
-                                  background: "#ffedd5",
-                                  color: "#9a3412",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                {numFormat(
-                                  agentSummaryTotals.consumi_energia,
-                                  2
-                                )}
-                              </td>
-
-                              <td
-                                data-label="Contratti gas"
-                                className="ge-number-cell"
-                                style={{
-                                  textAlign: "center",
-                                  background: "#dbeafe",
-                                  color: "#1d4ed8",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                {agentSummaryTotals.contracts_gas}
-                              </td>
-
-                              <td
-                                data-label="Consumi gas"
-                                className="ge-number-cell"
-                                style={{
-                                  textAlign: "center",
-                                  background: "#dbeafe",
-                                  color: "#1d4ed8",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                {numFormat(
-                                  agentSummaryTotals.consumi_gas,
-                                  2
-                                )}
-                              </td>
-
-                              <td
-                                data-label="Note"
-                                className="ge-note-cell"
-                                style={{
-                                  textAlign: "center",
-                                  color: "#64748b",
-                                  fontSize: 11,
-                                  fontWeight: 800,
-                                }}
-                              >
-                                TOTALE
-                              </td>
-
-                              <td
-                                data-label="Azioni"
-                                className="ge-action-cell"
-                                style={{ textAlign: "center" }}
-                              >
-                                —
-                              </td>
-                            </tr>
-
-                            {group.reports.map((r, i) => (
+                                  Nessun report nel periodo selezionato.
+                                </td>
+                              </tr>
+                            ) : (
+                              agentDetailReports.map((r, i) => (
                               <tr key={r.id || i}>
                                 <td
                                   data-label="Data"
@@ -11255,7 +11282,8 @@ function ReportAdmin({
                                   </button>
                                 </td>
                               </tr>
-                            ))}
+                              ))
+                            )}
                           </tbody>
                         </table>
                       </div>
