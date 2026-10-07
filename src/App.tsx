@@ -11792,6 +11792,7 @@ function AdminUsersManager({
         <div style={{ height: 16 }} />
 
         <div
+          className="ge-admin-responsive-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(4,minmax(0,1fr))",
@@ -12123,6 +12124,7 @@ function AdminUsersManager({
               }}
             >
               <table
+                className="ge-admin-password-table"
                 style={{
                   width: "100%",
                   borderCollapse: "collapse",
