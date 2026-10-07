@@ -104,6 +104,7 @@ type Agent = {
   username: string;
   password?: string;
   password_configured?: boolean;
+  password_changed_at?: string | null;
   owner_auth_id?: string;
   owner_admin_id?: number;
   provvigioni_visible?: boolean;
@@ -120,7 +121,32 @@ type AdminProfile = {
   token?: string;
   role?: string;
   full_access?: boolean;
+  password_configured?: boolean;
+  password_changed_at?: string | null;
  };
+function generateLoginPassword() {
+  const alphabet =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const bytes = new Uint32Array(14);
+  crypto.getRandomValues(bytes);
+
+  return Array.from(bytes, (value) =>
+    alphabet[value % alphabet.length]
+  ).join("");
+}
+
+function formatPasswordChangeDate(value?: string | null) {
+  if (!value) return "Data non disponibile";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Data non disponibile";
+
+  return date.toLocaleString("it-IT", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
 type PunPsvRow = {
   mese: string;
   mono: number;
