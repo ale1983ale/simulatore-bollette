@@ -67,6 +67,9 @@ type EditDraft = {
 type CreateDraft = EditDraft & {
   nome: string;
   cognome: string;
+  emailAttachment: string;
+  insertEmailMatching: boolean;
+  insertActiveAgent: boolean;
 };
 
 const EMPTY_CREATE_DRAFT: CreateDraft = {
@@ -82,6 +85,9 @@ const EMPTY_CREATE_DRAFT: CreateDraft = {
   zone: "",
   dm: "",
   showOnMap: false,
+  emailAttachment: "",
+  insertEmailMatching: false,
+  insertActiveAgent: false,
 };
 
 const cardStyle: React.CSSProperties = {
@@ -371,6 +377,14 @@ export default function UnifiedAgentManagement({
         )
           .trim()
           .toLocaleUpperCase("it"),
+        insertEmailMatching: Boolean(
+          String(prefill.email || "").trim()
+        ),
+        insertActiveAgent: Boolean(
+          String(prefill.phone || "").trim() ||
+            String(prefill.zone || "").trim() ||
+            String(prefill.region || "").trim()
+        ),
         ownerAdminId: adminProfile?.id || "",
       });
       setNotice(
@@ -805,17 +819,31 @@ export default function UnifiedAgentManagement({
     const canonicalName = `${nome} ${cognome}`.trim();
 
     if (!nome || !cognome || !username || !password) {
-      setNotice("Per creare un agente servono nome, cognome, username e password.");
+      setNotice(
+        "Per creare un agente servono nome, cognome, username e password."
+      );
       return;
     }
 
-    if (createDraft.reportNotify && !email) {
-      setNotice("Per attivare REPORT devi inserire anche l'email dell'agente.");
+    if (
+      createDraft.insertEmailMatching &&
+      createDraft.reportNotify &&
+      !email
+    ) {
+      setNotice(
+        "Per attivare REPORT nell'Abbinamento Email devi inserire anche l'email dell'agente."
+      );
       return;
     }
 
-    if (createDraft.showOnMap && !createDraft.zone.trim()) {
-      setNotice("Per mostrare il nuovo agente sulla mappa devi indicare una zona.");
+    if (
+      createDraft.insertActiveAgent &&
+      createDraft.showOnMap &&
+      !createDraft.zone.trim()
+    ) {
+      setNotice(
+        "Per MOSTRA IN MAPPA devi indicare la zona dell'agente."
+      );
       return;
     }
 
@@ -856,7 +884,9 @@ export default function UnifiedAgentManagement({
         const refreshedAgents = await adminAgentList("ALL");
         const createdAgent = (refreshedAgents || []).find(
           (item) =>
-            String(item.username || "").trim().toLocaleLowerCase("it") ===
+            String(item.username || "")
+              .trim()
+              .toLocaleLowerCase("it") ===
             username.toLocaleLowerCase("it")
         );
         agentId = Number(createdAgent?.id || 0);
@@ -875,50 +905,42 @@ export default function UnifiedAgentManagement({
         await adminAgentSetProvvigioniVisibility(agentId, true);
       }
 
-      const nextRecipients = recipients.map((item) => ({ ...item }));
-      let recipientIndex = nextRecipients.findIndex(
-        (item) =>
-          Number(item.agent_id || 0) === agentId ||
-          normalizeName(item.agenzia) === normalizeName(canonicalName)
-      );
+      if (createDraft.insertEmailMatching) {
+        const nextRecipients = recipients.map((item) => ({ ...item }));
+        const recipientIndex = nextRecipients.findIndex(
+          (item) =>
+            Number(item.agent_id || 0) === agentId ||
+            normalizeName(item.agenzia) === normalizeName(canonicalName)
+        );
 
-      const previousRecipient =
-        recipientIndex >= 0 ? nextRecipients[recipientIndex] : null;
+        const nextRecipient: EmailRecipient = {
+          agenzia: canonicalName,
+          email,
+          allegato: createDraft.emailAttachment.trim(),
+          dm: createDraft.dm.trim(),
+          report_notify: createDraft.reportNotify,
+          agent_id: agentId,
+        };
 
-      const nextRecipient: EmailRecipient = {
-        agenzia: canonicalName,
-        email,
-        allegato: previousRecipient?.allegato || "",
-        dm: createDraft.dm.trim(),
-        report_notify: createDraft.reportNotify,
-        agent_id: agentId,
-      };
+        if (recipientIndex >= 0) {
+          nextRecipients[recipientIndex] = nextRecipient;
+        } else {
+          nextRecipients.push(nextRecipient);
+        }
 
-      if (recipientIndex >= 0) {
-        nextRecipients[recipientIndex] = nextRecipient;
-      } else if (
-        nextRecipient.email ||
-        nextRecipient.dm ||
-        nextRecipient.report_notify
-      ) {
-        nextRecipients.push(nextRecipient);
-      }
-
-      if (
-        recipientIndex >= 0 ||
-        nextRecipient.email ||
-        nextRecipient.dm ||
-        nextRecipient.report_notify
-      ) {
         await saveEmailRecipients(nextRecipients);
+        window.dispatchEvent(
+          new Event("email-recipient-list-updated")
+        );
       }
 
-      if (
-        ctx &&
-        (createDraft.phone.trim() ||
-          createDraft.zone.trim() ||
-          createDraft.dm.trim())
-      ) {
+      if (createDraft.insertActiveAgent) {
+        if (!ctx) {
+          throw new Error(
+            "La gestione Agenti attivi / Mappe non è disponibile in questo momento."
+          );
+        }
+
         const existingRecruiting =
           recruitingByName.get(normalizeName(canonicalName)) || null;
 
@@ -931,6 +953,7 @@ export default function UnifiedAgentManagement({
           const normalizedRegion = normalizeItalianRegion(
             geo.region || createDraft.zone.trim()
           );
+
           if (ITALIAN_REGIONS.includes(normalizedRegion as any)) {
             region = normalizedRegion;
           }
@@ -952,6 +975,10 @@ export default function UnifiedAgentManagement({
             latitude = null;
             longitude = null;
           }
+        } else {
+          region = "";
+          latitude = null;
+          longitude = null;
         }
 
         const payload = {
@@ -982,10 +1009,18 @@ export default function UnifiedAgentManagement({
         }
       }
 
+      const createdParts = ["LOGIN"];
+      if (createDraft.insertEmailMatching) {
+        createdParts.push("ABBINAMENTO EMAIL");
+      }
+      if (createDraft.insertActiveAgent) {
+        createdParts.push("AGENTI ATTIVI / MAPPE");
+      }
+
       setCreateDraft({ ...EMPTY_CREATE_DRAFT });
       setCreateOpen(false);
       setNotice(
-        `${canonicalName}: agente creato con tutte le impostazioni associate.`
+        `${canonicalName}: creato ${createdParts.join(" + ")}.`
       );
       await loadAll();
     } catch (error: any) {
@@ -1631,7 +1666,11 @@ export default function UnifiedAgentManagement({
       {createOpen && (
         <div
           id="uam-new-agent-form"
-          style={{ ...cardStyle, border: "2px solid #86efac" }}
+          style={{
+            ...cardStyle,
+            border: "3px solid #16a34a",
+            background: "#f8fff9",
+          }}
         >
           <div
             style={{
@@ -1644,226 +1683,137 @@ export default function UnifiedAgentManagement({
             }}
           >
             <div>
-              <h3 style={{ margin: 0, color: "#166534" }}>Nuovo agente</h3>
+              <h3 style={{ margin: 0, color: "#166534" }}>
+                NUOVO AGENTE
+              </h3>
               <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
-                Compila tutto qui: anagrafica, accesso, contatti, zona, Report e
-                Provvigioni.
+                Crea prima il Login e scegli se inserire nello stesso salvataggio
+                anche Abbinamento Email e Agenti Attivi / Mappe.
               </div>
             </div>
           </div>
 
-          <div
-            className="uam-responsive-grid"
+          <section
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))",
-              gap: 10,
+              background: "white",
+              border: "1px solid #bbf7d0",
+              borderRadius: 12,
+              padding: 14,
             }}
           >
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                NOME *
-              </div>
-              <input
-                value={createDraft.nome}
-                onChange={(e) =>
-                  setCreateDraft({
-                    ...createDraft,
-                    nome: e.target.value.toLocaleUpperCase("it"),
-                  })
-                }
-                style={inputStyle}
-              />
+            <div
+              style={{
+                fontWeight: 950,
+                color: "#166534",
+                marginBottom: 10,
+              }}
+            >
+              🔐 LOGIN
             </div>
 
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                COGNOME *
-              </div>
-              <input
-                value={createDraft.cognome}
-                onChange={(e) =>
-                  setCreateDraft({
-                    ...createDraft,
-                    cognome: e.target.value.toLocaleUpperCase("it"),
-                  })
-                }
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                USERNAME *
-              </div>
-              <input
-                value={createDraft.username}
-                onChange={(e) =>
-                  setCreateDraft({ ...createDraft, username: e.target.value })
-                }
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                PASSWORD *
-              </div>
-              <input
-                type="text"
-                value={createDraft.password}
-                onChange={(e) =>
-                  setCreateDraft({ ...createDraft, password: e.target.value })
-                }
-                style={inputStyle}
-              />
-            </div>
-
-            {adminProfile?.role === "super_admin" && (
+            <div
+              className="uam-responsive-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(190px,1fr))",
+                gap: 10,
+              }}
+            >
               <div>
                 <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                  ADMIN ASSOCIATO *
+                  NOME *
                 </div>
-                <select
-                  value={createDraft.ownerAdminId}
+                <input
+                  value={createDraft.nome}
                   onChange={(e) =>
                     setCreateDraft({
                       ...createDraft,
-                      ownerAdminId: e.target.value
-                        ? Number(e.target.value)
-                        : "",
+                      nome: e.target.value.toLocaleUpperCase("it"),
                     })
                   }
                   style={inputStyle}
-                >
-                  <option value="">Seleziona...</option>
-                  {admins.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {String(
-                        `${item.nome || ""} ${item.cognome || ""}`
-                      ).trim() || item.username}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
-            )}
 
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                EMAIL
-              </div>
-              <input
-                type="email"
-                value={createDraft.email}
-                onChange={(e) =>
-                  setCreateDraft({ ...createDraft, email: e.target.value })
-                }
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                CELLULARE
-              </div>
-              <input
-                value={createDraft.phone}
-                onChange={(e) =>
-                  setCreateDraft({ ...createDraft, phone: e.target.value })
-                }
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                ZONA
-              </div>
-              <input
-                value={createDraft.zone}
-                onChange={(e) =>
-                  setCreateDraft({ ...createDraft, zone: e.target.value })
-                }
-                placeholder="Es. Perugia"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                DM DI RIFERIMENTO
-              </div>
-              <input
-                list="unified-dm-suggestions"
-                value={createDraft.dm}
-                onChange={(e) =>
-                  setCreateDraft({ ...createDraft, dm: e.target.value })
-                }
-                placeholder="Scegli un DM esistente o scrivine uno nuovo"
-                style={inputStyle}
-              />
-              <div style={{ marginTop: 4, fontSize: 11, color: "#64748b" }}>
-                Puoi selezionare un suggerimento oppure digitare un nuovo DM.
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
-                MAPPA
-              </div>
-              <label
-                style={{
-                  minHeight: 38,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontWeight: 900,
-                }}
-              >
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                  COGNOME *
+                </div>
                 <input
-                  type="checkbox"
-                  checked={createDraft.showOnMap}
+                  value={createDraft.cognome}
                   onChange={(e) =>
                     setCreateDraft({
                       ...createDraft,
-                      showOnMap: e.target.checked,
+                      cognome: e.target.value.toLocaleUpperCase("it"),
                     })
                   }
+                  style={inputStyle}
                 />
-                MOSTRA IN MAPPA
-              </label>
-            </div>
-          </div>
+              </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 18,
-              flexWrap: "wrap",
-              alignItems: "center",
-              marginTop: 14,
-            }}
-          >
-            <label
-              style={{
-                display: "inline-flex",
-                gap: 7,
-                alignItems: "center",
-                fontWeight: 900,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={createDraft.reportNotify}
-                onChange={(e) =>
-                  setCreateDraft({
-                    ...createDraft,
-                    reportNotify: e.target.checked,
-                  })
-                }
-              />
-              REPORT ATTIVO
-            </label>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                  USERNAME *
+                </div>
+                <input
+                  value={createDraft.username}
+                  onChange={(e) =>
+                    setCreateDraft({
+                      ...createDraft,
+                      username: e.target.value,
+                    })
+                  }
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                  PASSWORD *
+                </div>
+                <input
+                  type="text"
+                  value={createDraft.password}
+                  onChange={(e) =>
+                    setCreateDraft({
+                      ...createDraft,
+                      password: e.target.value,
+                    })
+                  }
+                  style={inputStyle}
+                />
+              </div>
+
+              {adminProfile?.role === "super_admin" && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    ADMIN ASSOCIATO *
+                  </div>
+                  <select
+                    value={createDraft.ownerAdminId}
+                    onChange={(e) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        ownerAdminId: e.target.value
+                          ? Number(e.target.value)
+                          : "",
+                      })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="">Seleziona...</option>
+                    {admins.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {String(
+                          `${item.nome || ""} ${item.cognome || ""}`
+                        ).trim() || item.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
 
             {adminProfile?.role === "super_admin" && (
               <label
@@ -1872,6 +1822,7 @@ export default function UnifiedAgentManagement({
                   gap: 7,
                   alignItems: "center",
                   fontWeight: 900,
+                  marginTop: 12,
                 }}
               >
                 <input
@@ -1884,20 +1835,422 @@ export default function UnifiedAgentManagement({
                     })
                   }
                 />
-                PROVVIGIONI
+                ACCESSO PROVVIGIONI
               </label>
             )}
+          </section>
 
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit,minmax(min(100%,360px),1fr))",
+              gap: 12,
+              marginTop: 14,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setCreateDraft({
+                  ...createDraft,
+                  insertEmailMatching:
+                    !createDraft.insertEmailMatching,
+                })
+              }
+              style={{
+                ...buttonStyle,
+                textAlign: "left",
+                padding: "14px 16px",
+                background: createDraft.insertEmailMatching
+                  ? "#e0f2fe"
+                  : "white",
+                color: "#075985",
+                border: createDraft.insertEmailMatching
+                  ? "2px solid #38bdf8"
+                  : "2px solid #bae6fd",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 9,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={createDraft.insertEmailMatching}
+                />
+                <span>INSERISCI ABBINAMENTO EMAIL</span>
+              </div>
+              <div
+                style={{
+                  marginTop: 5,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#64748b",
+                }}
+              >
+                {createDraft.insertEmailMatching
+                  ? "Campi aperti sotto"
+                  : "Clicca per compilare i dati della scheda Abbinamenti"}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setCreateDraft({
+                  ...createDraft,
+                  insertActiveAgent:
+                    !createDraft.insertActiveAgent,
+                })
+              }
+              style={{
+                ...buttonStyle,
+                textAlign: "left",
+                padding: "14px 16px",
+                background: createDraft.insertActiveAgent
+                  ? "#fff7ed"
+                  : "white",
+                color: "#9a3412",
+                border: createDraft.insertActiveAgent
+                  ? "2px solid #fb923c"
+                  : "2px solid #fed7aa",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 9,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={createDraft.insertActiveAgent}
+                />
+                <span>INSERISCI IN MAPPE / AGENTI ATTIVI</span>
+              </div>
+              <div
+                style={{
+                  marginTop: 5,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#64748b",
+                }}
+              >
+                {createDraft.insertActiveAgent
+                  ? "Campi aperti sotto"
+                  : "Clicca per compilare i dati di Agenti attivi / Mappe"}
+              </div>
+            </button>
+          </div>
+
+          {createDraft.insertEmailMatching && (
+            <section
+              style={{
+                marginTop: 12,
+                background: "#f0f9ff",
+                border: "2px solid #7dd3fc",
+                borderRadius: 12,
+                padding: 14,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 950,
+                  color: "#0369a1",
+                  marginBottom: 10,
+                }}
+              >
+                ✉️ ABBINAMENTO EMAIL
+              </div>
+
+              <div
+                className="uam-responsive-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit,minmax(210px,1fr))",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    AGENZIA
+                  </div>
+                  <div
+                    style={{
+                      ...inputStyle,
+                      minHeight: 38,
+                      background: "#f8fafc",
+                      fontWeight: 900,
+                    }}
+                  >
+                    {`${createDraft.nome} ${createDraft.cognome}`.trim() ||
+                      "NOME AGENTE"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    EMAIL
+                  </div>
+                  <input
+                    type="email"
+                    value={createDraft.email}
+                    onChange={(e) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        email: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    ALLEGATO PREVISTO
+                  </div>
+                  <input
+                    value={createDraft.emailAttachment}
+                    onChange={(e) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        emailAttachment: e.target.value,
+                      })
+                    }
+                    placeholder="Es. NOMEFILE.xlsx"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    DM
+                  </div>
+                  <input
+                    list="unified-dm-suggestions"
+                    value={createDraft.dm}
+                    onChange={(e) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        dm: e.target.value,
+                      })
+                    }
+                    placeholder="Scegli o inserisci un nuovo DM"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    LOGIN DI RIFERIMENTO
+                  </div>
+                  <div
+                    style={{
+                      ...inputStyle,
+                      minHeight: 38,
+                      background: "#ecfdf5",
+                      color: "#166534",
+                      fontWeight: 900,
+                    }}
+                  >
+                    {createDraft.username
+                      ? `${createDraft.nome} ${createDraft.cognome}`.trim() +
+                        " · " +
+                        createDraft.username
+                      : "VERRÀ COLLEGATO AL NUOVO LOGIN"}
+                  </div>
+                </div>
+              </div>
+
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 7,
+                  alignItems: "center",
+                  fontWeight: 900,
+                  marginTop: 12,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={createDraft.reportNotify}
+                  onChange={(e) =>
+                    setCreateDraft({
+                      ...createDraft,
+                      reportNotify: e.target.checked,
+                    })
+                  }
+                />
+                REPORT ATTIVO
+              </label>
+            </section>
+          )}
+
+          {createDraft.insertActiveAgent && (
+            <section
+              style={{
+                marginTop: 12,
+                background: "#fff7ed",
+                border: "2px solid #fdba74",
+                borderRadius: 12,
+                padding: 14,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 950,
+                  color: "#c2410c",
+                  marginBottom: 10,
+                }}
+              >
+                📍 MAPPE / AGENTI ATTIVI
+              </div>
+
+              <div
+                className="uam-responsive-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit,minmax(210px,1fr))",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    CELLULARE
+                  </div>
+                  <input
+                    value={createDraft.phone}
+                    onChange={(e) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        phone: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    ZONA
+                  </div>
+                  <input
+                    value={createDraft.zone}
+                    onChange={(e) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        zone: e.target.value.toLocaleUpperCase("it"),
+                      })
+                    }
+                    placeholder="Es. PERUGIA"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    REGIONE
+                  </div>
+                  <div
+                    style={{
+                      ...inputStyle,
+                      minHeight: 38,
+                      background: "#f8fafc",
+                      color: "#64748b",
+                    }}
+                  >
+                    AUTOMATICA DALLA ZONA
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    MACROAREA
+                  </div>
+                  <div
+                    style={{
+                      ...inputStyle,
+                      minHeight: 38,
+                      background: "#fffaf0",
+                      color: "#9a3412",
+                      fontWeight: 800,
+                    }}
+                  >
+                    AUTOMATICA DALLA REGIONE
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                    DM DI RIFERIMENTO
+                  </div>
+                  <input
+                    list="unified-dm-suggestions"
+                    value={createDraft.dm}
+                    onChange={(e) =>
+                      setCreateDraft({
+                        ...createDraft,
+                        dm: e.target.value,
+                      })
+                    }
+                    placeholder="Scegli o inserisci un nuovo DM"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 8,
+                  alignItems: "center",
+                  fontWeight: 900,
+                  marginTop: 12,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={createDraft.showOnMap}
+                  onChange={(e) =>
+                    setCreateDraft({
+                      ...createDraft,
+                      showOnMap: e.target.checked,
+                    })
+                  }
+                />
+                {createDraft.showOnMap
+                  ? "MOSTRA IN MAPPA"
+                  : "NON MOSTRARE IN MAPPA"}
+              </label>
+            </section>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginTop: 14,
+            }}
+          >
             <button
               type="button"
               disabled={busy}
               onClick={() => void createAgent()}
               style={{
                 ...buttonStyle,
-                marginLeft: "auto",
+                width: "min(280px,100%)",
                 background: busy ? "#94a3b8" : "#16a34a",
                 color: "white",
-                minWidth: 190,
+                fontSize: 15,
               }}
             >
               {busy ? "SALVATAGGIO..." : "CREA E SALVA AGENTE"}
