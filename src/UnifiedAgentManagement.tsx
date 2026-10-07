@@ -233,6 +233,10 @@ export default function UnifiedAgentManagement({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
+  const [archivedDiscrepancyKeys, setArchivedDiscrepancyKeys] =
+    useState<Set<string>>(() => new Set());
+  const [archivedAlertsOpen, setArchivedAlertsOpen] =
+    useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -245,6 +249,42 @@ export default function UnifiedAgentManagement({
     useState(false);
   const [editDmCustomOpen, setEditDmCustomOpen] =
     useState(false);
+
+  const archivedDiscrepancyStorageKey =
+    `uam_archived_discrepancies:${adminProfile?.id || "default"}`;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(
+        archivedDiscrepancyStorageKey
+      );
+      const parsed = raw ? JSON.parse(raw) : [];
+      setArchivedDiscrepancyKeys(
+        new Set(
+          Array.isArray(parsed)
+            ? parsed.map((value) => String(value))
+            : []
+        )
+      );
+    } catch {
+      setArchivedDiscrepancyKeys(new Set());
+    }
+    setArchivedAlertsOpen(false);
+  }, [archivedDiscrepancyStorageKey]);
+
+  const persistArchivedDiscrepancies = (
+    next: Set<string>
+  ) => {
+    setArchivedDiscrepancyKeys(next);
+    try {
+      localStorage.setItem(
+        archivedDiscrepancyStorageKey,
+        JSON.stringify(Array.from(next))
+      );
+    } catch {
+      // L'archivio resta comunque valido nella sessione corrente.
+    }
+  };
 
   const loadAll = async () => {
     setLoading(true);
