@@ -208,7 +208,7 @@ export default function UnifiedAgentManagement({
   onOpenAdminManagement,
 }: {
   adminProfile: AdminProfile | null;
-  onOpenEmailMatches: () => void;
+  onOpenEmailMatches: (targetAgency?: string) => void;
   onOpenZones: () => void;
   onOpenAdminManagement: () => void;
 }) {
@@ -392,7 +392,11 @@ export default function UnifiedAgentManagement({
             emailByAgentId.get(Number(agent.id)) ||
             emailByName.get(nameKey) ||
             null;
-          const recruiting = recruitingByName.get(nameKey) || null;
+          const recruiting =
+            recruitingByName.get(nameKey) ||
+            (email?.agenzia
+              ? recruitingByName.get(normalizeName(email.agenzia)) || null
+              : null);
 
           return { agent, fullName, email, recruiting };
         })
@@ -435,14 +439,30 @@ export default function UnifiedAgentManagement({
         normalizeName(`${agent.nome} ${agent.cognome}`)
       )
     );
+    const loginIds = new Set(
+      loginAgents
+        .map((agent) => Number(agent.id || 0))
+        .filter((id) => id > 0)
+    );
 
     return recruitingAgents
-      .filter(
-        (agent) =>
-          !loginNames.has(
-            normalizeName(`${agent.first_name} ${agent.last_name}`)
-          )
-      )
+      .filter((agent) => {
+        const key = normalizeName(
+          `${agent.first_name} ${agent.last_name}`
+        );
+
+        if (loginNames.has(key)) return false;
+
+        const recipient = emailByName.get(key);
+        if (
+          recipient?.agent_id &&
+          loginIds.has(Number(recipient.agent_id))
+        ) {
+          return false;
+        }
+
+        return true;
+      })
       .sort((a, b) =>
         `${a.first_name} ${a.last_name}`.localeCompare(
           `${b.first_name} ${b.last_name}`,
@@ -450,20 +470,15 @@ export default function UnifiedAgentManagement({
           { sensitivity: "base" }
         )
       );
-  }, [loginAgents, recruitingAgents]);
+  }, [loginAgents, recruitingAgents, emailByName]);
 
   const unmatchedRecruitingCount = unmatchedRecruitingAgents.length;
 
   const openUnmatchedRecruitingAgent = (agent: RecruitingAgent) => {
-    try {
-      sessionStorage.setItem(
-        "recruiting_open_agent_id",
-        String(agent.id)
-      );
-    } catch {
-      // Navigation still works even if sessionStorage is unavailable.
-    }
-    onOpenZones();
+    const label = `${agent.first_name || ""} ${agent.last_name || ""}`
+      .trim()
+      .toLocaleUpperCase("it");
+    onOpenEmailMatches(label);
   };
 
   const openRow = (row: (typeof rows)[number]) => {
@@ -1481,7 +1496,7 @@ export default function UnifiedAgentManagement({
                       border: "1px solid #fdba74",
                       textDecoration: "underline",
                     }}
-                    title="Apri direttamente la scheda agente in MACROAREE / MAPPA"
+                    title="Apri il nominativo nel Controllo Abbinamenti e imposta il Login di riferimento"
                   >
                     {label || "AGENTE SENZA NOME"} →
                   </button>
@@ -1490,8 +1505,8 @@ export default function UnifiedAgentManagement({
             </div>
 
             <div style={{ marginTop: 8, fontWeight: 700 }}>
-              Clicca un nome per aprire direttamente la sua scheda in
-              MACROAREE / MAPPA.
+              Clicca un nome per aprire direttamente il nominativo nel
+              CONTROLLO ABBINAMENTI e impostare il LOGIN DI RIFERIMENTO.
             </div>
           </div>
         )}
