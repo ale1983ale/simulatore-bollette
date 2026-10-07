@@ -856,9 +856,17 @@ export default function UnifiedAgentManagement({
     const email = createDraft.email.trim();
     const canonicalName = `${nome} ${cognome}`.trim();
 
-    if (!nome || !cognome || !username || !password) {
+    if (!nome || !cognome) {
+      setNotice("Per creare un agente servono nome e cognome.");
+      return;
+    }
+
+    if (
+      createDraft.insertLogin &&
+      (!username || !password)
+    ) {
       setNotice(
-        "Per creare un agente servono nome, cognome, username e password."
+        "Per creare il Login devi inserire username e password."
       );
       return;
     }
@@ -885,70 +893,80 @@ export default function UnifiedAgentManagement({
       return;
     }
 
-    const ownerAdminId =
-      adminProfile?.role === "super_admin"
-        ? createDraft.ownerAdminId === ""
-          ? null
-          : Number(createDraft.ownerAdminId)
-        : adminProfile?.id
-          ? Number(adminProfile.id)
-          : null;
+    let ownerAdminId: number | null = null;
 
-    if (!ownerAdminId) {
-      setNotice("Seleziona l'admin associato all'agente.");
-      return;
+    if (createDraft.insertLogin) {
+      ownerAdminId =
+        adminProfile?.role === "super_admin"
+          ? createDraft.ownerAdminId === ""
+            ? null
+            : Number(createDraft.ownerAdminId)
+          : adminProfile?.id
+            ? Number(adminProfile.id)
+            : null;
+
+      if (!ownerAdminId) {
+        setNotice("Seleziona l'admin associato all'agente.");
+        return;
+      }
     }
 
     setBusy(true);
     setNotice("");
 
     try {
-      const created = await adminAgentCreate({
-        nome,
-        cognome,
-        username,
-        password,
-        ownerAdminId,
-      });
+      let agentId = 0;
 
-      let agentId = Number(
-        (created as any)?.id ||
-          (created as any)?.agent_id ||
-          (created as any)?.agentId ||
-          0
-      );
+      if (createDraft.insertLogin) {
+        const created = await adminAgentCreate({
+          nome,
+          cognome,
+          username,
+          password,
+          ownerAdminId: Number(ownerAdminId),
+        });
 
-      if (!agentId) {
-        const refreshedAgents = await adminAgentList("ALL");
-        const createdAgent = (refreshedAgents || []).find(
-          (item) =>
-            String(item.username || "")
-              .trim()
-              .toLocaleLowerCase("it") ===
-            username.toLocaleLowerCase("it")
+        agentId = Number(
+          (created as any)?.id ||
+            (created as any)?.agent_id ||
+            (created as any)?.agentId ||
+            0
         );
-        agentId = Number(createdAgent?.id || 0);
-      }
 
-      if (!agentId) {
-        throw new Error(
-          "Account creato, ma non è stato possibile recuperare il suo ID."
-        );
-      }
+        if (!agentId) {
+          const refreshedAgents = await adminAgentList("ALL");
+          const createdAgent = (refreshedAgents || []).find(
+            (item) =>
+              String(item.username || "")
+                .trim()
+                .toLocaleLowerCase("it") ===
+              username.toLocaleLowerCase("it")
+          );
+          agentId = Number(createdAgent?.id || 0);
+        }
 
-      if (
-        adminProfile?.role === "super_admin" &&
-        createDraft.provvigioniVisible
-      ) {
-        await adminAgentSetProvvigioniVisibility(agentId, true);
+        if (!agentId) {
+          throw new Error(
+            "Account Login creato, ma non è stato possibile recuperare il suo ID."
+          );
+        }
+
+        if (
+          adminProfile?.role === "super_admin" &&
+          createDraft.provvigioniVisible
+        ) {
+          await adminAgentSetProvvigioniVisibility(agentId, true);
+        }
       }
 
       if (createDraft.insertEmailMatching) {
         const nextRecipients = recipients.map((item) => ({ ...item }));
         const recipientIndex = nextRecipients.findIndex(
           (item) =>
-            Number(item.agent_id || 0) === agentId ||
-            normalizeName(item.agenzia) === normalizeName(canonicalName)
+            (agentId > 0 &&
+              Number(item.agent_id || 0) === agentId) ||
+            normalizeName(item.agenzia) ===
+              normalizeName(canonicalName)
         );
 
         const nextRecipient: EmailRecipient = {
@@ -957,7 +975,7 @@ export default function UnifiedAgentManagement({
           allegato: createDraft.emailAttachment.trim(),
           dm: createDraft.dm.trim(),
           report_notify: createDraft.reportNotify,
-          agent_id: agentId,
+          agent_id: agentId > 0 ? agentId : null,
         };
 
         if (recipientIndex >= 0) {
@@ -987,7 +1005,9 @@ export default function UnifiedAgentManagement({
         let region = existingRecruiting?.region || "";
 
         if (createDraft.zone.trim()) {
-          const geo = await geocodeItalianZone(createDraft.zone.trim());
+          const geo = await geocodeItalianZone(
+            createDraft.zone.trim()
+          );
           const normalizedRegion = normalizeItalianRegion(
             geo.region || createDraft.zone.trim()
           );
@@ -1047,7 +1067,8 @@ export default function UnifiedAgentManagement({
         }
       }
 
-      const createdParts = ["LOGIN"];
+      const createdParts: string[] = [];
+      if (createDraft.insertLogin) createdParts.push("LOGIN");
       if (createDraft.insertEmailMatching) {
         createdParts.push("ABBINAMENTO EMAIL");
       }
@@ -1056,6 +1077,7 @@ export default function UnifiedAgentManagement({
       }
 
       setCreateDraft({ ...EMPTY_CREATE_DRAFT });
+      setCreateSource("login");
       setCreateDmCustomOpen(false);
       setCreateOpen(false);
       setNotice(
