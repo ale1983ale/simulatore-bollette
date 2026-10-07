@@ -16,6 +16,7 @@ import {
   adminAgentSetProvvigioniVisibility,
   getAgentPasswordResetProfile,
   completeAgentPasswordReset,
+  changeAgentPassword,
 } from "./agentSecurity";
 import Recruiting from "./Recruiting";
 import Appointments from "./Appointments";
@@ -8617,7 +8618,7 @@ function AgentsAdmin({
                       }}
                     >
                       {a.password_configured !== false
-                        ? "🔒 PROTETTA"
+                        ? "🔒 REIMPOSTABILE"
                         : "—"}
                     </td>
   
@@ -8762,19 +8763,51 @@ function AgentsAdmin({
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 Nuova password
               </div>
-              <input
-                type="password"
-                placeholder="Lascia vuoto per non cambiarla"
-                value={editPassword}
-                onChange={(e) => setEditPassword(e.target.value)}
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="Lascia vuoto per non cambiarla"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: 10,
+                    border: "1px solid #cbd5e1",
+                    borderRadius: 8,
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!editPassword}
+                  onClick={() => {
+                    if (!editPassword) return;
+                    void navigator.clipboard
+                      .writeText(editPassword)
+                      .then(() => alert("Password copiata"));
+                  }}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                    background: "#f8fafc",
+                    cursor: editPassword ? "pointer" : "not-allowed",
+                    fontWeight: 800,
+                  }}
+                >
+                  COPIA
+                </button>
+              </div>
+              <div
                 style={{
-                  width: "100%",
-                  padding: 10,
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 8,
-                  boxSizing: "border-box",
+                  marginTop: 6,
+                  color: "#64748b",
+                  fontSize: 12,
                 }}
-              />
+              >
+                La nuova password è visibile solo mentre la stai impostando.
+              </div>
             </div>
   
             {adminProfile?.role === "super_admin" && (
@@ -8869,6 +8902,11 @@ function LoginView({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changeNewPassword, setChangeNewPassword] = useState("");
+  const [changeConfirmPassword, setChangeConfirmPassword] = useState("");
+  const [changeBusy, setChangeBusy] = useState(false);
+  const [changeMessage, setChangeMessage] = useState("");
 
   const resetToken =
     typeof window !== "undefined"
@@ -8973,6 +9011,58 @@ function LoginView({
       );
     } finally {
       setResetSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    const user = username.trim().toLowerCase();
+    const current = password;
+    const next = changeNewPassword;
+
+    setChangeMessage("");
+    setErrorMsg("");
+
+    if (!user || !current) {
+      setErrorMsg(
+        "Inserisci username e password attuale."
+      );
+      return;
+    }
+
+    if (next.length < 8) {
+      setErrorMsg(
+        "La nuova password deve contenere almeno 8 caratteri."
+      );
+      return;
+    }
+
+    if (next !== changeConfirmPassword) {
+      setErrorMsg("Le due nuove password non coincidono.");
+      return;
+    }
+
+    setChangeBusy(true);
+
+    try {
+      await changeAgentPassword({
+        username: user,
+        currentPassword: current,
+        newPassword: next,
+      });
+
+      setPassword("");
+      setChangeNewPassword("");
+      setChangeConfirmPassword("");
+      setShowChangePassword(false);
+      setChangeMessage(
+        "Password cambiata. Ora accedi con la nuova password."
+      );
+    } catch (error: any) {
+      setErrorMsg(
+        error?.message || "Errore cambio password."
+      );
+    } finally {
+      setChangeBusy(false);
     }
   };
 
@@ -9214,6 +9304,7 @@ function LoginView({
             onClick={() => {
               setMode("agent");
               setErrorMsg("");
+              setChangeMessage("");
             }}
             style={{
               flex: 1,
@@ -9234,6 +9325,8 @@ function LoginView({
             onClick={() => {
               setMode("admin");
               setErrorMsg("");
+              setChangeMessage("");
+              setShowChangePassword(false);
             }}
             style={{
               flex: 1,
@@ -9275,8 +9368,96 @@ function LoginView({
           }}
         />
 
+        {mode === "agent" && showChangePassword && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid #fed7aa",
+              background: "#fff7ed",
+            }}
+          >
+            <div style={{ fontWeight: 800 }}>
+              Cambia password
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "#7c2d12",
+              }}
+            >
+              Usa nei campi sopra il tuo username e la password attuale.
+            </div>
+            <input
+              type="password"
+              placeholder="Nuova password"
+              value={changeNewPassword}
+              onChange={(event) =>
+                setChangeNewPassword(event.target.value)
+              }
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid #cbd5e1",
+                fontSize: 14,
+              }}
+            />
+            <input
+              type="password"
+              placeholder="Ripeti nuova password"
+              value={changeConfirmPassword}
+              onChange={(event) =>
+                setChangeConfirmPassword(event.target.value)
+              }
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid #cbd5e1",
+                fontSize: 14,
+              }}
+            />
+            <button
+              type="button"
+              disabled={changeBusy}
+              onClick={() => void handleChangePassword()}
+              style={{
+                padding: 11,
+                borderRadius: 9,
+                border: 0,
+                background: "#f97316",
+                color: "white",
+                fontWeight: 900,
+                cursor: changeBusy ? "wait" : "pointer",
+              }}
+            >
+              {changeBusy
+                ? "SALVATAGGIO..."
+                : "SALVA NUOVA PASSWORD"}
+            </button>
+          </div>
+        )}
+
         {errorMsg && (
           <div style={{ color: "red", fontSize: 13 }}>{errorMsg}</div>
+        )}
+
+        {changeMessage && (
+          <div
+            style={{
+              color: "#166534",
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 9,
+              padding: 9,
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            {changeMessage}
+          </div>
         )}
 
         <button
@@ -9295,6 +9476,30 @@ function LoginView({
         >
           {loading ? "Accesso..." : "Entra"}
         </button>
+
+        {mode === "agent" && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowChangePassword((current) => !current);
+              setErrorMsg("");
+              setChangeMessage("");
+            }}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #cbd5e1",
+              background: "white",
+              color: "#0f172a",
+              cursor: "pointer",
+              fontWeight: 800,
+            }}
+          >
+            {showChangePassword
+              ? "ANNULLA CAMBIO PASSWORD"
+              : "CAMBIA PASSWORD"}
+          </button>
+        )}
       </div>
     </div>
   );
