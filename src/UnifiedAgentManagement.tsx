@@ -340,6 +340,93 @@ export default function UnifiedAgentManagement({
     void loadAll();
   }, [adminProfile?.id, adminProfile?.role]);
 
+  const applyCreatePrefill = (prefill: {
+    source?: CreateSource;
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    email?: string;
+    emailAttachment?: string;
+    dm?: string;
+    zone?: string;
+    region?: string;
+    provinceCode?: string;
+    showOnMap?: boolean;
+    reportNotify?: boolean;
+  }) => {
+    const rawFullName = String(
+      prefill.fullName ||
+        `${prefill.firstName || ""} ${prefill.lastName || ""}`
+    )
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleUpperCase("it");
+
+    const parts = rawFullName.split(" ").filter(Boolean);
+    const nome = parts.shift() || "";
+    const cognome = parts.join(" ");
+    const source: CreateSource =
+      prefill.source === "email" || prefill.source === "map"
+        ? prefill.source
+        : "login";
+
+    setExpandedId(null);
+    setDraft(null);
+    setCreateOpen(true);
+    setCreateSource(source);
+    setCreateDmCustomOpen(false);
+    setCreateDraft({
+      ...EMPTY_CREATE_DRAFT,
+      nome,
+      cognome,
+      email: String(prefill.email || "").trim(),
+      emailAttachment: String(
+        prefill.emailAttachment || ""
+      ).trim(),
+      phone: String(prefill.phone || "").trim(),
+      zone: String(
+        prefill.zone ||
+          prefill.region ||
+          ""
+      )
+        .trim()
+        .toLocaleUpperCase("it"),
+      dm: String(prefill.dm || "")
+        .trim()
+        .toLocaleUpperCase("it"),
+      reportNotify: prefill.reportNotify === true,
+      showOnMap: prefill.showOnMap === true,
+      insertLogin: source === "login",
+      insertEmailMatching:
+        source === "email" ||
+        Boolean(String(prefill.email || "").trim()),
+      insertActiveAgent:
+        source === "map" ||
+        Boolean(
+          String(prefill.phone || "").trim() ||
+            String(prefill.zone || "").trim() ||
+            String(prefill.region || "").trim()
+        ),
+      ownerAdminId: adminProfile?.id || "",
+    });
+
+    setNotice(
+      rawFullName
+        ? `${rawFullName}: nuova scheda agente aperta da ${source === "login" ? "LOGIN" : source === "email" ? "ABBINAMENTO EMAIL" : "MAPPE / AGENTI ATTIVI"}.`
+        : `Nuova scheda agente aperta da ${source === "login" ? "LOGIN" : source === "email" ? "ABBINAMENTO EMAIL" : "MAPPE / AGENTI ATTIVI"}.`
+    );
+
+    window.setTimeout(() => {
+      document
+        .getElementById("uam-new-agent-form")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 120);
+  };
+
   useEffect(() => {
     let raw = "";
     try {
@@ -354,99 +441,8 @@ export default function UnifiedAgentManagement({
     if (!raw) return;
 
     try {
-      const prefill = JSON.parse(raw) as {
-        source?: CreateSource;
-        fullName?: string;
-        firstName?: string;
-        lastName?: string;
-        phone?: string;
-        email?: string;
-        emailAttachment?: string;
-        dm?: string;
-        zone?: string;
-        region?: string;
-        provinceCode?: string;
-        showOnMap?: boolean;
-        reportNotify?: boolean;
-      };
-
-      const rawFullName = String(
-        prefill.fullName ||
-          `${prefill.firstName || ""} ${prefill.lastName || ""}`
-      )
-        .trim()
-        .replace(/\s+/g, " ")
-        .toLocaleUpperCase("it");
-      const parts = rawFullName.split(" ").filter(Boolean);
-      const nome = parts.shift() || "";
-      const cognome = parts.join(" ");
-      const source: CreateSource =
-        prefill.source === "email" || prefill.source === "map"
-          ? prefill.source
-          : "login";
-
-      setExpandedId(null);
-      setDraft(null);
-      setCreateOpen(true);
-      setCreateSource(source);
-      setCreateDmCustomOpen(false);
-      setCreateDraft({
-        ...EMPTY_CREATE_DRAFT,
-        nome,
-        cognome,
-        email: String(prefill.email || "").trim(),
-        emailAttachment: String(
-          prefill.emailAttachment || ""
-        ).trim(),
-        phone: String(prefill.phone || "").trim(),
-        zone: String(
-          prefill.zone ||
-            prefill.region ||
-            ""
-        )
-          .trim()
-          .toLocaleUpperCase("it"),
-        dm: String(prefill.dm || "")
-          .trim()
-          .toLocaleUpperCase("it"),
-        reportNotify: prefill.reportNotify === true,
-        showOnMap: prefill.showOnMap === true,
-        insertLogin: source === "login",
-        insertEmailMatching:
-          source === "email" ||
-          Boolean(String(prefill.email || "").trim()),
-        insertActiveAgent:
-          source === "map" ||
-          Boolean(
-            String(prefill.phone || "").trim() ||
-              String(prefill.zone || "").trim() ||
-              String(prefill.region || "").trim()
-          ),
-        ownerAdminId: adminProfile?.id || "",
-      });
-      setNotice(
-        fullName
-          ? `${fullName}: dati principali importati dal contatto. Completa Login e impostazioni agente.`
-          : "Dati principali importati dal contatto. Completa Login e impostazioni agente."
-      );
-
-      try {
-        sessionStorage.removeItem(
-          "unified_agent_create_prefill"
-        );
-      } catch {
-        // Nessuna azione necessaria.
-      }
-
-      window.setTimeout(() => {
-        document
-          .getElementById("uam-new-agent-form")
-          ?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-      }, 120);
-    } catch {
+      applyCreatePrefill(JSON.parse(raw));
+    } finally {
       try {
         sessionStorage.removeItem(
           "unified_agent_create_prefill"
@@ -455,6 +451,37 @@ export default function UnifiedAgentManagement({
         // Nessuna azione necessaria.
       }
     }
+  }, [adminProfile?.id]);
+
+  useEffect(() => {
+    const onOpenUnifiedAgentCreate = (event: Event) => {
+      const detail = (
+        event as CustomEvent<Record<string, unknown>>
+      ).detail;
+
+      if (!detail) return;
+      applyCreatePrefill(detail as any);
+
+      try {
+        sessionStorage.removeItem(
+          "unified_agent_create_prefill"
+        );
+      } catch {
+        // Nessuna azione necessaria.
+      }
+    };
+
+    window.addEventListener(
+      "open-unified-agent-create",
+      onOpenUnifiedAgentCreate as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "open-unified-agent-create",
+        onOpenUnifiedAgentCreate as EventListener
+      );
+    };
   }, [adminProfile?.id]);
 
   useEffect(() => {
