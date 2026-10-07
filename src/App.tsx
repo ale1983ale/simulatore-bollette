@@ -10182,7 +10182,33 @@ function ReportAdmin({
           return true;
         });
 
-  const totals = filteredReports.reduce(
+  const productionToday = new Date();
+  const productionStart = new Date(
+    productionToday.getFullYear(),
+    productionToday.getMonth() -
+      (productionToday.getDate() < 12 ? 1 : 0),
+    12
+  );
+
+  const toLocalYmd = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const productionStartYmd = toLocalYmd(productionStart);
+  const productionTodayYmd = toLocalYmd(productionToday);
+
+  const productionReports = reports.filter((report) => {
+    const reportDate = String(report.report_date || "");
+    return (
+      reportDate >= productionStartYmd &&
+      reportDate <= productionTodayYmd
+    );
+  });
+
+  const totals = productionReports.reduce(
     (acc, r) => {
       acc.contracts_energia += Number(r.contracts_energia || 0);
       acc.consumi_energia += Number(r.consumi_energia || 0);
@@ -10197,6 +10223,11 @@ function ReportAdmin({
       consumi_gas: 0,
     }
   );
+
+  const productionPeriodLabel =
+    `${formatReportDate(productionStartYmd)} – ${formatReportDate(
+      productionTodayYmd
+    )}`;
 
   const getAgentName = (agentId: number) => {
     const agent = agents.find((a) => a.id === agentId);
@@ -10462,16 +10493,41 @@ function ReportAdmin({
           )}
         </div>
 
-        <h3
+        <div
           style={{
-            marginTop: 0,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            gap: 12,
+            flexWrap: "wrap",
             marginBottom: 14,
-            fontSize: 22,
-            color: "#0f172a",
           }}
         >
-          Riepilogo totali
-        </h3>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 22,
+              color: "#0f172a",
+            }}
+          >
+            RIEPILOGO PRODUZIONE IN CORSO
+          </h3>
+
+          <div
+            style={{
+              padding: "6px 10px",
+              borderRadius: 999,
+              background: "#f1f5f9",
+              border: "1px solid #cbd5e1",
+              color: "#475569",
+              fontSize: 12,
+              fontWeight: 900,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {productionPeriodLabel}
+          </div>
+        </div>
 
         <div
           style={{
