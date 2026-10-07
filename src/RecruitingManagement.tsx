@@ -89,7 +89,6 @@ export default function RecruitingManagement() {
   const [zone, setZone] = useState("");
   const [agentDm, setAgentDm] = useState("");
   const [agentShowOnMap, setAgentShowOnMap] = useState(false);
-  const [agentFormError, setAgentFormError] = useState("");
   const [dmReferenceFilter, setDmReferenceFilter] = useState("");
   const [customDmEditor, setCustomDmEditor] = useState<{
     agentId: string;
@@ -361,26 +360,21 @@ export default function RecruitingManagement() {
     setZone("");
     setAgentDm("");
     setAgentShowOnMap(false);
-    setAgentFormError("");
   };
 
   const saveAgent = async () => {
     if (!ctx) return;
-
-    setAgentFormError("");
-
     if (!firstName.trim() || !lastName.trim()) {
       const errorText = "Inserisci nome e cognome dell'agente.";
-      setAgentFormError(errorText);
       setMessage(errorText);
+      window.alert(errorText);
       return;
     }
-
     if (agentShowOnMap && !zone.trim()) {
       const errorText =
-        "Inserisci la zona per mostrare l'agente in mappa.";
-      setAgentFormError(errorText);
+        "Per MOSTRA IN MAPPA devi prima inserire la ZONA dell'agente.";
       setMessage(errorText);
+      window.alert(errorText);
       return;
     }
 
@@ -470,7 +464,6 @@ export default function RecruitingManagement() {
       const savedName = `${firstName.trim()} ${lastName.trim()}`.trim();
       resetAgentForm();
 
-      setAgentFormError("");
       setMessage(
         agentShowOnMap
           ? `${savedName}: modifiche salvate e agente visibile sulla mappa.`
@@ -478,11 +471,10 @@ export default function RecruitingManagement() {
       );
     } catch (error: any) {
       console.error(error);
-      const errorText =
+      setMessage(
         "Errore nel salvataggio dell'agente: " +
-        (error?.message || error);
-      setAgentFormError(errorText);
-      setMessage(errorText);
+          (error?.message || error)
+      );
     } finally {
       setBusy(false);
     }
@@ -504,7 +496,6 @@ export default function RecruitingManagement() {
       agent.latitude !== null &&
         agent.longitude !== null
     );
-    setAgentFormError("");
     setMessage("");
   };
 
@@ -826,10 +817,7 @@ export default function RecruitingManagement() {
             <label style={labelStyle}>Zona</label>
             <input
               value={zone}
-              onChange={(e) => {
-                setZone(e.target.value);
-                if (e.target.value.trim()) setAgentFormError("");
-              }}
+              onChange={(e) => setZone(e.target.value)}
               placeholder="Es. Perugia"
               style={inputStyle}
             />
@@ -1129,9 +1117,9 @@ export default function RecruitingManagement() {
                                 editAgent(agent);
                                 setAgentShowOnMap(true);
                                 const errorText =
-                                  "Inserisci la zona per mostrare l'agente in mappa.";
-                                setAgentFormError(errorText);
+                                  "Inserisci la ZONA nella modifica aperta e poi premi SALVA AGENTE.";
                                 setMessage(errorText);
+                                window.alert(errorText);
                                 return;
                               }
                               void toggleAgentOnMap(
@@ -1232,28 +1220,9 @@ export default function RecruitingManagement() {
                                 <label style={labelStyle}>Zona</label>
                                 <input
                                   value={zone}
-                                  onChange={(e) => {
-                                    setZone(e.target.value);
-                                    if (e.target.value.trim()) {
-                                      setAgentFormError("");
-                                    }
-                                  }}
+                                  onChange={(e) => setZone(e.target.value)}
                                   placeholder="Es. Perugia"
-                                  style={{
-                                    ...inputStyle,
-                                    border:
-                                      agentFormError &&
-                                      agentShowOnMap &&
-                                      !zone.trim()
-                                        ? "2px solid #dc2626"
-                                        : inputStyle.border,
-                                    background:
-                                      agentFormError &&
-                                      agentShowOnMap &&
-                                      !zone.trim()
-                                        ? "#fff7f7"
-                                        : inputStyle.background,
-                                  }}
+                                  style={inputStyle}
                                 />
                               </div>
                               <div>
@@ -1280,11 +1249,8 @@ export default function RecruitingManagement() {
                                   <input
                                     type="checkbox"
                                     checked={agentShowOnMap}
-                                    onChange={(e) => {
-                                      setAgentShowOnMap(e.target.checked);
-                                      if (!e.target.checked || zone.trim()) {
-                                        setAgentFormError("");
-                                      }
+                                    onChange={(e) =>
+                                      setAgentShowOnMap(e.target.checked)
                                     }
                                     style={{ width: 18, height: 18 }}
                                   />
@@ -1292,24 +1258,20 @@ export default function RecruitingManagement() {
                                     ? "MOSTRA IN MAPPA"
                                     : "NON MOSTRARE IN MAPPA"}
                                 </label>
+                                {agentShowOnMap && !zone.trim() && (
+                                  <div
+                                    style={{
+                                      marginTop: 6,
+                                      color: "#b91c1c",
+                                      fontWeight: 900,
+                                      fontSize: 12,
+                                    }}
+                                  >
+                                    Inserisci la ZONA prima di salvare.
+                                  </div>
+                                )}
                               </div>
                             </div>
-
-                            {agentFormError && (
-                              <div
-                                style={{
-                                  marginTop: 12,
-                                  padding: "10px 12px",
-                                  borderRadius: 9,
-                                  background: "#fef2f2",
-                                  border: "1px solid #fecaca",
-                                  color: "#991b1b",
-                                  fontWeight: 900,
-                                }}
-                              >
-                                {agentFormError}
-                              </div>
-                            )}
 
                             <div
                               style={{
@@ -1443,29 +1405,7 @@ export default function RecruitingManagement() {
                     </div>
                     <div>
                       <label style={labelStyle}>Zona</label>
-                      <input
-                        value={zone}
-                        onChange={(e) => {
-                          setZone(e.target.value);
-                          if (e.target.value.trim()) setAgentFormError("");
-                        }}
-                        placeholder="Es. Perugia"
-                        style={{
-                          ...inputStyle,
-                          border:
-                            agentFormError &&
-                            agentShowOnMap &&
-                            !zone.trim()
-                              ? "2px solid #dc2626"
-                              : inputStyle.border,
-                          background:
-                            agentFormError &&
-                            agentShowOnMap &&
-                            !zone.trim()
-                              ? "#fff7f7"
-                              : inputStyle.background,
-                        }}
-                      />
+                      <input value={zone} onChange={(e) => setZone(e.target.value)} placeholder="Es. Perugia" style={inputStyle} />
                     </div>
                     <div>
                       <label style={labelStyle}>DM di Riferimento</label>
@@ -1481,27 +1421,19 @@ export default function RecruitingManagement() {
                       <input
                         type="checkbox"
                         checked={agentShowOnMap}
-                        onChange={(e) => {
-                          setAgentShowOnMap(e.target.checked);
-                          if (!e.target.checked || zone.trim()) {
-                            setAgentFormError("");
-                          }
-                        }
+                        onChange={(e) => setAgentShowOnMap(e.target.checked)}
                       />
                       {agentShowOnMap ? "MOSTRA IN MAPPA" : "NON MOSTRARE IN MAPPA"}
                     </label>
-                    {agentFormError && (
+                    {agentShowOnMap && !zone.trim() && (
                       <div
                         style={{
-                          padding: "10px 12px",
-                          borderRadius: 9,
-                          background: "#fef2f2",
-                          border: "1px solid #fecaca",
-                          color: "#991b1b",
+                          color: "#b91c1c",
                           fontWeight: 900,
+                          fontSize: 12,
                         }}
                       >
-                        {agentFormError}
+                        Inserisci la ZONA prima di salvare.
                       </div>
                     )}
                     <button
