@@ -10838,7 +10838,7 @@ function ReportAdmin({
                                 <th
                                   key={h}
                                   style={{
-                                    textAlign: "left",
+                                    textAlign: "center",
                                     padding: 8,
                                     borderBottom:
                                       "1px solid #e2e8f0",
@@ -10855,6 +10855,7 @@ function ReportAdmin({
                                 <td
                                   data-label="Data"
                                   className="ge-date-cell"
+                                  style={{ textAlign: "center" }}
                                 >
                                   {formatReportDate(
                                     r.report_date
@@ -10863,12 +10864,14 @@ function ReportAdmin({
                                 <td
                                   data-label="Contratti energia"
                                   className="ge-number-cell"
+                                  style={{ textAlign: "center" }}
                                 >
                                   {r.contracts_energia}
                                 </td>
                                 <td
                                   data-label="Consumi energia"
                                   className="ge-number-cell"
+                                  style={{ textAlign: "center" }}
                                 >
                                   {numFormat(
                                     r.consumi_energia,
@@ -10878,12 +10881,14 @@ function ReportAdmin({
                                 <td
                                   data-label="Contratti gas"
                                   className="ge-number-cell"
+                                  style={{ textAlign: "center" }}
                                 >
                                   {r.contracts_gas}
                                 </td>
                                 <td
                                   data-label="Consumi gas"
                                   className="ge-number-cell"
+                                  style={{ textAlign: "center" }}
                                 >
                                   {numFormat(
                                     r.consumi_gas,
@@ -10893,12 +10898,14 @@ function ReportAdmin({
                                 <td
                                   data-label="Note"
                                   className="ge-note-cell"
+                                  style={{ textAlign: "center" }}
                                 >
                                   {r.notes || "-"}
                                 </td>
                                 <td
                                   data-label="Azioni"
                                   className="ge-action-cell"
+                                  style={{ textAlign: "center" }}
                                 >
                                   <button
                                     type="button"
