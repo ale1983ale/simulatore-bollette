@@ -4,6 +4,10 @@ import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { supabaseAnonKey, supabaseUrl } from "./supabase";
 import ReportNotificationPanel from "./ReportNotificationPanel";
+import {
+  adminAgentList,
+  type SafeAgentRecord,
+} from "./agentSecurity";
 
 type AgentRow = {
   agenzia: string;
@@ -11,6 +15,7 @@ type AgentRow = {
   allegato: string;
   dm: string;
   report_notify?: boolean;
+  agent_id?: number | null;
 };
 
 type PreparedRow = AgentRow & {
@@ -347,6 +352,8 @@ export default function OutlookEmail() {
   const [overlayTop, setOverlayTop] = useState(0);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
+  const [reportAccounts, setReportAccounts] =
+    useState<SafeAgentRecord[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [fileMode, setFileMode] = useState<FileMode>("single");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
@@ -573,6 +580,9 @@ export default function OutlookEmail() {
           allegato: String(item?.allegato || ""),
           dm: String(item?.dm || ""),
           report_notify: item?.report_notify === true,
+          agent_id: item?.agent_id
+            ? Number(item.agent_id)
+            : null,
         }))
         .filter(
           (item) =>
@@ -600,6 +610,7 @@ export default function OutlookEmail() {
         allegato: agent.allegato.trim(),
         dm: agent.dm.trim(),
         report_notify: agent.report_notify === true,
+        agent_id: agent.agent_id || null,
       }));
       const now = new Date().toISOString();
       const response = await fetch(`${supabaseUrl}/rest/v1/email_recipient_lists?on_conflict=owner_key`, {
@@ -621,6 +632,62 @@ export default function OutlookEmail() {
   useEffect(() => {
     if (open) void loadSavedRecipients(false);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const rows = await adminAgentList("ALL");
+        if (!cancelled) setReportAccounts(rows);
+      } catch (error) {
+        console.error("LOAD REPORT ACCOUNTS ERROR:", error);
+        if (!cancelled) setReportAccounts([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!reportAccounts.length) return;
+
+    const accountByName = new Map(
+      reportAccounts.map((account) => [
+        normalize(
+          `${account.nome || ""} ${account.cognome || ""}`
+        ),
+        account,
+      ])
+    );
+
+    let changed = false;
+    const next = agents.map((agent) => {
+      if (agent.agent_id || !agent.report_notify) {
+        return agent;
+      }
+
+      const match = accountByName.get(
+        normalize(agent.agenzia)
+      );
+      if (!match?.id) return agent;
+
+      changed = true;
+      return {
+        ...agent,
+        agent_id: Number(match.id),
+      };
+    });
+
+    if (changed) {
+      setAgents(next);
+      setDirty(true);
+    }
+  }, [reportAccounts, agents]);
 
   const assignment = useMemo(() => buildAssignments(agents, sourceAgencies), [agents, sourceAgencies]);
   const nonAssignedAgentIndex = useMemo(() => agents.findIndex(isNonAssignedAgent), [agents]);
@@ -1032,7 +1099,7 @@ export default function OutlookEmail() {
   const addAgent = () => {
     setAgents((current) => [
       ...current,
-      { agenzia: "", email: "", allegato: "", dm: "", report_notify: false },
+      { agenzia: "", email: "", allegato: "", dm: "", report_notify: false, agent_id: null },
     ]);
     setEditingRecipients(true);
     setDirty(true);
@@ -1856,6 +1923,9 @@ export default function OutlookEmail() {
                     <th style={{ padding: 5, width: "7%", textAlign: "center" }}>
                       REPORT
                     </th>
+                    <th style={{ padding: 5, width: "14%" }}>
+                      ACCOUNT REPORT
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1912,9 +1982,58 @@ export default function OutlookEmail() {
                           title="Partecipa agli invii Notifica Report"
                         />
                       </td>
+                      <td style={{ padding: 5 }}>
+                        {editingRecipients ? (
+                          <select
+                            value={agents[index]?.agent_id ?? ""}
+                            onChange={(event) =>
+                              updateAgent(
+                                index,
+                                "agent_id",
+                                event.target.value
+                                  ? Number(event.target.value)
+                                  : null
+                              )
+                            }
+                            style={{
+                              ...smallField,
+                              minWidth: 0,
+                            }}
+                          >
+                            <option value="">
+                              NON ASSOCIATO
+                            </option>
+                            {reportAccounts.map((account) => (
+                              <option
+                                key={account.id}
+                                value={account.id}
+                              >
+                                {`${account.nome} ${account.cognome} · ${account.username}`}
+                              </option>
+                            ))}
+                          </select>
+                        ) : agents[index]?.agent_id ? (
+                          (() => {
+                            const account = reportAccounts.find(
+                              (item) =>
+                                Number(item.id) ===
+                                Number(agents[index]?.agent_id)
+                            );
+                            return account
+                              ? `${account.nome} ${account.cognome} · ${account.username}`
+                              : `ID ${agents[index]?.agent_id}`;
+                          })()
+                        ) : agents[index]?.report_notify ? (
+                          <strong style={{ color: "#b91c1c" }}>
+                            NON ASSOCIATO
+                          </strong>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                     </tr>
                   ))}
-                  {!matched.length && <tr><td colSpan={editingRecipients ? 7 : 6} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>Nessun nominativo presente.</td></tr>}
+                  {!matched.length && <tr><td colSpan={editingRecipients ? 8 : 7} style={{ padding: 16, textAlign: "center", color: "#64748b" }}>Nessun nominativo presente.</td></tr>}
                 </tbody>
               </table>
 
