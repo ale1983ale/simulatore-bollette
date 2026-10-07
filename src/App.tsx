@@ -13003,6 +13003,50 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const onAgentManagementNav = (event: Event) => {
+      const target = String(
+        (event as CustomEvent<{ target?: string }>).detail?.target || ""
+      );
+
+      window.dispatchEvent(new Event("close-outlook-email"));
+      setAdminMenuOpen(false);
+
+      if (target === "map") {
+        setTab("recruitingManagement");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      if (target === "admin") {
+        setTab("agentManagement");
+        window.setTimeout(() => {
+          const section = document.getElementById(
+            "ge-admin-users-manager"
+          ) as HTMLDetailsElement | null;
+          if (!section) return;
+          section.open = true;
+          section.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 120);
+      }
+    };
+
+    window.addEventListener(
+      "agent-management-nav",
+      onAgentManagementNav as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "agent-management-nav",
+        onAgentManagementNav as EventListener
+      );
+    };
+  }, []);
+
   const openDatabaseSettings = () => {
     window.dispatchEvent(new Event("close-outlook-email"));
     setAdminMenuOpen(false);
