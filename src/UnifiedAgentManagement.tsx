@@ -10,6 +10,7 @@ import {
 import { adminListUsers } from "./adminSecurity";
 import { supabaseAnonKey, supabaseUrl } from "./supabase";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
+import AgentManagementToolbar from "./AgentManagementToolbar";
 import {
   geocodeItalianZone,
   ITALIAN_REGIONS,
@@ -2085,63 +2086,8 @@ export default function UnifiedAgentManagement({
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => {
-                setCreateOpen((current) => {
-                  const next = !current;
-                  if (!current) {
-                    setExpandedId(null);
-                    setDraft(null);
-                    setCreateSource("login");
-                    setCreateDmCustomOpen(false);
-                    setCreateDraft({
-                      ...EMPTY_CREATE_DRAFT,
-                      ownerAdminId:
-                        adminProfile?.role === "super_admin"
-                          ? adminProfile?.id || ""
-                          : adminProfile?.id || "",
-                    });
-                  }
-                  return next;
-                });
-              }}
-              style={{
-                ...buttonStyle,
-                background: createOpen ? "#dcfce7" : "#16a34a",
-                color: createOpen ? "#166534" : "white",
-              }}
-            >
-              {createOpen ? "CHIUDI NUOVO AGENTE" : "+ NUOVO AGENTE"}
-            </button>
-            {adminProfile?.role === "super_admin" && (
-              <button
-                type="button"
-                onClick={onOpenAdminManagement}
-                style={{
-                  ...buttonStyle,
-                  background: "#ede9fe",
-                  color: "#5b21b6",
-                }}
-              >
-                GESTIONE ADMIN
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onOpenEmailMatches()}
-              style={{ ...buttonStyle, background: "#e0f2fe" }}
-            >
-              ABBINAMENTI GLOBALI
-            </button>
-            <button
-              type="button"
-              onClick={onOpenZones}
-              style={{ ...buttonStyle, background: "#ffedd5" }}
-            >
-              MACROAREE / MAPPA
-            </button>
+          <div style={{ flex: "1 1 100%" }}>
+            <AgentManagementToolbar active="login" />
           </div>
         </div>
 
