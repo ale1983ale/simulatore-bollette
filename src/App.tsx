@@ -11637,10 +11637,9 @@ function AdminUsersManager({
     if (
       !editAdminNome.trim() ||
       !editAdminCognome.trim() ||
-      !editAdminUsername.trim() ||
-      !editAdminPassword.trim()
+      !editAdminUsername.trim()
     ) {
-      alert("Inserisci nome, cognome, username e password");
+      alert("Inserisci nome, cognome e username");
       return;
     }
 
@@ -11650,7 +11649,7 @@ function AdminUsersManager({
         nome: editAdminNome.trim(),
         cognome: editAdminCognome.trim(),
         username: editAdminUsername.trim(),
-        password: editAdminPassword.trim(),
+        password: editAdminPassword.trim() || undefined,
       });
     } catch (error: any) {
       alert("Errore modifica admin: " + (error?.message || error));
