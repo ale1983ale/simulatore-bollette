@@ -12959,11 +12959,14 @@ export default function App() {
     );
   };
 
-  const openOutlookEmailMatches = () => {
+  const openOutlookEmailMatches = (targetAgency?: string) => {
     setAdminMenuOpen(false);
     window.dispatchEvent(
       new CustomEvent("open-outlook-email", {
-        detail: { view: "matches" },
+        detail: {
+          view: "matches",
+          targetAgency: String(targetAgency || "").trim(),
+        },
       })
     );
   };
