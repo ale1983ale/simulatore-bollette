@@ -1,0 +1,1012 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  adminAgentList,
+  adminAgentSetProvvigioniVisibility,
+  adminAgentUpdate,
+  type SafeAgentRecord,
+} from "./agentSecurity";
+import { adminListUsers } from "./adminSecurity";
+import { supabaseAnonKey, supabaseUrl } from "./supabase";
+import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
+import {
+  geocodeItalianZone,
+  ITALIAN_REGIONS,
+  normalizeItalianRegion,
+} from "./recruitingData";
+
+type AdminProfile = {
+  id?: number;
+  username?: string;
+  role?: string;
+  nome?: string;
+  cognome?: string;
+};
+
+type EmailRecipient = {
+  agenzia: string;
+  email: string;
+  allegato: string;
+  dm: string;
+  report_notify: boolean;
+  agent_id: number | null;
+};
+
+type RecruitingAgent = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  zone: string;
+  region: string;
+  dm_reference: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+type EditDraft = {
+  username: string;
+  password: string;
+  ownerAdminId: number | "";
+  email: string;
+  reportNotify: boolean;
+  provvigioniVisible: boolean;
+  phone: string;
+  zone: string;
+  dm: string;
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "white",
+  border: "1px solid #e2e8f0",
+  borderRadius: 12,
+  padding: 16,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  border: "1px solid #cbd5e1",
+  borderRadius: 9,
+  padding: "9px 10px",
+  background: "white",
+};
+
+const buttonStyle: React.CSSProperties = {
+  border: 0,
+  borderRadius: 9,
+  padding: "9px 12px",
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const normalizeName = (value: string) =>
+  String(value || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]/g, "");
+
+function readAdminSession(): AdminProfile | null {
+  try {
+    const raw = localStorage.getItem("admin_session");
+    return raw ? (JSON.parse(raw) as AdminProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getOwnerKey() {
+  const admin = readAdminSession();
+  if (!admin?.id || !admin?.username) {
+    throw new Error("Sessione amministratore non valida.");
+  }
+
+  const seed = `${admin.id}|${String(admin.username)
+    .trim()
+    .toLowerCase()}|email-recipient-sync-v2`;
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(seed)
+  );
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function syncHeaders(ownerKey: string, includeJson = false) {
+  return {
+    apikey: supabaseAnonKey,
+    Authorization: `Bearer ${supabaseAnonKey}`,
+    "x-client-info": `email-recipient-sync-${ownerKey}`,
+    ...(includeJson ? { "Content-Type": "application/json" } : {}),
+  };
+}
+
+async function loadEmailRecipients() {
+  const ownerKey = await getOwnerKey();
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/email_recipient_lists?owner_key=eq.${ownerKey}&select=recipients&limit=1`,
+    { headers: syncHeaders(ownerKey) }
+  );
+  if (!response.ok) throw new Error(await response.text());
+
+  const rows = (await response.json()) as Array<{ recipients?: unknown }>;
+  const saved = Array.isArray(rows[0]?.recipients)
+    ? (rows[0]?.recipients as any[])
+    : [];
+
+  return saved
+    .map((item: any): EmailRecipient => ({
+      agenzia: String(item?.agenzia || ""),
+      email: String(item?.email || ""),
+      allegato: String(item?.allegato || ""),
+      dm: String(item?.dm || ""),
+      report_notify: item?.report_notify === true,
+      agent_id: item?.agent_id ? Number(item.agent_id) : null,
+    }))
+    .filter(
+      (item) =>
+        item.agenzia || item.email || item.allegato || item.dm
+    );
+}
+
+async function saveEmailRecipients(recipients: EmailRecipient[]) {
+  const ownerKey = await getOwnerKey();
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/email_recipient_lists?on_conflict=owner_key`,
+    {
+      method: "POST",
+      headers: {
+        ...syncHeaders(ownerKey, true),
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        owner_key: ownerKey,
+        recipients,
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
+  if (!response.ok) throw new Error(await response.text());
+}
+
+export default function UnifiedAgentManagement({
+  adminProfile,
+  onOpenLoginSettings,
+  onOpenEmailMatches,
+  onOpenZones,
+}: {
+  adminProfile: AdminProfile | null;
+  onOpenLoginSettings: () => void;
+  onOpenEmailMatches: () => void;
+  onOpenZones: () => void;
+}) {
+  const [loginAgents, setLoginAgents] = useState<SafeAgentRecord[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
+  const [recruitingAgents, setRecruitingAgents] = useState<RecruitingAgent[]>([]);
+  const [ctx, setCtx] = useState<RecruitingContext | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [draft, setDraft] = useState<EditDraft | null>(null);
+
+  const loadAll = async () => {
+    setLoading(true);
+    setNotice("");
+
+    try {
+      const context = await getRecruitingContext();
+      setCtx(context);
+
+      const [loginRows, emailRows, recruitingResult, adminRows] =
+        await Promise.all([
+          adminAgentList("ALL"),
+          loadEmailRecipients(),
+          context.client
+            .from("recruiting_active_agents")
+            .select(
+              "id,first_name,last_name,phone,zone,region,dm_reference,dm1,dm2,latitude,longitude"
+            )
+            .order("last_name", { ascending: true })
+            .order("first_name", { ascending: true }),
+          adminProfile?.role === "super_admin"
+            ? adminListUsers()
+            : Promise.resolve([]),
+        ]);
+
+      if (recruitingResult.error) throw recruitingResult.error;
+
+      setLoginAgents(loginRows || []);
+      setRecipients(emailRows || []);
+      setAdmins(adminRows || []);
+      setRecruitingAgents(
+        (recruitingResult.data || []).map((row: any) => ({
+          id: String(row.id),
+          first_name: String(row.first_name || ""),
+          last_name: String(row.last_name || ""),
+          phone: String(row.phone || ""),
+          zone: String(row.zone || ""),
+          region: String(row.region || ""),
+          dm_reference: String(
+            row.dm_reference || row.dm1 || row.dm2 || ""
+          ),
+          latitude:
+            row.latitude === null || row.latitude === undefined
+              ? null
+              : Number(row.latitude),
+          longitude:
+            row.longitude === null || row.longitude === undefined
+              ? null
+              : Number(row.longitude),
+        }))
+      );
+    } catch (error: any) {
+      console.error(error);
+      setNotice(
+        "Errore nel caricamento Gestione Agenti: " +
+          (error?.message || error)
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAll();
+  }, [adminProfile?.id, adminProfile?.role]);
+
+  const emailByAgentId = useMemo(() => {
+    const map = new Map<number, EmailRecipient>();
+    recipients.forEach((item) => {
+      if (item.agent_id) map.set(Number(item.agent_id), item);
+    });
+    return map;
+  }, [recipients]);
+
+  const emailByName = useMemo(() => {
+    const map = new Map<string, EmailRecipient>();
+    recipients.forEach((item) => {
+      const key = normalizeName(item.agenzia);
+      if (key && !map.has(key)) map.set(key, item);
+    });
+    return map;
+  }, [recipients]);
+
+  const recruitingByName = useMemo(() => {
+    const map = new Map<string, RecruitingAgent>();
+    recruitingAgents.forEach((item) => {
+      const key = normalizeName(
+        `${item.first_name} ${item.last_name}`
+      );
+      if (key && !map.has(key)) map.set(key, item);
+    });
+    return map;
+  }, [recruitingAgents]);
+
+  const rows = useMemo(
+    () =>
+      loginAgents
+        .map((agent) => {
+          const fullName = `${agent.nome || ""} ${agent.cognome || ""}`.trim();
+          const nameKey = normalizeName(fullName);
+          const email =
+            emailByAgentId.get(Number(agent.id)) ||
+            emailByName.get(nameKey) ||
+            null;
+          const recruiting = recruitingByName.get(nameKey) || null;
+
+          return { agent, fullName, email, recruiting };
+        })
+        .filter((row) => {
+          const needle = search.trim().toLocaleLowerCase("it");
+          if (!needle) return true;
+          return [
+            row.fullName,
+            row.agent.username,
+            row.email?.email,
+            row.recruiting?.phone,
+            row.recruiting?.zone,
+            row.email?.dm,
+            row.recruiting?.dm_reference,
+          ]
+            .filter(Boolean)
+            .some((value) =>
+              String(value)
+                .toLocaleLowerCase("it")
+                .includes(needle)
+            );
+        })
+        .sort((a, b) =>
+          a.fullName.localeCompare(b.fullName, "it", {
+            sensitivity: "base",
+          })
+        ),
+    [
+      loginAgents,
+      emailByAgentId,
+      emailByName,
+      recruitingByName,
+      search,
+    ]
+  );
+
+  const unmatchedRecruitingCount = useMemo(() => {
+    const loginNames = new Set(
+      loginAgents.map((agent) =>
+        normalizeName(`${agent.nome} ${agent.cognome}`)
+      )
+    );
+    return recruitingAgents.filter(
+      (agent) =>
+        !loginNames.has(
+          normalizeName(`${agent.first_name} ${agent.last_name}`)
+        )
+    ).length;
+  }, [loginAgents, recruitingAgents]);
+
+  const openRow = (row: (typeof rows)[number]) => {
+    const id = Number(row.agent.id);
+    if (!id) return;
+
+    if (expandedId === id) {
+      setExpandedId(null);
+      setDraft(null);
+      return;
+    }
+
+    setExpandedId(id);
+    setDraft({
+      username: row.agent.username || "",
+      password: "",
+      ownerAdminId: row.agent.owner_admin_id || "",
+      email: row.email?.email || "",
+      reportNotify: row.email?.report_notify === true,
+      provvigioniVisible: row.agent.provvigioni_visible === true,
+      phone: row.recruiting?.phone || "",
+      zone: row.recruiting?.zone || "",
+      dm:
+        row.recruiting?.dm_reference ||
+        row.email?.dm ||
+        "",
+    });
+  };
+
+  const saveRow = async (row: (typeof rows)[number]) => {
+    if (!draft || !row.agent.id) return;
+
+    setBusy(true);
+    setNotice("");
+
+    try {
+      const agentId = Number(row.agent.id);
+      const canonicalName = row.fullName.trim();
+
+      await adminAgentUpdate({
+        id: agentId,
+        username: draft.username.trim(),
+        password: draft.password.trim() || undefined,
+        ownerAdminId:
+          draft.ownerAdminId === ""
+            ? null
+            : Number(draft.ownerAdminId),
+      });
+
+      if (
+        draft.provvigioniVisible !==
+        Boolean(row.agent.provvigioni_visible)
+      ) {
+        await adminAgentSetProvvigioniVisibility(
+          agentId,
+          draft.provvigioniVisible
+        );
+      }
+
+      const nextRecipients = recipients.map((item) => ({ ...item }));
+      let recipientIndex = nextRecipients.findIndex(
+        (item) => Number(item.agent_id || 0) === agentId
+      );
+      if (recipientIndex < 0) {
+        recipientIndex = nextRecipients.findIndex(
+          (item) =>
+            normalizeName(item.agenzia) ===
+            normalizeName(canonicalName)
+        );
+      }
+
+      const previousRecipient =
+        recipientIndex >= 0
+          ? nextRecipients[recipientIndex]
+          : null;
+
+      const nextRecipient: EmailRecipient = {
+        agenzia: canonicalName,
+        email: draft.email.trim(),
+        allegato: previousRecipient?.allegato || "",
+        dm: draft.dm.trim(),
+        report_notify: draft.reportNotify,
+        agent_id: agentId,
+      };
+
+      if (recipientIndex >= 0) {
+        nextRecipients[recipientIndex] = nextRecipient;
+      } else if (
+        nextRecipient.email ||
+        nextRecipient.dm ||
+        nextRecipient.report_notify
+      ) {
+        nextRecipients.push(nextRecipient);
+      }
+
+      await saveEmailRecipients(nextRecipients);
+
+      if (ctx) {
+        const currentRecruiting = row.recruiting;
+        const needsRecruiting =
+          Boolean(currentRecruiting) ||
+          Boolean(draft.phone.trim()) ||
+          Boolean(draft.zone.trim()) ||
+          Boolean(draft.dm.trim());
+
+        if (needsRecruiting) {
+          let latitude = currentRecruiting?.latitude ?? null;
+          let longitude = currentRecruiting?.longitude ?? null;
+          let region = currentRecruiting?.region || "";
+
+          if (
+            draft.zone.trim() &&
+            draft.zone.trim() !==
+              String(currentRecruiting?.zone || "").trim()
+          ) {
+            const geo = await geocodeItalianZone(draft.zone.trim());
+            const normalizedRegion = normalizeItalianRegion(
+              geo.region || draft.zone.trim()
+            );
+            latitude = geo.latitude;
+            longitude = geo.longitude;
+            region = ITALIAN_REGIONS.includes(
+              normalizedRegion as any
+            )
+              ? normalizedRegion
+              : region;
+          }
+
+          const payload = {
+            owner_key: ctx.ownerKey,
+            first_name: String(row.agent.nome || "").trim(),
+            last_name: String(row.agent.cognome || "").trim(),
+            phone: draft.phone.trim(),
+            zone: draft.zone.trim(),
+            region,
+            dm_reference: draft.dm.trim(),
+            latitude,
+            longitude,
+            updated_at: new Date().toISOString(),
+          };
+
+          if (currentRecruiting?.id) {
+            const { error } = await ctx.client
+              .from("recruiting_active_agents")
+              .update(payload)
+              .eq("id", currentRecruiting.id)
+              .eq("owner_key", ctx.ownerKey);
+            if (error) throw error;
+          } else {
+            const { error } = await ctx.client
+              .from("recruiting_active_agents")
+              .insert(payload);
+            if (error) throw error;
+          }
+        }
+      }
+
+      setNotice(
+        `${canonicalName}: impostazioni aggiornate in un'unica operazione.`
+      );
+      setExpandedId(null);
+      setDraft(null);
+      await loadAll();
+    } catch (error: any) {
+      console.error(error);
+      setNotice(
+        "Errore nel salvataggio: " + (error?.message || error)
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
+    return <div style={cardStyle}>Caricamento Gestione Agenti...</div>;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={cardStyle}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0 }}>Gestione Agenti</h2>
+            <div
+              style={{
+                marginTop: 5,
+                color: "#64748b",
+                fontSize: 13,
+              }}
+            >
+              Una riga unica per accesso, email/report, zona, DM e
+              provvigioni.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={onOpenLoginSettings}
+              style={{ ...buttonStyle, background: "#e2e8f0" }}
+            >
+              ACCESSI / NUOVO AGENTE
+            </button>
+            <button
+              type="button"
+              onClick={onOpenEmailMatches}
+              style={{ ...buttonStyle, background: "#e0f2fe" }}
+            >
+              ABBINAMENTI AVANZATI
+            </button>
+            <button
+              type="button"
+              onClick={onOpenZones}
+              style={{ ...buttonStyle, background: "#ffedd5" }}
+            >
+              MACROAREE / MAPPA
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(220px, 420px) auto",
+            gap: 10,
+            marginTop: 14,
+            alignItems: "center",
+          }}
+        >
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca agente, email, telefono, zona o DM..."
+            style={inputStyle}
+          />
+          <button
+            type="button"
+            onClick={() => void loadAll()}
+            style={{
+              ...buttonStyle,
+              background: "#0f172a",
+              color: "white",
+            }}
+          >
+            AGGIORNA
+          </button>
+        </div>
+
+        {unmatchedRecruitingCount > 0 && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "8px 10px",
+              borderRadius: 9,
+              background: "#fff7ed",
+              border: "1px solid #fed7aa",
+              color: "#9a3412",
+              fontSize: 12,
+              fontWeight: 800,
+            }}
+          >
+            {unmatchedRecruitingCount} agenti presenti in Gestione
+            Zone non hanno ancora una corrispondenza esatta con un
+            account Login. Puoi verificarli da MACROAREE / MAPPA.
+          </div>
+        )}
+
+        {notice && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "9px 11px",
+              borderRadius: 9,
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              color: "#1e3a8a",
+              fontWeight: 800,
+            }}
+          >
+            {notice}
+          </div>
+        )}
+      </div>
+
+      <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              minWidth: 1120,
+            }}
+          >
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {[
+                  "AGENTE",
+                  "LOGIN",
+                  "ADMIN",
+                  "EMAIL",
+                  "REPORT",
+                  "CELLULARE",
+                  "ZONA",
+                  "DM",
+                  "PROVV.",
+                  "STATO",
+                  "",
+                ].map((label) => (
+                  <th
+                    key={label}
+                    style={{
+                      padding: "10px 9px",
+                      borderBottom: "1px solid #e2e8f0",
+                      textAlign: "left",
+                      fontSize: 11,
+                      color: "#475569",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((row) => {
+                const id = Number(row.agent.id);
+                const isOpen = expandedId === id;
+                const admin = admins.find(
+                  (item) =>
+                    Number(item.id) ===
+                    Number(row.agent.owner_admin_id || 0)
+                );
+                const dm =
+                  row.recruiting?.dm_reference ||
+                  row.email?.dm ||
+                  "";
+
+                return (
+                  <React.Fragment key={id}>
+                    <tr
+                      style={{
+                        background: isOpen ? "#f8fbff" : "white",
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "10px 9px",
+                          borderBottom: "1px solid #f1f5f9",
+                          fontWeight: 900,
+                          color: "#0f2d69",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {row.fullName.toUpperCase()}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.agent.username || "-"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
+                        {admin
+                          ? String(
+                              `${admin.nome || ""} ${admin.cognome || ""}`
+                            ).trim() || admin.username
+                          : row.agent.owner_admin_id
+                            ? `ID ${row.agent.owner_admin_id}`
+                            : "-"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.email?.email || "-"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
+                        {row.email?.report_notify ? "✅" : "—"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.recruiting?.phone || "-"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
+                        {row.recruiting?.zone || "-"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
+                        {dm || "-"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
+                        {row.agent.provvigioni_visible ? "✅" : "—"}
+                      </td>
+                      <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                        <span
+                          title="Accesso"
+                          style={{ marginRight: 4 }}
+                        >
+                          🔐
+                        </span>
+                        <span
+                          title={
+                            row.email
+                              ? "Abbinamento email presente"
+                              : "Email non abbinata"
+                          }
+                          style={{ marginRight: 4, opacity: row.email ? 1 : 0.25 }}
+                        >
+                          ✉️
+                        </span>
+                        <span
+                          title={
+                            row.recruiting
+                              ? "Agente presente in Zone"
+                              : "Zona non configurata"
+                          }
+                          style={{ opacity: row.recruiting ? 1 : 0.25 }}
+                        >
+                          📍
+                        </span>
+                      </td>
+                      <td style={{ padding: "7px 9px", borderBottom: "1px solid #f1f5f9" }}>
+                        <button
+                          type="button"
+                          onClick={() => openRow(row)}
+                          style={{
+                            ...buttonStyle,
+                            padding: "7px 10px",
+                            background: isOpen
+                              ? "#dbeafe"
+                              : "#e2e8f0",
+                            color: "#0f172a",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {isOpen ? "CHIUDI" : "MODIFICA"}
+                        </button>
+                      </td>
+                    </tr>
+
+                    {isOpen && draft && (
+                      <tr>
+                        <td
+                          colSpan={11}
+                          style={{
+                            padding: 14,
+                            background: "#f8fbff",
+                            borderBottom: "2px solid #bfdbfe",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fit,minmax(190px,1fr))",
+                              gap: 10,
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>USERNAME</div>
+                              <input
+                                value={draft.username}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    username: e.target.value,
+                                  })
+                                }
+                                style={inputStyle}
+                              />
+                            </div>
+
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>NUOVA PASSWORD</div>
+                              <input
+                                type="password"
+                                value={draft.password}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    password: e.target.value,
+                                  })
+                                }
+                                placeholder="Lascia vuoto per non cambiarla"
+                                style={inputStyle}
+                              />
+                            </div>
+
+                            {adminProfile?.role === "super_admin" && (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>ADMIN ASSOCIATO</div>
+                                <select
+                                  value={draft.ownerAdminId}
+                                  onChange={(e) =>
+                                    setDraft({
+                                      ...draft,
+                                      ownerAdminId: e.target.value
+                                        ? Number(e.target.value)
+                                        : "",
+                                    })
+                                  }
+                                  style={inputStyle}
+                                >
+                                  <option value="">Nessuno</option>
+                                  {admins.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                      {String(
+                                        `${item.nome || ""} ${item.cognome || ""}`
+                                      ).trim() || item.username}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>EMAIL</div>
+                              <input
+                                type="email"
+                                value={draft.email}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    email: e.target.value,
+                                  })
+                                }
+                                style={inputStyle}
+                              />
+                            </div>
+
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>CELLULARE</div>
+                              <input
+                                value={draft.phone}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    phone: e.target.value,
+                                  })
+                                }
+                                style={inputStyle}
+                              />
+                            </div>
+
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>ZONA</div>
+                              <input
+                                value={draft.zone}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    zone: e.target.value,
+                                  })
+                                }
+                                placeholder="Es. Perugia"
+                                style={inputStyle}
+                              />
+                            </div>
+
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>DM DI RIFERIMENTO</div>
+                              <input
+                                value={draft.dm}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    dm: e.target.value,
+                                  })
+                                }
+                                style={inputStyle}
+                              />
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 18,
+                              flexWrap: "wrap",
+                              alignItems: "center",
+                              marginTop: 12,
+                            }}
+                          >
+                            <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900 }}>
+                              <input
+                                type="checkbox"
+                                checked={draft.reportNotify}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    reportNotify: e.target.checked,
+                                  })
+                                }
+                              />
+                              REPORT ATTIVO
+                            </label>
+
+                            <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900 }}>
+                              <input
+                                type="checkbox"
+                                checked={draft.provvigioniVisible}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...draft,
+                                    provvigioniVisible:
+                                      e.target.checked,
+                                  })
+                                }
+                              />
+                              PROVVIGIONI
+                            </label>
+
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void saveRow(row)}
+                              style={{
+                                ...buttonStyle,
+                                marginLeft: "auto",
+                                background: busy
+                                  ? "#94a3b8"
+                                  : "#16a34a",
+                                color: "white",
+                                minWidth: 180,
+                              }}
+                            >
+                              {busy
+                                ? "SALVATAGGIO..."
+                                : "SALVA AGENTE"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+
+              {!rows.length && (
+                <tr>
+                  <td
+                    colSpan={11}
+                    style={{
+                      padding: 20,
+                      textAlign: "center",
+                      color: "#64748b",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Nessun agente trovato.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
