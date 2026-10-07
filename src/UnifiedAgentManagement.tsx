@@ -429,19 +429,42 @@ export default function UnifiedAgentManagement({
     ]
   );
 
-  const unmatchedRecruitingCount = useMemo(() => {
+  const unmatchedRecruitingAgents = useMemo(() => {
     const loginNames = new Set(
       loginAgents.map((agent) =>
         normalizeName(`${agent.nome} ${agent.cognome}`)
       )
     );
-    return recruitingAgents.filter(
-      (agent) =>
-        !loginNames.has(
-          normalizeName(`${agent.first_name} ${agent.last_name}`)
+
+    return recruitingAgents
+      .filter(
+        (agent) =>
+          !loginNames.has(
+            normalizeName(`${agent.first_name} ${agent.last_name}`)
+          )
+      )
+      .sort((a, b) =>
+        `${a.first_name} ${a.last_name}`.localeCompare(
+          `${b.first_name} ${b.last_name}`,
+          "it",
+          { sensitivity: "base" }
         )
-    ).length;
+      );
   }, [loginAgents, recruitingAgents]);
+
+  const unmatchedRecruitingCount = unmatchedRecruitingAgents.length;
+
+  const openUnmatchedRecruitingAgent = (agent: RecruitingAgent) => {
+    try {
+      sessionStorage.setItem(
+        "recruiting_open_agent_id",
+        String(agent.id)
+      );
+    } catch {
+      // Navigation still works even if sessionStorage is unavailable.
+    }
+    onOpenZones();
+  };
 
   const openRow = (row: (typeof rows)[number]) => {
     const id = Number(row.agent.id);
@@ -659,8 +682,8 @@ export default function UnifiedAgentManagement({
   };
 
   const createAgent = async () => {
-    const nome = createDraft.nome.trim();
-    const cognome = createDraft.cognome.trim();
+    const nome = createDraft.nome.trim().toLocaleUpperCase("it");
+    const cognome = createDraft.cognome.trim().toLocaleUpperCase("it");
     const username = createDraft.username.trim();
     const password = createDraft.password.trim();
     const email = createDraft.email.trim();
@@ -1418,7 +1441,7 @@ export default function UnifiedAgentManagement({
           <div
             style={{
               marginTop: 10,
-              padding: "8px 10px",
+              padding: "10px 12px",
               borderRadius: 9,
               background: "#fff7ed",
               border: "1px solid #fed7aa",
@@ -1427,9 +1450,49 @@ export default function UnifiedAgentManagement({
               fontWeight: 800,
             }}
           >
-            {unmatchedRecruitingCount} agenti presenti in Gestione
-            Zone non hanno ancora una corrispondenza esatta con un
-            account Login. Puoi verificarli da MACROAREE / MAPPA.
+            <div>
+              {unmatchedRecruitingCount} agenti presenti in Gestione Zone
+              non hanno ancora una corrispondenza esatta con un account Login.
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 7,
+                marginTop: 9,
+              }}
+            >
+              {unmatchedRecruitingAgents.map((agent) => {
+                const label = `${agent.first_name || ""} ${agent.last_name || ""}`
+                  .trim()
+                  .toLocaleUpperCase("it");
+
+                return (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => openUnmatchedRecruitingAgent(agent)}
+                    style={{
+                      ...buttonStyle,
+                      padding: "6px 9px",
+                      background: "white",
+                      color: "#9a3412",
+                      border: "1px solid #fdba74",
+                      textDecoration: "underline",
+                    }}
+                    title="Apri direttamente la scheda agente in MACROAREE / MAPPA"
+                  >
+                    {label || "AGENTE SENZA NOME"} →
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ marginTop: 8, fontWeight: 700 }}>
+              Clicca un nome per aprire direttamente la sua scheda in
+              MACROAREE / MAPPA.
+            </div>
           </div>
         )}
 
@@ -1486,7 +1549,10 @@ export default function UnifiedAgentManagement({
               <input
                 value={createDraft.nome}
                 onChange={(e) =>
-                  setCreateDraft({ ...createDraft, nome: e.target.value })
+                  setCreateDraft({
+                    ...createDraft,
+                    nome: e.target.value.toLocaleUpperCase("it"),
+                  })
                 }
                 style={inputStyle}
               />
@@ -1499,7 +1565,10 @@ export default function UnifiedAgentManagement({
               <input
                 value={createDraft.cognome}
                 onChange={(e) =>
-                  setCreateDraft({ ...createDraft, cognome: e.target.value })
+                  setCreateDraft({
+                    ...createDraft,
+                    cognome: e.target.value.toLocaleUpperCase("it"),
+                  })
                 }
                 style={inputStyle}
               />
