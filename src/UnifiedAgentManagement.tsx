@@ -800,6 +800,12 @@ export default function UnifiedAgentManagement({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <datalist id="unified-dm-suggestions">
+        {dmSuggestions.map((dm) => (
+          <option key={dm} value={dm} />
+        ))}
+      </datalist>
+
       <div style={cardStyle}>
         <div
           style={{
@@ -852,12 +858,25 @@ export default function UnifiedAgentManagement({
             >
               {createOpen ? "CHIUDI NUOVO AGENTE" : "+ NUOVO AGENTE"}
             </button>
+            {adminProfile?.role === "super_admin" && (
+              <button
+                type="button"
+                onClick={onOpenAdminManagement}
+                style={{
+                  ...buttonStyle,
+                  background: "#ede9fe",
+                  color: "#5b21b6",
+                }}
+              >
+                GESTIONE ADMIN
+              </button>
+            )}
             <button
               type="button"
               onClick={onOpenEmailMatches}
               style={{ ...buttonStyle, background: "#e0f2fe" }}
             >
-              ABBINAMENTI AVANZATI
+              ABBINAMENTI GLOBALI
             </button>
             <button
               type="button"
@@ -1090,12 +1109,17 @@ export default function UnifiedAgentManagement({
                 DM DI RIFERIMENTO
               </div>
               <input
+                list="unified-dm-suggestions"
                 value={createDraft.dm}
                 onChange={(e) =>
                   setCreateDraft({ ...createDraft, dm: e.target.value })
                 }
+                placeholder="Scegli un DM esistente o scrivine uno nuovo"
                 style={inputStyle}
               />
+              <div style={{ marginTop: 4, fontSize: 11, color: "#64748b" }}>
+                Puoi selezionare un suggerimento oppure digitare un nuovo DM.
+              </div>
             </div>
           </div>
 
@@ -1338,186 +1362,347 @@ export default function UnifiedAgentManagement({
                         >
                           <div
                             style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "repeat(auto-fit,minmax(190px,1fr))",
-                              gap: 10,
-                            }}
-                          >
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>USERNAME</div>
-                              <input
-                                value={draft.username}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    username: e.target.value,
-                                  })
-                                }
-                                style={inputStyle}
-                              />
-                            </div>
-
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>NUOVA PASSWORD</div>
-                              <input
-                                type="password"
-                                value={draft.password}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    password: e.target.value,
-                                  })
-                                }
-                                placeholder="Lascia vuoto per non cambiarla"
-                                style={inputStyle}
-                              />
-                            </div>
-
-                            {adminProfile?.role === "super_admin" && (
-                              <div>
-                                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>ADMIN ASSOCIATO</div>
-                                <select
-                                  value={draft.ownerAdminId}
-                                  onChange={(e) =>
-                                    setDraft({
-                                      ...draft,
-                                      ownerAdminId: e.target.value
-                                        ? Number(e.target.value)
-                                        : "",
-                                    })
-                                  }
-                                  style={inputStyle}
-                                >
-                                  <option value="">Nessuno</option>
-                                  {admins.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                      {String(
-                                        `${item.nome || ""} ${item.cognome || ""}`
-                                      ).trim() || item.username}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>EMAIL</div>
-                              <input
-                                type="email"
-                                value={draft.email}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    email: e.target.value,
-                                  })
-                                }
-                                style={inputStyle}
-                              />
-                            </div>
-
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>CELLULARE</div>
-                              <input
-                                value={draft.phone}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    phone: e.target.value,
-                                  })
-                                }
-                                style={inputStyle}
-                              />
-                            </div>
-
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>ZONA</div>
-                              <input
-                                value={draft.zone}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    zone: e.target.value,
-                                  })
-                                }
-                                placeholder="Es. Perugia"
-                                style={inputStyle}
-                              />
-                            </div>
-
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>DM DI RIFERIMENTO</div>
-                              <input
-                                value={draft.dm}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    dm: e.target.value,
-                                  })
-                                }
-                                style={inputStyle}
-                              />
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
                               display: "flex",
-                              gap: 18,
-                              flexWrap: "wrap",
-                              alignItems: "center",
-                              marginTop: 12,
+                              flexDirection: "column",
+                              gap: 12,
                             }}
                           >
-                            <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900 }}>
-                              <input
-                                type="checkbox"
-                                checked={draft.reportNotify}
-                                onChange={(e) =>
-                                  setDraft({
-                                    ...draft,
-                                    reportNotify: e.target.checked,
-                                  })
-                                }
-                              />
-                              REPORT ATTIVO
-                            </label>
+                            <section
+                              style={{
+                                background: "white",
+                                border: "1px solid #cbd5e1",
+                                borderRadius: 12,
+                                padding: 14,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: 950,
+                                  fontSize: 13,
+                                  color: "#0f2d69",
+                                  marginBottom: 10,
+                                }}
+                              >
+                                🔐 LOGIN
+                              </div>
 
-                            {adminProfile?.role === "super_admin" && (
-                              <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900 }}>
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit,minmax(210px,1fr))",
+                                  gap: 10,
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    USERNAME
+                                  </div>
+                                  <input
+                                    value={draft.username}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        username: e.target.value,
+                                      })
+                                    }
+                                    style={inputStyle}
+                                  />
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    NUOVA PASSWORD
+                                  </div>
+                                  <input
+                                    type="password"
+                                    value={draft.password}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        password: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Lascia vuoto per non cambiarla"
+                                    style={inputStyle}
+                                  />
+                                </div>
+
+                                {adminProfile?.role === "super_admin" && (
+                                  <div>
+                                    <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                      ADMIN ASSOCIATO
+                                    </div>
+                                    <select
+                                      value={draft.ownerAdminId}
+                                      onChange={(e) =>
+                                        setDraft({
+                                          ...draft,
+                                          ownerAdminId: e.target.value
+                                            ? Number(e.target.value)
+                                            : "",
+                                        })
+                                      }
+                                      style={inputStyle}
+                                    >
+                                      <option value="">Nessuno</option>
+                                      {admins.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                          {String(
+                                            `${item.nome || ""} ${item.cognome || ""}`
+                                          ).trim() || item.username}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+
+                              {adminProfile?.role === "super_admin" && (
+                                <label
+                                  style={{
+                                    display: "inline-flex",
+                                    gap: 7,
+                                    alignItems: "center",
+                                    fontWeight: 900,
+                                    marginTop: 12,
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={draft.provvigioniVisible}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        provvigioniVisible: e.target.checked,
+                                      })
+                                    }
+                                  />
+                                  ACCESSO PROVVIGIONI
+                                </label>
+                              )}
+                            </section>
+
+                            <section
+                              style={{
+                                background: "white",
+                                border: "1px solid #bae6fd",
+                                borderRadius: 12,
+                                padding: 14,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: 950,
+                                  fontSize: 13,
+                                  color: "#0369a1",
+                                  marginBottom: 10,
+                                }}
+                              >
+                                ✉️ ABBINAMENTI
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit,minmax(210px,1fr))",
+                                  gap: 10,
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    EMAIL
+                                  </div>
+                                  <input
+                                    type="email"
+                                    value={draft.email}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        email: e.target.value,
+                                      })
+                                    }
+                                    style={inputStyle}
+                                  />
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    DM DI RIFERIMENTO
+                                  </div>
+                                  <input
+                                    list="unified-dm-suggestions"
+                                    value={draft.dm}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        dm: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Scegli un DM o scrivine uno nuovo"
+                                    style={inputStyle}
+                                  />
+                                </div>
+                              </div>
+
+                              <label
+                                style={{
+                                  display: "inline-flex",
+                                  gap: 7,
+                                  alignItems: "center",
+                                  fontWeight: 900,
+                                  marginTop: 12,
+                                }}
+                              >
                                 <input
                                   type="checkbox"
-                                  checked={draft.provvigioniVisible}
+                                  checked={draft.reportNotify}
                                   onChange={(e) =>
                                     setDraft({
                                       ...draft,
-                                      provvigioniVisible:
-                                        e.target.checked,
+                                      reportNotify: e.target.checked,
                                     })
                                   }
                                 />
-                                PROVVIGIONI
+                                REPORT ATTIVO
                               </label>
-                            )}
+                            </section>
 
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void saveRow(row)}
+                            <section
                               style={{
-                                ...buttonStyle,
-                                marginLeft: "auto",
-                                background: busy
-                                  ? "#94a3b8"
-                                  : "#16a34a",
-                                color: "white",
-                                minWidth: 180,
+                                background: "white",
+                                border: "1px solid #fed7aa",
+                                borderRadius: 12,
+                                padding: 14,
                               }}
                             >
-                              {busy
-                                ? "SALVATAGGIO..."
-                                : "SALVA AGENTE"}
-                            </button>
+                              <div
+                                style={{
+                                  fontWeight: 950,
+                                  fontSize: 13,
+                                  color: "#c2410c",
+                                  marginBottom: 10,
+                                }}
+                              >
+                                📍 MACROAREE
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns:
+                                    "repeat(auto-fit,minmax(210px,1fr))",
+                                  gap: 10,
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    CELLULARE
+                                  </div>
+                                  <input
+                                    value={draft.phone}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        phone: e.target.value,
+                                      })
+                                    }
+                                    style={inputStyle}
+                                  />
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    ZONA
+                                  </div>
+                                  <input
+                                    value={draft.zone}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        zone: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Es. Perugia"
+                                    style={inputStyle}
+                                  />
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    REGIONE
+                                  </div>
+                                  <div
+                                    style={{
+                                      ...inputStyle,
+                                      minHeight: 38,
+                                      background: "#f8fafc",
+                                      color: "#334155",
+                                    }}
+                                  >
+                                    {row.recruiting?.region || "Automatica dalla zona"}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+                                    MACROAREA
+                                  </div>
+                                  <div
+                                    style={{
+                                      ...inputStyle,
+                                      minHeight: 38,
+                                      background: "#fff7ed",
+                                      color: "#9a3412",
+                                      fontWeight: 800,
+                                    }}
+                                  >
+                                    {row.recruiting?.region
+                                      ? macroareaByRegion.get(
+                                          normalizeItalianRegion(
+                                            row.recruiting.region
+                                          )
+                                        ) || "Nessuna macroarea associata"
+                                      : "Si aggiorna dopo il salvataggio della zona"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div
+                                style={{
+                                  marginTop: 8,
+                                  fontSize: 11,
+                                  color: "#64748b",
+                                }}
+                              >
+                                La regione e la macroarea vengono ricalcolate
+                                automaticamente quando modifichi la zona.
+                              </div>
+                            </section>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                gap: 10,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void saveRow(row)}
+                                style={{
+                                  ...buttonStyle,
+                                  background: busy ? "#94a3b8" : "#16a34a",
+                                  color: "white",
+                                  minWidth: 190,
+                                }}
+                              >
+                                {busy ? "SALVATAGGIO..." : "SALVA TUTTO"}
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
