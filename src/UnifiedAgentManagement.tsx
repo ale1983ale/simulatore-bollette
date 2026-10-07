@@ -785,14 +785,84 @@ export default function UnifiedAgentManagement({
     emailByName,
   ]);
 
+  const discrepancyArchiveKey = (
+    item: (typeof branchDiscrepancies)[number]
+  ) =>
+    `${item.key}|${[...item.missing].sort().join(",")}`;
+
+  const activeDiscrepancies = useMemo(
+    () =>
+      branchDiscrepancies.filter(
+        (item) =>
+          !archivedDiscrepancyKeys.has(
+            discrepancyArchiveKey(item)
+          )
+      ),
+    [branchDiscrepancies, archivedDiscrepancyKeys]
+  );
+
+  const archivedDiscrepancies = useMemo(
+    () =>
+      branchDiscrepancies.filter((item) =>
+        archivedDiscrepancyKeys.has(
+          discrepancyArchiveKey(item)
+        )
+      ),
+    [branchDiscrepancies, archivedDiscrepancyKeys]
+  );
+
+  useEffect(() => {
+    if (loading) return;
+
+    const currentKeys = new Set(
+      branchDiscrepancies.map((item) =>
+        discrepancyArchiveKey(item)
+      )
+    );
+    const next = new Set(
+      Array.from(archivedDiscrepancyKeys).filter((key) =>
+        currentKeys.has(key)
+      )
+    );
+
+    if (
+      next.size !== archivedDiscrepancyKeys.size ||
+      Array.from(next).some(
+        (key) => !archivedDiscrepancyKeys.has(key)
+      )
+    ) {
+      persistArchivedDiscrepancies(next);
+    }
+  }, [
+    loading,
+    branchDiscrepancies,
+    archivedDiscrepancyKeys,
+  ]);
+
+  const archiveDiscrepancy = (
+    item: (typeof branchDiscrepancies)[number]
+  ) => {
+    const next = new Set(archivedDiscrepancyKeys);
+    next.add(discrepancyArchiveKey(item));
+    persistArchivedDiscrepancies(next);
+  };
+
+  const restoreDiscrepancy = (
+    item: (typeof branchDiscrepancies)[number]
+  ) => {
+    const next = new Set(archivedDiscrepancyKeys);
+    next.delete(discrepancyArchiveKey(item));
+    persistArchivedDiscrepancies(next);
+  };
+
   const discrepancyByLoginId = useMemo(() => {
     const map = new Map<number, (typeof branchDiscrepancies)[number]>();
-    branchDiscrepancies.forEach((item) => {
+    activeDiscrepancies.forEach((item) => {
       const id = Number(item.login?.id || 0);
       if (id > 0) map.set(id, item);
     });
     return map;
-  }, [branchDiscrepancies]);
+  }, [activeDiscrepancies]);
 
   const openDiscrepancy = (
     item: (typeof branchDiscrepancies)[number],
