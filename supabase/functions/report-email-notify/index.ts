@@ -263,52 +263,68 @@ function buildEmail(
         ${credentialsHtml}
       </div>
 
-      <div style="margin-top:30px;padding-top:18px;border-top:1px solid #e2e8f0;font-family:Arial,sans-serif">
-        <div style="font-size:24px;line-height:1.15;font-weight:800;color:#244f86">
+      <div style="margin-top:26px;padding-top:16px;border-top:1px solid #e2e8f0;font-family:Arial,sans-serif;max-width:680px">
+        <div style="font-size:20px;line-height:1.15;font-weight:800;color:#244f86">
           Alessio Cedroni
         </div>
-        <div style="font-size:20px;line-height:1.2;color:#244f86;margin-top:3px">
+        <div style="font-size:17px;line-height:1.2;color:#244f86;margin-top:2px">
           Responsabile Commerciale
         </div>
-        <div style="font-size:18px;line-height:1.3;color:#244f86;margin-top:2px">
+        <div style="font-size:15px;line-height:1.35;color:#244f86;margin-top:3px">
           Tel. <a href="tel:+393470402901" style="color:#1267c9;text-decoration:underline">3470402901</a>
-        </div>
-        <div style="font-size:18px;line-height:1.3;margin-top:2px">
-          <a href="mailto:alessio.cedroni@piuenergia.it" style="color:#1267c9;text-decoration:underline">
-            alessio.cedroni@piuenergia.it
-          </a>
+          &nbsp;·&nbsp;
+          <a href="mailto:alessio.cedroni@piuenergia.it" style="color:#1267c9;text-decoration:underline">alessio.cedroni@piuenergia.it</a>
         </div>
 
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:26px;width:100%;max-width:720px">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:16px;width:100%;max-width:680px">
           <tr>
-            <td valign="middle" style="width:270px;background:#f9781e;padding:24px 18px;text-align:center">
-              <div style="font-size:42px;font-weight:800;color:#ffffff;letter-spacing:-1px">+energia</div>
-              <div style="font-size:15px;font-style:italic;color:#ffffff;margin-top:5px">L'energia positiva!</div>
+            <td valign="middle" style="width:205px;padding:8px 14px 8px 0;border-right:1px solid #f3d1b8">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">
+                <tr>
+                  <td valign="middle" style="width:64px;padding-right:10px">
+                    <img
+                      src="https://www.piuenergia.it/images/resource/sec-img.png?1="
+                      alt="+energia"
+                      width="58"
+                      height="58"
+                      style="display:block;width:58px;height:58px;border:0"
+                    />
+                  </td>
+                  <td valign="middle">
+                    <div style="font-size:29px;line-height:1;font-weight:900;color:#f9781e;letter-spacing:-1px">
+                      +energia
+                    </div>
+                    <div style="font-size:11px;line-height:1.2;font-style:italic;color:#f9781e;margin-top:5px">
+                      L'energia positiva!
+                    </div>
+                  </td>
+                </tr>
+              </table>
             </td>
-            <td valign="top" style="padding:4px 0 4px 14px;color:#111111;font-size:15px;line-height:1.32">
-              <div style="margin-bottom:14px">
-                <span style="display:inline-block;background:#f9781e;color:#ffffff;font-weight:800;padding:4px 8px">
+
+            <td valign="top" style="padding:6px 0 4px 14px;color:#111111;font-size:12px;line-height:1.35">
+              <div style="margin-bottom:7px">
+                <span style="display:inline-block;background:#f9781e;color:#ffffff;font-weight:800;padding:3px 6px">
                   +energia s.p.a.
                 </span>
-                <span style="color:#f9781e;font-weight:800;margin-left:7px">
+                <span style="color:#f9781e;font-weight:800;margin-left:5px">
                   www.piuenergia.it
                 </span>
               </div>
               <div style="font-weight:800">SEDE LEGALE/AMMINISTRATIVA</div>
               <div><strong>Foligno</strong> | Via Fedeli 2/A - 06034 (PG)</div>
               <div>Tel 074220813 - Fax 0742320349</div>
-              <div>Email <em>info@piuenergia.it</em></div>
-              <div>Partita Iva 01244170526</div>
+              <div>Email <em>info@piuenergia.it</em> · P.IVA 01244170526</div>
             </td>
           </tr>
         </table>
 
-        <div style="max-width:720px;margin-top:14px;color:#222222;font-size:13px;font-weight:700;line-height:1.35">
-          <div style="font-weight:800">Sedi commerciali</div>
-          <div>Foligno - Milano - Roma - Civitanova Marche - Pescara - Bologna - Avellino - San Cesareo</div>
+        <div style="max-width:680px;margin-top:9px;color:#222222;font-size:11px;font-weight:700;line-height:1.3">
+          <strong>Sedi commerciali:</strong>
+          Foligno - Milano - Roma - Civitanova Marche - Pescara - Bologna - Avellino - San Cesareo
         </div>
 
-        <div style="max-width:720px;margin-top:12px;color:#7fbe2f;font-size:12px;font-weight:700">
+        <div style="max-width:680px;margin-top:7px;color:#7fbe2f;font-size:10px;font-weight:700">
           ♻ Rispetta l'ambiente: se non necessario, non stampare questa mail
         </div>
       </div>
