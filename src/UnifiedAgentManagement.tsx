@@ -1096,6 +1096,481 @@ export default function UnifiedAgentManagement({
     }
   };
 
+  const renderCreateIdentityFields = () => (
+    <>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+          NOME *
+        </div>
+        <input
+          value={createDraft.nome}
+          onChange={(e) =>
+            setCreateDraft({
+              ...createDraft,
+              nome: e.target.value.toLocaleUpperCase("it"),
+            })
+          }
+          style={inputStyle}
+        />
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+          COGNOME *
+        </div>
+        <input
+          value={createDraft.cognome}
+          onChange={(e) =>
+            setCreateDraft({
+              ...createDraft,
+              cognome: e.target.value.toLocaleUpperCase("it"),
+            })
+          }
+          style={inputStyle}
+        />
+      </div>
+    </>
+  );
+
+  const renderCreateLoginSection = (primary = false) => (
+    <section
+      style={{
+        background: primary ? "#f0fdf4" : "white",
+        border: primary
+          ? "3px solid #22c55e"
+          : "2px solid #bbf7d0",
+        borderRadius: 12,
+        padding: 14,
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 950,
+          color: "#166534",
+          marginBottom: 10,
+        }}
+      >
+        🔐 LOGIN{primary ? " · SCHEDA PRINCIPALE" : ""}
+      </div>
+
+      <div
+        className="uam-responsive-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit,minmax(190px,1fr))",
+          gap: 10,
+        }}
+      >
+        {primary && renderCreateIdentityFields()}
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            USERNAME *
+          </div>
+          <input
+            value={createDraft.username}
+            onChange={(e) =>
+              setCreateDraft({
+                ...createDraft,
+                username: e.target.value,
+              })
+            }
+            style={inputStyle}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            PASSWORD *
+          </div>
+          <input
+            type="text"
+            value={createDraft.password}
+            onChange={(e) =>
+              setCreateDraft({
+                ...createDraft,
+                password: e.target.value,
+              })
+            }
+            style={inputStyle}
+          />
+        </div>
+
+        {adminProfile?.role === "super_admin" && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+              ADMIN ASSOCIATO *
+            </div>
+            <select
+              value={createDraft.ownerAdminId}
+              onChange={(e) =>
+                setCreateDraft({
+                  ...createDraft,
+                  ownerAdminId: e.target.value
+                    ? Number(e.target.value)
+                    : "",
+                })
+              }
+              style={inputStyle}
+            >
+              <option value="">Seleziona...</option>
+              {admins.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {String(
+                    `${item.nome || ""} ${item.cognome || ""}`
+                  ).trim() || item.username}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {adminProfile?.role === "super_admin" && (
+        <label
+          style={{
+            display: "inline-flex",
+            gap: 7,
+            alignItems: "center",
+            fontWeight: 900,
+            marginTop: 12,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={createDraft.provvigioniVisible}
+            onChange={(e) =>
+              setCreateDraft({
+                ...createDraft,
+                provvigioniVisible: e.target.checked,
+              })
+            }
+          />
+          ACCESSO PROVVIGIONI
+        </label>
+      )}
+    </section>
+  );
+
+  const renderCreateDmField = (label: string) => (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+        {label}
+      </div>
+      <select
+        value={
+          createDmCustomOpen
+            ? "__NEW_DM__"
+            : createDraft.dm
+        }
+        onChange={(e) => {
+          const value = e.target.value;
+          if (value === "__NEW_DM__") {
+            setCreateDmCustomOpen(true);
+            setCreateDraft({
+              ...createDraft,
+              dm: "",
+            });
+            return;
+          }
+          setCreateDmCustomOpen(false);
+          setCreateDraft({
+            ...createDraft,
+            dm: value,
+          });
+        }}
+        style={inputStyle}
+      >
+        <option value="">SELEZIONA DM...</option>
+        {dmSuggestions.map((dm) => (
+          <option key={dm} value={dm}>
+            {dm.toLocaleUpperCase("it")}
+          </option>
+        ))}
+        <option value="__NEW_DM__">ALTRO / NUOVO DM</option>
+      </select>
+
+      {createDmCustomOpen && (
+        <input
+          autoFocus
+          value={createDraft.dm}
+          onChange={(e) =>
+            setCreateDraft({
+              ...createDraft,
+              dm: e.target.value.toLocaleUpperCase("it"),
+            })
+          }
+          placeholder="INSERISCI NUOVO DM"
+          style={{ ...inputStyle, marginTop: 7 }}
+        />
+      )}
+    </div>
+  );
+
+  const renderCreateEmailSection = (primary = false) => (
+    <section
+      style={{
+        background: "#f0f9ff",
+        border: primary
+          ? "3px solid #0ea5e9"
+          : "2px solid #7dd3fc",
+        borderRadius: 12,
+        padding: 14,
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 950,
+          color: "#0369a1",
+          marginBottom: 10,
+        }}
+      >
+        ✉️ ABBINAMENTO EMAIL{primary ? " · SCHEDA PRINCIPALE" : ""}
+      </div>
+
+      <div
+        className="uam-responsive-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit,minmax(210px,1fr))",
+          gap: 10,
+        }}
+      >
+        {primary && renderCreateIdentityFields()}
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            AGENZIA
+          </div>
+          <div
+            style={{
+              ...inputStyle,
+              minHeight: 38,
+              background: "#f8fafc",
+              fontWeight: 900,
+            }}
+          >
+            {`${createDraft.nome} ${createDraft.cognome}`.trim() ||
+              "NOME AGENTE"}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            EMAIL
+          </div>
+          <input
+            type="email"
+            value={createDraft.email}
+            onChange={(e) =>
+              setCreateDraft({
+                ...createDraft,
+                email: e.target.value,
+              })
+            }
+            style={inputStyle}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            ALLEGATO PREVISTO
+          </div>
+          <input
+            value={createDraft.emailAttachment}
+            onChange={(e) =>
+              setCreateDraft({
+                ...createDraft,
+                emailAttachment: e.target.value,
+              })
+            }
+            placeholder="Es. NOMEFILE.xlsx"
+            style={inputStyle}
+          />
+        </div>
+
+        {renderCreateDmField("DM")}
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            LOGIN DI RIFERIMENTO
+          </div>
+          <div
+            style={{
+              ...inputStyle,
+              minHeight: 38,
+              background: createDraft.insertLogin
+                ? "#ecfdf5"
+                : "#f8fafc",
+              color: createDraft.insertLogin
+                ? "#166534"
+                : "#64748b",
+              fontWeight: 900,
+            }}
+          >
+            {createDraft.insertLogin
+              ? createDraft.username
+                ? `${createDraft.nome} ${createDraft.cognome}`.trim() +
+                  " · " +
+                  createDraft.username
+                : "VERRÀ COLLEGATO AL NUOVO LOGIN"
+              : "NON ASSOCIATO · ATTIVA INSERISCI LOGIN"}
+          </div>
+        </div>
+      </div>
+
+      <label
+        style={{
+          display: "inline-flex",
+          gap: 7,
+          alignItems: "center",
+          fontWeight: 900,
+          marginTop: 12,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={createDraft.reportNotify}
+          onChange={(e) =>
+            setCreateDraft({
+              ...createDraft,
+              reportNotify: e.target.checked,
+            })
+          }
+        />
+        REPORT ATTIVO
+      </label>
+    </section>
+  );
+
+  const renderCreateMapSection = (primary = false) => (
+    <section
+      style={{
+        background: "#fff7ed",
+        border: primary
+          ? "3px solid #f97316"
+          : "2px solid #fdba74",
+        borderRadius: 12,
+        padding: 14,
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 950,
+          color: "#c2410c",
+          marginBottom: 10,
+        }}
+      >
+        📍 MAPPE / AGENTI ATTIVI{primary ? " · SCHEDA PRINCIPALE" : ""}
+      </div>
+
+      <div
+        className="uam-responsive-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit,minmax(210px,1fr))",
+          gap: 10,
+        }}
+      >
+        {primary && renderCreateIdentityFields()}
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            CELLULARE
+          </div>
+          <input
+            value={createDraft.phone}
+            onChange={(e) =>
+              setCreateDraft({
+                ...createDraft,
+                phone: e.target.value,
+              })
+            }
+            style={inputStyle}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            ZONA
+          </div>
+          <input
+            value={createDraft.zone}
+            onChange={(e) =>
+              setCreateDraft({
+                ...createDraft,
+                zone: e.target.value.toLocaleUpperCase("it"),
+              })
+            }
+            placeholder="Es. PERUGIA"
+            style={inputStyle}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            REGIONE
+          </div>
+          <div
+            style={{
+              ...inputStyle,
+              minHeight: 38,
+              background: "#f8fafc",
+              color: "#64748b",
+            }}
+          >
+            AUTOMATICA DALLA ZONA
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
+            MACROAREA
+          </div>
+          <div
+            style={{
+              ...inputStyle,
+              minHeight: 38,
+              background: "#fffaf0",
+              color: "#9a3412",
+              fontWeight: 800,
+            }}
+          >
+            AUTOMATICA DALLA REGIONE
+          </div>
+        </div>
+
+        {renderCreateDmField("DM DI RIFERIMENTO")}
+      </div>
+
+      <label
+        style={{
+          display: "inline-flex",
+          gap: 8,
+          alignItems: "center",
+          fontWeight: 900,
+          marginTop: 12,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={createDraft.showOnMap}
+          onChange={(e) =>
+            setCreateDraft({
+              ...createDraft,
+              showOnMap: e.target.checked,
+            })
+          }
+        />
+        {createDraft.showOnMap
+          ? "MOSTRA IN MAPPA"
+          : "NON MOSTRARE IN MAPPA"}
+      </label>
+    </section>
+  );
+
   const removeFromZones = async (row: (typeof rows)[number]) => {
     if (!ctx || !row.recruiting?.id) return;
 
