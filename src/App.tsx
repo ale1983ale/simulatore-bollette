@@ -10090,6 +10090,10 @@ function ReportAdmin({
     useState<number | null>(null);
   const [reportAdminView, setReportAdminView] =
     useState<"REPORT" | "NOTIFY">("REPORT");
+  const [reportNotificationRecipients, setReportNotificationRecipients] =
+    useState<any[]>([]);
+  const [selectedMissingReportAgentIds, setSelectedMissingReportAgentIds] =
+    useState<Set<number>>(new Set());
 
   const loadAgents = async () => {
     try {
@@ -10098,6 +10102,62 @@ function ReportAdmin({
     } catch (error) {
       console.error("LOAD AGENTS ERROR:", error);
       setAgents([]);
+    }
+  };
+
+  const loadReportNotificationRecipients = async () => {
+    try {
+      const raw = localStorage.getItem("admin_session");
+      const session = raw ? JSON.parse(raw) : null;
+      const sessionToken = String(session?.token || "");
+
+      if (!sessionToken) {
+        setReportNotificationRecipients([]);
+        return;
+      }
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/report-email-notify`,
+        {
+          method: "POST",
+          headers: {
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "list",
+            session_token: sessionToken,
+          }),
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) {
+        throw new Error(
+          data?.error || `Errore HTTP ${response.status}`
+        );
+      }
+
+      setReportNotificationRecipients(
+        Array.isArray(data?.recipients)
+          ? data.recipients.map((item: any) => ({
+              agenzia: String(item?.agenzia || ""),
+              email: String(item?.email || ""),
+              report_notify: true,
+              agent_id: item?.agent_id
+                ? Number(item.agent_id)
+                : null,
+              username: String(item?.username || ""),
+            }))
+          : []
+      );
+    } catch (error) {
+      console.error(
+        "LOAD REPORT NOTIFICATION RECIPIENTS ERROR:",
+        error
+      );
+      setReportNotificationRecipients([]);
     }
   };
 
@@ -10140,7 +10200,13 @@ function ReportAdmin({
     setExpandedReportAgentId(null);
     loadAgents();
     loadReports(null);
+    loadReportNotificationRecipients();
+    setSelectedMissingReportAgentIds(new Set());
   }, [ownerFilter, adminProfile?.id, adminProfile?.role]);
+
+  useEffect(() => {
+    setSelectedMissingReportAgentIds(new Set());
+  }, [mode, dateFrom, dateTo]);
 
   const deleteReportAdmin = async (reportId: number) => {
     const ok = window.confirm("Vuoi davvero cancellare questo report?");
@@ -10284,7 +10350,7 @@ function ReportAdmin({
   };
 
   const groupedReportAgents = Array.from(
-    reports.reduce((map, report) => {
+    summaryReports.reduce((map, report) => {
       const agentId = Number(report.agent_id);
       const current = map.get(agentId) || [];
       current.push(report);
@@ -10311,6 +10377,62 @@ function ReportAdmin({
         String(a.latestReportDate)
       )
     );
+
+  const reportAgentIdsInSummary = new Set(
+    summaryReports
+      .map((report) => Number(report.agent_id || 0))
+      .filter((id) => id > 0)
+  );
+
+  const visibleAgentIds = new Set(
+    agents
+      .map((agent) => Number(agent.id || 0))
+      .filter((id) => id > 0)
+  );
+
+  const missingReportAgents = Array.from(
+    reportNotificationRecipients.reduce((map, recipient) => {
+      const agentId = Number(recipient?.agent_id || 0);
+      if (
+        !agentId ||
+        !visibleAgentIds.has(agentId) ||
+        reportAgentIdsInSummary.has(agentId) ||
+        map.has(agentId)
+      ) {
+        return map;
+      }
+
+      map.set(agentId, {
+        ...recipient,
+        agentId,
+      });
+      return map;
+    }, new Map<number, any>())
+  )
+    .map(([, recipient]) => recipient)
+    .sort((a, b) =>
+      getAgentName(a.agentId).localeCompare(
+        getAgentName(b.agentId),
+        "it"
+      )
+    );
+
+  const toggleMissingReportAgent = (agentId: number) => {
+    setSelectedMissingReportAgentIds((current) => {
+      const next = new Set(current);
+      if (next.has(agentId)) {
+        next.delete(agentId);
+      } else {
+        next.add(agentId);
+      }
+      return next;
+    });
+  };
+
+  const openSelectedReportNotifications = () => {
+    if (selectedMissingReportAgentIds.size === 0) return;
+    setReportAdminView("NOTIFY");
+  };
 
   const reportAdminTabs = (
     <div
@@ -10348,7 +10470,10 @@ function ReportAdmin({
       </button>
       <button
         type="button"
-        onClick={() => setReportAdminView("NOTIFY")}
+        onClick={() => {
+          setSelectedMissingReportAgentIds(new Set());
+          setReportAdminView("NOTIFY");
+        }}
         style={{
           border: 0,
           borderRadius: 9,
@@ -10389,7 +10514,14 @@ function ReportAdmin({
         >
           {reportAdminTabs}
         </div>
-        <ReportNotificationPanel />
+        <ReportNotificationPanel
+          agents={reportNotificationRecipients}
+          initialSelectedAgentIds={
+            selectedMissingReportAgentIds.size > 0
+              ? Array.from(selectedMissingReportAgentIds)
+              : null
+          }
+        />
       </div>
     );
   }
@@ -11294,6 +11426,128 @@ function ReportAdmin({
             })}
           </div>
         )}
+
+        <div
+          style={{
+            marginTop: 20,
+            paddingTop: 18,
+            borderTop: "2px solid #e2e8f0",
+          }}
+        >
+          <h3 style={{ margin: "0 0 6px" }}>
+            Agenti senza dati nel periodo
+          </h3>
+          <div
+            style={{
+              marginBottom: 12,
+              color: "#64748b",
+              fontSize: 13,
+            }}
+          >
+            Solo agenti con flag REPORT attivo · {summaryPeriodLabel}
+          </div>
+
+          {missingReportAgents.length === 0 ? (
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 10,
+                background: "#f8fafc",
+                color: "#64748b",
+                fontWeight: 800,
+              }}
+            >
+              Nessun agente con flag Report attivo senza dati nel periodo.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              {missingReportAgents.map((recipient) => {
+                const agentId = Number(recipient.agentId);
+                const checked =
+                  selectedMissingReportAgentIds.has(agentId);
+
+                return (
+                  <label
+                    key={agentId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: checked
+                        ? "2px solid #f59e0b"
+                        : "1px solid #e2e8f0",
+                      background: checked
+                        ? "#fffbeb"
+                        : "#f8fafc",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        toggleMissingReportAgent(agentId)
+                      }
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          color: "#0f2d69",
+                        }}
+                      >
+                        {getAgentName(agentId)}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 2,
+                          fontSize: 12,
+                          color: "#64748b",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {recipient.email || "Email non disponibile"}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={openSelectedReportNotifications}
+                disabled={selectedMissingReportAgentIds.size === 0}
+                style={{
+                  marginTop: 8,
+                  width: "100%",
+                  border: 0,
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontWeight: 900,
+                  cursor:
+                    selectedMissingReportAgentIds.size > 0
+                      ? "pointer"
+                      : "not-allowed",
+                  background:
+                    selectedMissingReportAgentIds.size > 0
+                      ? "#16a34a"
+                      : "#cbd5e1",
+                  color: "white",
+                }}
+              >
+                🔔 INVIA NOTIFICA REPORT
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
