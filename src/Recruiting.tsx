@@ -6989,6 +6989,55 @@ export default function Recruiting({
           .recruiting-status-column select {
             min-height: 42px;
           }
+
+          .recruiting-nav-bar {
+            display: grid !important;
+            grid-template-columns:
+              minmax(0, 1.05fr)
+              minmax(0, .9fr)
+              minmax(0, .72fr)
+              minmax(0, .72fr)
+              minmax(0, .68fr)
+              minmax(0, 1.28fr) !important;
+            gap: 4px !important;
+            width: 100%;
+            min-width: 0;
+          }
+
+          .recruiting-nav-group {
+            display: contents !important;
+          }
+
+          .recruiting-nav-button {
+            min-width: 0 !important;
+            width: 100% !important;
+            padding: 7px 4px !important;
+            min-height: 38px !important;
+            font-size: 9.5px !important;
+            line-height: 1.05 !important;
+            border-radius: 8px !important;
+            white-space: nowrap !important;
+          }
+
+          .recruiting-nav-label-desktop {
+            display: none !important;
+          }
+
+          .recruiting-nav-label-mobile {
+            display: inline !important;
+          }
+
+          .recruiting-nav-count {
+            margin-left: 3px !important;
+            min-width: 15px !important;
+            height: 15px !important;
+            padding: 0 3px !important;
+            font-size: 8px !important;
+          }
+        }
+
+        .recruiting-nav-label-mobile {
+          display: none;
         }
 
         .recruiting-modal-backdrop {
@@ -7033,17 +7082,29 @@ export default function Recruiting({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div
+        className="recruiting-nav-bar"
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <div
+          className="recruiting-nav-group"
+          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+        >
           {[
-            ["contacts", "CONTATTI"],
-            ["external_contacts", "CONTATTI ESTERNI"],
-            ["calendar", "CALENDARIO"],
-            ["map", "MAPPA"],
-          ].map(([key, label]) => (
+            ["contacts", "CONTATTI", "CONTATTI"],
+            ["external_contacts", "CONTATTI ESTERNI", "ESTERNI"],
+            ["calendar", "CALENDARIO", "CAL."],
+            ["map", "MAPPA", "MAPPA"],
+          ].map(([key, label, mobileLabel]) => (
             <button
               key={key}
               type="button"
+              className="recruiting-nav-button"
               onClick={() => {
                 if (key === "calendar") {
                   setGooglePanelOpen(false);
@@ -7069,12 +7130,18 @@ export default function Recruiting({
                 border: section === key ? "1px solid #0f172a" : "1px solid #cbd5e1",
               }}
             >
-              {label}
+              <span className="recruiting-nav-label-desktop">
+                {label}
+              </span>
+              <span className="recruiting-nav-label-mobile">
+                {mobileLabel}
+              </span>
             </button>
           ))}
         </div>
 
         <div
+          className="recruiting-nav-group"
           style={{
             marginLeft: "auto",
             display: "flex",
@@ -7084,6 +7151,7 @@ export default function Recruiting({
         >
           <button
             type="button"
+            className="recruiting-nav-button"
             onClick={() => setSection("hr_notes")}
             style={{
               ...buttonStyle,
@@ -7094,9 +7162,15 @@ export default function Recruiting({
               border: "1px solid #93c5fd",
             }}
           >
-            SALA D'ATTESA HR
+            <span className="recruiting-nav-label-desktop">
+              SALA D'ATTESA HR
+            </span>
+            <span className="recruiting-nav-label-mobile">
+              HR
+            </span>
             {hrSyncPendingCount > 0 && (
               <span
+                className="recruiting-nav-count"
                 style={{
                   marginLeft: 7,
                   display: "inline-flex",
@@ -7121,6 +7195,7 @@ export default function Recruiting({
 
           <button
             type="button"
+            className="recruiting-nav-button"
             onClick={() => setSection("management")}
             style={{
               ...buttonStyle,
@@ -7134,7 +7209,12 @@ export default function Recruiting({
                   : "1px solid #cbd5e1",
             }}
           >
-            GESTIONE AGENTI ATTIVI / ZONE
+            <span className="recruiting-nav-label-desktop">
+              GESTIONE AGENTI ATTIVI / ZONE
+            </span>
+            <span className="recruiting-nav-label-mobile">
+              AGENTI/ZONE
+            </span>
           </button>
 
         </div>
