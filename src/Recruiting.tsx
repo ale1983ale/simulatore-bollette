@@ -6993,12 +6993,12 @@ export default function Recruiting({
           .recruiting-nav-bar {
             display: grid !important;
             grid-template-columns:
-              minmax(0, 1.05fr)
-              minmax(0, .9fr)
-              minmax(0, .72fr)
-              minmax(0, .72fr)
-              minmax(0, .68fr)
-              minmax(0, 1.28fr) !important;
+              minmax(0, 1.02fr)
+              minmax(0, .86fr)
+              minmax(0, .78fr)
+              minmax(0, .70fr)
+              minmax(0, .92fr)
+              minmax(0, 1.18fr) !important;
             gap: 4px !important;
             width: 100%;
             min-width: 0;
@@ -7033,6 +7033,16 @@ export default function Recruiting({
             height: 15px !important;
             padding: 0 3px !important;
             font-size: 8px !important;
+            flex: 0 0 auto !important;
+          }
+
+          .recruiting-nav-waiting-label {
+            display: inline-flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: .92 !important;
+            gap: 0 !important;
           }
         }
 
@@ -7098,7 +7108,7 @@ export default function Recruiting({
           {[
             ["contacts", "CONTATTI", "CONTATTI"],
             ["external_contacts", "CONTATTI ESTERNI", "ESTERNI"],
-            ["calendar", "CALENDARIO", "CAL."],
+            ["calendar", "CALENDARIO", "CALEND"],
             ["map", "MAPPA", "MAPPA"],
           ].map(([key, label, mobileLabel]) => (
             <button
@@ -7165,8 +7175,9 @@ export default function Recruiting({
             <span className="recruiting-nav-label-desktop">
               SALA D'ATTESA HR
             </span>
-            <span className="recruiting-nav-label-mobile">
-              HR
+            <span className="recruiting-nav-label-mobile recruiting-nav-waiting-label">
+              <span>SALA</span>
+              <span>D'ATTESA</span>
             </span>
             {hrSyncPendingCount > 0 && (
               <span
