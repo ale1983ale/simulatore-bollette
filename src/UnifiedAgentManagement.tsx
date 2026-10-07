@@ -325,6 +325,88 @@ export default function UnifiedAgentManagement({
   }, [adminProfile?.id, adminProfile?.role]);
 
   useEffect(() => {
+    let raw = "";
+    try {
+      raw =
+        sessionStorage.getItem(
+          "unified_agent_create_prefill"
+        ) || "";
+    } catch {
+      raw = "";
+    }
+
+    if (!raw) return;
+
+    try {
+      const prefill = JSON.parse(raw) as {
+        fullName?: string;
+        phone?: string;
+        email?: string;
+        zone?: string;
+        region?: string;
+        provinceCode?: string;
+      };
+
+      const fullName = String(prefill.fullName || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLocaleUpperCase("it");
+      const parts = fullName.split(" ").filter(Boolean);
+      const nome = parts.shift() || "";
+      const cognome = parts.join(" ");
+
+      setExpandedId(null);
+      setDraft(null);
+      setCreateOpen(true);
+      setCreateDraft({
+        ...EMPTY_CREATE_DRAFT,
+        nome,
+        cognome,
+        email: String(prefill.email || "").trim(),
+        phone: String(prefill.phone || "").trim(),
+        zone: String(
+          prefill.zone ||
+            prefill.region ||
+            ""
+        )
+          .trim()
+          .toLocaleUpperCase("it"),
+        ownerAdminId: adminProfile?.id || "",
+      });
+      setNotice(
+        fullName
+          ? `${fullName}: dati principali importati dal contatto. Completa Login e impostazioni agente.`
+          : "Dati principali importati dal contatto. Completa Login e impostazioni agente."
+      );
+
+      try {
+        sessionStorage.removeItem(
+          "unified_agent_create_prefill"
+        );
+      } catch {
+        // Nessuna azione necessaria.
+      }
+
+      window.setTimeout(() => {
+        document
+          .getElementById("uam-new-agent-form")
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+      }, 120);
+    } catch {
+      try {
+        sessionStorage.removeItem(
+          "unified_agent_create_prefill"
+        );
+      } catch {
+        // Nessuna azione necessaria.
+      }
+    }
+  }, [adminProfile?.id]);
+
+  useEffect(() => {
     const onRecipientListUpdated = () => {
       void loadAll();
     };
@@ -1547,7 +1629,10 @@ export default function UnifiedAgentManagement({
       </div>
 
       {createOpen && (
-        <div style={{ ...cardStyle, border: "2px solid #86efac" }}>
+        <div
+          id="uam-new-agent-form"
+          style={{ ...cardStyle, border: "2px solid #86efac" }}
+        >
           <div
             style={{
               display: "flex",
