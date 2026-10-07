@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 import { getAdminSessionToken } from "./adminSecurity";
 
 export type SecureAgentSession = {
@@ -212,4 +212,38 @@ export async function completeAgentPasswordReset(
 
   if (error) throw error;
   return data;
+}
+
+
+export async function changeAgentPassword(input: {
+  username: string;
+  currentPassword: string;
+  newPassword: string;
+}) {
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/agent-password-change`,
+    {
+      method: "POST",
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username: input.username.trim(),
+        current_password: input.currentPassword,
+        new_password: input.newPassword,
+      }),
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data?.ok === false) {
+    throw new Error(
+      data?.error || `Errore HTTP ${response.status}`
+    );
+  }
+
+  return true;
 }
