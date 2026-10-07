@@ -9034,6 +9034,37 @@ function LoginView({
   );
 }
 
+function parseItalianReportNumber(value: unknown) {
+  const raw = String(value ?? "").trim().replace(/\s+/g, "");
+  if (!raw) return 0;
+
+  const sign = raw.startsWith("-") ? -1 : 1;
+  const unsigned = raw.replace(/^[+-]/, "").replace(/[^0-9.,]/g, "");
+  if (!unsigned) return 0;
+
+  const lastDot = unsigned.lastIndexOf(".");
+  const lastComma = unsigned.lastIndexOf(",");
+  let normalized = unsigned;
+
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimalSeparator = lastDot > lastComma ? "." : ",";
+    const thousandSeparator = decimalSeparator === "." ? "," : ".";
+    normalized = unsigned.split(thousandSeparator).join("");
+    normalized = normalized.replace(decimalSeparator, ".");
+  } else if (lastDot >= 0) {
+    normalized = /^\d{1,3}(\.\d{3})+$/.test(unsigned)
+      ? unsigned.replace(/\./g, "")
+      : unsigned;
+  } else if (lastComma >= 0) {
+    normalized = /^\d{1,3}(,\d{3})+$/.test(unsigned)
+      ? unsigned.replace(/,/g, "")
+      : unsigned.replace(",", ".");
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed * sign : 0;
+}
+
 function ReportAgent({ agentSession }: { agentSession: any }) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -9091,10 +9122,10 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
       report_date: form.report_date,
       agent_id: agentSession.id,
       owner_admin_id: agentSession.owner_admin_id,
-      contracts_energia: Number(form.contracts_energia || 0),
-      consumi_energia: Number(form.consumi_energia || 0),
-      contracts_gas: Number(form.contracts_gas || 0),
-      consumi_gas: Number(form.consumi_gas || 0),
+      contracts_energia: parseItalianReportNumber(form.contracts_energia),
+      consumi_energia: parseItalianReportNumber(form.consumi_energia),
+      contracts_gas: parseItalianReportNumber(form.contracts_gas),
+      consumi_gas: parseItalianReportNumber(form.consumi_gas),
       notes: form.notes || "",
     };
 
@@ -9183,7 +9214,8 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
                 Contratti energia
               </div>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={form.contracts_energia}
                 onChange={(e) =>
                   setForm((prev: any) => ({
@@ -9206,7 +9238,8 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
                 Consumi energia
               </div>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={form.consumi_energia}
                 onChange={(e) =>
                   setForm((prev: any) => ({
@@ -9229,7 +9262,8 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
                 Contratti gas
               </div>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={form.contracts_gas}
                 onChange={(e) =>
                   setForm((prev: any) => ({
@@ -9252,7 +9286,8 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
                 Consumi gas
               </div>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={form.consumi_gas}
                 onChange={(e) =>
                   setForm((prev: any) => ({
@@ -9573,46 +9608,7 @@ function ReportAdmin({
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={async () => {
-              setSelectedAgentId(null);
-              await loadReports(null);
-            }}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: selectedAgentId === null ? "#0f172a" : "white",
-              color: selectedAgentId === null ? "white" : "#0f172a",
-              cursor: "pointer",
-            }}
-          >
-            Tutti
-          </button>
 
-          {agents.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={async () => {
-                setSelectedAgentId(a.id);
-                await loadReports(a.id);
-              }}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: selectedAgentId === a.id ? "#0f172a" : "white",
-                color: selectedAgentId === a.id ? "white" : "#0f172a",
-                cursor: "pointer",
-              }}
-            >
-              {(a.nome + " " + a.cognome).toUpperCase()}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div
@@ -9633,22 +9629,53 @@ function ReportAdmin({
             gap: 12,
           }}
         >
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-              Modalità
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Modalità
+              </div>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as any)}
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                }}
+              >
+                <option value="ALL">TOTALE</option>
+                <option value="PERIODO">PERIODO SCELTO</option>
+              </select>
             </div>
-            <select
-              value={mode}
-              onChange={(e) => setMode(e.target.value as any)}
-              style={{
-                padding: 8,
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-              }}
-            >
-              <option value="ALL">TOTALE</option>
-              <option value="PERIODO">PERIODO SCELTO</option>
-            </select>
+
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Agente
+              </div>
+              <select
+                value={selectedAgentId ?? ""}
+                onChange={async (e) => {
+                  const value = e.target.value;
+                  const nextAgentId = value ? Number(value) : null;
+                  setSelectedAgentId(nextAgentId);
+                  await loadReports(nextAgentId);
+                }}
+                style={{
+                  minWidth: 230,
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "white",
+                }}
+              >
+                <option value="">TUTTI GLI AGENTI</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {String(agent.nome || "")} {String(agent.cognome || "")}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {mode === "PERIODO" && (
@@ -10680,6 +10707,9 @@ export default function App() {
     if (requestedTab === "driveArchive") {
       return "driveArchive";
     }
+    if (requestedTab === "report") {
+      return "report";
+    }
 
     return "dashboard";
   });
@@ -10781,7 +10811,8 @@ export default function App() {
 
     if (
       requestedTab === "recruitingWaiting" ||
-      requestedTab === "driveArchive"
+      requestedTab === "driveArchive" ||
+      requestedTab === "report"
     ) return;
 
     setAdminMenuOpen(false);
@@ -12005,7 +12036,9 @@ const renderAdminContent = () => {
           const nextTab =
             requestedTab === "recruitingWaiting"
               ? "recruitingWaiting"
-              : "dashboard";
+              : requestedTab === "report"
+                ? "report"
+                : "dashboard";
 
           setTab(nextTab);
           localStorage.setItem("app_tab", nextTab);
@@ -12641,8 +12674,12 @@ if (!agentSession && !adminSession) {
       setAdminProfile={setAdminProfile}
       setAgentSession={setAgentSession}
         onLoginSuccess={() => {
-          setTab("dashboard");
-          localStorage.setItem("app_tab", "dashboard");
+          const requestedTab =
+            new URLSearchParams(window.location.search).get("tab");
+          const nextTab =
+            requestedTab === "report" ? "report" : "dashboard";
+          setTab(nextTab);
+          localStorage.setItem("app_tab", nextTab);
         }}
       />
   );
