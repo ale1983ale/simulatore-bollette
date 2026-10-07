@@ -349,6 +349,7 @@ export default function OutlookEmail() {
   const [open, setOpen] = useState(false);
   const [activeView, setActiveView] =
     useState<"email" | "matches" | "report">("email");
+  const [targetMatchAgency, setTargetMatchAgency] = useState("");
   const [overlayTop, setOverlayTop] = useState(0);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -381,10 +382,18 @@ export default function OutlookEmail() {
 
   useEffect(() => {
     const onOpenEmail = (event: Event) => {
-      const requestedView = (
-        event as CustomEvent<{ view?: "email" | "matches" | "report" }>
-      ).detail?.view;
+      const detail = (
+        event as CustomEvent<{
+          view?: "email" | "matches" | "report";
+          targetAgency?: string;
+        }>
+      ).detail;
+      const requestedView = detail?.view;
+      const requestedAgency = String(
+        detail?.targetAgency || ""
+      ).trim();
 
+      setTargetMatchAgency(requestedAgency);
       setActiveView(
         requestedView === "matches"
           ? "matches"
@@ -632,6 +641,60 @@ export default function OutlookEmail() {
   useEffect(() => {
     if (open) void loadSavedRecipients(false);
   }, [open]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      activeView !== "matches" ||
+      !targetMatchAgency ||
+      !agents.length
+    ) {
+      return;
+    }
+
+    const targetKey = normalize(targetMatchAgency);
+    const targetIndex = agents.findIndex(
+      (agent) => normalize(agent.agenzia) === targetKey
+    );
+
+    if (targetIndex < 0) {
+      setEditingRecipients(true);
+      setNotice(
+        targetMatchAgency.toLocaleUpperCase("it") +
+          ": nominativo non trovato nell'elenco abbinamenti. Aggiungilo all'elenco e poi imposta il LOGIN DI RIFERIMENTO."
+      );
+      return;
+    }
+
+    setNotice(
+      targetMatchAgency.toLocaleUpperCase("it") +
+        ": seleziona il LOGIN DI RIFERIMENTO nella riga evidenziata e poi premi SALVA ELENCO ONLINE."
+    );
+
+    const timer = window.setTimeout(() => {
+      const row = document.querySelector(
+        '[data-login-reference-row="' + targetIndex + '"]'
+      ) as HTMLElement | null;
+
+      row?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      const select = row?.querySelector(
+        '[data-login-reference-select="true"]'
+      ) as HTMLSelectElement | null;
+
+      select?.focus();
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    open,
+    activeView,
+    targetMatchAgency,
+    agents.length,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -1868,8 +1931,9 @@ export default function OutlookEmail() {
                       fontSize: 14,
                     }}
                   >
-                    Gestisci Agenzia, Email, Allegato previsto e DM. Le modifiche
-                    restano evidenziate finché non premi Salva elenco online.
+                    Gestisci Agenzia, Email, Allegato previsto, DM e LOGIN DI
+                    RIFERIMENTO. Le modifiche restano evidenziate finché non
+                    premi Salva elenco online.
                   </div>
                   <div
                     style={{
@@ -1924,13 +1988,34 @@ export default function OutlookEmail() {
                       REPORT
                     </th>
                     <th style={{ padding: 5, width: "14%" }}>
-                      ACCOUNT REPORT
+                      LOGIN DI RIFERIMENTO
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {matched.map((row, index) => (
-                    <tr key={index} data-email-row-index={index} data-email-removed={removedRows.has(index) ? "true" : "false"} data-email-file-name={row.file?.name || ""} style={{ borderBottom: "1px solid #f1f5f9", opacity: removedRows.has(index) ? 0.62 : 1 }}>
+                    <tr
+                      key={index}
+                      data-email-row-index={index}
+                      data-login-reference-row={index}
+                      data-email-removed={removedRows.has(index) ? "true" : "false"}
+                      data-email-file-name={row.file?.name || ""}
+                      style={{
+                        borderBottom: "1px solid #f1f5f9",
+                        opacity: removedRows.has(index) ? 0.62 : 1,
+                        background:
+                          targetMatchAgency &&
+                          normalize(row.agenzia) === normalize(targetMatchAgency)
+                            ? "#fff7ed"
+                            : "transparent",
+                        outline:
+                          targetMatchAgency &&
+                          normalize(row.agenzia) === normalize(targetMatchAgency)
+                            ? "2px solid #f97316"
+                            : "none",
+                        outlineOffset: "-2px",
+                      }}
+                    >
                       <td style={{ padding: 6, overflowWrap: "anywhere" }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 0 }} value={agents[index]?.agenzia ?? ""} onChange={(e) => updateAgent(index, "agenzia", e.target.value)} placeholder="Agenzia" /> : row.agenzia || "—"}</td>
                       <td style={{ padding: 6, overflowWrap: "anywhere" }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 0 }} value={agents[index]?.email ?? ""} onChange={(e) => updateAgent(index, "email", e.target.value)} placeholder="email@esempio.it" type="email" /> : row.email || "—"}</td>
                       <td style={{ padding: 6, overflowWrap: "anywhere" }}>{editingRecipients ? <input style={{ ...smallField, minWidth: 0 }} value={agents[index]?.allegato ?? ""} onChange={(e) => updateAgent(index, "allegato", e.target.value)} placeholder="NOMEFILE.xlsx" /> : row.allegato || "—"}</td>
@@ -1984,6 +2069,7 @@ export default function OutlookEmail() {
                       </td>
                       <td style={{ padding: 5 }}>
                         <select
+                          data-login-reference-select="true"
                           value={agents[index]?.agent_id ?? ""}
                           onChange={(event) =>
                             updateAgent(
@@ -2008,7 +2094,7 @@ export default function OutlookEmail() {
                               key={account.id}
                               value={account.id}
                             >
-                              {`${account.nome} ${account.cognome} · ${account.username}`}
+                              {`${account.nome} ${account.cognome}`.toLocaleUpperCase("it")} · {account.username}
                             </option>
                           ))}
                         </select>
