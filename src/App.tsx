@@ -10782,7 +10782,11 @@ export default function App() {
     if (window.history.state?.geTab === tab) return;
 
     const url = new URL(window.location.href);
-    if (tab !== "recruitingWaiting") {
+    if (
+      tab !== "recruitingWaiting" &&
+      tab !== "driveArchive" &&
+      tab !== "report"
+    ) {
       url.searchParams.delete("tab");
     }
 
