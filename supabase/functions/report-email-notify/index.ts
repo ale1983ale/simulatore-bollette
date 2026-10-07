@@ -262,6 +262,15 @@ function buildEmail(
       <div style="margin-top:30px;padding-top:18px;border-top:1px solid #e2e8f0">
         ${credentialsHtml}
       </div>
+
+      <div style="margin-top:28px">
+        <img
+          src="${APP_ORIGIN}/api/report-signature"
+          alt="Firma Alessio Cedroni +Energia"
+          width="720"
+          style="display:block;width:100%;max-width:720px;height:auto;border:0;outline:none;text-decoration:none"
+        />
+      </div>
     </div>
   </body>
 </html>`.trim();
