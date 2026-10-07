@@ -10053,6 +10053,8 @@ function ReportAdmin({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<"ALL" | "MINE" | "OTHERS">("ALL");
+  const [expandedReportAgentId, setExpandedReportAgentId] =
+    useState<number | null>(null);
   const [reportAdminView, setReportAdminView] =
     useState<"REPORT" | "NOTIFY">("REPORT");
 
@@ -10102,6 +10104,7 @@ function ReportAdmin({
 
   useEffect(() => {
     setSelectedAgentId(null);
+    setExpandedReportAgentId(null);
     loadAgents();
     loadReports(null);
   }, [ownerFilter, adminProfile?.id, adminProfile?.role]);
@@ -10169,6 +10172,35 @@ function ReportAdmin({
       ? `${agent.nome} ${agent.cognome}`.toUpperCase()
       : `ID ${agentId}`;
   };
+
+  const groupedReportAgents = Array.from(
+    filteredReports.reduce((map, report) => {
+      const agentId = Number(report.agent_id);
+      const current = map.get(agentId) || [];
+      current.push(report);
+      map.set(agentId, current);
+      return map;
+    }, new Map<number, any[]>())
+  )
+    .map(([agentId, agentReports]) => {
+      const sortedReports = [...agentReports].sort((a, b) =>
+        String(b.report_date || "").localeCompare(
+          String(a.report_date || "")
+        )
+      );
+
+      return {
+        agentId,
+        reports: sortedReports,
+        latestReportDate:
+          sortedReports[0]?.report_date || "",
+      };
+    })
+    .sort((a, b) =>
+      String(b.latestReportDate).localeCompare(
+        String(a.latestReportDate)
+      )
+    );
 
   const reportAdminTabs = (
     <div
@@ -10340,6 +10372,7 @@ function ReportAdmin({
                   const value = e.target.value;
                   const nextAgentId = value ? Number(value) : null;
                   setSelectedAgentId(nextAgentId);
+                  setExpandedReportAgentId(null);
                   await loadReports(nextAgentId);
                 }}
                 style={{
@@ -10640,79 +10673,255 @@ function ReportAdmin({
           padding: 16,
         }}
       >
-        <h3 style={{ marginTop: 0 }}>Storico report</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 6 }}>
+          Storico report
+        </h3>
+        <div
+          style={{
+            marginBottom: 12,
+            color: "#64748b",
+            fontSize: 13,
+          }}
+        >
+          Una riga per agente, ordinata in base al report più recente.
+          Clicca sull'agente per aprire lo storico completo.
+        </div>
 
         {loading ? (
           <div>Caricamento...</div>
-        ) : reports.length === 0 ? (
+        ) : groupedReportAgents.length === 0 ? (
           <div>Nessun report</div>
         ) : (
-          <div className="ge-table-shell">
-            <table className="ge-list-table ge-report-table">
-              <thead>
-                <tr>
-                  {[
-                    "Agente",
-                    "Data",
-                    "Contratti energia",
-                    "Consumi energia",
-                    "Contratti gas",
-                    "Consumi gas",
-                    "Note",
-                    "Azioni",
-                  ].map((h) => (
-                    <th
-                      key={h}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 9,
+            }}
+          >
+            {groupedReportAgents.map((group) => {
+              const isOpen =
+                expandedReportAgentId === group.agentId;
+
+              return (
+                <div
+                  key={group.agentId}
+                  style={{
+                    border: isOpen
+                      ? "2px solid #93c5fd"
+                      : "1px solid #e2e8f0",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    background: "white",
+                    boxShadow: isOpen
+                      ? "0 8px 22px rgba(37,99,235,.08)"
+                      : "none",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedReportAgentId((current) =>
+                        current === group.agentId
+                          ? null
+                          : group.agentId
+                      )
+                    }
+                    style={{
+                      width: "100%",
+                      border: 0,
+                      background: isOpen
+                        ? "#eff6ff"
+                        : "#f8fafc",
+                      cursor: "pointer",
+                      padding: "12px 14px",
+                      display: "grid",
+                      gridTemplateColumns:
+                        "minmax(0,1fr) auto auto auto",
+                      gap: 14,
+                      alignItems: "center",
+                      textAlign: "left",
+                      color: "#0f172a",
+                    }}
+                  >
+                    <div
                       style={{
-                        textAlign: "left",
-                        padding: 8,
-                        borderBottom: "1px solid #e2e8f0",
+                        minWidth: 0,
+                        fontWeight: 900,
+                        color: "#0f2d69",
+                        overflowWrap: "anywhere",
                       }}
                     >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredReports.map((r, i) => (
-                  <tr key={r.id || i}>
-                    <td data-label="Agente" className="ge-agent-cell">
-                      {getAgentName(r.agent_id)?.toUpperCase()}
-                    </td>
-                    <td data-label="Data" className="ge-date-cell">
-                      {formatReportDate(r.report_date)}
-                    </td>
-                    <td data-label="Contratti energia" className="ge-number-cell">
-                      {r.contracts_energia}
-                    </td>
-                    <td data-label="Consumi energia" className="ge-number-cell">
-                      {numFormat(r.consumi_energia, 2)}
-                    </td>
-                    <td data-label="Contratti gas" className="ge-number-cell">
-                      {r.contracts_gas}
-                    </td>
-                    <td data-label="Consumi gas" className="ge-number-cell">
-                      {numFormat(r.consumi_gas, 2)}
-                    </td>
-                    <td data-label="Note" className="ge-note-cell">
-                      {r.notes || "-"}
-                    </td>
-                    <td data-label="Azioni" className="ge-action-cell">
-                      <button
-                        type="button"
-                        onClick={() => deleteReportAdmin(r.id)}
-                        className="ge-icon-danger"
-                        title="Cancella report"
-                        aria-label="Cancella report"
+                      {getAgentName(group.agentId)}
+                    </div>
+
+                    <div
+                      style={{
+                        whiteSpace: "nowrap",
+                        fontSize: 13,
+                        color: "#475569",
+                      }}
+                    >
+                      Ultimo:{" "}
+                      <strong>
+                        {formatReportDate(
+                          group.latestReportDate
+                        )}
+                      </strong>
+                    </div>
+
+                    <div
+                      style={{
+                        minWidth: 34,
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        background: "#dbeafe",
+                        color: "#1d4ed8",
+                        textAlign: "center",
+                        fontWeight: 900,
+                        fontSize: 12,
+                      }}
+                    >
+                      {group.reports.length}
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 900,
+                        color: "#2563eb",
+                        transform: isOpen
+                          ? "rotate(180deg)"
+                          : "none",
+                        transition: "transform .15s ease",
+                      }}
+                    >
+                      ▼
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div
+                      style={{
+                        padding: 10,
+                        borderTop:
+                          "1px solid #bfdbfe",
+                        background: "#ffffff",
+                      }}
+                    >
+                      <div
+                        style={{
+                          margin: "2px 4px 10px",
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color: "#64748b",
+                          textTransform: "uppercase",
+                          letterSpacing: ".35px",
+                        }}
                       >
-                        🗑️
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        Storico di {getAgentName(group.agentId)}
+                      </div>
+
+                      <div className="ge-table-shell">
+                        <table className="ge-list-table ge-report-table">
+                          <thead>
+                            <tr>
+                              {[
+                                "Data",
+                                "Contratti energia",
+                                "Consumi energia",
+                                "Contratti gas",
+                                "Consumi gas",
+                                "Note",
+                                "Azioni",
+                              ].map((h) => (
+                                <th
+                                  key={h}
+                                  style={{
+                                    textAlign: "left",
+                                    padding: 8,
+                                    borderBottom:
+                                      "1px solid #e2e8f0",
+                                  }}
+                                >
+                                  {h}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.reports.map((r, i) => (
+                              <tr key={r.id || i}>
+                                <td
+                                  data-label="Data"
+                                  className="ge-date-cell"
+                                >
+                                  {formatReportDate(
+                                    r.report_date
+                                  )}
+                                </td>
+                                <td
+                                  data-label="Contratti energia"
+                                  className="ge-number-cell"
+                                >
+                                  {r.contracts_energia}
+                                </td>
+                                <td
+                                  data-label="Consumi energia"
+                                  className="ge-number-cell"
+                                >
+                                  {numFormat(
+                                    r.consumi_energia,
+                                    2
+                                  )}
+                                </td>
+                                <td
+                                  data-label="Contratti gas"
+                                  className="ge-number-cell"
+                                >
+                                  {r.contracts_gas}
+                                </td>
+                                <td
+                                  data-label="Consumi gas"
+                                  className="ge-number-cell"
+                                >
+                                  {numFormat(
+                                    r.consumi_gas,
+                                    2
+                                  )}
+                                </td>
+                                <td
+                                  data-label="Note"
+                                  className="ge-note-cell"
+                                >
+                                  {r.notes || "-"}
+                                </td>
+                                <td
+                                  data-label="Azioni"
+                                  className="ge-action-cell"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      deleteReportAdmin(r.id)
+                                    }
+                                    className="ge-icon-danger"
+                                    title="Cancella report"
+                                    aria-label="Cancella report"
+                                  >
+                                    🗑️
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
