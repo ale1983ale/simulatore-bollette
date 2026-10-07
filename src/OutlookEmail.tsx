@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { supabaseAnonKey, supabaseUrl } from "./supabase";
 import ReportNotificationPanel from "./ReportNotificationPanel";
+import AgentManagementToolbar from "./AgentManagementToolbar";
 import {
   adminAgentList,
   type SafeAgentRecord,
@@ -1489,6 +1490,12 @@ export default function OutlookEmail() {
                 🔔 INVIO NOTIFICA REPORT
               </button>
             </div>
+
+            {activeView === "matches" && (
+              <div style={{ marginBottom: 16 }}>
+                <AgentManagementToolbar active="email" />
+              </div>
+            )}
 
             {activeView === "email" && (
               <>
