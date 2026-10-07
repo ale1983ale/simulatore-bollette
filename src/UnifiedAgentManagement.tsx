@@ -850,47 +850,98 @@ export default function UnifiedAgentManagement({
   );
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || !ctx) return;
 
     const currentKeys = new Set(
       branchDiscrepancies.map((item) =>
         discrepancyArchiveKey(item)
       )
     );
-    const next = new Set(
-      Array.from(archivedDiscrepancyKeys).filter((key) =>
-        currentKeys.has(key)
-      )
-    );
+    const staleKeys = Array.from(
+      archivedDiscrepancyKeys
+    ).filter((key) => !currentKeys.has(key));
 
-    if (
-      next.size !== archivedDiscrepancyKeys.size ||
-      Array.from(next).some(
-        (key) => !archivedDiscrepancyKeys.has(key)
-      )
-    ) {
-      persistArchivedDiscrepancies(next);
-    }
+    if (!staleKeys.length) return;
+
+    const next = new Set(archivedDiscrepancyKeys);
+    staleKeys.forEach((key) => next.delete(key));
+    setArchivedDiscrepancyKeys(next);
+
+    void ctx.client
+      .from("recruiting_agent_discrepancy_archives")
+      .delete()
+      .eq("owner_key", ctx.ownerKey)
+      .in("alert_key", staleKeys)
+      .then(({ error }) => {
+        if (error) {
+          console.warn(
+            "ARCHIVED AGENT ALERT CLEANUP ERROR:",
+            error
+          );
+        }
+      });
   }, [
     loading,
+    ctx,
     branchDiscrepancies,
     archivedDiscrepancyKeys,
   ]);
 
-  const archiveDiscrepancy = (
+  const archiveDiscrepancy = async (
     item: (typeof branchDiscrepancies)[number]
   ) => {
+    const active =
+      ctx || (await getRecruitingContext());
+    const key = discrepancyArchiveKey(item);
+
     const next = new Set(archivedDiscrepancyKeys);
-    next.add(discrepancyArchiveKey(item));
-    persistArchivedDiscrepancies(next);
+    next.add(key);
+    setArchivedDiscrepancyKeys(next);
+
+    const { error } = await active.client
+      .from("recruiting_agent_discrepancy_archives")
+      .upsert(
+        {
+          owner_key: active.ownerKey,
+          alert_key: key,
+          archived_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "owner_key,alert_key",
+        }
+      );
+
+    if (error) {
+      const rollback = new Set(next);
+      rollback.delete(key);
+      setArchivedDiscrepancyKeys(rollback);
+      throw error;
+    }
   };
 
-  const restoreDiscrepancy = (
+  const restoreDiscrepancy = async (
     item: (typeof branchDiscrepancies)[number]
   ) => {
+    const active =
+      ctx || (await getRecruitingContext());
+    const key = discrepancyArchiveKey(item);
+
     const next = new Set(archivedDiscrepancyKeys);
-    next.delete(discrepancyArchiveKey(item));
-    persistArchivedDiscrepancies(next);
+    next.delete(key);
+    setArchivedDiscrepancyKeys(next);
+
+    const { error } = await active.client
+      .from("recruiting_agent_discrepancy_archives")
+      .delete()
+      .eq("owner_key", active.ownerKey)
+      .eq("alert_key", key);
+
+    if (error) {
+      const rollback = new Set(next);
+      rollback.add(key);
+      setArchivedDiscrepancyKeys(rollback);
+      throw error;
+    }
   };
 
   const discrepancyByLoginId = useMemo(() => {
@@ -2512,7 +2563,15 @@ export default function UnifiedAgentManagement({
 
                   <button
                     type="button"
-                    onClick={() => archiveDiscrepancy(item)}
+                    onClick={() =>
+                        void archiveDiscrepancy(item).catch((error) => {
+                          console.error(error);
+                          setNotice(
+                            "Errore nell'archiviazione dell'avviso: " +
+                              (error?.message || error)
+                          );
+                        })
+                      }
                     style={{
                       ...buttonStyle,
                       padding: "4px 7px",
@@ -2673,7 +2732,15 @@ export default function UnifiedAgentManagement({
 
                     <button
                       type="button"
-                      onClick={() => restoreDiscrepancy(item)}
+                      onClick={() =>
+                        void restoreDiscrepancy(item).catch((error) => {
+                          console.error(error);
+                          setNotice(
+                            "Errore nel ripristino dell'avviso: " +
+                              (error?.message || error)
+                          );
+                        })
+                      }
                       style={{
                         ...buttonStyle,
                         marginLeft: "auto",
