@@ -231,7 +231,7 @@ function buildEmail(
         <div>Username: <strong>${escapeHtml(credentials.username)}</strong></div>
         <div style="margin-top:10px">
           <a href="${escapeHtml(credentials.setupUrl)}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:800">
-            IMPOSTA / REIMPOSTA PASSWORD
+            IMPOSTA / CAMBIA PASSWORD
           </a>
         </div>
         <div style="margin-top:8px;color:#78716c;font-size:12px">
