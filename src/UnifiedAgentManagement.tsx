@@ -234,6 +234,10 @@ export default function UnifiedAgentManagement({
   const [createDraft, setCreateDraft] = useState<CreateDraft>({
     ...EMPTY_CREATE_DRAFT,
   });
+  const [createDmCustomOpen, setCreateDmCustomOpen] =
+    useState(false);
+  const [editDmCustomOpen, setEditDmCustomOpen] =
+    useState(false);
 
   const loadAll = async () => {
     setLoading(true);
@@ -364,6 +368,7 @@ export default function UnifiedAgentManagement({
       setExpandedId(null);
       setDraft(null);
       setCreateOpen(true);
+      setCreateDmCustomOpen(false);
       setCreateDraft({
         ...EMPTY_CREATE_DRAFT,
         nome,
@@ -606,6 +611,7 @@ export default function UnifiedAgentManagement({
     }
 
     setExpandedId(id);
+    setEditDmCustomOpen(false);
     setDraft({
       username: row.agent.username || "",
       password: row.agent.password || "",
@@ -1018,6 +1024,7 @@ export default function UnifiedAgentManagement({
       }
 
       setCreateDraft({ ...EMPTY_CREATE_DRAFT });
+      setCreateDmCustomOpen(false);
       setCreateOpen(false);
       setNotice(
         `${canonicalName}: creato ${createdParts.join(" + ")}.`
@@ -1255,13 +1262,42 @@ export default function UnifiedAgentManagement({
             </div>
             <div>
               <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>DM DI RIFERIMENTO</div>
-              <input
-                list="unified-dm-suggestions"
-                value={draft.dm}
-                onChange={(e) => setDraft({ ...draft, dm: e.target.value })}
-                placeholder="Scegli un DM esistente o scrivine uno nuovo"
+              <select
+                value={editDmCustomOpen ? "__NEW_DM__" : draft.dm}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "__NEW_DM__") {
+                    setEditDmCustomOpen(true);
+                    setDraft({ ...draft, dm: "" });
+                    return;
+                  }
+                  setEditDmCustomOpen(false);
+                  setDraft({ ...draft, dm: value });
+                }}
                 style={inputStyle}
-              />
+              >
+                <option value="">SELEZIONA DM...</option>
+                {dmSuggestions.map((dm) => (
+                  <option key={dm} value={dm}>
+                    {dm.toLocaleUpperCase("it")}
+                  </option>
+                ))}
+                <option value="__NEW_DM__">ALTRO / NUOVO DM</option>
+              </select>
+              {editDmCustomOpen && (
+                <input
+                  autoFocus
+                  value={draft.dm}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      dm: e.target.value.toLocaleUpperCase("it"),
+                    })
+                  }
+                  placeholder="INSERISCI NUOVO DM"
+                  style={{ ...inputStyle, marginTop: 7 }}
+                />
+              )}
             </div>
           </div>
           <label style={{ display: "inline-flex", gap: 7, alignItems: "center", fontWeight: 900, marginTop: 12 }}>
@@ -1469,12 +1505,6 @@ export default function UnifiedAgentManagement({
         }
       `}</style>
 
-      <datalist id="unified-dm-suggestions">
-        {dmSuggestions.map((dm) => (
-          <option key={dm} value={dm} />
-        ))}
-      </datalist>
-
       <div style={cardStyle}>
         <div
           style={{
@@ -1508,6 +1538,7 @@ export default function UnifiedAgentManagement({
                   if (!current) {
                     setExpandedId(null);
                     setDraft(null);
+                    setCreateDmCustomOpen(false);
                     setCreateDraft({
                       ...EMPTY_CREATE_DRAFT,
                       ownerAdminId:
@@ -2034,18 +2065,54 @@ export default function UnifiedAgentManagement({
                   <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
                     DM
                   </div>
-                  <input
-                    list="unified-dm-suggestions"
-                    value={createDraft.dm}
-                    onChange={(e) =>
+                  <select
+                    value={
+                      createDmCustomOpen
+                        ? "__NEW_DM__"
+                        : createDraft.dm
+                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "__NEW_DM__") {
+                        setCreateDmCustomOpen(true);
+                        setCreateDraft({
+                          ...createDraft,
+                          dm: "",
+                        });
+                        return;
+                      }
+                      setCreateDmCustomOpen(false);
                       setCreateDraft({
                         ...createDraft,
-                        dm: e.target.value,
-                      })
-                    }
-                    placeholder="Scegli o inserisci un nuovo DM"
+                        dm: value,
+                      });
+                    }}
                     style={inputStyle}
-                  />
+                  >
+                    <option value="">SELEZIONA DM...</option>
+                    {dmSuggestions.map((dm) => (
+                      <option key={dm} value={dm}>
+                        {dm.toLocaleUpperCase("it")}
+                      </option>
+                    ))}
+                    <option value="__NEW_DM__">
+                      ALTRO / NUOVO DM
+                    </option>
+                  </select>
+                  {createDmCustomOpen && (
+                    <input
+                      autoFocus
+                      value={createDraft.dm}
+                      onChange={(e) =>
+                        setCreateDraft({
+                          ...createDraft,
+                          dm: e.target.value.toLocaleUpperCase("it"),
+                        })
+                      }
+                      placeholder="INSERISCI NUOVO DM"
+                      style={{ ...inputStyle, marginTop: 7 }}
+                    />
+                  )}
                 </div>
 
                 <div>
@@ -2193,18 +2260,54 @@ export default function UnifiedAgentManagement({
                   <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>
                     DM DI RIFERIMENTO
                   </div>
-                  <input
-                    list="unified-dm-suggestions"
-                    value={createDraft.dm}
-                    onChange={(e) =>
+                  <select
+                    value={
+                      createDmCustomOpen
+                        ? "__NEW_DM__"
+                        : createDraft.dm
+                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "__NEW_DM__") {
+                        setCreateDmCustomOpen(true);
+                        setCreateDraft({
+                          ...createDraft,
+                          dm: "",
+                        });
+                        return;
+                      }
+                      setCreateDmCustomOpen(false);
                       setCreateDraft({
                         ...createDraft,
-                        dm: e.target.value,
-                      })
-                    }
-                    placeholder="Scegli o inserisci un nuovo DM"
+                        dm: value,
+                      });
+                    }}
                     style={inputStyle}
-                  />
+                  >
+                    <option value="">SELEZIONA DM...</option>
+                    {dmSuggestions.map((dm) => (
+                      <option key={dm} value={dm}>
+                        {dm.toLocaleUpperCase("it")}
+                      </option>
+                    ))}
+                    <option value="__NEW_DM__">
+                      ALTRO / NUOVO DM
+                    </option>
+                  </select>
+                  {createDmCustomOpen && (
+                    <input
+                      autoFocus
+                      value={createDraft.dm}
+                      onChange={(e) =>
+                        setCreateDraft({
+                          ...createDraft,
+                          dm: e.target.value.toLocaleUpperCase("it"),
+                        })
+                      }
+                      placeholder="INSERISCI NUOVO DM"
+                      style={{ ...inputStyle, marginTop: 7 }}
+                    />
+                  )}
                 </div>
               </div>
 
