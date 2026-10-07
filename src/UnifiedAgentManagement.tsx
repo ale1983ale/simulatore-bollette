@@ -700,6 +700,150 @@ export default function UnifiedAgentManagement({
     ]
   );
 
+  useEffect(() => {
+    if (loading) return;
+
+    let raw = "";
+    try {
+      raw =
+        sessionStorage.getItem(
+          "agent_management_open_target"
+        ) || "";
+    } catch {
+      raw = "";
+    }
+
+    if (!raw) return;
+
+    let target: any = null;
+    try {
+      target = JSON.parse(raw);
+    } catch {
+      target = null;
+    }
+
+    if (!target) return;
+
+    const targetId = String(
+      target.recruitingAgentId || ""
+    );
+    const targetName = normalizeName(
+      String(target.fullName || "")
+    );
+
+    const recruiting =
+      recruitingAgents.find(
+        (agent) => String(agent.id) === targetId
+      ) ||
+      recruitingAgents.find(
+        (agent) =>
+          normalizeName(
+            `${agent.first_name} ${agent.last_name}`
+          ) === targetName
+      ) ||
+      null;
+
+    const resolvedName = recruiting
+      ? normalizeName(
+          `${recruiting.first_name} ${recruiting.last_name}`
+        )
+      : targetName;
+
+    const login =
+      loginAgents.find(
+        (agent) =>
+          normalizeName(
+            `${agent.nome || ""} ${agent.cognome || ""}`
+          ) === resolvedName
+      ) || null;
+
+    if (login) {
+      const agentId = Number(login.id);
+      const email =
+        emailByAgentId.get(agentId) ||
+        emailByName.get(resolvedName) ||
+        null;
+
+      setSearch("");
+      setCreateOpen(false);
+      setExpandedId(agentId);
+      setEditDmCustomOpen(false);
+      setDraft({
+        username: login.username || "",
+        password: login.password || "",
+        ownerAdminId: login.owner_admin_id || "",
+        email: email?.email || "",
+        reportNotify: email?.report_notify === true,
+        provvigioniVisible:
+          login.provvigioni_visible === true,
+        phone: recruiting?.phone || "",
+        zone: recruiting?.zone || "",
+        dm:
+          recruiting?.dm_reference ||
+          email?.dm ||
+          "",
+        showOnMap:
+          recruiting?.latitude !== null &&
+          recruiting?.latitude !== undefined &&
+          recruiting?.longitude !== null &&
+          recruiting?.longitude !== undefined,
+      });
+
+      window.setTimeout(() => {
+        document
+          .querySelector(
+            `[data-uam-agent-row="${agentId}"]`
+          )
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+      }, 180);
+    } else if (recruiting || targetName) {
+      const displayName = recruiting
+        ? `${recruiting.first_name} ${recruiting.last_name}`
+        : String(target.fullName || "");
+
+      applyCreatePrefill({
+        source: "map",
+        fullName: displayName,
+        phone:
+          recruiting?.phone ||
+          String(target.phone || ""),
+        zone:
+          recruiting?.zone ||
+          String(target.zone || ""),
+        region:
+          recruiting?.region ||
+          String(target.region || ""),
+        dm:
+          recruiting?.dm_reference ||
+          String(target.dm || ""),
+        showOnMap:
+          recruiting
+            ? recruiting.latitude !== null &&
+              recruiting.longitude !== null
+            : target.showOnMap === true,
+        insertLogin: true,
+        insertActiveAgent: true,
+      });
+    }
+
+    try {
+      sessionStorage.removeItem(
+        "agent_management_open_target"
+      );
+    } catch {
+      // Nessuna azione necessaria.
+    }
+  }, [
+    loading,
+    loginAgents,
+    recruitingAgents,
+    emailByAgentId,
+    emailByName,
+  ]);
+
   const branchDiscrepancies = useMemo(() => {
     type BranchRecord = {
       key: string;
