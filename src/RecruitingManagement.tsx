@@ -56,8 +56,8 @@ const buttonStyle: React.CSSProperties = {
 function rowToAgent(row: any): ActiveAgent {
   return {
     id: String(row.id),
-    firstName: String(row.first_name || ""),
-    lastName: String(row.last_name || ""),
+    firstName: String(row.first_name || "").toLocaleUpperCase("it"),
+    lastName: String(row.last_name || "").toLocaleUpperCase("it"),
     phone: String(row.phone || ""),
     zone: String(row.zone || ""),
     region: String(row.region || ""),
@@ -191,6 +191,62 @@ export default function RecruitingManagement() {
       return true;
     });
   }, [agents, dmReferenceFilter]);
+
+  useEffect(() => {
+    if (!agents.length) return;
+
+    let targetId = "";
+    try {
+      targetId =
+        sessionStorage.getItem("recruiting_open_agent_id") || "";
+    } catch {
+      targetId = "";
+    }
+
+    if (!targetId) return;
+
+    const target = agents.find(
+      (agent) => String(agent.id) === String(targetId)
+    );
+    if (!target) return;
+
+    setDmReferenceFilter("");
+    setAgentId(target.id);
+    setFirstName(target.firstName.toLocaleUpperCase("it"));
+    setLastName(target.lastName.toLocaleUpperCase("it"));
+    setPhone(target.phone);
+    setZone(target.zone);
+    setAgentDm(target.dmReference);
+    setAgentShowOnMap(
+      target.latitude !== null && target.longitude !== null
+    );
+    setMessage(
+      `${target.firstName.toLocaleUpperCase("it")} ${target.lastName.toLocaleUpperCase("it")}: scheda aperta dalla Gestione Agenti.`
+    );
+
+    try {
+      sessionStorage.removeItem("recruiting_open_agent_id");
+    } catch {
+      // Nothing else to do.
+    }
+
+    window.setTimeout(() => {
+      const matches = Array.from(
+        document.querySelectorAll(
+          `[data-recruiting-agent-id="${target.id}"]`
+        )
+      ) as HTMLElement[];
+
+      const visible =
+        matches.find((element) => element.offsetParent !== null) ||
+        matches[0];
+
+      visible?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 120);
+  }, [agents]);
 
   const resetMacroForm = () => {
     setMacroId(null);
@@ -436,8 +492,8 @@ export default function RecruitingManagement() {
 
       const payload = {
         owner_key: ctx.ownerKey,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
+        first_name: firstName.trim().toLocaleUpperCase("it"),
+        last_name: lastName.trim().toLocaleUpperCase("it"),
         phone: phone.trim(),
         zone: zone.trim(),
         region,
@@ -461,7 +517,9 @@ export default function RecruitingManagement() {
       }
 
       await loadAll(ctx);
-      const savedName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const savedName = `${firstName.trim()} ${lastName.trim()}`
+        .trim()
+        .toLocaleUpperCase("it");
       resetAgentForm();
 
       setMessage(
@@ -487,8 +545,8 @@ export default function RecruitingManagement() {
     }
 
     setAgentId(agent.id);
-    setFirstName(agent.firstName);
-    setLastName(agent.lastName);
+    setFirstName(agent.firstName.toLocaleUpperCase("it"));
+    setLastName(agent.lastName.toLocaleUpperCase("it"));
     setPhone(agent.phone);
     setZone(agent.zone);
     setAgentDm(agent.dmReference);
@@ -803,11 +861,23 @@ export default function RecruitingManagement() {
         >
           <div>
             <label style={labelStyle}>Nome</label>
-            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
+            <input
+              value={firstName}
+              onChange={(e) =>
+                setFirstName(e.target.value.toLocaleUpperCase("it"))
+              }
+              style={inputStyle}
+            />
           </div>
           <div>
             <label style={labelStyle}>Cognome</label>
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} />
+            <input
+              value={lastName}
+              onChange={(e) =>
+                setLastName(e.target.value.toLocaleUpperCase("it"))
+              }
+              style={inputStyle}
+            />
           </div>
           <div>
             <label style={labelStyle}>Cellulare</label>
@@ -976,6 +1046,7 @@ export default function RecruitingManagement() {
                 return (
                   <React.Fragment key={agent.id}>
                     <tr
+                      data-recruiting-agent-id={agent.id}
                       style={{
                         background: isEditing
                           ? "#eff6ff"
@@ -984,8 +1055,8 @@ export default function RecruitingManagement() {
                             : "transparent",
                       }}
                     >
-                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.firstName}</td>
-                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.lastName}</td>
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.firstName.toLocaleUpperCase("it")}</td>
+                      <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.lastName.toLocaleUpperCase("it")}</td>
                       <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.phone || "—"}</td>
                       <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.zone || "—"}</td>
                       <td style={{ padding: "9px 10px", borderBottom: "1px solid #f1f5f9" }}>{agent.region || "—"}</td>
@@ -1196,7 +1267,11 @@ export default function RecruitingManagement() {
                                 <label style={labelStyle}>Nome</label>
                                 <input
                                   value={firstName}
-                                  onChange={(e) => setFirstName(e.target.value)}
+                                  onChange={(e) =>
+                                    setFirstName(
+                                      e.target.value.toLocaleUpperCase("it")
+                                    )
+                                  }
                                   style={inputStyle}
                                 />
                               </div>
@@ -1204,7 +1279,11 @@ export default function RecruitingManagement() {
                                 <label style={labelStyle}>Cognome</label>
                                 <input
                                   value={lastName}
-                                  onChange={(e) => setLastName(e.target.value)}
+                                  onChange={(e) =>
+                                    setLastName(
+                                      e.target.value.toLocaleUpperCase("it")
+                                    )
+                                  }
                                   style={inputStyle}
                                 />
                               </div>
@@ -1335,6 +1414,7 @@ export default function RecruitingManagement() {
             return (
               <div
                 key={agent.id}
+                data-recruiting-agent-id={agent.id}
                 style={{
                   border: isEditing
                     ? "2px solid #2563eb"
@@ -1345,7 +1425,8 @@ export default function RecruitingManagement() {
                 }}
               >
                 <div style={{ fontWeight: 950, color: "#0f2d69" }}>
-                  {agent.firstName} {agent.lastName}
+                  {agent.firstName.toLocaleUpperCase("it")}{" "}
+                  {agent.lastName.toLocaleUpperCase("it")}
                 </div>
                 <div style={{ display: "grid", gap: 4, marginTop: 8, fontSize: 13 }}>
                   <div><strong>Cellulare:</strong> {agent.phone || "—"}</div>
@@ -1393,11 +1474,27 @@ export default function RecruitingManagement() {
                   >
                     <div>
                       <label style={labelStyle}>Nome</label>
-                      <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
+                      <input
+                        value={firstName}
+                        onChange={(e) =>
+                          setFirstName(
+                            e.target.value.toLocaleUpperCase("it")
+                          )
+                        }
+                        style={inputStyle}
+                      />
                     </div>
                     <div>
                       <label style={labelStyle}>Cognome</label>
-                      <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} />
+                      <input
+                        value={lastName}
+                        onChange={(e) =>
+                          setLastName(
+                            e.target.value.toLocaleUpperCase("it")
+                          )
+                        }
+                        style={inputStyle}
+                      />
                     </div>
                     <div>
                       <label style={labelStyle}>Cellulare</label>
