@@ -5722,12 +5722,16 @@ export default function Recruiting({
     setFocusedMapAgentId(agent.id);
 
     const map = mapRef.current;
+    const marker = agentMarkersRef.current.get(agent.id);
+    const focusPosition =
+      marker?.getLatLng() ||
+      L.latLng(agent.latitude, agent.longitude);
     const targetZoom = Math.max(
       map.getZoom(),
       mapMode === "region" ? 9 : 8
     );
 
-    map.flyTo([agent.latitude, agent.longitude], targetZoom, {
+    map.flyTo(focusPosition, targetZoom, {
       animate: true,
       duration: 0.65,
     });
@@ -5737,7 +5741,6 @@ export default function Recruiting({
       block: "center",
     });
 
-    const marker = agentMarkersRef.current.get(agent.id);
     if (!marker) return;
 
     window.setTimeout(() => {
@@ -6208,6 +6211,101 @@ export default function Recruiting({
         }).addTo(markerLayer!);
       });
 
+    const agentLocationGroups = new Map<string, ActiveAgent[]>();
+
+    mapAgentsToRender.forEach((agent) => {
+      if (agent.latitude === null || agent.longitude === null) return;
+
+      const zoneKey = normalizePlaceName(agent.zone || "");
+      const regionKey = normalizeItalianRegion(
+        agent.region || agent.zone || ""
+      );
+      const coordinateKey =
+        `${agent.latitude.toFixed(5)}|${agent.longitude.toFixed(5)}`;
+      const locationKey = zoneKey
+        ? `${regionKey}|${zoneKey}`
+        : coordinateKey;
+
+      const group = agentLocationGroups.get(locationKey) || [];
+      group.push(agent);
+      agentLocationGroups.set(locationKey, group);
+    });
+
+    const agentMarkerPositions = new Map<string, L.LatLng>();
+    const currentMapZoom = map.getZoom();
+
+    agentLocationGroups.forEach((group) => {
+      const sortedGroup = [...group].sort((a, b) =>
+        `${a.firstName} ${a.lastName} ${a.id}`.localeCompare(
+          `${b.firstName} ${b.lastName} ${b.id}`,
+          "it",
+          { sensitivity: "base" }
+        )
+      );
+
+      if (sortedGroup.length === 1) {
+        const onlyAgent = sortedGroup[0];
+        if (
+          onlyAgent.latitude !== null &&
+          onlyAgent.longitude !== null
+        ) {
+          agentMarkerPositions.set(
+            onlyAgent.id,
+            L.latLng(onlyAgent.latitude, onlyAgent.longitude)
+          );
+        }
+        return;
+      }
+
+      const validAgents = sortedGroup.filter(
+        (agent) =>
+          agent.latitude !== null &&
+          agent.longitude !== null
+      );
+
+      if (!validAgents.length) return;
+
+      const centerLat =
+        validAgents.reduce(
+          (sum, agent) => sum + Number(agent.latitude),
+          0
+        ) / validAgents.length;
+      const centerLng =
+        validAgents.reduce(
+          (sum, agent) => sum + Number(agent.longitude),
+          0
+        ) / validAgents.length;
+
+      const centerPoint = map.project(
+        L.latLng(centerLat, centerLng),
+        currentMapZoom
+      );
+
+      validAgents.forEach((agent, index) => {
+        const ring = Math.floor(index / 8);
+        const ringStart = ring * 8;
+        const itemsInRing = Math.min(
+          8,
+          validAgents.length - ringStart
+        );
+        const indexInRing = index - ringStart;
+        const radiusPx = 28 + ring * 24;
+        const angle =
+          -Math.PI / 2 +
+          (Math.PI * 2 * indexInRing) / itemsInRing;
+
+        const markerPoint = L.point(
+          centerPoint.x + Math.cos(angle) * radiusPx,
+          centerPoint.y + Math.sin(angle) * radiusPx
+        );
+
+        agentMarkerPositions.set(
+          agent.id,
+          map.unproject(markerPoint, currentMapZoom)
+        );
+      });
+    });
+
     mapAgentsToRender.forEach((agent) => {
       if (agent.latitude === null || agent.longitude === null) return;
       const initials = `${agent.firstName.charAt(0)}${agent.lastName.charAt(0)}`.toUpperCase() || "A";
@@ -6218,7 +6316,11 @@ export default function Recruiting({
         iconAnchor: [16, 16],
       });
 
-      const marker = L.marker([agent.latitude, agent.longitude], { icon });
+      const markerPosition =
+        agentMarkerPositions.get(agent.id) ||
+        L.latLng(agent.latitude, agent.longitude);
+
+      const marker = L.marker(markerPosition, { icon });
       marker.bindTooltip(escapeHtml(`${agent.firstName} ${agent.lastName}`), {
         direction: "top",
         offset: [0, -14],
