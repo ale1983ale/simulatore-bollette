@@ -69,13 +69,19 @@ async function callReportApi(action: string, payload: Record<string, unknown> = 
 }
 
 export default function ReportNotificationPanel({
-  agents,
-  dirty,
-  onOpenMatches,
+  agents = [],
+  dirty = false,
+  onOpenMatches = () => {
+    window.dispatchEvent(
+      new CustomEvent("open-outlook-email", {
+        detail: { view: "matches" },
+      })
+    );
+  },
 }: {
-  agents: ReportAgentRecipient[];
-  dirty: boolean;
-  onOpenMatches: () => void;
+  agents?: ReportAgentRecipient[];
+  dirty?: boolean;
+  onOpenMatches?: () => void;
 }) {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
@@ -86,12 +92,17 @@ export default function ReportNotificationPanel({
     "Buongiorno,\n\nti ricordo di compilare il Report aggiornato.\n\nGrazie."
   );
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
+  const [remoteRecipients, setRemoteRecipients] =
+    useState<ReportAgentRecipient[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
+  const effectiveAgents =
+    agents.length > 0 ? agents : remoteRecipients;
+
   const eligible = useMemo(() => {
     const seen = new Set<string>();
-    return agents
+    return effectiveAgents
       .filter((agent) => agent.report_notify === true && validEmail(agent.email))
       .filter((agent) => {
         const key = agent.email.trim().toLowerCase();
@@ -99,7 +110,7 @@ export default function ReportNotificationPanel({
         seen.add(key);
         return true;
       });
-  }, [agents]);
+  }, [effectiveAgents]);
 
   useEffect(() => {
     setSelectedEmails(new Set(eligible.map((agent) => agent.email.trim().toLowerCase())));
@@ -112,6 +123,15 @@ export default function ReportNotificationPanel({
       const data = await callReportApi("list");
       setTemplates(Array.isArray(data.templates) ? data.templates : []);
       setHistory(Array.isArray(data.history) ? data.history : []);
+      setRemoteRecipients(
+        Array.isArray(data.recipients)
+          ? data.recipients.map((item: any) => ({
+              agenzia: String(item?.agenzia || ""),
+              email: String(item?.email || ""),
+              report_notify: true,
+            }))
+          : []
+      );
     } catch (error: any) {
       setNotice(error?.message || String(error));
     } finally {
