@@ -5,6 +5,14 @@
   --ge-border: #dbe5f2;
 }
 
+
+/* Tutti i menu a tendina della webapp mostrano le voci in MAIUSCOLO. */
+select,
+select option,
+select optgroup {
+  text-transform: uppercase !important;
+}
+
 .ge-brand-shell {
   position: relative;
   width: 100%;
