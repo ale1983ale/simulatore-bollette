@@ -8192,6 +8192,12 @@ function AgentsAdmin({
   const [editPassword, setEditPassword] = useState("");
   const [editOwnerAdminId, setEditOwnerAdminId] = useState<number | "">("");
   const [ownerFilter,setOwnerFilter] = useState("ALL");
+  const [bulkAgentPasswordsOpen, setBulkAgentPasswordsOpen] =
+    useState(false);
+  const [bulkAgentPasswords, setBulkAgentPasswords] =
+    useState<Record<number, string>>({});
+  const [bulkAgentPasswordsSaving, setBulkAgentPasswordsSaving] =
+    useState(false);
 
   const loadAdmins = async () => {
     if (adminProfile?.role !== "super_admin") return;
@@ -8393,6 +8399,91 @@ function AgentsAdmin({
   
     await loadAgents();
   };
+
+  const openBulkAgentPasswords = () => {
+    const next: Record<number, string> = {};
+
+    agents.forEach((agent) => {
+      if (!agent.id) return;
+      next[agent.id] = agent.password || "";
+    });
+
+    setBulkAgentPasswords(next);
+    setBulkAgentPasswordsOpen(true);
+  };
+
+  const saveBulkAgentPasswords = async () => {
+    const changed = agents.filter((agent) => {
+      if (!agent.id) return false;
+      const nextPassword =
+        bulkAgentPasswords[agent.id]?.trim() || "";
+      return (
+        nextPassword &&
+        nextPassword !== String(agent.password || "")
+      );
+    });
+
+    if (!changed.length) {
+      alert("Non ci sono password modificate da salvare.");
+      return;
+    }
+
+    const missing = agents.filter((agent) => {
+      if (!agent.id) return false;
+      return !(
+        bulkAgentPasswords[agent.id]?.trim() ||
+        String(agent.password || "").trim()
+      );
+    });
+
+    if (missing.length) {
+      const ok = window.confirm(
+        `Ci sono ${missing.length} account con password ancora vuota. Vuoi salvare comunque le altre password modificate?`
+      );
+      if (!ok) return;
+    }
+
+    const ok = window.confirm(
+      `Vuoi aggiornare ${changed.length} password agente?`
+    );
+    if (!ok) return;
+
+    setBulkAgentPasswordsSaving(true);
+
+    const results = await Promise.allSettled(
+      changed.map((agent) =>
+        adminAgentUpdate({
+          id: Number(agent.id),
+          username: agent.username.trim(),
+          password:
+            bulkAgentPasswords[Number(agent.id)].trim(),
+          ownerAdminId:
+            adminProfile?.role === "super_admin"
+              ? agent.owner_admin_id
+              : undefined,
+        })
+      )
+    );
+
+    setBulkAgentPasswordsSaving(false);
+
+    const failed = results.filter(
+      (result) => result.status === "rejected"
+    );
+
+    if (failed.length) {
+      alert(
+        `Aggiornamento completato con ${failed.length} errori. Le altre password sono state salvate.`
+      );
+    } else {
+      alert(
+        `${changed.length} password agente aggiornate correttamente.`
+      );
+      setBulkAgentPasswordsOpen(false);
+    }
+
+    await loadAgents();
+  };
   
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -8540,7 +8631,33 @@ function AgentsAdmin({
           padding: 16,
         }}
       >
-        <h2 style={{ marginTop: 0 }}>Elenco agenti</h2>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            marginBottom: 12,
+          }}
+        >
+          <h2 style={{ margin: 0 }}>Elenco agenti</h2>
+          <button
+            type="button"
+            onClick={openBulkAgentPasswords}
+            style={{
+              padding: "9px 12px",
+              borderRadius: 9,
+              border: "1px solid #f97316",
+              background: "#fff7ed",
+              color: "#c2410c",
+              cursor: "pointer",
+              fontWeight: 900,
+            }}
+          >
+            MODIFICA TUTTE LE PASSWORD
+          </button>
+        </div>
         <div style={{ marginBottom:16 }}>
   <div style={{ fontSize:12, fontWeight:700, marginBottom:4 }}>
     Filtro agenti
@@ -8717,6 +8834,212 @@ function AgentsAdmin({
         )}
       </div>
   
+      {bulkAgentPasswordsOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.42)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 10020,
+            padding: 16,
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            style={{
+              width: "min(900px, 100%)",
+              maxHeight: "88vh",
+              overflow: "hidden",
+              background: "white",
+              borderRadius: 14,
+              boxShadow: "0 18px 50px rgba(15,23,42,.25)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                padding: 16,
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>
+                Modifica tutte le password agenti
+              </h3>
+              <div
+                style={{
+                  marginTop: 5,
+                  color: "#64748b",
+                  fontSize: 13,
+                }}
+              >
+                Modifica tutte le righe che vuoi e poi premi SALVA TUTTE.
+              </div>
+            </div>
+
+            <div
+              style={{
+                overflow: "auto",
+                padding: 14,
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 650,
+                }}
+              >
+                <thead>
+                  <tr>
+                    {["Nome", "Cognome", "Username", "Password"].map(
+                      (label) => (
+                        <th
+                          key={label}
+                          style={{
+                            textAlign: "left",
+                            padding: 8,
+                            borderBottom:
+                              "1px solid #cbd5e1",
+                          }}
+                        >
+                          {label}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {agents.map((agent) => (
+                    <tr key={agent.id}>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        {agent.nome}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        {agent.cognome}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        {agent.username}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        <input
+                          value={
+                            agent.id
+                              ? bulkAgentPasswords[agent.id] ??
+                                ""
+                              : ""
+                          }
+                          onChange={(event) => {
+                            if (!agent.id) return;
+                            setBulkAgentPasswords(
+                              (current) => ({
+                                ...current,
+                                [agent.id as number]:
+                                  event.target.value,
+                              })
+                            );
+                          }}
+                          placeholder={
+                            agent.password
+                              ? ""
+                              : "Inserisci password"
+                          }
+                          style={{
+                            width: "100%",
+                            minWidth: 180,
+                            padding: 8,
+                            border:
+                              "1px solid #cbd5e1",
+                            borderRadius: 8,
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                padding: 14,
+                borderTop: "1px solid #e2e8f0",
+              }}
+            >
+              <button
+                type="button"
+                disabled={bulkAgentPasswordsSaving}
+                onClick={() =>
+                  setBulkAgentPasswordsOpen(false)
+                }
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #94a3b8",
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                disabled={bulkAgentPasswordsSaving}
+                onClick={() =>
+                  void saveBulkAgentPasswords()
+                }
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: 0,
+                  background: "#f97316",
+                  color: "white",
+                  cursor: bulkAgentPasswordsSaving
+                    ? "wait"
+                    : "pointer",
+                  fontWeight: 900,
+                }}
+              >
+                {bulkAgentPasswordsSaving
+                  ? "SALVATAGGIO..."
+                  : "SALVA TUTTE"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingAgent && (
         <div
           style={{
@@ -9838,6 +10161,12 @@ function AdminUsersManager({
   const [editAdminCognome, setEditAdminCognome] = useState("");
   const [editAdminUsername, setEditAdminUsername] = useState("");
   const [editAdminPassword, setEditAdminPassword] = useState("");
+  const [bulkAdminPasswordsOpen, setBulkAdminPasswordsOpen] =
+    useState(false);
+  const [bulkAdminPasswords, setBulkAdminPasswords] =
+    useState<Record<number, string>>({});
+  const [bulkAdminPasswordsSaving, setBulkAdminPasswordsSaving] =
+    useState(false);
 
   const loadAdmins = async () => {
     if (adminProfile?.role !== "super_admin") return;
@@ -9958,6 +10287,74 @@ function AdminUsersManager({
     }
   };
 
+  const openBulkAdminPasswords = () => {
+    const next: Record<number, string> = {};
+
+    admins.forEach((admin) => {
+      if (!admin.id) return;
+      next[Number(admin.id)] = admin.password || "";
+    });
+
+    setBulkAdminPasswords(next);
+    setBulkAdminPasswordsOpen(true);
+  };
+
+  const saveBulkAdminPasswords = async () => {
+    const changed = admins.filter((admin) => {
+      if (!admin.id) return false;
+      const nextPassword =
+        bulkAdminPasswords[Number(admin.id)]?.trim() || "";
+      return (
+        nextPassword &&
+        nextPassword !== String(admin.password || "")
+      );
+    });
+
+    if (!changed.length) {
+      alert("Non ci sono password modificate da salvare.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Vuoi aggiornare ${changed.length} password admin?`
+    );
+    if (!ok) return;
+
+    setBulkAdminPasswordsSaving(true);
+
+    const results = await Promise.allSettled(
+      changed.map((admin) =>
+        adminUpdateUser({
+          id: Number(admin.id),
+          nome: String(admin.nome || "").trim(),
+          cognome: String(admin.cognome || "").trim(),
+          username: String(admin.username || "").trim(),
+          password:
+            bulkAdminPasswords[Number(admin.id)].trim(),
+        })
+      )
+    );
+
+    setBulkAdminPasswordsSaving(false);
+
+    const failed = results.filter(
+      (result) => result.status === "rejected"
+    );
+
+    if (failed.length) {
+      alert(
+        `Aggiornamento completato con ${failed.length} errori. Le altre password sono state salvate.`
+      );
+    } else {
+      alert(
+        `${changed.length} password admin aggiornate correttamente.`
+      );
+      setBulkAdminPasswordsOpen(false);
+    }
+
+    await loadAdmins();
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div
@@ -10072,7 +10469,33 @@ function AdminUsersManager({
           padding: 16,
         }}
       >
-        <h2 style={{ marginTop: 0 }}>Elenco admin</h2>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            marginBottom: 12,
+          }}
+        >
+          <h2 style={{ margin: 0 }}>Elenco admin</h2>
+          <button
+            type="button"
+            onClick={openBulkAdminPasswords}
+            style={{
+              padding: "9px 12px",
+              borderRadius: 9,
+              border: "1px solid #f97316",
+              background: "#fff7ed",
+              color: "#c2410c",
+              cursor: "pointer",
+              fontWeight: 900,
+            }}
+          >
+            MODIFICA TUTTE LE PASSWORD
+          </button>
+        </div>
 
         {loading ? (
           <div>Caricamento...</div>
@@ -10237,6 +10660,213 @@ function AdminUsersManager({
           </div>
         )}
       </div>
+
+      {bulkAdminPasswordsOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.42)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 10020,
+            padding: 16,
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            style={{
+              width: "min(900px, 100%)",
+              maxHeight: "88vh",
+              overflow: "hidden",
+              background: "white",
+              borderRadius: 14,
+              boxShadow: "0 18px 50px rgba(15,23,42,.25)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                padding: 16,
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>
+                Modifica tutte le password Admin
+              </h3>
+              <div
+                style={{
+                  marginTop: 5,
+                  color: "#64748b",
+                  fontSize: 13,
+                }}
+              >
+                Modifica tutte le righe che vuoi e poi premi SALVA TUTTE.
+              </div>
+            </div>
+
+            <div
+              style={{
+                overflow: "auto",
+                padding: 14,
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 650,
+                }}
+              >
+                <thead>
+                  <tr>
+                    {["Nome", "Cognome", "Username", "Password"].map(
+                      (label) => (
+                        <th
+                          key={label}
+                          style={{
+                            textAlign: "left",
+                            padding: 8,
+                            borderBottom:
+                              "1px solid #cbd5e1",
+                          }}
+                        >
+                          {label}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {admins.map((admin) => (
+                    <tr key={admin.id}>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        {admin.nome || "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        {admin.cognome || "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        {admin.username}
+                      </td>
+                      <td
+                        style={{
+                          padding: 8,
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                        }}
+                      >
+                        <input
+                          value={
+                            admin.id
+                              ? bulkAdminPasswords[
+                                  Number(admin.id)
+                                ] ?? ""
+                              : ""
+                          }
+                          onChange={(event) => {
+                            if (!admin.id) return;
+                            setBulkAdminPasswords(
+                              (current) => ({
+                                ...current,
+                                [Number(admin.id)]:
+                                  event.target.value,
+                              })
+                            );
+                          }}
+                          placeholder={
+                            admin.password
+                              ? ""
+                              : "Inserisci password"
+                          }
+                          style={{
+                            width: "100%",
+                            minWidth: 180,
+                            padding: 8,
+                            border:
+                              "1px solid #cbd5e1",
+                            borderRadius: 8,
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                padding: 14,
+                borderTop: "1px solid #e2e8f0",
+              }}
+            >
+              <button
+                type="button"
+                disabled={bulkAdminPasswordsSaving}
+                onClick={() =>
+                  setBulkAdminPasswordsOpen(false)
+                }
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #94a3b8",
+                  background: "white",
+                  cursor: "pointer",
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                disabled={bulkAdminPasswordsSaving}
+                onClick={() =>
+                  void saveBulkAdminPasswords()
+                }
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: 0,
+                  background: "#f97316",
+                  color: "white",
+                  cursor: bulkAdminPasswordsSaving
+                    ? "wait"
+                    : "pointer",
+                  fontWeight: 900,
+                }}
+              >
+                {bulkAdminPasswordsSaving
+                  ? "SALVATAGGIO..."
+                  : "SALVA TUTTE"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingAdmin && (
         <div
