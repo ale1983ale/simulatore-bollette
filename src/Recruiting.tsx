@@ -7108,7 +7108,7 @@ export default function Recruiting({
           {[
             ["contacts", "CONTATTI", "CONTATTI"],
             ["external_contacts", "CONTATTI ESTERNI", "ESTERNI"],
-            ["calendar", "CALENDARIO", "CALEND"],
+            ["calendar", "CALENDARIO", "CALENDARIO"],
             ["map", "MAPPA", "MAPPA"],
           ].map(([key, label, mobileLabel]) => (
             <button
