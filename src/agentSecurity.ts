@@ -19,6 +19,7 @@ export type SafeAgentRecord = {
   owner_admin_id?: number | null;
   provvigioni_visible?: boolean;
   password_configured?: boolean;
+  password_changed_at?: string | null;
 };
 
 export async function agentLogin(
