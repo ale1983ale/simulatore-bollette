@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
 import { geocodeItalianZone, ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
+import AgentManagementToolbar from "./AgentManagementToolbar";
 
 type Macroarea = {
   id: string;
@@ -716,6 +717,7 @@ export default function RecruitingManagement() {
           }
         }
       `}</style>
+      <AgentManagementToolbar active="map" />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
           type="button"
