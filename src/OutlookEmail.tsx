@@ -1327,8 +1327,32 @@ export default function OutlookEmail() {
     unresolvedManualSources.length > 0 ||
     splitWarnings.length > 0;
 
+  const openUnifiedAgentFromEmail = () => {
+    setOpen(false);
+    window.dispatchEvent(
+      new CustomEvent("open-unified-agent-create", {
+        detail: {
+          source: "email",
+        },
+      })
+    );
+  };
+
   const renderRecipientEditButtons = () => (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <button
+        type="button"
+        onClick={openUnifiedAgentFromEmail}
+        style={{
+          ...button,
+          background: "#ede9fe",
+          color: "#6b21a8",
+          padding: "7px 11px",
+        }}
+      >
+        + AGGIUNGI AGENTE
+      </button>
+
       {editingRecipients && (
         <button
           onClick={addAgent}
