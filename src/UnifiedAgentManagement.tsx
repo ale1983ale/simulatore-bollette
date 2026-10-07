@@ -1152,8 +1152,16 @@ export default function UnifiedAgentManagement({
               />
               {draft.showOnMap ? "MOSTRA IN MAPPA" : "NON MOSTRARE IN MAPPA"}
             </label>
-            <span style={{ fontSize: 12, color: "#64748b" }}>
-              Stato attuale: {mapActive ? "visibile sulla mappa" : "non visibile sulla mappa"}
+            <span
+              style={{
+                fontSize: 12,
+                color: draft.showOnMap ? "#166534" : "#991b1b",
+                fontWeight: 800,
+              }}
+            >
+              {draft.showOnMap
+                ? "L'agente sarà mostrato sulla mappa"
+                : "L'agente non sarà mostrato sulla mappa"}
             </span>
             {row.recruiting && (
               <button
