@@ -324,6 +324,24 @@ export default function UnifiedAgentManagement({
     void loadAll();
   }, [adminProfile?.id, adminProfile?.role]);
 
+  useEffect(() => {
+    const onRecipientListUpdated = () => {
+      void loadAll();
+    };
+
+    window.addEventListener(
+      "email-recipient-list-updated",
+      onRecipientListUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        "email-recipient-list-updated",
+        onRecipientListUpdated
+      );
+    };
+  }, [adminProfile?.id, adminProfile?.role]);
+
   const emailByAgentId = useMemo(() => {
     const map = new Map<number, EmailRecipient>();
     recipients.forEach((item) => {
