@@ -25,6 +25,7 @@ type HistoryRow = {
   recipient_count: number;
   success_count: number;
   failure_count: number;
+  credentials_included?: boolean;
   status: string;
   error?: string;
   sent_at?: string | null;
@@ -85,6 +86,7 @@ export default function ReportNotificationPanel({
     "Buongiorno,\n\nti ricordo di compilare il Report aggiornato.\n\nGrazie."
   );
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
+  const [includeCredentials, setIncludeCredentials] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -222,12 +224,15 @@ export default function ReportNotificationPanel({
         subject: subject.trim(),
         body: body.trim(),
         selected_emails: selected.map((agent) => agent.email.trim()),
+        include_credentials: includeCredentials,
       });
 
       setNotice(
         `Invio completato: ${Number(data.success_count || 0)} riusciti su ${Number(
           data.recipient_count || selected.length
-        )}${Number(data.failure_count || 0) ? ` · ${data.failure_count} errori` : ""}.`
+        )}${Number(data.failure_count || 0) ? ` · ${data.failure_count} errori` : ""}${
+          includeCredentials ? " · credenziali incluse" : ""
+        }.`
       );
       await loadData();
     } catch (error: any) {
@@ -435,6 +440,62 @@ export default function ReportNotificationPanel({
 
         <div
           style={{
+            marginTop: 12,
+            padding: 12,
+            border: includeCredentials
+              ? "2px solid #fb923c"
+              : "1px solid #e2e8f0",
+            borderRadius: 10,
+            background: includeCredentials
+              ? "#fff7ed"
+              : "#f8fafc",
+          }}
+        >
+          <label
+            style={{
+              display: "flex",
+              gap: 9,
+              alignItems: "flex-start",
+              cursor: "pointer",
+              fontWeight: 900,
+              color: "#0f172a",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={includeCredentials}
+              onChange={(event) =>
+                setIncludeCredentials(event.target.checked)
+              }
+              style={{
+                width: 18,
+                height: 18,
+                marginTop: 1,
+              }}
+            />
+            <span>
+              INCLUDI CREDENZIALI DI ACCESSO
+              <span
+                style={{
+                  display: "block",
+                  marginTop: 4,
+                  color: "#64748b",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  lineHeight: 1.45,
+                }}
+              >
+                Ogni agente riceverà il proprio username e un link personale,
+                valido 72 ore e utilizzabile una sola volta, per impostare o
+                reimpostare la password. La password permanente non viene mai
+                inserita nella mail.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div
+          style={{
             display: "flex",
             gap: 8,
             flexWrap: "wrap",
@@ -513,6 +574,7 @@ export default function ReportNotificationPanel({
                 <th style={{ padding: 7 }}>Oggetto</th>
                 <th style={{ padding: 7 }}>Destinatari</th>
                 <th style={{ padding: 7 }}>Esito</th>
+                <th style={{ padding: 7 }}>Credenziali</th>
                 <th style={{ padding: 7 }}>Azioni</th>
               </tr>
             </thead>
@@ -527,6 +589,17 @@ export default function ReportNotificationPanel({
                   <td style={{ padding: 7 }}>
                     {item.success_count}/{item.recipient_count} inviati
                     {item.failure_count ? ` · ${item.failure_count} errori` : ""}
+                  </td>
+                  <td
+                    style={{
+                      padding: 7,
+                      fontWeight: 800,
+                      color: item.credentials_included
+                        ? "#c2410c"
+                        : "#64748b",
+                    }}
+                  >
+                    {item.credentials_included ? "SÌ" : "NO"}
                   </td>
                   <td style={{ padding: 7 }}>
                     <button
@@ -550,7 +623,7 @@ export default function ReportNotificationPanel({
               ))}
               {!history.length && (
                 <tr>
-                  <td colSpan={5} style={{ padding: 14, color: "#64748b" }}>
+                  <td colSpan={6} style={{ padding: 14, color: "#64748b" }}>
                     Nessun invio registrato.
                   </td>
                 </tr>
