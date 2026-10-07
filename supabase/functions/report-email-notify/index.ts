@@ -248,15 +248,20 @@ function buildEmail(
     <div style="max-width:680px;margin:0 auto">
       <div style="font-size:22px;font-weight:800;color:#0f2d69;margin-bottom:18px">+ENERGIA · REPORT</div>
       <div style="font-size:15px">${messageHtml}</div>
-      ${credentialsHtml}
-      <p style="margin:24px 0">
-        <a href="${REPORT_URL}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 18px;border-radius:9px;font-weight:800">
+
+      <div style="margin:22px 0 10px 0">
+        <a href="${REPORT_URL}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:underline;padding:14px 22px;border-radius:9px;font-weight:900;font-size:20px;letter-spacing:.2px">
           COMPILA IL REPORT
         </a>
-      </p>
-      <p style="color:#64748b;font-size:12px">
+      </div>
+
+      <p style="margin:0 0 28px 0;color:#64748b;font-size:12px">
         Il pulsante apre direttamente l'area Report. Se non sei già autenticato, effettua l'accesso agente e verrai portato al Report.
       </p>
+
+      <div style="margin-top:30px;padding-top:18px;border-top:1px solid #e2e8f0">
+        ${credentialsHtml}
+      </div>
     </div>
   </body>
 </html>`.trim();
