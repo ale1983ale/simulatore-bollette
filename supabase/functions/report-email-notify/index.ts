@@ -38,6 +38,25 @@ function isValidEmail(value: unknown) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function normalizePersonName(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLocaleUpperCase("it")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function randomToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return bytesToBase64(bytes)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
 function hasScope(scope: unknown, required: string) {
   return String(scope || "")
     .split(/\s+/)
@@ -198,8 +217,30 @@ async function refreshGoogleToken(adminId: number, force = false) {
   return String(payload.access_token);
 }
 
-function buildEmail(recipient: string, subject: string, body: string) {
+function buildEmail(
+  recipient: string,
+  subject: string,
+  body: string,
+  credentials?: { username: string; setupUrl: string } | null
+) {
   const messageHtml = escapeHtml(body).replace(/\r?\n/g, "<br>");
+  const credentialsHtml = credentials
+    ? `
+      <div style="margin:22px 0;padding:15px;border:1px solid #fed7aa;border-radius:10px;background:#fff7ed">
+        <div style="font-weight:900;color:#9a3412;margin-bottom:7px">CREDENZIALI AREA REPORT</div>
+        <div>Username: <strong>${escapeHtml(credentials.username)}</strong></div>
+        <div style="margin-top:10px">
+          <a href="${escapeHtml(credentials.setupUrl)}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:800">
+            IMPOSTA / REIMPOSTA PASSWORD
+          </a>
+        </div>
+        <div style="margin-top:8px;color:#78716c;font-size:12px">
+          Link personale valido 72 ore e utilizzabile una sola volta.
+        </div>
+      </div>
+    `
+    : "";
+
   const html = `
 <!doctype html>
 <html>
@@ -207,6 +248,7 @@ function buildEmail(recipient: string, subject: string, body: string) {
     <div style="max-width:680px;margin:0 auto">
       <div style="font-size:22px;font-weight:800;color:#0f2d69;margin-bottom:18px">+ENERGIA · REPORT</div>
       <div style="font-size:15px">${messageHtml}</div>
+      ${credentialsHtml}
       <p style="margin:24px 0">
         <a href="${REPORT_URL}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 18px;border-radius:9px;font-weight:800">
           COMPILA IL REPORT
@@ -237,9 +279,15 @@ async function sendOne(
   recipient: string,
   subject: string,
   body: string,
-  accessToken: string
+  accessToken: string,
+  credentials?: { username: string; setupUrl: string } | null
 ) {
-  const raw = buildEmail(recipient, subject, body);
+  const raw = buildEmail(
+    recipient,
+    subject,
+    body,
+    credentials
+  );
 
   let response = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -287,17 +335,47 @@ async function getReportRecipients(admin: any) {
     `${admin.id}|${String(admin.username).trim().toLowerCase()}|email-recipient-sync-v2`
   );
 
-  const { data, error } = await db
-    .from("email_recipient_lists")
-    .select("recipients")
-    .eq("owner_key", ownerKey)
-    .maybeSingle();
+  const [{ data, error }, agentsResult] = await Promise.all([
+    db
+      .from("email_recipient_lists")
+      .select("recipients")
+      .eq("owner_key", ownerKey)
+      .maybeSingle(),
+    db
+      .from("agents")
+      .select("id,nome,cognome,username,owner_admin_id")
+      .order("nome", { ascending: true }),
+  ]);
 
   if (error) throw error;
+  if (agentsResult.error) throw agentsResult.error;
+
+  const agentRows = Array.isArray(agentsResult.data)
+    ? agentsResult.data
+    : [];
+  const agentsById = new Map<number, any>();
+  const agentsByName = new Map<string, any>();
+
+  for (const agent of agentRows) {
+    const id = Number(agent?.id || 0);
+    if (id) agentsById.set(id, agent);
+
+    const key = normalizePersonName(
+      `${String(agent?.nome || "")} ${String(agent?.cognome || "")}`
+    );
+    if (key && !agentsByName.has(key)) {
+      agentsByName.set(key, agent);
+    }
+  }
 
   const raw = Array.isArray(data?.recipients) ? data.recipients : [];
   const seen = new Set<string>();
-  const recipients: Array<{ agenzia: string; email: string }> = [];
+  const recipients: Array<{
+    agenzia: string;
+    email: string;
+    agent_id: number | null;
+    username: string;
+  }> = [];
 
   for (const item of raw) {
     const email = String(item?.email || "").trim();
@@ -305,14 +383,62 @@ async function getReportRecipients(admin: any) {
     if (item?.report_notify !== true || !isValidEmail(email) || seen.has(key)) {
       continue;
     }
+
+    const agenzia = String(item?.agenzia || "").trim();
+    const explicitAgentId = Number(item?.agent_id || 0);
+    const matchedAgent =
+      (explicitAgentId
+        ? agentsById.get(explicitAgentId)
+        : null) ||
+      agentsByName.get(normalizePersonName(agenzia)) ||
+      null;
+
     seen.add(key);
     recipients.push({
-      agenzia: String(item?.agenzia || "").trim(),
+      agenzia,
       email,
+      agent_id: matchedAgent?.id
+        ? Number(matchedAgent.id)
+        : null,
+      username: String(matchedAgent?.username || ""),
     });
   }
 
   return recipients;
+}
+
+async function createAgentSetupLink(
+  adminId: number,
+  agentId: number
+) {
+  const token = randomToken();
+  const tokenHash = await sha256Hex(token);
+
+  await db
+    .from("agent_password_reset_tokens")
+    .delete()
+    .eq("agent_id", agentId)
+    .is("used_at", null);
+
+  const expiresAt = new Date(
+    Date.now() + 72 * 60 * 60 * 1000
+  ).toISOString();
+
+  const { error } = await db
+    .from("agent_password_reset_tokens")
+    .insert({
+      token_hash: tokenHash,
+      agent_id: agentId,
+      created_by_admin_id: adminId,
+      expires_at: expiresAt,
+    });
+
+  if (error) throw error;
+
+  return {
+    tokenHash,
+    setupUrl: `${APP_ORIGIN}/?agent-reset=${encodeURIComponent(token)}`,
+  };
 }
 
 async function listData(adminId: number) {
@@ -325,7 +451,7 @@ async function listData(adminId: number) {
         .order("updated_at", { ascending: false }),
       db
         .from("report_notification_history")
-        .select("id,template_id,subject,body,recipients,recipient_count,success_count,failure_count,status,error,sent_at,created_at")
+        .select("id,template_id,subject,body,recipients,recipient_count,success_count,failure_count,credentials_included,status,error,sent_at,created_at")
         .eq("admin_id", adminId)
         .order("created_at", { ascending: false })
         .limit(50),
@@ -436,6 +562,7 @@ Deno.serve(async (req: Request) => {
       const subject = String(body?.subject || "").trim();
       const message = String(body?.body || "").trim();
       const templateId = Number(body?.template_id || 0) || null;
+      const includeCredentials = body?.include_credentials === true;
       const requested = Array.isArray(body?.selected_emails)
         ? body.selected_emails.map((value: unknown) => String(value || "").trim().toLowerCase())
         : [];
@@ -457,18 +584,62 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      if (includeCredentials) {
+        const missingAccounts = recipients.filter(
+          (item) => !item.agent_id || !item.username
+        );
+
+        if (missingAccounts.length) {
+          return json(
+            {
+              ok: false,
+              error:
+                "Non riesco ad associare un account Report a: " +
+                missingAccounts
+                  .map((item) => item.agenzia || item.email)
+                  .join(", ") +
+                ". Verifica che il nome nel Controllo abbinamento email corrisponda al nome e cognome dell'agente.",
+            },
+            400
+          );
+        }
+      }
+
       let accessToken = await refreshGoogleToken(adminId);
       const successful: Array<{ agenzia: string; email: string; gmail_message_id: string }> = [];
       const failed: Array<{ agenzia: string; email: string; error: string }> = [];
 
       for (const recipient of recipients) {
+        let resetTokenHash = "";
+
         try {
+          let credentials:
+            | { username: string; setupUrl: string }
+            | null = null;
+
+          if (
+            includeCredentials &&
+            recipient.agent_id &&
+            recipient.username
+          ) {
+            const reset = await createAgentSetupLink(
+              adminId,
+              recipient.agent_id
+            );
+            resetTokenHash = reset.tokenHash;
+            credentials = {
+              username: recipient.username,
+              setupUrl: reset.setupUrl,
+            };
+          }
+
           const sent = await sendOne(
             adminId,
             recipient.email,
             subject,
             message,
-            accessToken
+            accessToken,
+            credentials
           );
           accessToken = sent.accessToken;
           successful.push({
@@ -476,6 +647,13 @@ Deno.serve(async (req: Request) => {
             gmail_message_id: sent.gmailMessageId,
           });
         } catch (error: any) {
+          if (resetTokenHash) {
+            await db
+              .from("agent_password_reset_tokens")
+              .delete()
+              .eq("token_hash", resetTokenHash);
+          }
+
           failed.push({
             ...recipient,
             error: String(error?.message || error).slice(0, 500),
@@ -506,11 +684,12 @@ Deno.serve(async (req: Request) => {
           recipient_count: recipients.length,
           success_count: successful.length,
           failure_count: failed.length,
+          credentials_included: includeCredentials,
           status,
           error: failed.map((item) => `${item.email}: ${item.error}`).join(" | ").slice(0, 3000),
           sent_at: sentAt,
         })
-        .select("id,template_id,subject,body,recipients,recipient_count,success_count,failure_count,status,error,sent_at,created_at")
+        .select("id,template_id,subject,body,recipients,recipient_count,success_count,failure_count,credentials_included,status,error,sent_at,created_at")
         .single();
 
       if (historyError) throw historyError;
@@ -521,6 +700,7 @@ Deno.serve(async (req: Request) => {
         recipient_count: recipients.length,
         success_count: successful.length,
         failure_count: failed.length,
+        credentials_included: includeCredentials,
         successful,
         failed,
         history,
