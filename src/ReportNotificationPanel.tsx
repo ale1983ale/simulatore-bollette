@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabaseAnonKey, supabaseUrl } from "./supabase";
 
-type ReportAgentRecipient = {
+export type ReportAgentRecipient = {
   agenzia: string;
   email: string;
   report_notify?: boolean;
+  agent_id?: number | null;
+  username?: string;
 };
 
 type TemplateRow = {
@@ -70,6 +72,7 @@ async function callReportApi(action: string, payload: Record<string, unknown> = 
 
 export default function ReportNotificationPanel({
   agents = [],
+  initialSelectedAgentIds = null,
   dirty = false,
   onOpenMatches = () => {
     window.dispatchEvent(
@@ -80,6 +83,7 @@ export default function ReportNotificationPanel({
   },
 }: {
   agents?: ReportAgentRecipient[];
+  initialSelectedAgentIds?: number[] | null;
   dirty?: boolean;
   onOpenMatches?: () => void;
 }) {
@@ -112,9 +116,46 @@ export default function ReportNotificationPanel({
       });
   }, [effectiveAgents]);
 
+  const initialSelectedAgentIdsKey = Array.isArray(initialSelectedAgentIds)
+    ? [...initialSelectedAgentIds]
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .sort((a, b) => a - b)
+        .join("|")
+    : "";
+
   useEffect(() => {
-    setSelectedEmails(new Set(eligible.map((agent) => agent.email.trim().toLowerCase())));
-  }, [eligible.map((agent) => agent.email.trim().toLowerCase()).join("|")]);
+    if (Array.isArray(initialSelectedAgentIds)) {
+      const wantedAgentIds = new Set(
+        initialSelectedAgentIds
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      );
+
+      setSelectedEmails(
+        new Set(
+          eligible
+            .filter(
+              (agent) =>
+                Number(agent.agent_id || 0) > 0 &&
+                wantedAgentIds.has(Number(agent.agent_id))
+            )
+            .map((agent) => agent.email.trim().toLowerCase())
+        )
+      );
+      return;
+    }
+
+    setSelectedEmails(
+      new Set(
+        eligible.map((agent) => agent.email.trim().toLowerCase())
+      )
+    );
+  }, [
+    eligible.map((agent) => agent.email.trim().toLowerCase()).join("|"),
+    initialSelectedAgentIdsKey,
+    Array.isArray(initialSelectedAgentIds),
+  ]);
 
   const loadData = async () => {
     setBusy(true);
@@ -129,6 +170,8 @@ export default function ReportNotificationPanel({
               agenzia: String(item?.agenzia || ""),
               email: String(item?.email || ""),
               report_notify: true,
+              agent_id: item?.agent_id ? Number(item.agent_id) : null,
+              username: String(item?.username || ""),
             }))
           : []
       );
