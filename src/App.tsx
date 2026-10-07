@@ -13894,16 +13894,6 @@ const renderAdminContent = () => {
             <button onClick={() => setTab("personale")} style={{ ...baseBtn, ...(tab === "personale" ? activeBtn : {}) }}>PERSONALE</button>
           )}
           <button onClick={() => setTab("reportAdmin")} style={{ ...baseBtn, ...(tab === "reportAdmin" ? activeBtn : {}) }}>REPORT ADMIN</button>
-          {hasFullAdminAccess && (
-            <button
-              onClick={openOutlookEmailMatches}
-              style={baseBtn}
-            >
-              CONTROLLO ABBINAMENTO EMAIL
-            </button>
-          )}
-          {hasFullAdminAccess && <button onClick={() => setTab("agents")} style={{ ...baseBtn, ...(databaseAdminTabs.includes(tab) ? activeBtn : {}) }}>IMPOSTAZIONI LOGIN</button>}
-
 {(agentSession || adminSession) && (
   <button
     onClick={() => {
@@ -13953,7 +13943,17 @@ const renderAdminContent = () => {
               ...(tab === "agents" ? activeBtn : {}),
             }}
           >
-            Agent Admin
+            IMPOSTAZIONI LOGIN
+          </button>
+
+          <button
+            onClick={openOutlookEmailMatches}
+            style={{
+              ...baseBtn,
+              padding: "9px 14px",
+            }}
+          >
+            CONTROLLO ABBINAMENTO EMAIL
           </button>
 
           <button
