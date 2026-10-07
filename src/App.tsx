@@ -12969,6 +12969,40 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  useEffect(() => {
+    const onOpenUnifiedAgentCreate = (event: Event) => {
+      const detail = (
+        event as CustomEvent<Record<string, unknown>>
+      ).detail || {};
+
+      try {
+        sessionStorage.setItem(
+          "unified_agent_create_prefill",
+          JSON.stringify(detail)
+        );
+      } catch {
+        // La navigazione funziona comunque.
+      }
+
+      window.dispatchEvent(new Event("close-outlook-email"));
+      setAdminMenuOpen(false);
+      setTab("agentManagement");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.addEventListener(
+      "open-unified-agent-create",
+      onOpenUnifiedAgentCreate as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "open-unified-agent-create",
+        onOpenUnifiedAgentCreate as EventListener
+      );
+    };
+  }, []);
+
   const openDatabaseSettings = () => {
     window.dispatchEvent(new Event("close-outlook-email"));
     setAdminMenuOpen(false);
