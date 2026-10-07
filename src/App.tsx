@@ -13047,6 +13047,40 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const onOpenAgentManagementRecord = (event: Event) => {
+      const detail = (
+        event as CustomEvent<Record<string, unknown>>
+      ).detail || {};
+
+      try {
+        sessionStorage.setItem(
+          "agent_management_open_target",
+          JSON.stringify(detail)
+        );
+      } catch {
+        // La navigazione resta comunque disponibile.
+      }
+
+      window.dispatchEvent(new Event("close-outlook-email"));
+      setAdminMenuOpen(false);
+      setTab("agentManagement");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.addEventListener(
+      "open-agent-management-record",
+      onOpenAgentManagementRecord as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "open-agent-management-record",
+        onOpenAgentManagementRecord as EventListener
+      );
+    };
+  }, []);
+
   const openDatabaseSettings = () => {
     window.dispatchEvent(new Event("close-outlook-email"));
     setAdminMenuOpen(false);
