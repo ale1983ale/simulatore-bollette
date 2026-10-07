@@ -6090,7 +6090,7 @@ export default function Recruiting({
             layer.bindTooltip(provinceLabel, {
               permanent: mapMode === "region",
               direction: "center",
-              opacity: mapMode === "region" ? 0.42 : 0.5,
+              opacity: mapMode === "region" ? 0.9 : 0.82,
               interactive: false,
               pane: "overlayPane",
               className: "recruiting-map-province-label",
@@ -6133,7 +6133,7 @@ export default function Recruiting({
         layer.bindTooltip(regionName, {
           permanent: true,
           direction: "center",
-          opacity: 0.38,
+          opacity: 0.82,
           interactive: false,
           pane: "overlayPane",
           className: "recruiting-map-region-label",
@@ -6183,7 +6183,7 @@ export default function Recruiting({
           className: "",
           html: `<div style="white-space:nowrap;font-size:${
             mapMode === "region" ? 11 : 9
-          }px;font-weight:${city.primary ? 900 : 700};color:rgba(51,65,85,.42);opacity:.62;text-shadow:0 1px 0 rgba(255,255,255,.65);">• ${escapeHtml(
+          }px;font-weight:${city.primary ? 900 : 700};color:#000000;opacity:.9;text-shadow:0 1px 0 rgba(255,255,255,.8);">• ${escapeHtml(
             city.name
           )}</div>`,
           iconSize: [90, 18],
@@ -6682,8 +6682,8 @@ export default function Recruiting({
           background: rgba(255, 255, 255, 0.48);
           border-color: rgba(100, 116, 139, 0.16);
           box-shadow: none;
-          color: rgba(51, 65, 85, 0.52);
-          font-weight: 650;
+          color: #000000;
+          font-weight: 700;
           pointer-events: none;
         }
 
