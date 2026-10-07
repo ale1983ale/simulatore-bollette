@@ -762,13 +762,6 @@ export default function UnifiedAgentManagement({
 
     if (item.login) {
       const id = Number(item.login.id);
-      const row = {
-        agent: item.login,
-        fullName: item.fullName,
-        email: item.email,
-        recruiting: item.recruiting,
-      };
-
       setSearch("");
       setCreateOpen(false);
       setExpandedId(id);
