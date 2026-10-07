@@ -12921,6 +12921,54 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const openNewAgentFromRecruiting = (candidate: {
+    id: string;
+    fullName: string;
+    phone: string;
+    email: string;
+    operationalZone: string;
+    provinceCode: string;
+    region: string;
+    contactScope: "internal" | "external";
+  }) => {
+    const payload = {
+      sourceCandidateId: candidate.id,
+      sourceScope: candidate.contactScope,
+      fullName: String(candidate.fullName || "")
+        .trim()
+        .toLocaleUpperCase("it"),
+      phone: String(candidate.phone || "").trim(),
+      email: String(candidate.email || "").trim(),
+      zone: String(
+        candidate.operationalZone ||
+          candidate.region ||
+          ""
+      )
+        .trim()
+        .toLocaleUpperCase("it"),
+      region: String(candidate.region || "")
+        .trim()
+        .toLocaleUpperCase("it"),
+      provinceCode: String(candidate.provinceCode || "")
+        .trim()
+        .toLocaleUpperCase("it"),
+    };
+
+    try {
+      sessionStorage.setItem(
+        "unified_agent_create_prefill",
+        JSON.stringify(payload)
+      );
+    } catch {
+      // Il passaggio funziona comunque anche se lo storage non è disponibile.
+    }
+
+    window.dispatchEvent(new Event("close-outlook-email"));
+    setAdminMenuOpen(false);
+    setTab("agentManagement");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const openDatabaseSettings = () => {
     window.dispatchEvent(new Event("close-outlook-email"));
     setAdminMenuOpen(false);
@@ -14366,6 +14414,7 @@ const renderAdminContent = () => {
             hideNavigation
             onOpenContact={openRecruitingContactFromCalendar}
             onOpenAppointment={openAppointmentFromCalendar}
+            onAddToAgents={openNewAgentFromRecruiting}
           />
         </div>
       )}
@@ -14406,13 +14455,17 @@ const renderAdminContent = () => {
           <Recruiting
             key={`recruiting-${recruitingEntrySection}`}
             initialSection={recruitingEntrySection}
+            onAddToAgents={openNewAgentFromRecruiting}
           />
         </div>
       )}
 
       {tab === "recruitingWaiting" && (
         <div style={{ width: "100%", minWidth: 0 }}>
-          <Recruiting initialSection="hr_notes" />
+          <Recruiting
+            initialSection="hr_notes"
+            onAddToAgents={openNewAgentFromRecruiting}
+          />
         </div>
       )}
 
@@ -14490,7 +14543,11 @@ const renderAdminContent = () => {
 
       {tab === "recruitingCrm" && (
         <div style={{ width: "100%", minWidth: 0 }}>
-          <Recruiting initialSection="crm_management" hideNavigation />
+          <Recruiting
+            initialSection="crm_management"
+            hideNavigation
+            onAddToAgents={openNewAgentFromRecruiting}
+          />
         </div>
       )}
 
