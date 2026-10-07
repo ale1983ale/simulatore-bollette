@@ -2414,7 +2414,7 @@ export default function UnifiedAgentManagement({
           </button>
         </div>
 
-        {branchDiscrepancies.length > 0 && (
+        {activeDiscrepancies.length > 0 && (
           <div
             style={{
               marginTop: 10,
@@ -2428,7 +2428,8 @@ export default function UnifiedAgentManagement({
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 950 }}>
-              ⚠️ {branchDiscrepancies.length} AGENTI NON SONO ALLINEATI IN TUTTI E 3 I RAMI
+              ⚠️ {activeDiscrepancies.length} AGENTI NON SONO
+              ALLINEATI IN TUTTI E 3 I RAMI
             </div>
             <div style={{ marginTop: 4, color: "#7c2d12" }}>
               LOGIN · ABBINAMENTO EMAIL · MAPPE / AGENTI ATTIVI
@@ -2442,9 +2443,9 @@ export default function UnifiedAgentManagement({
                 marginTop: 10,
               }}
             >
-              {branchDiscrepancies.map((item) => (
+              {activeDiscrepancies.map((item) => (
                 <div
-                  key={item.key}
+                  key={discrepancyArchiveKey(item)}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -2469,6 +2470,21 @@ export default function UnifiedAgentManagement({
                     title="Apri direttamente la prima scheda mancante"
                   >
                     {item.fullName || "AGENTE SENZA NOME"} →
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => archiveDiscrepancy(item)}
+                    style={{
+                      ...buttonStyle,
+                      padding: "4px 7px",
+                      fontSize: 10,
+                      background: "#f1f5f9",
+                      color: "#475569",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  >
+                    ARCHIVIA AVVISO
                   </button>
 
                   {item.missing.map((branch) => (
@@ -2513,8 +2529,129 @@ export default function UnifiedAgentManagement({
             </div>
 
             <div style={{ marginTop: 8, fontWeight: 700 }}>
-              Clicca il nome oppure direttamente il ramo mancante per aprire la scheda da compilare.
+              Clicca il nome oppure direttamente il ramo mancante
+              per aprire la scheda da compilare.
             </div>
+          </div>
+        )}
+
+        {archivedDiscrepancies.length > 0 && (
+          <div
+            style={{
+              marginTop: 10,
+              border: "1px solid #cbd5e1",
+              borderRadius: 10,
+              overflow: "hidden",
+              background: "#f8fafc",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setArchivedAlertsOpen((current) => !current)
+              }
+              style={{
+                width: "100%",
+                border: 0,
+                background: "#e2e8f0",
+                color: "#334155",
+                padding: "9px 11px",
+                textAlign: "left",
+                fontWeight: 950,
+                cursor: "pointer",
+              }}
+            >
+              {archivedAlertsOpen ? "▼" : "▶"} AVVISI ARCHIVIATI (
+              {archivedDiscrepancies.length})
+            </button>
+
+            {archivedAlertsOpen && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 7,
+                  padding: 10,
+                }}
+              >
+                {archivedDiscrepancies.map((item) => (
+                  <div
+                    key={discrepancyArchiveKey(item)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                      flexWrap: "wrap",
+                      background: "white",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 9,
+                      padding: "7px 8px",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openDiscrepancy(item)}
+                      style={{
+                        ...buttonStyle,
+                        padding: "5px 8px",
+                        background: "#f8fafc",
+                        color: "#475569",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {item.fullName || "AGENTE SENZA NOME"} →
+                    </button>
+
+                    {item.missing.map((branch) => (
+                      <span
+                        key={branch}
+                        style={{
+                          padding: "4px 7px",
+                          borderRadius: 7,
+                          fontSize: 10,
+                          fontWeight: 900,
+                          background:
+                            branch === "login"
+                              ? "#dcfce7"
+                              : branch === "email"
+                                ? "#e0f2fe"
+                                : "#ffedd5",
+                          color:
+                            branch === "login"
+                              ? "#166534"
+                              : branch === "email"
+                                ? "#075985"
+                                : "#9a3412",
+                        }}
+                      >
+                        MANCA{" "}
+                        {branch === "login"
+                          ? "LOGIN"
+                          : branch === "email"
+                            ? "ABBINAMENTO EMAIL"
+                            : "MAPPE / AGENTI ATTIVI"}
+                      </span>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={() => restoreDiscrepancy(item)}
+                      style={{
+                        ...buttonStyle,
+                        marginLeft: "auto",
+                        padding: "4px 7px",
+                        fontSize: 10,
+                        background: "#dbeafe",
+                        color: "#1d4ed8",
+                        border: "1px solid #93c5fd",
+                      }}
+                    >
+                      RIPRISTINA AVVISO
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
