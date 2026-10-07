@@ -389,11 +389,18 @@ export default function OutlookEmail() {
         }>
       ).detail;
       const requestedView = detail?.view;
-      const requestedAgency = String(
-        detail?.targetAgency || ""
-      ).trim();
+      const rawTargetAgency = detail?.targetAgency;
+      const requestedAgency =
+        typeof rawTargetAgency === "string"
+          ? rawTargetAgency.trim()
+          : "";
+      const safeRequestedAgency =
+        requestedAgency &&
+        !/^\[object\s+object\]$/i.test(requestedAgency)
+          ? requestedAgency
+          : "";
 
-      setTargetMatchAgency(requestedAgency);
+      setTargetMatchAgency(safeRequestedAgency);
       setActiveView(
         requestedView === "matches"
           ? "matches"
@@ -582,7 +589,7 @@ export default function OutlookEmail() {
       const rows = (await response.json()) as Array<{ recipients?: unknown; updated_at?: string }>;
       const row = rows[0];
       const saved = Array.isArray(row?.recipients) ? row.recipients : [];
-      const cleaned = saved
+      const mapped = saved
         .map((item: any) => ({
           agenzia: String(item?.agenzia || ""),
           email: String(item?.email || ""),
@@ -597,11 +604,35 @@ export default function OutlookEmail() {
           (item) =>
             item.agenzia || item.email || item.allegato || item.dm
         );
+
+      const malformedRows = mapped.filter((item) =>
+        /^\[object\s+object\]$/i.test(
+          String(item.agenzia || "").trim()
+        )
+      );
+      const cleaned = mapped.filter(
+        (item) =>
+          !/^\[object\s+object\]$/i.test(
+            String(item.agenzia || "").trim()
+          )
+      );
+
       setAgents(cleaned);
       setRemovedRows(new Set());
-      setDirty(false);
+      setDirty(malformedRows.length > 0);
       setSavedAt(row?.updated_at || null);
-      if (showMessage) setNotice(cleaned.length ? `Caricati ${cleaned.length} nominativi salvati online.` : "Nessun nominativo salvato online.");
+
+      if (malformedRows.length > 0) {
+        setNotice(
+          "Rimossa automaticamente una riga anomala [OBJECT OBJECT]. Premi SALVA ELENCO ONLINE per confermare la cancellazione."
+        );
+      } else if (showMessage) {
+        setNotice(
+          cleaned.length
+            ? `Caricati ${cleaned.length} nominativi salvati online.`
+            : "Nessun nominativo salvato online."
+        );
+      }
     } catch (error: any) {
       setNotice(`Salvataggio online: ${error?.message || error}`);
     } finally {
@@ -650,6 +681,7 @@ export default function OutlookEmail() {
       !open ||
       activeView !== "matches" ||
       !targetMatchAgency ||
+      /^\[object\s+object\]$/i.test(targetMatchAgency) ||
       !agents.length
     ) {
       return;
@@ -1169,9 +1201,27 @@ export default function OutlookEmail() {
   };
 
   const deleteAgent = (index: number) => {
-    setAgents((current) => current.filter((_, i) => i !== index));
+    const deletedAgency = String(
+      agents[index]?.agenzia || ""
+    ).trim();
+
+    if (
+      targetMatchAgency &&
+      normalize(deletedAgency) === normalize(targetMatchAgency)
+    ) {
+      setTargetMatchAgency("");
+    }
+
+    setAgents((current) =>
+      current.filter((_, i) => i !== index)
+    );
     setRemovedRows(new Set());
     setDirty(true);
+    setNotice(
+      deletedAgency
+        ? `${deletedAgency.toLocaleUpperCase("it")}: riga eliminata. Premi SALVA ELENCO ONLINE per confermare.`
+        : "Riga eliminata. Premi SALVA ELENCO ONLINE per confermare."
+    );
   };
 
   const addAgent = () => {
