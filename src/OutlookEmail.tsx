@@ -630,6 +630,9 @@ export default function OutlookEmail() {
       if (!response.ok) throw new Error(await response.text());
       setDirty(false);
       setSavedAt(now);
+      window.dispatchEvent(
+        new Event("email-recipient-list-updated")
+      );
       setNotice(`Elenco salvato online: ${recipients.length} nominativi.`);
     } catch (error: any) {
       setNotice(`Impossibile salvare l'elenco: ${error?.message || error}`);
