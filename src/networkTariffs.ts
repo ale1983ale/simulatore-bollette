@@ -267,16 +267,45 @@ export async function fetchNetworkTariffRows(force = false): Promise<{
   // Only server-side vetted and approved overrides can replace static rates.
   // RLS exposes overrides as read-only: the browser cannot update amounts.
   const baseRows = rows.length ? rows : INITIAL_NETWORK_TARIFF_ROWS;
-  const [approved, audit] = await Promise.all([
+  const [approved, audit, automaticDomestic] = await Promise.all([
     supabase.from("network_tariff_verified_overrides")
       .select("mese,tipo,quota_fissa_annua,quota_potenza_annua,quota_energia,source_url,batch_id"),
     supabase.from("network_tariff_audit_log")
       .select("checked_at,status,warnings,period").order("checked_at", { ascending: false }).limit(1),
+    supabase.from("network_domestic_auto_rates")
+      .select("mese,tipo,anno,mese_numero,quota_fissa_annua,quota_potenza_annua,quota_energia,source_url"),
   ]);
   const warnings: string[] = Array.isArray(payload?.warnings)
     ? payload.warnings.map(String) : [];
   if (approved.error) warnings.push("Tariffe approvate non accessibili: restano i dati di riferimento.");
   if (audit.error) warnings.push("Storico controlli ARERA momentaneamente non accessibile.");
+  if (automaticDomestic.error) warnings.push("Archivio dati ARERA domestici momentaneamente non accessibile.");
+  const officialAuto = new Map<string, NetworkTariffRow>();
+  for(const item of automaticDomestic.data || []){
+    const tipo=String(item.tipo||"").toUpperCase();
+    const mese=String(item.mese||"").toUpperCase();
+    const anno=Number(item.anno), meseNumero=Number(item.mese_numero);
+    const quotaFissaAnnua=Number(item.quota_fissa_annua);
+    const quotaPotenzaAnnua=Number(item.quota_potenza_annua);
+    const quotaEnergia=Number(item.quota_energia);
+    if(
+      !["RESIDENTE","NON RESIDENTE","RESIDENTE CANONE ESENTE"].includes(tipo) ||
+      anno<2025 || anno>2100 || meseNumero<1 || meseNumero>12 ||
+      mese!==MONTHS[meseNumero-1]+" "+anno ||
+      String(item.source_url||"")!==
+        "https://www.arera.it/fileadmin/area_operatori/prezzi_e_tariffe/Corrispettivi_libero_elettrico_domestico_2026.xlsx" ||
+      ![quotaFissaAnnua,quotaPotenzaAnnua,quotaEnergia].every(Number.isFinite) ||
+      quotaFissaAnnua<0 || quotaFissaAnnua>500 ||
+      quotaPotenzaAnnua<0 || quotaPotenzaAnnua>200 ||
+      quotaEnergia<0.005 || quotaEnergia>0.3
+    )continue;
+    officialAuto.set(mese+"|"+tipo,{
+      mese,tipo,anno,meseNumero,quotaFissaAnnua,
+      quotaPotenzaAnnua,quotaEnergia,
+      source:String(item.source_url),
+      status:"VALORI ARERA SINCRONIZZATI AUTOMATICAMENTE",
+    });
+  }
   const overrides = new Map<string, NetworkTariffRow>();
   for (const item of approved.data || []) {
     const tipo = String(item.tipo || "").toUpperCase();
@@ -309,13 +338,16 @@ export async function fetchNetworkTariffRows(force = false): Promise<{
     });
   }
   const mergedRows = baseRows.map((row) =>
-    overrides.get(row.mese + "|" + row.tipo) || {
-      ...row, status: "BASE DA VERIFICARE",
-    }
+    overrides.get(row.mese + "|" + row.tipo) ||
+    officialAuto.get(row.mese + "|" + row.tipo) ||
+    (row.status === "AGGIORNATO DA PROSPETTO ARERA"
+      ? row : { ...row, status: "BASE DA VERIFICARE" })
   );
-  for (const [key, override] of overrides.entries()) {
-    if (!baseRows.some((row) => row.mese + "|" + row.tipo === key)) {
-      mergedRows.push(override);
+  for (const candidate of [officialAuto,overrides]) {
+    for (const [key, override] of candidate.entries()) {
+      if (!mergedRows.some((row) => row.mese + "|" + row.tipo === key)) {
+        mergedRows.push(override);
+      }
     }
   }
   const latest = (audit.data || [])[0];
@@ -325,8 +357,10 @@ export async function fetchNetworkTariffRows(force = false): Promise<{
     meta: {
       checkedAt: String(latest?.checked_at || payload?.checkedAt || new Date().toISOString()),
       sourceStatus: overrides.size
-        ? "PROSPETTI APPROVATI + BASE STORICA"
-        : "BASE STORICA NON CONVALIDATA AUTOMATICAMENTE",
+        ? "PROSPETTI APPROVATI + ALTRI DATI"
+        : (officialAuto.size || baseRows.some((row) => row.status === "AGGIORNATO DA PROSPETTO ARERA"))
+          ? "DOMESTICI ARERA AUTOAGGIORNATI, BTA/MTA DA VERIFICARE"
+          : "BASE STORICA NON CONVALIDATA AUTOMATICAMENTE",
       auditStatus: String(latest?.status || "non_eseguito"),
       auditCheckedAt: String(latest?.checked_at || ""),
       approvedCount: overrides.size,
