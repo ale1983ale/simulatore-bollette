@@ -1,3 +1,5 @@
+import { supabase } from "./supabase";
+
 export type NetworkTariffRow = {
   mese: string;
   anno: number;
@@ -14,6 +16,9 @@ export type NetworkTariffMeta = {
   checkedAt: string;
   sourceStatus: string;
   warnings: string[];
+  auditStatus?: string;
+  auditCheckedAt?: string;
+  approvedCount?: number;
 };
 
 type Triple = [number, number, number];
@@ -259,14 +264,60 @@ export async function fetchNetworkTariffRows(force = false): Promise<{
         )
     : [];
 
+  // Only server-side vetted and approved overrides can replace static rates.
+  // RLS exposes overrides as read-only: the browser cannot update amounts.
+  const baseRows = rows.length ? rows : INITIAL_NETWORK_TARIFF_ROWS;
+  const [approved, audit] = await Promise.all([
+    supabase.from("network_tariff_verified_overrides")
+      .select("mese,tipo,quota_fissa_annua,quota_potenza_annua,quota_energia,source_url,batch_id"),
+    supabase.from("network_tariff_audit_log")
+      .select("checked_at,status,warnings,period").order("checked_at", { ascending: false }).limit(1),
+  ]);
+  const warnings: string[] = Array.isArray(payload?.warnings)
+    ? payload.warnings.map(String) : [];
+  if (approved.error) warnings.push("Tariffe approvate non accessibili: restano i dati di riferimento.");
+  if (audit.error) warnings.push("Storico controlli ARERA momentaneamente non accessibile.");
+  const overrides = new Map<string, NetworkTariffRow>();
+  for (const item of approved.data || []) {
+    const tipo = String(item.tipo || "").toUpperCase();
+    const mese = String(item.mese || "").toUpperCase();
+    const quotaFissaAnnua = Number(item.quota_fissa_annua);
+    const quotaPotenzaAnnua = Number(item.quota_potenza_annua);
+    const quotaEnergia = Number(item.quota_energia);
+    const match = baseRows.find((row) => row.mese === mese && row.tipo === tipo);
+    if (
+      !match || !item.batch_id ||
+      !/^https:\/\/(?:www\.)?arera\.it\//i.test(String(item.source_url || "")) ||
+      ![quotaFissaAnnua, quotaPotenzaAnnua, quotaEnergia].every(Number.isFinite) ||
+      quotaFissaAnnua < 0 || quotaFissaAnnua > 10000 ||
+      quotaPotenzaAnnua < 0 || quotaPotenzaAnnua > 1000 ||
+      quotaEnergia < 0 || quotaEnergia > 0.5
+    ) continue;
+    overrides.set(mese + "|" + tipo, {
+      ...match,
+      quotaFissaAnnua, quotaPotenzaAnnua, quotaEnergia,
+      source: String(item.source_url),
+      status: "PROSPETTO ARERA APPROVATO",
+    });
+  }
+  const mergedRows = baseRows.map((row) =>
+    overrides.get(row.mese + "|" + row.tipo) || {
+      ...row, status: "BASE DA VERIFICARE",
+    }
+  );
+  const latest = (audit.data || [])[0];
+  if (Array.isArray(latest?.warnings)) warnings.push(...latest.warnings.map(String));
   return {
-    rows: rows.length ? rows : INITIAL_NETWORK_TARIFF_ROWS,
+    rows: mergedRows,
     meta: {
-      checkedAt: String(payload?.checkedAt || new Date().toISOString()),
-      sourceStatus: String(payload?.sourceStatus || "STORICO LOCALE"),
-      warnings: Array.isArray(payload?.warnings)
-        ? payload.warnings.map(String)
-        : [],
+      checkedAt: String(latest?.checked_at || payload?.checkedAt || new Date().toISOString()),
+      sourceStatus: overrides.size
+        ? "PROSPETTI APPROVATI + BASE STORICA"
+        : "BASE STORICA NON CONVALIDATA AUTOMATICAMENTE",
+      auditStatus: String(latest?.status || "non_eseguito"),
+      auditCheckedAt: String(latest?.checked_at || ""),
+      approvedCount: overrides.size,
+      warnings: [...new Set(warnings)],
     },
   };
 }
