@@ -46,9 +46,9 @@ const SEED = [
 ].map(([anno,meseNumero,tide,cpMarket,cdispDomestico]) => makeRow({
   anno, meseNumero, tide, cpMarket, cdispDomestico,
   status: "STORICO PRECARICATO",
-  sourceTide: "TERNA",
-  sourceCapacity: "ARERA",
-  sourceDomestic: "ARERA",
+  sourceTide: "STORICO PRECARICATO",
+  sourceCapacity: "STORICO PRECARICATO",
+  sourceDomestic: "STORICO PRECARICATO",
 }));
 
 const DOMESTIC_URL = (year) =>
