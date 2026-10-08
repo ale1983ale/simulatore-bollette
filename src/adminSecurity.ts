@@ -10,6 +10,7 @@ export type SecureAdminSession = {
   username: string;
   role?: string;
   full_access?: boolean;
+  dashboard_tabs?: string[] | null;
 };
 
 function normalizeRpcData<T>(data: T | null): T | null {
@@ -27,8 +28,14 @@ export async function adminLogin(username: string, password: string): Promise<Se
   const session = normalizeRpcData(data as SecureAdminSession | null);
   if (!session?.token) return null;
 
-  localStorage.setItem("admin_session", JSON.stringify(session));
-  return session;
+  const { data: access, error: accessError } = await supabase.rpc("admin_dashboard_access", {
+    p_session_token: session.token,
+    p_action: "self",
+  });
+  if (accessError) throw accessError;
+  const validated = { ...session, dashboard_tabs: (access as any)?.dashboard_tabs ?? null };
+  localStorage.setItem("admin_session", JSON.stringify(validated));
+  return validated;
 }
 
 export async function ensureAdminSession(): Promise<SecureAdminSession | null> {
@@ -53,6 +60,12 @@ export async function ensureAdminSession(): Promise<SecureAdminSession | null> {
         token: parsed.token,
       } as SecureAdminSession;
 
+      const { data: access, error: accessError } = await supabase.rpc("admin_dashboard_access", {
+        p_session_token: parsed.token,
+        p_action: "self",
+      });
+      if (accessError) throw accessError;
+      validated.dashboard_tabs = (access as any)?.dashboard_tabs ?? null;
       localStorage.setItem("admin_session", JSON.stringify(validated));
       return validated;
     }
@@ -105,7 +118,33 @@ export async function adminListUsers(): Promise<any[]> {
   });
 
   if (error) throw error;
-  return Array.isArray(data) ? data : [];
+  const { data: access, error: accessError } = await supabase.rpc("admin_dashboard_access", {
+    p_session_token: token,
+    p_action: "list",
+  });
+  if (accessError) throw accessError;
+  const rights = new Map((Array.isArray(access) ? access : []).map((entry: any) => [
+    Number(entry.id),
+    entry.dashboard_tabs ?? null,
+  ]));
+  return Array.isArray(data)
+    ? data.map((admin: any) => ({
+        ...admin,
+        dashboard_tabs: rights.get(Number(admin.id)) ?? null,
+      }))
+    : [];
+}
+
+export async function adminSetDashboardTabs(adminId: number, tabs: string[]) {
+  const token = await getAdminSessionToken();
+  const { data, error } = await supabase.rpc("admin_dashboard_access", {
+    p_session_token: token,
+    p_action: "set",
+    p_admin_id: adminId,
+    p_tabs: tabs,
+  });
+  if (error) throw error;
+  return data;
 }
 
 export async function adminCreateUser(input: {
