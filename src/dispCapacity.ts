@@ -186,7 +186,7 @@ export async function fetchDispCapacityRows(force = false): Promise<{
     const year = Number(item.anno), month = Number(item.mese_numero);
     if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) continue;
     const key = year+"-"+month;
-    const base = seen.get(key) || {
+    const base: DispCpRow = seen.get(key) || {
       mese: MONTHS[month-1]+" "+year,anno:year,meseNumero:month,
       tide:null,cpMarket:null,businessTotale:null,cdispDomestico:null,
       status:"",sourceTide:"",sourceCapacity:"",sourceDomestic:"",
