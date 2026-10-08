@@ -39,7 +39,7 @@ function makeFallback(
     cpMarket,
     businessTotale,
     cdispDomestico,
-    status: "STORICO VERIFICATO",
+    status: "STORICO PRECARICATO",
     sourceTide: "TERNA",
     sourceCapacity: "ARERA",
     sourceDomestic: "ARERA",
