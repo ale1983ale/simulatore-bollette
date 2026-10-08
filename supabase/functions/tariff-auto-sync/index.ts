@@ -132,6 +132,9 @@ async function handleDispatch(body: any) {
   }
   if(quarantined)warnings.push(quarantined+" componenti non applicate perché non superano la validazione");
   if(!upserts.length)warnings.push("Nessun nuovo dato numerico ARERA/TERNA estratto e verificato: conservati i valori storici");
+  if(upserts.some((row) => row.tide == null || row.cp_market == null)){
+    warnings.push("C_DISPD domestico acquisito, ma TIDE e/o Capacity Market business non sono ancora verificati automaticamente.");
+  }
   const status = upserts.length
     ? warnings.length ? "partial" : changed ? "updated" : "no_change"
     : "blocked";
