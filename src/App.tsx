@@ -6690,6 +6690,7 @@ function SystemChargesAdmin({
   networkTariffMeta,
   networkTariffRefreshing,
   onRefreshNetworkTariffs,
+  superAdmin,
 }: {
   dispCpRows: DispCpRow[];
   dispCpMeta: DispCapacityMeta;
@@ -6699,6 +6700,7 @@ function SystemChargesAdmin({
   networkTariffMeta: NetworkTariffMeta;
   networkTariffRefreshing: boolean;
   onRefreshNetworkTariffs: () => Promise<void>;
+  superAdmin: boolean;
 }) {
   const [dispHistoryYear, setDispHistoryYear] = useState(2026);
   const [networkHistoryYear, setNetworkHistoryYear] = useState(2026);
@@ -7038,7 +7040,7 @@ function SystemChargesAdmin({
           </span>
         </div>
 
-        <TariffAuditPanel onRatesUpdated={onRefreshNetworkTariffs} />
+        {superAdmin && <TariffAuditPanel onRatesUpdated={onRefreshNetworkTariffs} />}
 
         {networkTariffMeta.warnings.length > 0 && (
           <div
@@ -14844,6 +14846,7 @@ const renderAdminContent = () => {
           networkTariffMeta={networkTariffMeta}
           networkTariffRefreshing={networkTariffRefreshing}
           onRefreshNetworkTariffs={() => refreshNetworkTariffs(true)}
+          superAdmin={isSuperAdmin}
         />
       )}
 
