@@ -6751,8 +6751,9 @@ function SystemChargesAdmin({
             >
               DOMESTICI: C_DISPD ARERA · BUSINESS BT/MT: TIDE + Capacity Market.
               <br />
-              Controllo automatico all'apertura e ogni 6 ore. In caso di errore
-              rimangono in uso gli ultimi valori validi.
+              Controllo all'apertura e ogni 6 ore. Solo le componenti lette correttamente
+              dalla fonte vengono aggiornate; in caso di anomalie, rimangono i valori
+              storici di riferimento e compare un avviso.
             </div>
           </div>
 
@@ -6816,6 +6817,21 @@ function SystemChargesAdmin({
           </span>
         </div>
 
+        <div style={{
+          marginTop: 10,
+          fontSize: 12,
+          fontWeight: 850,
+          color: dispCpMeta.warnings.length ? "#92400e" : "#166534",
+        }}>
+          Esito acquisizione: {dispCpMeta.sourceStatus === "AGGIORNAMENTO_COMPLETO"
+            ? "COMPLETATO"
+            : dispCpMeta.sourceStatus === "AGGIORNAMENTO_PARZIALE"
+              ? "PARZIALE – VERIFICARE LE FONTI"
+              : dispCpMeta.sourceStatus === "FALLBACK_STORICO"
+                ? "NESSUN NUOVO VALORE – STORICO CONSERVATO"
+                : dispCpMeta.sourceStatus || "NON ANCORA VERIFICATO"}
+        </div>
+
         {dispCpMeta.warnings.length > 0 && (
           <div
             style={{
@@ -6829,8 +6845,16 @@ function SystemChargesAdmin({
               fontWeight: 700,
             }}
           >
-            Una fonte non ha risposto correttamente: la webapp mantiene i valori
-            storici validi già disponibili.
+            <strong>VERIFICA PARZIALE – DATI DA CONTROLLARE.</strong>
+            <div style={{ marginTop: 4 }}>
+              Le fonti ARERA non sono state elaborate completamente: per i valori
+              mancanti restano in uso quelli di riferimento già disponibili.
+            </div>
+            <div style={{ marginTop: 7 }}>
+              {dispCpMeta.warnings.map((warning, index) => (
+                <div key={index}>• {warning}</div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -14153,9 +14177,16 @@ const refreshDispCapacity = async (force = false) => {
     setDispCpMeta(result.meta);
     if (force) {
       const warning = result.meta.warnings.length
-        ? "\n\n" + result.meta.warnings.join("\n")
+        ? "\n\nDettaglio anomalie:\n" + result.meta.warnings.join("\n")
         : "";
-      alert("Dispacciamento / Capacity aggiornati." + warning);
+      const updated = result.meta.sourceStatus === "AGGIORNAMENTO_COMPLETO";
+      const partiallyUpdated = result.meta.sourceStatus === "AGGIORNAMENTO_PARZIALE";
+      const title = updated
+        ? "Dispacciamento / Capacity: aggiornamento completo."
+        : partiallyUpdated
+          ? "VERIFICA PARZIALE: alcuni valori sono stati aggiornati, gli altri sono rimasti invariati."
+          : "NESSUN AGGIORNAMENTO: mantenuti i valori storici di riferimento.";
+      alert(title + warning);
     }
   } catch (error: any) {
     console.error("DISP CAPACITY UPDATE ERROR:", error);
