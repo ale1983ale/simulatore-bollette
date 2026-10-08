@@ -11581,7 +11581,8 @@ function getAdminDashboardPermissions(profile: AdminProfile | null): Set<string>
     return new Set(profile.dashboard_tabs);
   }
   if (profile.full_access !== false) {
-    return new Set(ADMIN_DASHBOARD_CHOICES.map((item) => item.key));
+    // Mantiene la riservatezza delle provvigioni per gli admin non Super Admin.
+    return new Set(ADMIN_DASHBOARD_CHOICES.filter((item) => item.key !== "provvigioni").map((item) => item.key));
   }
   // Compatibilità con gli admin precedentemente limitati da "Tutte le schede".
   return new Set(["energia", "gas", "report", "punpsvPublic", "ateco", "driveArchive", "reportAdmin"]);
@@ -11592,7 +11593,7 @@ function canAdminAccessTab(profile: AdminProfile | null, requestedTab: string): 
   if (Array.isArray(profile.dashboard_tabs)) {
     return profile.dashboard_tabs.includes(requestedTab);
   }
-  if (profile.full_access !== false) return true;
+  if (profile.full_access !== false) return requestedTab !== "provvigioni";
   return getAdminDashboardPermissions(profile).has(requestedTab);
 }
 
@@ -12686,12 +12687,14 @@ function AdminDashboard({
   waitingIncomingCount,
   waitingOutgoingCount,
   allowedTabs,
+  showReportCard,
 }: {
   navigate: DashboardNavigate;
   openEmail: () => void;
   waitingIncomingCount: number;
   waitingOutgoingCount: number;
   allowedTabs: Set<string>;
+  showReportCard: boolean;
 }) {
   const canShow = (key: string) => allowedTabs.has(key);
   return (
@@ -12703,7 +12706,7 @@ function AdminDashboard({
         {canShow("ateco") && <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />}
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
-        {canShow("report") && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
+        {showReportCard && canShow("report") && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
         {canShow("calendarAdmin") && <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />}
         {canShow("recruiting") && <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />}
         {canShow("appointments") && <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />}
@@ -14679,6 +14682,7 @@ const renderAdminContent = () => {
           waitingIncomingCount={waitingRoomIncomingCount}
           waitingOutgoingCount={waitingRoomOutgoingCount}
           allowedTabs={getAdminDashboardPermissions(adminProfile)}
+          showReportCard={Array.isArray(adminProfile?.dashboard_tabs) || adminProfile?.full_access === false}
         />
       )}
 
