@@ -201,9 +201,9 @@ export default async function handler(req, res) {
     checkedAt,
     rows: buildRows(),
     sourceStatus: warnings.length
-      ? "STORICO_UFFICIALE_CON_FONTE_NON_RAGGIUNGIBILE"
-      : "STORICO_UFFICIALE_VERIFICATO",
-    warnings,
+      ? "FONTI_NON_DISPONIBILI_TARIFFE_BASE"
+      : "FONTI_RAGGIUNGIBILI_TARIFFE_BASE",
+    warnings: [...warnings, "Le fonti ARERA sono controllate automaticamente; la pagina non fornisce in questo endpoint un prospetto numerico nuovo da applicare. Restano i valori di riferimento."],
     assumptions: {
       business: "ASOS classe 0 / non energivoro",
       years: "2025-2026",
