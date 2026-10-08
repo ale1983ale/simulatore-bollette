@@ -1238,7 +1238,7 @@ export default function UnifiedAgentManagement({
         latitude = geo.latitude;
         longitude = geo.longitude;
       }
-      const { error } = await ctx.client
+      const { data: updatedMapRecord, error } = await ctx.client
         .from("recruiting_active_agents")
         .update({
           latitude,
@@ -1246,8 +1246,13 @@ export default function UnifiedAgentManagement({
           updated_at: new Date().toISOString(),
         })
         .eq("id", row.recruiting.id)
-        .eq("owner_key", ctx.ownerKey);
+        .eq("owner_key", ctx.ownerKey)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!updatedMapRecord) {
+        throw new Error("Agente non aggiornato sulla mappa. Ricarica i dati e riprova.");
+      }
       setRecruitingAgents((current) =>
         current.map((item) =>
           item.id === row.recruiting?.id
