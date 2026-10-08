@@ -1212,7 +1212,7 @@ export default function UnifiedAgentManagement({
     enabled: boolean
   ) => {
     if (busy || !ctx) return;
-    if (!row.recruiting?.id || !row.recruiting.zone.trim()) {
+    if (!row.recruiting?.id || (enabled && !row.recruiting.zone.trim())) {
       setNotice(
         `${row.fullName.toUpperCase()}: apri la scheda e inserisci una zona prima di attivare MAPPA.`
       );
@@ -3390,7 +3390,7 @@ export default function UnifiedAgentManagement({
                             row.recruiting?.latitude != null &&
                             row.recruiting?.longitude != null
                           }
-                          disabled={busy || !ctx || !row.recruiting?.id || !row.recruiting?.zone}
+                          disabled={busy || !ctx || !row.recruiting?.id || (row.recruiting?.latitude == null && !row.recruiting?.zone)}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) => {
                             event.stopPropagation();
@@ -3598,7 +3598,7 @@ export default function UnifiedAgentManagement({
                     <input
                       type="checkbox"
                       checked={row.recruiting?.latitude != null && row.recruiting?.longitude != null}
-                      disabled={busy || !ctx || !row.recruiting?.id || !row.recruiting?.zone}
+                      disabled={busy || !ctx || !row.recruiting?.id || (row.recruiting?.latitude == null && !row.recruiting?.zone)}
                       onClick={(event) => event.stopPropagation()}
                       onChange={(event) => {
                         event.stopPropagation();
