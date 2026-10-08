@@ -14247,7 +14247,7 @@ const refreshGasNetworkTariffs = async (force = false) => {
       const warning = result.meta.warnings.length
         ? "\n\n" + result.meta.warnings.join("\n")
         : "";
-      alert("Rete + oneri Gas aggiornati." + warning);
+      alert("Controllo fonti ARERA Gas effettuato. I valori numerici di riferimento rimangono invariati finché non è disponibile un nuovo prospetto completo e verificato." + warning);
     }
   } catch (error: any) {
     console.error("GAS NETWORK TARIFF UPDATE ERROR:", error);
