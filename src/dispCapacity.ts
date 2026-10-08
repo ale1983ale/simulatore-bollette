@@ -1,3 +1,5 @@
+import { supabase } from "./supabase";
+
 export type DispCpRow = {
   mese: string;
   anno: number;
@@ -167,14 +169,67 @@ export async function fetchDispCapacityRows(force = false): Promise<{
         )
     : [];
 
+  const initial = rows.length ? rows : INITIAL_AUTO_DISP_CP_ROWS;
+  const [saved, syncHistory] = await Promise.all([
+    supabase.from("disp_capacity_auto_rates")
+      .select("anno,mese_numero,tide,cp_market,cdisp_domestico,tide_source,cp_source,cdisp_source,checked_at"),
+    supabase.from("tariff_sync_runs")
+      .select("checked_at,status,warnings,changed_rows")
+      .eq("category","disp_capacity")
+      .order("checked_at",{ascending:false}).limit(1),
+  ]);
+  const resultRows = initial.map((row) => ({ ...row }));
+  const seen = new Map<string, DispCpRow>();
+  resultRows.forEach((row) => seen.set(row.anno+"-"+row.meseNumero, row));
+  let verifiedCount = 0;
+  for (const item of saved.data || []) {
+    const year = Number(item.anno), month = Number(item.mese_numero);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) continue;
+    const key = year+"-"+month;
+    const base = seen.get(key) || {
+      mese: MONTHS[month-1]+" "+year,anno:year,meseNumero:month,
+      tide:null,cpMarket:null,businessTotale:null,cdispDomestico:null,
+      status:"",sourceTide:"",sourceCapacity:"",sourceDomestic:"",
+    };
+    let changed = false;
+    const authorized = (value: any, source: unknown) =>
+      value !== null && value !== undefined &&
+      Number.isFinite(Number(value)) &&
+      Number(value) >= 0 && Number(value) <= 0.2 &&
+      ["ARERA","ARERA/TERNA","TERNA"].includes(String(source));
+    if(authorized(item.tide,item.tide_source)){
+      base.tide=Number(item.tide);base.sourceTide=String(item.tide_source);changed=true;
+    }
+    if(authorized(item.cp_market,item.cp_source)){
+      base.cpMarket=Number(item.cp_market);base.sourceCapacity=String(item.cp_source);changed=true;
+    }
+    if(authorized(item.cdisp_domestico,item.cdisp_source)){
+      base.cdispDomestico=Number(item.cdisp_domestico);
+      base.sourceDomestic=String(item.cdisp_source);changed=true;
+    }
+    if(changed){
+      base.businessTotale = base.tide != null && base.cpMarket != null
+        ? Number((base.tide+base.cpMarket).toFixed(6)) : null;
+      base.status="VALORI CONVALIDATI AUTOMATICAMENTE";
+      verifiedCount++;
+    }
+    if (!seen.has(key)){resultRows.push(base);seen.set(key,base);}
+  }
+  const lastSync = (syncHistory.data || [])[0];
+  const warnings = Array.isArray(payload?.warnings)
+    ? payload.warnings.map(String) : [];
+  if (saved.error) warnings.push("Archivio tariffe verificate non accessibile");
+  if (syncHistory.error) warnings.push("Storico sincronizzazione non accessibile");
+  if (lastSync?.status === "error") warnings.push("Ultimo controllo giornaliero non riuscito.");
+  const uniqueWarnings = [...new Set(warnings)];
   return {
-    rows: rows.length ? rows : INITIAL_AUTO_DISP_CP_ROWS,
+    rows: resultRows.sort((a,b) => a.anno-b.anno || a.meseNumero-b.meseNumero),
     meta: {
-      checkedAt: String(payload?.checkedAt || new Date().toISOString()),
-      sourceStatus: String(payload?.sourceStatus || ""),
-      warnings: Array.isArray(payload?.warnings)
-        ? payload.warnings.map(String)
-        : [],
+      checkedAt: String(lastSync?.checked_at || payload?.checkedAt || new Date().toISOString()),
+      sourceStatus: verifiedCount
+        ? "DATI_VERIFICATI_AUTOMATICAMENTE"
+        : String(payload?.sourceStatus || "STORICO PRECARICATO"),
+      warnings: uniqueWarnings,
     },
   };
 }
