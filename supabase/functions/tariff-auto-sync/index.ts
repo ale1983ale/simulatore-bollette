@@ -138,6 +138,87 @@ async function handleDispatch(body: any) {
   return {status,changed_rows:changed,verified_rows:verified,warnings};
 }
 
+async function handleElectricNetwork(body: any) {
+  const warnings: string[] = Array.isArray(body.warnings) ? body.warnings.map(String) : [];
+  const approved = (body.rows || []).filter((row:any) =>
+    row.status === "AGGIORNATO DA PROSPETTO ARERA" &&
+    String(row.source || "").startsWith("https://www.arera.it/fileadmin/") &&
+    ["RESIDENTE","NON RESIDENTE","RESIDENTE CANONE ESENTE"].includes(row.tipo)
+  );
+  const byPeriod = new Map<string,any[]>();
+  for(const row of approved){
+    const key=String(row.mese||"");
+    const list=byPeriod.get(key)||[];list.push(row);byPeriod.set(key,list);
+  }
+  const { data: existing, error: oldError } = await db.from("network_domestic_auto_rates").select("*");
+  if(oldError)throw oldError;
+  const prior = new Map((existing||[]).map((row:any)=>[row.mese+"|"+row.tipo,row]));
+  const updates:any[]=[];
+  let changes=0;
+  for(const [month, group] of byPeriod){
+    if(group.length!==3 || new Set(group.map(r=>r.tipo)).size!==3){
+      warnings.push(month+": tipologie incomplete, aggiornamento domestico bloccato.");
+      continue;
+    }
+    const resident=group.find(r=>r.tipo==="RESIDENTE");
+    const exempt=group.find(r=>r.tipo==="RESIDENTE CANONE ESENTE");
+    if(!resident||!exempt || ["quotaFissaAnnua","quotaPotenzaAnnua","quotaEnergia"]
+      .some(field=>Math.abs(Number(resident[field])-Number(exempt[field]))>0.000001)){
+      warnings.push(month+": incongruenza tra residenti ed esenti, nessuna modifica.");
+      continue;
+    }
+    const candidate:any[]=[];
+    let safe=true;
+    for(const row of group){
+      const anno=Number(row.anno), meseNumero=Number(row.meseNumero);
+      const year=Number(month.split(" ").at(-1));
+      const values=[Number(row.quotaFissaAnnua),Number(row.quotaPotenzaAnnua),Number(row.quotaEnergia)];
+      if(anno!==year || anno<2025 || anno>new Date().getUTCFullYear()+1 ||
+        meseNumero<1 || meseNumero>12 ||
+        !values.every(Number.isFinite) ||
+        values[0]<0 || values[0]>500 || values[1]<0 || values[1]>200 ||
+        values[2]<0.005 || values[2]>0.3) {
+        safe=false;break;
+      }
+      const previous:any=prior.get(month+"|"+row.tipo);
+      if(previous && (
+        Math.abs(values[0]-Number(previous.quota_fissa_annua))>150 ||
+        Math.abs(values[1]-Number(previous.quota_potenza_annua))>60 ||
+        Math.abs(values[2]-Number(previous.quota_energia))>0.02
+      )){safe=false;break;}
+      candidate.push({
+        mese:month,tipo:row.tipo,anno,mese_numero:meseNumero,
+        quota_fissa_annua:values[0],quota_potenza_annua:values[1],
+        quota_energia:values[2],source_url:String(row.source),
+        checked_at:new Date().toISOString(),
+      });
+    }
+    if(!safe){
+      warnings.push(month+": importi numerici non validi o variazione eccessiva.");
+      continue;
+    }
+    for(const row of candidate){
+      const previous:any=prior.get(row.mese+"|"+row.tipo);
+      if(!previous || Math.abs(Number(previous.quota_energia)-row.quota_energia)>0.0000005 ||
+        Math.abs(Number(previous.quota_fissa_annua)-row.quota_fissa_annua)>0.0000005 ||
+        Math.abs(Number(previous.quota_potenza_annua)-row.quota_potenza_annua)>0.0000005)changes++;
+    }
+    updates.push(...candidate);
+  }
+  if(updates.length){
+    const {error}=await db.from("network_domestic_auto_rates")
+      .upsert(updates,{onConflict:"mese,tipo"});
+    if(error)throw error;
+  } else {
+    warnings.push("Rete domestici: nessun prospetto ARERA numericamente completo validato.");
+  }
+  warnings.push("Per BTA e MTA resta necessaria una fonte numerica completa: tariffe storiche conservate.");
+  return {
+    status:updates.length?"partial":"blocked",
+    changed_rows:changes,verified_rows:updates.length,warnings,
+  };
+}
+
 async function syncCategory(category:Category) {
   const started=new Date().toISOString();
   try {
@@ -151,6 +232,8 @@ async function syncCategory(category:Category) {
     };
     if(category==="disp_capacity"){
       outcome=await handleDispatch(body);
+    }else if(category==="electric_network"){
+      outcome=await handleElectricNetwork(body);
     }else{
       // I servizi Rete Energia e Gas restituiscono oggi tariffe di base
       // precaricate. Non usare mai la sola raggiungibilità della pagina
