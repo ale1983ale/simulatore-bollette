@@ -197,8 +197,8 @@ function parseDomesticNetworkSection(rows, headerAt) {
   };
   if (!matches(reteEnergia,energy[7]) ||
     !matches(oneriEnergia,energy[10]) ||
-    !matches(quotaFissaAnnua,Number(fixed[7] || 0)+Number(fixed[10]||0),0.02) ||
-    !matches(quotaPotenzaAnnua,Number(power[7]||0)+Number(power[10]||0),0.02) ||
+    !matches(quotaFissaAnnua,officialNumber(fixed[7],true)+officialNumber(fixed[10],true),0.02) ||
+    !matches(quotaPotenzaAnnua,officialNumber(power[7],true)+officialNumber(power[10],true),0.02) ||
     quotaEnergia<0.005 || quotaEnergia>0.2 ||
     quotaFissaAnnua>500 || quotaPotenzaAnnua>200) return null;
   return {
