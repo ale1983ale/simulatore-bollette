@@ -27,6 +27,7 @@ import DriveArchive from "./DriveArchive";
 import ReportNotificationPanel from "./ReportNotificationPanel";
 import { getRecruitingContext } from "./recruitingClient";
 import TariffAuditPanel from "./TariffAuditPanel";
+import TariffSyncStatus from "./TariffSyncStatus";
 import {
   INITIAL_AUTO_DISP_CP_ROWS,
   dispCapacityRate,
@@ -6719,6 +6720,7 @@ function SystemChargesAdmin({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <TariffSyncStatus />
 
       <div
         style={{
@@ -7238,7 +7240,8 @@ function GasNetworkChargesAdmin({
         }}
       >
         <div>
-          <h2 style={{ margin: 0 }}>Rete + Oneri Gas · automatico</h2>
+          <TariffSyncStatus />
+    <h2 style={{ margin: 0 }}>Rete + Oneri Gas · automatico</h2>
           <div
             style={{
               marginTop: 6,
