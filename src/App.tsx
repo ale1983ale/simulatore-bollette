@@ -4,7 +4,7 @@ import html2canvas from "html2canvas";
 import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
-import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminSetFullAccess, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
+import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminSetFullAccess, adminSetDashboardTabs, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
 import {
   agentLogin,
   ensureAgentSession,
@@ -122,6 +122,7 @@ type AdminProfile = {
   token?: string;
   role?: string;
   full_access?: boolean;
+  dashboard_tabs?: string[] | null;
   password_configured?: boolean;
   password_changed_at?: string | null;
  };
@@ -11554,6 +11555,47 @@ function ReportAdmin({
   );
 }
 
+const ADMIN_DASHBOARD_CHOICES: Array<{ key: string; label: string }> = [
+  { key: "energia", label: "ENERGIA" },
+  { key: "gas", label: "GAS" },
+  { key: "report", label: "REPORT" },
+  { key: "punpsvPublic", label: "PUN-PSV" },
+  { key: "ateco", label: "ATECO" },
+  { key: "calendarAdmin", label: "CALENDARIO" },
+  { key: "recruiting", label: "RECRUITING" },
+  { key: "appointments", label: "APPUNTAMENTI" },
+  { key: "archive", label: "DATI PRODUZIONE" },
+  { key: "email", label: "INVIO EMAIL" },
+  { key: "driveArchive", label: "ARCHIVIO DRIVE" },
+  { key: "provvigioni", label: "PROVVIGIONI" },
+  { key: "reportAdmin", label: "REPORT AGENTI" },
+  { key: "recruitingWaiting", label: "SALA D'ATTESA HR" },
+  { key: "personale", label: "PERSONALE" },
+];
+
+function getAdminDashboardPermissions(profile: AdminProfile | null): Set<string> {
+  if (!profile || profile.role === "super_admin") {
+    return new Set(ADMIN_DASHBOARD_CHOICES.map((item) => item.key));
+  }
+  if (Array.isArray(profile.dashboard_tabs)) {
+    return new Set(profile.dashboard_tabs);
+  }
+  if (profile.full_access !== false) {
+    return new Set(ADMIN_DASHBOARD_CHOICES.map((item) => item.key));
+  }
+  // Compatibilità con gli admin precedentemente limitati da "Tutte le schede".
+  return new Set(["energia", "gas", "report", "punpsvPublic", "ateco", "driveArchive", "reportAdmin"]);
+}
+
+function canAdminAccessTab(profile: AdminProfile | null, requestedTab: string): boolean {
+  if (!profile || profile.role === "super_admin" || requestedTab === "dashboard") return true;
+  if (Array.isArray(profile.dashboard_tabs)) {
+    return profile.dashboard_tabs.includes(requestedTab);
+  }
+  if (profile.full_access !== false) return true;
+  return getAdminDashboardPermissions(profile).has(requestedTab);
+}
+
 function AdminUsersManager({
   adminProfile,
 }: {
@@ -11577,6 +11619,7 @@ function AdminUsersManager({
     useState<Record<number, string>>({});
   const [bulkAdminPasswordsSaving, setBulkAdminPasswordsSaving] =
     useState(false);
+  const [savingDashboardAdminId, setSavingDashboardAdminId] = useState<number | null>(null);
 
   const loadAdmins = async () => {
     if (adminProfile?.role !== "super_admin") return;
@@ -11693,6 +11736,30 @@ function AdminUsersManager({
       await loadAdmins();
     } catch (error: any) {
       alert("Errore aggiornamento permessi: " + (error?.message || error));
+    }
+  };
+
+  const setAdminDashboardSelection = async (admin: any, key: string, enabled: boolean) => {
+    if (admin.role === "super_admin" || !admin.id) return;
+    const current = getAdminDashboardPermissions(admin);
+    if (enabled) current.add(key);
+    else current.delete(key);
+    if (!current.size) {
+      alert("Devi lasciare almeno una scheda abilitata.");
+      return;
+    }
+    setSavingDashboardAdminId(Number(admin.id));
+    try {
+      await adminSetDashboardTabs(Number(admin.id), [...current]);
+      setAdmins((previous) => previous.map((entry) =>
+        Number(entry.id) === Number(admin.id)
+          ? { ...entry, dashboard_tabs: [...current] }
+          : entry
+      ));
+    } catch (error: any) {
+      alert("Errore nel salvataggio delle schede: " + (error?.message || error));
+    } finally {
+      setSavingDashboardAdminId(null);
     }
   };
 
@@ -11916,7 +11983,7 @@ function AdminUsersManager({
             <table className="ge-list-table">
               <thead>
                 <tr>
-                  {["Nome", "Cognome", "Username", "Password", "Ruolo", "Tutte le schede", "Azioni"].map(
+                  {["Nome", "Cognome", "Username", "Password", "Ruolo", "Schede dashboard", "Azioni"].map(
                     (h) => (
                       <th
                         key={h}
@@ -12009,14 +12076,66 @@ function AdminUsersManager({
                         textAlign: "center",
                       }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={a.role === "super_admin" || a.full_access !== false}
-                        disabled={a.role === "super_admin"}
-                        onChange={(event) => void setFullAccess(Number(a.id), event.target.checked)}
-                        title={a.role === "super_admin" ? "Il Super Admin ha sempre accesso completo" : "Se disattivato vede le stesse schede degli agenti più Report Admin"}
-                        style={{ width: 20, height: 20, cursor: a.role === "super_admin" ? "default" : "pointer" }}
-                      />
+                      {a.role === "super_admin" ? (
+                        <strong style={{ color: "#166534", fontSize: 12 }}>TUTTE (SUPER ADMIN)</strong>
+                      ) : (
+                        <details style={{ position: "relative", minWidth: 205, textAlign: "left" }}>
+                          <summary
+                            style={{
+                              padding: "9px 11px",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: 9,
+                              background: "#f8fafc",
+                              color: "#0f2d69",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                              userSelect: "none",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {savingDashboardAdminId === Number(a.id)
+                              ? "SALVATAGGIO..."
+                              : `${getAdminDashboardPermissions(a).size} SCHEDE SELEZIONATE ▾`}
+                          </summary>
+                          <div
+                            style={{
+                              display: "grid",
+                              gap: 5,
+                              marginTop: 5,
+                              padding: 9,
+                              border: "1px solid #cbd5e1",
+                              borderRadius: 10,
+                              background: "white",
+                              boxShadow: "0 7px 18px rgba(15,23,42,.08)",
+                              maxHeight: 250,
+                              overflowY: "auto",
+                              minWidth: 220,
+                            }}
+                          >
+                            {ADMIN_DASHBOARD_CHOICES.map(({ key, label }) => (
+                              <label
+                                key={key}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 9,
+                                  padding: "5px 3px",
+                                  fontSize: 12,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={getAdminDashboardPermissions(a).has(key)}
+                                  disabled={savingDashboardAdminId === Number(a.id)}
+                                  onChange={(event) => void setAdminDashboardSelection(a, key, event.target.checked)}
+                                />
+                                {label}
+                              </label>
+                            ))}
+                          </div>
+                        </details>
+                      )}
                     </td>
 
                     <td
@@ -12566,38 +12685,35 @@ function AdminDashboard({
   openEmail,
   waitingIncomingCount,
   waitingOutgoingCount,
-  fullAccess,
-  superAdmin,
+  allowedTabs,
 }: {
   navigate: DashboardNavigate;
   openEmail: () => void;
   waitingIncomingCount: number;
   waitingOutgoingCount: number;
-  fullAccess: boolean;
-  superAdmin: boolean;
+  allowedTabs: Set<string>;
 }) {
+  const canShow = (key: string) => allowedTabs.has(key);
   return (
     <div className="ge-dashboard">
       <div className="ge-dashboard-primary ge-dashboard-primary--admin">
-        <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />
-        <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />
-        <DashboardCard title="PUN-PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />
-        <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />
+        {canShow("energia") && <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />}
+        {canShow("gas") && <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />}
+        {canShow("punpsvPublic") && <DashboardCard title="PUN-PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />}
+        {canShow("ateco") && <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />}
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
-        {!fullAccess && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
-        {fullAccess && <>
-          <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />
-          <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />
-          <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />
-          <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />
-          <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />
-        </>}
-        <DashboardCard title="ARCHIVIO DRIVE" description="Consulta documenti e file condivisi." icon="📁" className="ge-card-drive" compact onClick={() => navigate("driveArchive")} />
-        {superAdmin && <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />}
-        <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />
-        {fullAccess && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
-        {fullAccess && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
+        {canShow("report") && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
+        {canShow("calendarAdmin") && <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />}
+        {canShow("recruiting") && <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />}
+        {canShow("appointments") && <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />}
+        {canShow("archive") && <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />}
+        {canShow("email") && <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />}
+        {canShow("driveArchive") && <DashboardCard title="ARCHIVIO DRIVE" description="Consulta documenti e file condivisi." icon="📁" className="ge-card-drive" compact onClick={() => navigate("driveArchive")} />}
+        {canShow("provvigioni") && <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />}
+        {canShow("reportAdmin") && <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />}
+        {canShow("recruitingWaiting") && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
+        {canShow("personale") && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
       </div>
     </div>
   );
@@ -14514,8 +14630,7 @@ const renderAdminContent = () => {
           openEmail={openOutlookEmail}
           waitingIncomingCount={waitingRoomIncomingCount}
           waitingOutgoingCount={waitingRoomOutgoingCount}
-          fullAccess={hasFullAdminAccess}
-          superAdmin={isSuperAdmin}
+          allowedTabs={getAdminDashboardPermissions(adminProfile)}
         />
       )}
 
