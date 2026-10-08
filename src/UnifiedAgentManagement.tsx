@@ -1207,6 +1207,67 @@ export default function UnifiedAgentManagement({
     });
   };
 
+  const toggleMapVisibility = async (
+    row: (typeof rows)[number],
+    enabled: boolean
+  ) => {
+    if (busy || !ctx) return;
+    if (!row.recruiting?.id || !row.recruiting.zone.trim()) {
+      setNotice(
+        `${row.fullName.toUpperCase()}: apri la scheda e inserisci una zona prima di attivare MAPPA.`
+      );
+      if (enabled) openRow(row);
+      return;
+    }
+
+    setBusy(true);
+    setNotice("");
+    try {
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      if (enabled) {
+        const geo = await geocodeItalianZone(row.recruiting.zone.trim());
+        if (
+          geo.latitude === null ||
+          geo.longitude === null ||
+          !Number.isFinite(geo.latitude) ||
+          !Number.isFinite(geo.longitude)
+        ) {
+          throw new Error("Impossibile individuare la zona sulla mappa. Verifica la città nella scheda agente.");
+        }
+        latitude = geo.latitude;
+        longitude = geo.longitude;
+      }
+      const { error } = await ctx.client
+        .from("recruiting_active_agents")
+        .update({
+          latitude,
+          longitude,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.recruiting.id)
+        .eq("owner_key", ctx.ownerKey);
+      if (error) throw error;
+      setRecruitingAgents((current) =>
+        current.map((item) =>
+          item.id === row.recruiting?.id
+            ? { ...item, latitude, longitude }
+            : item
+        )
+      );
+      if (expandedId === Number(row.agent.id)) {
+        setDraft((current) => current ? { ...current, showOnMap: enabled } : current);
+      }
+      setNotice(
+        `${row.fullName.toUpperCase()}: ${enabled ? "VISIBILE" : "NON VISIBILE"} SULLA MAPPA. Modifica salvata.`
+      );
+    } catch (error: any) {
+      setNotice("Errore MAPPA: " + (error?.message || error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveRow = async (row: (typeof rows)[number]) => {
     if (!draft || !row.agent.id) return;
 
@@ -3171,6 +3232,7 @@ export default function UnifiedAgentManagement({
                   "ZONA",
                   "DM",
                   "PROVV.",
+                  "MAPPA",
                   "STATO",
                   "",
                 ].map((label) => (
@@ -3311,6 +3373,32 @@ export default function UnifiedAgentManagement({
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
                         {row.agent.provvigioni_visible ? "✅" : "—"}
                       </td>
+                      <td
+                        style={{
+                          padding: "10px 9px",
+                          borderBottom: "1px solid #f1f5f9",
+                          textAlign: "center",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Mostra ${row.fullName.toUpperCase()} sulla mappa`}
+                          title={row.recruiting?.id && row.recruiting?.zone
+                            ? "Selezionato: visibile sulla mappa. Modifica e salvataggio immediati."
+                            : "Configura prima la zona nella scheda agente"}
+                          checked={
+                            row.recruiting?.latitude != null &&
+                            row.recruiting?.longitude != null
+                          }
+                          disabled={busy || !ctx || !row.recruiting?.id || !row.recruiting?.zone}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => {
+                            event.stopPropagation();
+                            void toggleMapVisibility(row, event.target.checked);
+                          }}
+                          style={{ width: 17, height: 17, cursor: "pointer", accentColor: "#16a34a" }}
+                        />
+                      </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
                         <span
                           title="Accesso"
@@ -3328,16 +3416,7 @@ export default function UnifiedAgentManagement({
                         >
                           ✉️
                         </span>
-                        <span
-                          title={
-                            row.recruiting
-                              ? "Agente presente in Zone"
-                              : "Zona non configurata"
-                          }
-                          style={{ opacity: row.recruiting ? 1 : 0.25 }}
-                        >
-                          📍
-                        </span>
+
                       </td>
                       <td style={{ padding: "7px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         <button
@@ -3507,15 +3586,27 @@ export default function UnifiedAgentManagement({
                   <div><strong>Zona:</strong> {row.recruiting?.zone || "—"}</div>
                   <div><strong>DM:</strong> {dm || "—"}</div>
                   <div><strong>Report:</strong> {row.email?.report_notify ? "ATTIVO" : "NON ATTIVO"}</div>
-                  <div>
-                    <strong>Mappa:</strong>{" "}
-                    {row.recruiting?.latitude !== null &&
-                    row.recruiting?.latitude !== undefined &&
-                    row.recruiting?.longitude !== null &&
-                    row.recruiting?.longitude !== undefined
-                      ? "MOSTRA"
-                      : "NON MOSTRARE"}
-                  </div>
+                  <label
+                    style={{ display: "flex", alignItems: "center", gap: 9, fontWeight: 800 }}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <strong>MAPPA:</strong>
+                    <input
+                      type="checkbox"
+                      checked={row.recruiting?.latitude != null && row.recruiting?.longitude != null}
+                      disabled={busy || !ctx || !row.recruiting?.id || !row.recruiting?.zone}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) => {
+                        event.stopPropagation();
+                        void toggleMapVisibility(row, event.target.checked);
+                      }}
+                      aria-label={`Mostra ${row.fullName.toUpperCase()} sulla mappa`}
+                      style={{ width: 18, height: 18, accentColor: "#16a34a" }}
+                    />
+                    {row.recruiting?.latitude != null && row.recruiting?.longitude != null
+                      ? "VISIBILE"
+                      : "NON VISIBILE"}
+                  </label>
                 </div>
               </button>
 
