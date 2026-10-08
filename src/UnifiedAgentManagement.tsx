@@ -3586,6 +3586,10 @@ export default function UnifiedAgentManagement({
                   <div><strong>Zona:</strong> {row.recruiting?.zone || "—"}</div>
                   <div><strong>DM:</strong> {dm || "—"}</div>
                   <div><strong>Report:</strong> {row.email?.report_notify ? "ATTIVO" : "NON ATTIVO"}</div>
+
+                </div>
+              </button>
+              <div style={{ padding: "8px 13px 10px", borderTop: "1px solid #e2e8f0", background: "#f8fafc" }}>
                   <label
                     style={{ display: "flex", alignItems: "center", gap: 9, fontWeight: 800 }}
                     onClick={(event) => event.stopPropagation()}
@@ -3607,8 +3611,7 @@ export default function UnifiedAgentManagement({
                       ? "VISIBILE"
                       : "NON VISIBILE"}
                   </label>
-                </div>
-              </button>
+              </div>
 
               {isOpen && draft && (
                 <div style={{ padding: 10, maxWidth: "100%", boxSizing: "border-box" }}>
