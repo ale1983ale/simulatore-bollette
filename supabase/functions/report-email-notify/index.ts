@@ -632,6 +632,37 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true });
     }
 
+    if (action === "delete_history") {
+      const historyId = Number(body?.history_id);
+      if (!Number.isSafeInteger(historyId) || historyId <= 0) {
+        return json({ ok: false, error: "Messaggio storico non valido." }, 400);
+      }
+
+      const { data, error } = await db
+        .from("report_notification_history")
+        .delete()
+        .eq("id", historyId)
+        .eq("admin_id", adminId)
+        .select("id")
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        return json({ ok: false, error: "Messaggio non trovato nello storico." }, 404);
+      }
+      return json({ ok: true, deleted_id: data.id });
+    }
+
+    if (action === "delete_all_history") {
+      const { error } = await db
+        .from("report_notification_history")
+        .delete()
+        .eq("admin_id", adminId);
+
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
     if (action === "send") {
       const subject = String(body?.subject || "").trim();
       const message = String(body?.body || "").trim();
