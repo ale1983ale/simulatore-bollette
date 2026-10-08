@@ -456,15 +456,20 @@ select optgroup {
   display: none;
 }
 
-@media (max-width: 720px) {
-  /* Mobile: una sola riga navigabile, senza abbreviazioni né pulsanti schiacciati. */
+/* Galaxy Z Fold aperto: tutta la navigazione in una sola riga, anche
+   alle larghezze intermedie in cui prima il flex-wrap mandava Admin a capo. */
+@media (min-width: 621px) and (max-width: 1100px) {
   .ge-main-nav {
     display: flex !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
-    gap: 7px !important;
+    gap: 6px !important;
     width: 100% !important;
     min-width: 0;
+    padding: 5px 6px;
+    border: 1px solid #dbe5f1;
+    border-radius: 13px;
+    background: rgba(255,255,255,.78);
     margin-bottom: 12px !important;
   }
 
@@ -472,18 +477,12 @@ select optgroup {
     display: flex !important;
     flex: 1 1 0;
     min-width: 0;
-    align-items: center !important;
-    gap: 6px !important;
     flex-wrap: nowrap !important;
+    gap: 5px !important;
+    align-items: center !important;
     overflow-x: auto;
-    overflow-y: hidden;
-    padding: 2px 1px 5px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-x: contain;
     scrollbar-width: none;
-    scroll-snap-type: x proximity;
-    -webkit-mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 10px), transparent 100%);
-    mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 10px), transparent 100%);
+    -webkit-overflow-scrolling: touch;
   }
 
   .ge-main-nav__primary::-webkit-scrollbar {
@@ -493,56 +492,143 @@ select optgroup {
   .ge-main-nav__actions {
     display: flex !important;
     flex: 0 0 auto;
-    align-items: center !important;
-    gap: 5px !important;
     flex-wrap: nowrap !important;
+    gap: 5px !important;
+    align-items: center !important;
     margin-left: 0 !important;
-    padding: 0 0 3px 7px;
-    border-left: 1px solid #cbd5e1;
   }
 
   .ge-main-nav button {
-    flex: 0 0 auto;
     width: auto !important;
     min-width: 0 !important;
-    min-height: 42px !important;
-    height: 42px !important;
+    flex-shrink: 0;
     margin: 0 !important;
-    padding: 0 11px !important;
-    font-size: 12px !important;
-    font-weight: 800 !important;
-    line-height: 1.1 !important;
-    border-radius: 10px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 clamp(5px, .95vw, 11px) !important;
+    font-size: clamp(11px, 1.23vw, 14px) !important;
+    font-weight: 750 !important;
+    border-radius: 9px !important;
+    line-height: 1 !important;
     white-space: nowrap !important;
-    scroll-snap-align: start;
-  }
-
-  /* Mostrare i nomi completi anche su telefono: PUN-PSV, ARCHIVIO, Area Admin. */
-  .ge-main-nav__label-desktop {
-    display: inline !important;
-  }
-
-  .ge-main-nav__label-mobile {
-    display: none !important;
   }
 
   .ge-main-nav__actions button:not(.ge-main-nav__reload):not(.ge-main-nav__settings) {
-    padding: 0 9px !important;
-    font-size: 11px !important;
+    font-size: 12px !important;
+    padding: 0 8px !important;
   }
 
   .ge-main-nav__reload,
   .ge-main-nav__settings {
+    display: grid !important;
+    place-items: center !important;
     width: 36px !important;
     min-width: 36px !important;
-    height: 42px !important;
-    min-height: 42px !important;
     padding: 0 !important;
-    display: grid !important;
-    place-items: center;
     font-size: 19px !important;
-    line-height: 1 !important;
   }
+}
+
+/* Galaxy Z Fold chiuso: tutte e sei le schede sulla prima riga, comandi
+   Admin/aggiorna/impostazioni sulla seconda. Mai nascondere le schede. */
+@media (max-width: 620px) {
+  .ge-main-nav {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    width: 100% !important;
+    min-width: 0;
+    padding: 6px;
+    border: 1px solid #dbe5f1;
+    border-radius: 13px;
+    background: rgba(255,255,255,.82);
+    margin-bottom: 12px !important;
+  }
+
+  .ge-main-nav__primary {
+    display: grid !important;
+    grid-template-columns: 1.05fr .7fr 1fr 1.23fr 1fr 1.32fr !important;
+    gap: 3px !important;
+    width: 100% !important;
+    min-width: 0;
+    align-items: stretch !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .ge-main-nav__actions {
+    display: flex !important;
+    flex: 0 0 auto;
+    align-items: stretch !important;
+    justify-content: flex-end;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .ge-main-nav__actions:empty {
+    display: none !important;
+  }
+
+  .ge-main-nav button {
+    min-width: 0 !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    margin: 0 !important;
+    padding: 0 3px !important;
+    font-size: clamp(9px, 2.65vw, 11px) !important;
+    font-weight: 750 !important;
+    line-height: 1 !important;
+    border-radius: 9px !important;
+    text-align: center;
+    white-space: nowrap !important;
+  }
+
+  .ge-main-nav__primary button {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .ge-main-nav__actions button:not(.ge-main-nav__reload):not(.ge-main-nav__settings) {
+    flex: 1 1 auto;
+    font-size: 12px !important;
+    text-align: left;
+    padding: 0 14px !important;
+  }
+
+  .ge-main-nav__reload,
+  .ge-main-nav__settings {
+    display: grid !important;
+    place-items: center !important;
+    flex: 0 0 40px;
+    width: 40px !important;
+    min-width: 40px !important;
+    padding: 0 !important;
+    font-size: 20px !important;
+  }
+}
+
+/* Interfaccia Fold: le tessere secondarie restano su due colonne,
+   invece di diventare quattro tessere alte e strettissime. */
+@media (min-width: 721px) and (max-width: 1100px) {
+  .ge-dashboard-secondary--admin,
+  .ge-dashboard-secondary--agent {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 11px;
+  }
+  .ge-dashboard-card--compact {
+    min-height: 96px;
+    align-items: center;
+  }
+  .ge-dashboard-card--compact .ge-dashboard-card__title {
+    overflow-wrap: break-word;
+  }
+}
+
+@media (max-width: 720px) {
 
   .ge-brand {
     border-radius: 14px;
