@@ -26,6 +26,7 @@ import Personale from "./Personale";
 import DriveArchive from "./DriveArchive";
 import ReportNotificationPanel from "./ReportNotificationPanel";
 import { getRecruitingContext } from "./recruitingClient";
+import TariffAuditPanel from "./TariffAuditPanel";
 import {
   INITIAL_AUTO_DISP_CP_ROWS,
   dispCapacityRate,
@@ -6939,8 +6940,8 @@ function SystemChargesAdmin({
               Quota fissa, quota potenza e quota consumi utilizzate dal
               simulatore Energia. Storico 2025 e 2026.
               <br />
-              Per BTA/MTA il riferimento automatico è ASOS classe 0
-              (cliente non energivoro).
+              Per BTA/MTA il riferimento è ASOS classe 0 (cliente non energivoro).
+              I valori storici sono segnalati come "da verificare" finché non esiste un prospetto approvato.
             </div>
           </div>
 
@@ -7037,6 +7038,8 @@ function SystemChargesAdmin({
           </span>
         </div>
 
+        <TariffAuditPanel onRatesUpdated={onRefreshNetworkTariffs} />
+
         {networkTariffMeta.warnings.length > 0 && (
           <div
             style={{
@@ -7050,8 +7053,9 @@ function SystemChargesAdmin({
               fontWeight: 700,
             }}
           >
-            Una fonte ufficiale non ha risposto: restano in uso gli ultimi
-            valori validi presenti nello storico.
+            {networkTariffMeta.warnings.map((warning, index) => (
+              <div key={index}>⚠ {warning}</div>
+            ))}
           </div>
         )}
 
@@ -7106,8 +7110,8 @@ function SystemChargesAdmin({
                           display: "inline-block",
                           padding: "4px 7px",
                           borderRadius: 999,
-                          background: "#dcfce7",
-                          color: "#166534",
+                          background: row.status.includes("APPROVATO") ? "#dcfce7" : "#fef3c7",
+                          color: row.status.includes("APPROVATO") ? "#166534" : "#92400e",
                           fontSize: 11,
                           fontWeight: 900,
                           whiteSpace: "nowrap",
