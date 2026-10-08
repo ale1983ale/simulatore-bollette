@@ -45,7 +45,7 @@ const SEED = [
   [2026,9,0.010501,0.003197,0.015068],
 ].map(([anno,meseNumero,tide,cpMarket,cdispDomestico]) => makeRow({
   anno, meseNumero, tide, cpMarket, cdispDomestico,
-  status: "STORICO VERIFICATO",
+  status: "STORICO PRECARICATO",
   sourceTide: "TERNA",
   sourceCapacity: "ARERA",
   sourceDomestic: "ARERA",
@@ -61,24 +61,29 @@ function round6(value) {
   return Number.isFinite(number) ? Number(number.toFixed(6)) : null;
 }
 
+function isValidRate(value) {
+  return value !== null && value !== undefined && value !== "" &&
+    Number.isFinite(Number(value));
+}
+
 function makeRow({
   anno, meseNumero, tide = null, cpMarket = null, cdispDomestico = null,
   status = "DISPONIBILE", sourceTide = "", sourceCapacity = "", sourceDomestic = ""
 }) {
   const businessTotale =
-    Number.isFinite(Number(tide)) && Number.isFinite(Number(cpMarket))
+    isValidRate(tide) && isValidRate(cpMarket)
       ? round6(Number(tide) + Number(cpMarket))
       : null;
   const domestic =
-    Number.isFinite(Number(cdispDomestico))
+    isValidRate(cdispDomestico)
       ? round6(cdispDomestico)
       : null;
   return {
     mese: `${MONTHS[meseNumero - 1]} ${anno}`,
     anno,
     meseNumero,
-    tide: Number.isFinite(Number(tide)) ? round6(tide) : null,
-    cpMarket: Number.isFinite(Number(cpMarket)) ? round6(cpMarket) : null,
+    tide: isValidRate(tide) ? round6(tide) : null,
+    cpMarket: isValidRate(cpMarket) ? round6(cpMarket) : null,
     businessTotale,
     cdispDomestico: domestic,
     status,
@@ -340,21 +345,21 @@ function mergeOfficial(seedRows, domesticMaps, businessMaps) {
   return [...map.values()]
     .map((row) => {
       const businessTotale =
-        Number.isFinite(Number(row.tide)) && Number.isFinite(Number(row.cpMarket))
+        isValidRate(row.tide) && isValidRate(row.cpMarket)
           ? round6(Number(row.tide) + Number(row.cpMarket))
           : null;
       return {
         ...row,
         businessTotale,
         cdispDomestico:
-          Number.isFinite(Number(row.cdispDomestico))
+          isValidRate(row.cdispDomestico)
             ? round6(row.cdispDomestico)
             : null,
       };
     })
     .filter((row) =>
-      Number.isFinite(Number(row.cdispDomestico)) ||
-      Number.isFinite(Number(row.businessTotale))
+      isValidRate(row.cdispDomestico) ||
+      isValidRate(row.businessTotale)
     )
     .sort((a, b) => a.anno - b.anno || a.meseNumero - b.meseNumero);
 }
@@ -403,9 +408,13 @@ export default async function handler(req, res) {
     checkedAt: now.toISOString(),
     rows,
     sourceStatus:
-      domesticMaps.length || businessMaps.length
-        ? "AGGIORNAMENTO_AUTOMATICO_OK"
-        : "FALLBACK_STORICO",
+      warnings.length > 0
+        ? (domesticMaps.length || businessMaps.length
+            ? "AGGIORNAMENTO_PARZIALE"
+            : "FALLBACK_STORICO")
+        : (domesticMaps.length || businessMaps.length
+            ? "AGGIORNAMENTO_COMPLETO"
+            : "FALLBACK_STORICO"),
     warnings,
     sources: {
       domestic: {
