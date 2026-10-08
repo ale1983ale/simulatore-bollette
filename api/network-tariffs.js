@@ -1,3 +1,5 @@
+import * as XLSX from "xlsx";
+
 const MONTHS = [
   "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
   "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
@@ -157,6 +159,88 @@ function buildRows() {
   return rows;
 }
 
+const DOMESTIC_SOURCE = "https://www.arera.it/fileadmin/area_operatori/prezzi_e_tariffe/Corrispettivi_libero_elettrico_domestico_2026.xlsx";
+const DOMESTIC_TYPES = ["RESIDENTE","NON RESIDENTE","RESIDENTE CANONE ESENTE"];
+
+function officialNumber(value, optional=false) {
+  if (value === null || value === undefined || String(value).trim() === "") return optional ? 0 : null;
+  const v=String(value).trim();
+  if (/^-+$/.test(v)) return optional ? 0 : null;
+  const result=Number(v.replace(/\s/g,"").replace(",","."));
+  return Number.isFinite(result) && result>=0 ? result : null;
+}
+
+function parseDomesticNetworkSection(rows, headerAt) {
+  const header=(rows[headerAt] || []).map((v)=>String(v).trim().toLowerCase());
+  if (header[1] !== "dispacciamento" || !String(header[2]).includes("σ1") ||
+    !String(header[3]).includes("σ2") || !String(header[4]).includes("σ3") ||
+    !String(header[8]).includes("asos") || !String(header[9]).includes("arim")) return null;
+  const energy=rows[headerAt+2] || [], fixed=rows[headerAt+3] || [],power=rows[headerAt+4] || [];
+  if (!String(energy[0]).toLowerCase().includes("quota energia") ||
+    !String(fixed[0]).toLowerCase().includes("quota fissa") ||
+    !String(power[0]).toLowerCase().includes("quota potenza")) return null;
+
+  const required=[
+    officialNumber(energy[4]),officialNumber(energy[5]),officialNumber(energy[6]),
+    officialNumber(energy[8]),officialNumber(energy[9]),
+    officialNumber(fixed[2]),officialNumber(power[3]),officialNumber(power[6]),
+  ];
+  if(required.some((n)=>n===null))return null;
+  const reteEnergia=required[0]+required[1]+required[2];
+  const oneriEnergia=required[3]+required[4];
+  const quotaEnergia=reteEnergia+oneriEnergia;
+  const quotaFissaAnnua=required[5]+officialNumber(fixed[8],true)+officialNumber(fixed[9],true);
+  const quotaPotenzaAnnua=required[6]+required[7]+officialNumber(power[8],true)+officialNumber(power[9],true);
+  const matches=(sum,expected,tolerance=0.000002)=>{
+    const n=officialNumber(expected);
+    return n!==null && Math.abs(sum-n)<=tolerance;
+  };
+  if (!matches(reteEnergia,energy[7]) ||
+    !matches(oneriEnergia,energy[10]) ||
+    !matches(quotaFissaAnnua,Number(fixed[7] || 0)+Number(fixed[10]||0),0.02) ||
+    !matches(quotaPotenzaAnnua,Number(power[7]||0)+Number(power[10]||0),0.02) ||
+    quotaEnergia<0.005 || quotaEnergia>0.2 ||
+    quotaFissaAnnua>500 || quotaPotenzaAnnua>200) return null;
+  return {
+    quotaFissaAnnua:round6(quotaFissaAnnua),
+    quotaPotenzaAnnua:round6(quotaPotenzaAnnua),
+    quotaEnergia:round6(quotaEnergia),
+  };
+}
+
+async function fetchDomesticOfficialNetwork() {
+  const response=await fetch(DOMESTIC_SOURCE,{
+    headers:{"User-Agent":"simulatore-bollette/1.0"},
+    signal:AbortSignal.timeout(22000),
+  });
+  if(!response.ok)throw Error("ARERA domestici 2026 HTTP "+response.status);
+  const workbook=XLSX.read(new Uint8Array(await response.arrayBuffer()),{type:"array"});
+  const result=[];
+  for(const sheetName of workbook.SheetNames){
+    const parts=sheetName.trim().toLowerCase().split(/\s+/);
+    const year=Number(parts[parts.length-1]);
+    const month=MONTHS.findIndex((label)=>label.toLowerCase()===parts[0])+1;
+    if(year!==2026||month<1)continue;
+    const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{
+      header:1,defval:"",raw:false,
+    });
+    const residential=parseDomesticNetworkSection(rows,10);
+    const nonresidential=parseDomesticNetworkSection(rows,20);
+    if(!residential||!nonresidential)continue;
+    for(const tipo of DOMESTIC_TYPES){
+      const data=tipo==="NON RESIDENTE"?nonresidential:residential;
+      result.push({
+        mese:MONTHS[month-1]+" "+year,
+        anno:year,meseNumero:month,tipo,...data,
+        status:"AGGIORNATO DA PROSPETTO ARERA",
+        source:DOMESTIC_SOURCE,
+      });
+    }
+  }
+  if(result.length<9)throw Error("Prospetto ARERA privo dei dati domestici completi");
+  return result;
+}
+
 const SOURCE_URLS = [
   "https://www.arera.it/area-operatori/prezzi-e-tariffe/distr",
   "https://www.arera.it/consumatori/valori-trasporto-oneri-generali-nondomestici-ee",
@@ -197,13 +281,29 @@ export default async function handler(req, res) {
     );
   }
 
+  const baseRows=buildRows();
+  let domesticRows=[];
+  try {
+    domesticRows=await fetchDomesticOfficialNetwork();
+  } catch (error) {
+    warnings.push("Rete domestica ARERA 2026: " + (error?.message||error));
+  }
+  const domesticMap=new Map(domesticRows.map((row)=>[row.mese+"|"+row.tipo,row]));
+  const merged=baseRows.map((row)=>domesticMap.get(row.mese+"|"+row.tipo)||row);
+  for(const item of domesticRows){
+    if(!baseRows.some((row)=>row.mese===item.mese&&row.tipo===item.tipo))merged.push(item);
+  }
+  if(!domesticRows.length){
+    warnings.push("Rete domestici: impossibile estrarre nuovi importi, conservati i valori storici.");
+  }
+
   return res.status(200).json({
     checkedAt,
-    rows: buildRows(),
-    sourceStatus: warnings.length
-      ? "FONTI_NON_DISPONIBILI_TARIFFE_BASE"
-      : "FONTI_RAGGIUNGIBILI_TARIFFE_BASE",
-    warnings: [...warnings, "Le fonti ARERA sono controllate automaticamente; la pagina non fornisce in questo endpoint un prospetto numerico nuovo da applicare. Restano i valori di riferimento."],
+    rows: merged,
+    sourceStatus: domesticRows.length
+      ? "DOMESTICO_AGGIORNATO_AUTOMATICAMENTE_ALTRI_STORICI"
+      : "RETE_DOMESTICI_NON_ESTRATTA",
+    warnings: [...warnings, "Per BTA e MTA il prospetto numerico completo non viene ancora estratto automaticamente: conservate le tariffe di riferimento."],
     assumptions: {
       business: "ASOS classe 0 / non energivoro",
       years: "2025-2026",
