@@ -285,8 +285,12 @@ export async function fetchNetworkTariffRows(force = false): Promise<{
     const quotaPotenzaAnnua = Number(item.quota_potenza_annua);
     const quotaEnergia = Number(item.quota_energia);
     const match = baseRows.find((row) => row.mese === mese && row.tipo === tipo);
+    const year = Number(mese.split(" ").at(-1));
+    const meseNumero = MONTHS.indexOf(mese.split(" ")[0]) + 1;
     if (
-      !match || !item.batch_id ||
+      !TYPES.includes(tipo) || !Number.isSafeInteger(year) ||
+      year < 2025 || year > 2100 || meseNumero < 1 ||
+      !item.batch_id ||
       !/^https:\/\/(?:www\.)?arera\.it\//i.test(String(item.source_url || "")) ||
       ![quotaFissaAnnua, quotaPotenzaAnnua, quotaEnergia].every(Number.isFinite) ||
       quotaFissaAnnua < 0 || quotaFissaAnnua > 10000 ||
@@ -294,7 +298,11 @@ export async function fetchNetworkTariffRows(force = false): Promise<{
       quotaEnergia < 0 || quotaEnergia > 0.5
     ) continue;
     overrides.set(mese + "|" + tipo, {
-      ...match,
+      ...(match || {
+        mese, tipo, anno: year, meseNumero,
+        quotaFissaAnnua, quotaPotenzaAnnua, quotaEnergia,
+        source: "", status: "",
+      }),
       quotaFissaAnnua, quotaPotenzaAnnua, quotaEnergia,
       source: String(item.source_url),
       status: "PROSPETTO ARERA APPROVATO",
@@ -305,6 +313,11 @@ export async function fetchNetworkTariffRows(force = false): Promise<{
       ...row, status: "BASE DA VERIFICARE",
     }
   );
+  for (const [key, override] of overrides.entries()) {
+    if (!baseRows.some((row) => row.mese + "|" + row.tipo === key)) {
+      mergedRows.push(override);
+    }
+  }
   const latest = (audit.data || [])[0];
   if (Array.isArray(latest?.warnings)) warnings.push(...latest.warnings.map(String));
   return {
