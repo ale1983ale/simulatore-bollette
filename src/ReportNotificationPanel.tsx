@@ -268,7 +268,7 @@ export default function ReportNotificationPanel({
     }
 
     const names = selected
-      .map((agent) => agent.agenzia || agent.email)
+      .map((agent) => (agent.agenzia || agent.email).toLocaleUpperCase("it-IT"))
       .slice(0, 20)
       .join("\n• ");
     const more = selected.length > 20 ? `\n...e altri ${selected.length - 20}` : "";
@@ -297,6 +297,46 @@ export default function ReportNotificationPanel({
       await loadData();
     } catch (error: any) {
       setNotice(error?.message || String(error));
+      setBusy(false);
+    }
+  };
+
+  const deleteHistoryEntry = async (item: HistoryRow) => {
+    if (busy) return;
+    const dateLabel = new Date(item.sent_at || item.created_at || "").toLocaleString("it-IT");
+    if (!window.confirm(
+      `Eliminare dallo storico il messaggio "${item.subject}" del ${dateLabel}?\n\nLa cancellazione non ritira le email già inviate.`
+    )) return;
+
+    setBusy(true);
+    setNotice("");
+    try {
+      await callReportApi("delete_history", { history_id: item.id });
+      await loadData();
+      setNotice("Messaggio eliminato dallo storico.");
+    } catch (error: any) {
+      setNotice(error?.message || String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteAllHistory = async () => {
+    if (busy || !history.length) return;
+    if (!window.confirm(
+      "Eliminare TUTTO lo storico degli invii Report, inclusi quelli più vecchi non mostrati nella tabella?\n\nLe email già inviate non verranno ritirate."
+    )) return;
+    if (!window.confirm("SEI SICURO? Confermi la cancellazione definitiva di tutto lo storico invii Report?")) return;
+
+    setBusy(true);
+    setNotice("");
+    try {
+      await callReportApi("delete_all_history");
+      await loadData();
+      setNotice("Tutto lo storico invii Report è stato eliminato.");
+    } catch (error: any) {
+      setNotice(error?.message || String(error));
+    } finally {
       setBusy(false);
     }
   };
@@ -461,7 +501,7 @@ export default function ReportNotificationPanel({
                   }
                 />
                 <span style={{ minWidth: 0 }}>
-                  <strong>{agent.agenzia || "Senza nome"}</strong>
+                  <strong>{(agent.agenzia || "Senza nome").toLocaleUpperCase("it-IT")}</strong>
                   <div
                     style={{
                       color: "#64748b",
@@ -612,7 +652,23 @@ export default function ReportNotificationPanel({
       )}
 
       <div style={{ ...card, marginBottom: 16 }}>
-        <strong>Storico invii</strong>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <strong>Storico invii</strong>
+          <button
+            type="button"
+            disabled={busy || !history.length}
+            onClick={() => void deleteAllHistory()}
+            style={{
+              ...button,
+              background: "#fee2e2",
+              color: "#991b1b",
+              borderColor: "#fecaca",
+              opacity: busy || !history.length ? 0.5 : 1,
+            }}
+          >
+            ELIMINA TUTTI
+          </button>
+        </div>
         <div style={{ marginTop: 10, overflowX: "auto" }}>
           <table
             style={{
@@ -656,22 +712,39 @@ export default function ReportNotificationPanel({
                     {item.credentials_included ? "SÌ" : "NO"}
                   </td>
                   <td style={{ padding: 7 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedTemplateId(item.template_id || null);
-                        setSubject(item.subject || "");
-                        setBody(item.body || "");
-                        setNotice("Messaggio precedente caricato.");
-                      }}
-                      style={{
-                        ...button,
-                        padding: "5px 8px",
-                        background: "#e2e8f0",
-                      }}
-                    >
-                      RIUTILIZZA
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setSelectedTemplateId(item.template_id || null);
+                          setSubject(item.subject || "");
+                          setBody(item.body || "");
+                          setNotice("Messaggio precedente caricato.");
+                        }}
+                        style={{
+                          ...button,
+                          padding: "5px 8px",
+                          background: "#e2e8f0",
+                        }}
+                      >
+                        RIUTILIZZA
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void deleteHistoryEntry(item)}
+                        style={{
+                          ...button,
+                          padding: "5px 8px",
+                          background: "#fee2e2",
+                          color: "#991b1b",
+                          borderColor: "#fecaca",
+                        }}
+                      >
+                        ELIMINA
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
