@@ -202,46 +202,55 @@ function sheetFallbackYear(sheetName, fallbackYear = null) {
 
 function extractDomesticCdisp(sheets, fallbackYear) {
   const found = new Map();
-
+  // L'XLSX ufficiale ARERA 2026 ha un foglio per mese.
+  // Riga "dispacciamento" (colonna B), seguita dalla riga
+  // "Quota energia (euro/kWh)" (senza intestazione C_DISPD numerica).
   for (const sheet of sheets || []) {
     const rows = sheet.rows || [];
-    const fallback = sheetFallbackYear(sheet.name, fallbackYear);
+    const period = parsePeriodsFromText(sheet.name, fallbackYear);
+    if (period.length === 1) {
+      const { year, month } = period[0];
+      const extracted = [];
+      for (let i = 0; i < rows.length - 1; i += 1) {
+        const head = (rows[i] || []).map(normalizeText);
+        const dispCol = head.findIndex((cell) => cell === "dispacciamento");
+        if (dispCol < 1) continue;
+        for (let j = i + 1; j <= Math.min(i + 4, rows.length - 1); j += 1) {
+          if (!normalizeText(rows[j]?.[0]).includes("quota energia")) continue;
+          const value = parseNumber(rows[j]?.[dispCol]);
+          if (value !== null && value >= 0.001 && value <= 0.1) {
+            extracted.push(value);
+          }
+          break;
+        }
+      }
+      if (extracted.length && extracted.every(
+        (rate) => Math.abs(rate - extracted[0]) < 0.000001
+      )) {
+        found.set(`${year}-${month}`, round6(extracted[0]));
+      }
+      continue;
+    }
 
+    // Compatibilità con eventuali prospetti meno recenti a righe.
+    const fallback = sheetFallbackYear(sheet.name, fallbackYear);
     for (let headerIndex = 0; headerIndex < rows.length; headerIndex += 1) {
       const header = rows[headerIndex].map(normalizeText);
       const cdispCol = header.findIndex((cell) =>
         cell.includes("c_dispd") ||
         cell.includes("c dispd") ||
-        cell.includes("cdispd") ||
-        (cell.includes("dispacciamento") && cell.includes("domestic"))
+        cell.includes("cdispd")
       );
       if (cdispCol < 0) continue;
-
-      const headerText = rows[headerIndex][cdispCol];
       for (let r = headerIndex + 1; r < Math.min(rows.length, headerIndex + 80); r += 1) {
         const row = rows[r] || [];
-        const periods = row
-          .flatMap((cell) => parsePeriodsFromText(cell, fallback))
-          .filter((period, index, arr) =>
-            arr.findIndex((item) => item.year === period.year && item.month === period.month) === index
-          );
-        if (!periods.length) continue;
-
-        const value = normalizeRate(row[cdispCol], headerText);
-        if (
-          value === null ||
-          value <= 0.001 ||
-          value >= 0.1
-        ) {
-          continue;
-        }
-        periods.forEach(({ year, month }) => {
-          found.set(`${year}-${month}`, value);
-        });
+        const periods = row.flatMap((cell) => parsePeriodsFromText(cell, fallback));
+        const value = normalizeRate(row[cdispCol], rows[headerIndex][cdispCol]);
+        if (value === null || value < 0.001 || value > 0.1) continue;
+        periods.forEach(({ year, month }) => found.set(`${year}-${month}`, value));
       }
     }
   }
-
   return found;
 }
 
@@ -372,7 +381,10 @@ export default async function handler(req, res) {
   const domesticMaps = [];
   const businessMaps = [];
 
-  const domesticYears = Array.from(new Set([2025, 2026, currentYear]));
+  // Il file storico ARERA 2025 non esiste più a questo URL (404).
+  // Conserviamo lo storico 2025; 2026 e anni successivi vengono letti
+  // dai corrispondenti prospetti mensili ufficiali disponibili.
+  const domesticYears = Array.from(new Set([2026, currentYear]));
   for (const year of domesticYears) {
     try {
       const sheets = await fetchWorkbook(DOMESTIC_URL(year));
