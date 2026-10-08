@@ -457,64 +457,90 @@ select optgroup {
 }
 
 @media (max-width: 720px) {
+  /* Mobile: una sola riga navigabile, senza abbreviazioni né pulsanti schiacciati. */
   .ge-main-nav {
-    display: grid !important;
-    grid-template-columns:
-      minmax(0, 1.08fr)
-      minmax(0, .72fr)
-      minmax(0, .95fr)
-      minmax(0, .72fr)
-      minmax(0, .88fr)
-      minmax(0, .86fr)
-      minmax(0, .92fr)
-      34px
-      34px;
-    gap: 4px !important;
-    align-items: stretch !important;
-    margin-bottom: 10px !important;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 7px !important;
+    width: 100% !important;
+    min-width: 0;
+    margin-bottom: 12px !important;
   }
 
-  .ge-main-nav__primary,
+  .ge-main-nav__primary {
+    display: flex !important;
+    flex: 1 1 0;
+    min-width: 0;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 1px 5px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    -webkit-mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 10px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 10px), transparent 100%);
+  }
+
+  .ge-main-nav__primary::-webkit-scrollbar {
+    display: none;
+  }
+
   .ge-main-nav__actions {
-    display: contents !important;
+    display: flex !important;
+    flex: 0 0 auto;
+    align-items: center !important;
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+    margin-left: 0 !important;
+    padding: 0 0 3px 7px;
+    border-left: 1px solid #cbd5e1;
   }
 
   .ge-main-nav button {
-    width: 100% !important;
+    flex: 0 0 auto;
+    width: auto !important;
     min-width: 0 !important;
-    min-height: 36px !important;
-    height: 36px !important;
+    min-height: 42px !important;
+    height: 42px !important;
     margin: 0 !important;
-    padding: 6px 3px !important;
-    font-size: 9px !important;
-    line-height: 1 !important;
-    border-radius: 8px !important;
+    padding: 0 11px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    border-radius: 10px !important;
     white-space: nowrap !important;
+    scroll-snap-align: start;
   }
 
+  /* Mostrare i nomi completi anche su telefono: PUN-PSV, ARCHIVIO, Area Admin. */
   .ge-main-nav__label-desktop {
-    display: none !important;
+    display: inline !important;
   }
 
   .ge-main-nav__label-mobile {
-    display: inline !important;
+    display: none !important;
+  }
+
+  .ge-main-nav__actions button:not(.ge-main-nav__reload):not(.ge-main-nav__settings) {
+    padding: 0 9px !important;
+    font-size: 11px !important;
   }
 
   .ge-main-nav__reload,
   .ge-main-nav__settings {
-    grid-column: auto !important;
-    grid-row: auto !important;
-    width: 34px !important;
-    min-width: 34px !important;
-    height: 36px !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 42px !important;
+    min-height: 42px !important;
     padding: 0 !important;
-    justify-self: stretch !important;
-    font-size: 17px !important;
-    line-height: 1 !important;
-  }
-
-  .ge-main-nav__actions button:last-child {
-    font-size: 17px !important;
+    display: grid !important;
+    place-items: center;
+    font-size: 19px !important;
     line-height: 1 !important;
   }
 
