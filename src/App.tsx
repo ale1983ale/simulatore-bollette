@@ -13227,6 +13227,7 @@ export default function App() {
   }, [tab]);
 
   const openOutlookEmail = () => {
+    if (adminSession && !canAdminAccessTab(adminProfile, "email")) return;
     setAdminMenuOpen(false);
     window.dispatchEvent(
       new CustomEvent("open-outlook-email", {
@@ -13236,6 +13237,7 @@ export default function App() {
   };
 
   const openOutlookEmailMatches = (targetAgency?: string) => {
+    if (adminSession && !canAdminAccessTab(adminProfile, "email")) return;
     setAdminMenuOpen(false);
     window.dispatchEvent(
       new CustomEvent("open-outlook-email", {
@@ -13862,28 +13864,12 @@ useEffect(() => {
 
 useEffect(() => {
   if (!adminSession || !adminProfile) return;
-  const fullAccess =
-    adminProfile.role === "super_admin" ||
-    adminProfile.full_access !== false;
-  if (fullAccess) return;
-
-  const allowedTabs = new Set([
-    "dashboard",
-    "energia",
-    "gas",
-    "report",
-    "provvigioni",
-    "punpsvPublic",
-    "ateco",
-    "reportAdmin",
-    "driveArchive",
-  ]);
-
-  if (!allowedTabs.has(tab)) {
+  if (!canAdminAccessTab(adminProfile, tab)) {
+    setAdminMenuOpen(false);
     setTab("dashboard");
     localStorage.setItem("app_tab", "dashboard");
   }
-}, [adminSession, adminProfile?.role, adminProfile?.full_access, tab]);
+}, [adminSession, adminProfile, tab]);
 
 useEffect(() => {
   if (!adminSession || tab !== "recruitingWaiting") return;
@@ -14062,10 +14048,13 @@ useEffect(() => {
   const isAdminTab = adminTabs.includes(tab);
   const isSuperAdmin = adminProfile?.role === "super_admin";
   const canUseProvvigioni =
-    isSuperAdmin || Boolean(agentSession?.provvigioni_visible);
+    isSuperAdmin ||
+    (Boolean(adminSession) && getAdminDashboardPermissions(adminProfile).has("provvigioni")) ||
+    Boolean(agentSession?.provvigioni_visible);
   const hasFullAdminAccess =
-    adminProfile?.role === "super_admin" ||
-    adminProfile?.full_access !== false;
+    isSuperAdmin ||
+    (!Array.isArray(adminProfile?.dashboard_tabs) &&
+      adminProfile?.full_access !== false);
 
   const thStyle = {
     padding: "12px",
@@ -14432,10 +14421,12 @@ const renderAdminContent = () => {
         </button>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {hasFullAdminAccess && (
+          {canAdminAccessTab(adminProfile, "personale") && (
             <button onClick={() => setTab("personale")} style={{ ...baseBtn, ...(tab === "personale" ? activeBtn : {}) }}>PERSONALE</button>
           )}
-          <button onClick={() => setTab("reportAdmin")} style={{ ...baseBtn, ...(tab === "reportAdmin" ? activeBtn : {}) }}>REPORT ADMIN</button>
+          {canAdminAccessTab(adminProfile, "reportAdmin") && (
+            <button onClick={() => setTab("reportAdmin")} style={{ ...baseBtn, ...(tab === "reportAdmin" ? activeBtn : {}) }}>REPORT ADMIN</button>
+          )}
 {(agentSession || adminSession) && (
   <button
     onClick={() => {
@@ -15171,7 +15162,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </button>
         )}
 
-        {adminSession && hasFullAdminAccess && (
+        {adminSession && (canAdminAccessTab(adminProfile, "calendarAdmin") ||
+          canAdminAccessTab(adminProfile, "recruiting") ||
+          canAdminAccessTab(adminProfile, "email")) && (
           <div
             className="ge-brand-quick-actions"
             style={{
@@ -15184,6 +15177,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               gap: 7,
             }}
           >
+            {canAdminAccessTab(adminProfile, "calendarAdmin") && (
             <button
               type="button"
               title="Calendario"
@@ -15213,7 +15207,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             >
               📅
             </button>
+            )}
 
+            {canAdminAccessTab(adminProfile, "recruiting") && (
             <button
               type="button"
               title="Recruiting"
@@ -15243,7 +15239,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             >
               👥
             </button>
+            )}
 
+            {canAdminAccessTab(adminProfile, "email") && (
             <button
               type="button"
               title="Invio Email"
@@ -15267,6 +15265,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             >
               ✉️
             </button>
+            )}
 
           </div>
         )}
@@ -15324,6 +15323,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             alignItems: "center",
           }}
         >
+          {(!adminSession || canAdminAccessTab(adminProfile, "energia")) && (
           <button
             onClick={() => navigateTo("energia")}
             style={{
@@ -15334,7 +15334,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             <span className="ge-main-nav__label-desktop">Energia</span>
             <span className="ge-main-nav__label-mobile">ENERGIA</span>
           </button>
+          )}
 
+          {(!adminSession || canAdminAccessTab(adminProfile, "gas")) && (
           <button
             onClick={() => navigateTo("gas")}
             style={{
@@ -15345,7 +15347,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             <span className="ge-main-nav__label-desktop">Gas</span>
             <span className="ge-main-nav__label-mobile">GAS</span>
           </button>
+          )}
 
+          {(!adminSession || canAdminAccessTab(adminProfile, "report")) && (
           <button
             onClick={() => navigateTo("report")}
             style={{
@@ -15356,7 +15360,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             <span className="ge-main-nav__label-desktop">Report</span>
             <span className="ge-main-nav__label-mobile">REPORT</span>
           </button>
+          )}
 
+          {(!adminSession || canAdminAccessTab(adminProfile, "punpsvPublic")) && (
           <button
             onClick={() => navigateTo("punpsvPublic")}
             style={{
@@ -15367,7 +15373,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             <span className="ge-main-nav__label-desktop">PUN-PSV</span>
             <span className="ge-main-nav__label-mobile">PUN</span>
           </button>
+          )}
 
+          {(!adminSession || canAdminAccessTab(adminProfile, "ateco")) && (
           <button
             onClick={() => navigateTo("ateco")}
             style={{
@@ -15378,7 +15386,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             <span className="ge-main-nav__label-desktop">ATECO</span>
             <span className="ge-main-nav__label-mobile">ATECO</span>
           </button>
+          )}
 
+          {(!adminSession || canAdminAccessTab(adminProfile, "driveArchive")) && (
           <button
             onClick={() => navigateTo("driveArchive")}
             style={{
@@ -15389,6 +15399,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             <span className="ge-main-nav__label-desktop">ARCHIVIO</span>
             <span className="ge-main-nav__label-mobile">ARCH.</span>
           </button>
+          )}
 
         </div>
 
@@ -15472,7 +15483,11 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
       </div>
   
   
-{tab === "dashboard" ? (
+{adminSession && adminProfile && !canAdminAccessTab(adminProfile, tab) ? (
+  <div style={{ padding: 24, background: "white", borderRadius: 12, color: "#991b1b", fontWeight: 800 }}>
+    Non hai accesso a questa scheda. Ritorno alla dashboard.
+  </div>
+) : tab === "dashboard" ? (
   adminSession ? (
     renderAdminContent()
   ) : (
