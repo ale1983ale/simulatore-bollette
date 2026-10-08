@@ -13289,6 +13289,63 @@ export default function App() {
     })();
   }, []);
 
+  // Mantiene le autorizzazioni dashboard allineate tra Fold, PC e altri dispositivi.
+  useEffect(() => {
+    const token = String(adminSession?.token || "");
+    if (!token) return;
+    let cancelled = false;
+
+    const refreshDashboardAccess = async () => {
+      try {
+        const { data, error } = await supabase.rpc("admin_dashboard_access", {
+          p_session_token: token,
+          p_action: "self",
+        });
+        if (cancelled || error || !data) return;
+        const access = data as any;
+        const dashboard_tabs = Array.isArray(access.dashboard_tabs)
+          ? access.dashboard_tabs.map(String)
+          : null;
+        setAdminProfile((current) => {
+          if (!current) return current;
+          const oldKeys = JSON.stringify(current.dashboard_tabs ?? null);
+          const newKeys = JSON.stringify(dashboard_tabs);
+          if (
+            oldKeys === newKeys &&
+            current.full_access === access.full_access &&
+            current.role === access.role
+          ) return current;
+          const updated = {
+            ...current,
+            dashboard_tabs,
+            full_access: access.full_access,
+            role: access.role,
+          };
+          localStorage.setItem("admin_session", JSON.stringify({
+            ...updated,
+            token,
+          }));
+          return updated;
+        });
+      } catch (error) {
+        console.warn("DASHBOARD ACCESS REFRESH ERROR:", error);
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refreshDashboardAccess();
+    };
+    window.addEventListener("focus", refreshDashboardAccess);
+    document.addEventListener("visibilitychange", onVisibility);
+    const timer = window.setInterval(refreshDashboardAccess, 60000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshDashboardAccess);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(timer);
+    };
+  }, [adminSession?.token]);
+
   useEffect(() => {
     if (!adminSession || !adminProfile) {
       setWaitingRoomIncomingCount(0);
