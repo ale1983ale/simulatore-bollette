@@ -3950,6 +3950,10 @@ function Energia({
   };
 
   const printEnergyPdf = () => {
+    if (r.isBalanced && !r.balancedFixedReady) {
+      alert("Completa prima il PREZZO FISSO bilanciato delle fasce con consumo. Il PDF non può essere generato con importi incompleti.");
+      return;
+    }
     const pdfCompetenceMonth = (
       selectedMonth: string,
       dispReferenceMonth: string
