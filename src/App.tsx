@@ -3250,6 +3250,7 @@ function Energia({
   dispCpRows,
   networkTariffRows,
   showAgentAssociation,
+  offerVisibility,
   canUseProvvigioni,
   onOpenProvvigioni,
 }: {
@@ -3258,10 +3259,19 @@ function Energia({
   dispCpRows: DispCpRow[];
   networkTariffRows: NetworkTariffRow[];
   showAgentAssociation: boolean;
+  offerVisibility: OfferVisibilitySettings;
   canUseProvvigioni: boolean;
   onOpenProvvigioni: (prefill: ProvvigioniPrefill) => void;
 }) {
   const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
+  const allowedEnergyModes: OfferPriceMode[] = [
+    "VARIABILE",
+    ...(offerVisibility.energyFixed ? ["FISSO" as const] : []),
+    ...(offerVisibility.energyBalanced ? ["BILANCIATO" as const] : []),
+  ];
+  const eligibleEnergyOffers = visibleEnergyOffers.filter((offer) =>
+    allowedEnergyModes.includes(energyOfferPriceMode(offer.nome))
+  );
 
   const buildEnergyInitialState = () => ({
     iva: "22",
@@ -3272,7 +3282,7 @@ function Energia({
     tipo: "BTA2",
     tipologiaOfferta: "VARIABILE",
     offerta:
-      visibleEnergyOffers.find((offer) => !isSicuraOffer(offer.nome))?.nome ||
+      eligibleEnergyOffers.find((offer) => energyOfferPriceMode(offer.nome) === "VARIABILE")?.nome ||
       "",
     mese1: "",
     mese2: "",
@@ -3417,8 +3427,11 @@ function Energia({
   const energyFixedMode =
     String(s.tipologiaOfferta || "VARIABILE") === "FISSO";
 
-  const fixedModeEnergyOffers = visibleEnergyOffers.filter(
-    (offer) => isSicuraOffer(offer.nome) === energyFixedMode
+  const activeEnergyMode: OfferPriceMode =
+    allowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)
+      ? s.tipologiaOfferta as OfferPriceMode : "VARIABILE";
+  const fixedModeEnergyOffers = eligibleEnergyOffers.filter(
+    (offer) => energyOfferPriceMode(offer.nome) === activeEnergyMode
   );
 
   const selectedEnergyOffer =
@@ -3485,6 +3498,8 @@ function Energia({
     s.tipo,
     s.tipologiaOfferta,
     energyFixedMode,
+    offerVisibility.energyFixed,
+    offerVisibility.energyBalanced,
   ]);
 
   useEffect(() => {
@@ -3806,10 +3821,9 @@ function Energia({
     setLastEnergyInputAt(Date.now());
     setDispCpAutoMode(true);
 
-    const fixed = tipologia === "FISSO";
-    const candidateOffers = visibleEnergyOffers.filter(
+    const candidateOffers = eligibleEnergyOffers.filter(
       (offer) =>
-        isSicuraOffer(offer.nome) === fixed &&
+        energyOfferPriceMode(offer.nome) === tipologia &&
         energyOfferAllowsType(offer, s.tipo)
     );
 
@@ -4361,8 +4375,9 @@ return (
               "controllare accuratamente la tipologia di cliente per il corretto calcolo automatico delle voci Reti e oneri"
             )}
             {offerTypeField(
-              s.tipologiaOfferta || "VARIABILE",
-              handleEnergyOfferTypeChange
+              activeEnergyMode,
+              handleEnergyOfferTypeChange,
+              allowedEnergyModes
             )}
             {selectField(
               "Offerta",
