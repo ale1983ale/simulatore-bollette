@@ -4,7 +4,7 @@ import html2canvas from "html2canvas";
 import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
-import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminSetFullAccess, adminSetDashboardTabs, adminUpdateUser, adminUpsertSettings, ensureAdminSession } from "./adminSecurity";
+import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminSetFullAccess, adminSetDashboardTabs, adminUpdateUser, adminUpsertSettings, ensureAdminSession, getAdminSessionToken } from "./adminSecurity";
 import {
   agentLogin,
   ensureAgentSession,
@@ -667,6 +667,7 @@ type SavedSimulation = {
   id: string;
   name: string;
   agent_name?: string | null;
+  agent_id?: number;
   state: Record<string, any>;
   created_at: string;
 };
@@ -933,6 +934,32 @@ async function listSavedSimulations(
   return Array.isArray(data)
     ? (data as SavedSimulation[])
     : [];
+}
+
+/** Elenco in sola lettura. L'RPC valida la sessione admin e filtra
+ * server-side gli agenti collegati (owner_admin_id), senza usare il
+ * campo facoltativo agent_name delle simulazioni personali. */
+async function listLinkedAgentSavedSimulations(
+  type: SavedSimulationType
+): Promise<SavedSimulation[]> {
+  const token = await getAdminSessionToken();
+  const { data, error } = await supabase.rpc(
+    "admin_list_agent_simulations",
+    {
+      p_session_token: token,
+      p_simulation_type: type,
+      p_limit: 100,
+    }
+  );
+  if (error) throw error;
+  if (!Array.isArray(data)) {
+    throw new Error("L'elenco delle simulazioni degli agenti non è disponibile.");
+  }
+  return (data as SavedSimulation[]).sort(
+    (left, right) =>
+      new Date(right.created_at).getTime() -
+      new Date(left.created_at).getTime()
+  );
 }
 
 async function saveSimulationArchive(
@@ -1350,12 +1377,14 @@ function SavedSimulationsModal({
   title,
   onClose,
   onOpenSimulation,
+  isAdmin,
 }: {
   open: boolean;
   type: SavedSimulationType;
   title: string;
   onClose: () => void;
   onOpenSimulation: (simulation: SavedSimulation) => void;
+  isAdmin: boolean;
 }) {
   const [items, setItems] = useState<SavedSimulation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1366,6 +1395,7 @@ function SavedSimulationsModal({
   const [deletingAll, setDeletingAll] = useState(false);
   const [customerFilter, setCustomerFilter] = useState("");
   const [agentFilter, setAgentFilter] = useState("");
+  const [archiveView, setArchiveView] = useState<"personal" | "agents">("personal");
 
   const agentFilterOptions = useMemo(
     () =>
@@ -1400,12 +1430,14 @@ function SavedSimulationsModal({
     });
   }, [items, customerFilter, agentFilter]);
 
-  const reloadSavedSimulations = async () => {
+  const reloadSavedSimulations = async (view: "personal" | "agents") => {
     setLoading(true);
     setError("");
 
     try {
-      const rows = await listSavedSimulations(type);
+      const rows = view === "agents"
+        ? await listLinkedAgentSavedSimulations(type)
+        : await listSavedSimulations(type);
       setItems(rows);
     } catch (err) {
       setItems([]);
@@ -1421,14 +1453,25 @@ function SavedSimulationsModal({
 
   useEffect(() => {
     if (!open) return;
+    setArchiveView("personal");
     setCustomerFilter("");
     setAgentFilter("");
-    void reloadSavedSimulations();
+    void reloadSavedSimulations("personal");
   }, [open, type]);
+
+  const switchArchiveView = (view: "personal" | "agents") => {
+    if (view === "agents" && !isAdmin) return;
+    setArchiveView(view);
+    setCustomerFilter("");
+    setAgentFilter("");
+    setItems([]);
+    void reloadSavedSimulations(view);
+  };
 
   const handleDeleteOne = async (
     simulation: SavedSimulation
   ) => {
+    if (archiveView !== "personal") return;
     if (
       !window.confirm(
         `Vuoi eliminare la simulazione "${simulation.name}"?`
@@ -1459,7 +1502,7 @@ function SavedSimulationsModal({
   };
 
   const handleDeleteAll = async () => {
-    if (items.length === 0) return;
+    if (archiveView !== "personal" || items.length === 0) return;
 
     if (
       !window.confirm(
@@ -1532,7 +1575,9 @@ function SavedSimulationsModal({
         >
           <div>
             <div style={{ fontWeight: 950, fontSize: 22 }}>
-              {title}
+              {archiveView === "agents"
+                ? `Simulazioni ${type === "energy" ? "Energia" : "Gas"} degli agenti`
+                : title}
             </div>
             <div
               style={{
@@ -1541,7 +1586,9 @@ function SavedSimulationsModal({
                 marginTop: 3,
               }}
             >
-              Ultime 100 simulazioni salvate
+              {archiveView === "agents"
+                ? "Ultime 100 simulazioni salvate dagli agenti collegati al tuo admin · dalla più recente"
+                : "Ultime 100 simulazioni salvate"}
             </div>
           </div>
           <div
@@ -1552,7 +1599,7 @@ function SavedSimulationsModal({
               justifyContent: "flex-end",
             }}
           >
-            <button
+            {archiveView === "personal" && <button
               type="button"
               disabled={
                 deletingAll || loading || items.length === 0
@@ -1576,7 +1623,7 @@ function SavedSimulationsModal({
               }}
             >
               {deletingAll ? "ELIMINAZIONE..." : "ELIMINA TUTTO"}
-            </button>
+            </button>}
             <button
               type="button"
               onClick={onClose}
@@ -1593,6 +1640,34 @@ function SavedSimulationsModal({
             </button>
           </div>
         </div>
+
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => switchArchiveView(
+              archiveView === "personal" ? "agents" : "personal"
+            )}
+            disabled={loading || deletingAll || Boolean(deletingId)}
+            style={{
+              width: "100%",
+              minHeight: 44,
+              marginBottom: 14,
+              border: "1px solid #1d4ed8",
+              background: archiveView === "personal" ? "#1d4ed8" : "#eff6ff",
+              color: archiveView === "personal" ? "white" : "#1d4ed8",
+              borderRadius: 10,
+              padding: "10px 14px",
+              fontWeight: 900,
+              fontSize: 13,
+              cursor: loading ? "wait" : "pointer",
+              textAlign: "center",
+            }}
+          >
+            {archiveView === "personal"
+              ? "APRI SIMULAZIONI AGENTI"
+              : "← TORNA ALLE MIE SIMULAZIONI"}
+          </button>
+        )}
 
         {!loading && !error && items.length > 0 && (
           <div
@@ -1646,7 +1721,7 @@ function SavedSimulationsModal({
                 fontSize: 12,
               }}
             >
-              Agente associato
+              {archiveView === "agents" ? "Agente che ha salvato" : "Agente associato"}
               <select
                 value={agentFilter}
                 onChange={(event) =>
@@ -1663,7 +1738,9 @@ function SavedSimulationsModal({
                 }}
               >
                 <option value="">TUTTI GLI AGENTI</option>
-                <option value="__NO_AGENT__">SENZA AGENTE</option>
+                {archiveView === "personal" && (
+                  <option value="__NO_AGENT__">SENZA AGENTE</option>
+                )}
                 {agentFilterOptions.map((agent) => (
                   <option key={agent} value={agent}>
                     {agent}
@@ -1730,7 +1807,9 @@ function SavedSimulationsModal({
           </div>
         ) : items.length === 0 ? (
           <div style={{ padding: 22, color: "#64748b" }}>
-            Nessuna simulazione salvata.
+            {archiveView === "agents"
+              ? "Nessuna simulazione degli agenti associati al tuo admin."
+              : "Nessuna simulazione salvata."}
           </div>
         ) : filteredItems.length === 0 ? (
           <div
@@ -1792,7 +1871,12 @@ function SavedSimulationsModal({
                         fontWeight: 800,
                       }}
                     >
-                      Agente: {item.agent_name}
+                      {archiveView === "agents"
+                        ? "Salvata da: "
+                        : "Agente: "}
+                      {archiveView === "agents"
+                        ? String(item.agent_name).toLocaleUpperCase("it-IT")
+                        : item.agent_name}
                     </div>
                   )}
                 </div>
@@ -1820,7 +1904,7 @@ function SavedSimulationsModal({
                   >
                     APRI
                   </button>
-                  <button
+                  {archiveView === "personal" && <button
                     type="button"
                     disabled={deletingId === item.id}
                     onClick={() =>
@@ -1844,7 +1928,7 @@ function SavedSimulationsModal({
                     {deletingId === item.id
                       ? "..."
                       : "ELIMINA"}
-                  </button>
+                  </button>}
                 </div>
               </div>
             ))}
@@ -5118,6 +5202,7 @@ Base suggerito
       title="Simulazioni Energia salvate"
       onClose={() => setEnergySavedOpen(false)}
       onOpenSimulation={openSavedEnergySimulation}
+      isAdmin={showAgentAssociation}
     />
   </div>
 );
@@ -6677,6 +6762,7 @@ border: "1px solid #bfd8f6",
         title="Simulazioni Gas salvate"
         onClose={() => setGasSavedOpen(false)}
         onOpenSimulation={openSavedGasSimulation}
+        isAdmin={showAgentAssociation}
       />
     </div>
   );
