@@ -26,6 +26,13 @@ type ParsedProductionFile = {
   rows: ProductionRow[];
   originalRowCount: number;
   duplicateRowsInFile: number;
+  sheetPreviews: Array<{
+    sheetName: string;
+    periodLabel: string;
+    sections: Array<{ commodity: Commodity; rows: number; totalConsumptionColumn: string }>;
+    warnings: string[];
+  }>;
+  blockingIssues: string[];
 };
 
 type AgentZone = {
@@ -162,12 +169,35 @@ function parseReportTitle(value: unknown) {
   };
 }
 
+function parseProductionSheetPeriod(name: string) {
+  const match = name.match(/(\d{1,2}[./-]\d{1,2}[./-]\d{4})\s*-\s*(\d{1,2}[./-]\d{1,2}[./-]\d{4})/);
+  if (!match) return null;
+  const periodStart = parseItalianDate(match[1]);
+  const periodEnd = parseItalianDate(match[2]);
+  return periodStart && periodEnd && periodStart < periodEnd
+    ? { periodStart, periodEnd, periodLabel: formatIsoDate(periodStart) + " - " + formatIsoDate(periodEnd) }
+    : null;
+}
+
+function totalConsumptionColumn(header: unknown[], commodity: Commodity) {
+  return header.findIndex((cell, i) => i > 0 &&
+    normalize(cell).includes("CONSUMOTOTALE") &&
+    normalize(cell).includes(commodity === "LUCE" ? "KWH" : "SMC"));
+}
+
+function excelColumn(index: number) {
+  let n = index + 1;
+  let out = "";
+  while (n > 0) { n--; out = String.fromCharCode(65 + n % 26) + out; n = Math.floor(n / 26); }
+  return out;
+}
+
 function isGroupOrTotalRow(name: string) {
   const trimmed = String(name || "").trim();
   if (!trimmed) return true;
   if (/^totale\s+complessivo$/i.test(trimmed)) return true;
   const upper = trimmed.toUpperCase();
-  return ITALIAN_REGIONS.some((region) => upper.startsWith(region.toUpperCase() + " -"));
+  return ITALIAN_REGIONS.some((region) => upper === region.toUpperCase() || upper.startsWith(region.toUpperCase() + " -"));
 }
 
 async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
