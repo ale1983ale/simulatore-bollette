@@ -15074,7 +15074,13 @@ const renderAdminContent = () => {
 
       {tab === "archive" && (
         <div style={{ width: "100%", minWidth: 0 }}>
-          <Archive />
+          <Archive
+            reportAdminPanel={
+              canAdminAccessTab(adminProfile, "reportAdmin")
+                ? <ReportAdmin adminProfile={adminProfile} />
+                : null
+            }
+          />
         </div>
       )}
 
