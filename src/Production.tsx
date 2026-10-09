@@ -204,91 +204,102 @@ async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
   const data = await file.arrayBuffer();
   await yieldToBrowser();
   const workbook = XLSX.read(data, { type: "array", cellDates: true, dense: true });
-  await yieldToBrowser();
-
   const byKey = new Map<string, ProductionRow>();
+  const sheetPreviews: ParsedProductionFile["sheetPreviews"] = [];
+  const blockingIssues: string[] = [];
   let originalRowCount = 0;
 
-  for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex += 1) {
+  for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
     const sheetName = workbook.SheetNames[sheetIndex];
+    const sheetPeriod = parseProductionSheetPeriod(sheetName);
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
-      header: 1,
-      defval: "",
-      raw: true,
+      header: 1, defval: "", raw: true,
     }) as unknown[][];
-
+    const preview: ParsedProductionFile["sheetPreviews"][number] = {
+      sheetName, periodLabel: sheetPeriod?.periodLabel || "Da intestazione",
+      sections: [], warnings: [],
+    };
+    sheetPreviews.push(preview);
     let report: ReturnType<typeof parseReportTitle> = null;
     let inData = false;
+    let consumptionCol = -1;
+    let activeSection: (typeof preview.sections)[number] | null = null;
 
-    for (let rowIndex = 0; rowIndex < matrix.length; rowIndex += 1) {
+    for (let rowIndex = 0; rowIndex < matrix.length; rowIndex++) {
       const sourceRow = matrix[rowIndex] || [];
       const firstCell = stringifyCell(sourceRow[0]);
-      const parsedTitle = parseReportTitle(firstCell);
-
-      if (parsedTitle) {
-        report = parsedTitle;
+      const titleType = firstCell.match(/^REPORT\s+(LUCE|GAS)\b/i);
+      if (titleType) {
+        const title = parseReportTitle(firstCell);
+        report = sheetPeriod
+          ? { ...sheetPeriod, commodity: titleType[1].toUpperCase() as Commodity }
+          : title;
+        if (!report) blockingIssues.push(sheetName + ": periodo REPORT non riconosciuto.");
+        if (title && sheetPeriod &&
+            (title.periodStart !== sheetPeriod.periodStart || title.periodEnd !== sheetPeriod.periodEnd)) {
+          preview.warnings.push("Titolo " + titleType[1].toUpperCase() +
+            " con date diverse: usato il periodo del foglio.");
+        }
         inData = false;
+        consumptionCol = -1;
+        activeSection = null;
         continue;
       }
-
       if (!report) continue;
-
-      if (normalize(firstCell) === normalize("SOTTOGR.-AGENTE")) {
+      if (normalize(firstCell).includes("SOTTOGRAGENTE")) {
+        consumptionCol = totalConsumptionColumn(sourceRow, report.commodity);
+        if (consumptionCol < 0 || normalize(sourceRow[1]) !== "INATTIVAZIONE") {
+          blockingIssues.push(sheetName + ": colonne " + report.commodity +
+            " non riconosciute alla riga " + (rowIndex + 1));
+          inData = false;
+          continue;
+        }
+        activeSection = {
+          commodity: report.commodity, rows: 0,
+          totalConsumptionColumn: excelColumn(consumptionCol),
+        };
+        preview.sections.push(activeSection);
         inData = true;
         continue;
       }
-
-      if (!inData || !firstCell) continue;
+      if (!inData || !firstCell || consumptionCol < 0 || !activeSection) continue;
       if (/^totale\s+complessivo$/i.test(firstCell)) {
         inData = false;
         continue;
       }
       if (isGroupOrTotalRow(firstCell)) continue;
-
-      originalRowCount += 1;
       const agente = firstCell.trim();
       const agentKey = normalize(agente);
       if (!agentKey) continue;
-
+      originalRowCount++;
+      activeSection.rows++;
       const inAttivazioneCount = Math.round(parseNumber(sourceRow[1]));
       const dedupKey = [
-        report.periodStart,
-        report.periodEnd,
-        report.commodity,
-        agentKey,
-        inAttivazioneCount,
+        report.periodStart, report.periodEnd, report.commodity, agentKey, inAttivazioneCount,
       ].join("|");
-
-      const row: ProductionRow = {
-        id: dedupKey,
-        dedupKey,
-        periodStart: report.periodStart,
-        periodEnd: report.periodEnd,
-        periodLabel: report.periodLabel,
-        commodity: report.commodity,
-        agente,
-        agentKey,
-        inAttivazioneCount,
+      if (!byKey.has(dedupKey)) byKey.set(dedupKey, {
+        id: dedupKey, dedupKey,
+        periodStart: report.periodStart, periodEnd: report.periodEnd,
+        periodLabel: report.periodLabel, commodity: report.commodity,
+        agente, agentKey, inAttivazioneCount,
         inAttivazioneConsumo: parseNumber(sourceRow[2]),
-        consumoTotale: parseNumber(sourceRow[6]),
+        consumoTotale: parseNumber(sourceRow[consumptionCol]),
         sourceFiles: [file.name],
-      };
-
-      if (!byKey.has(dedupKey)) byKey.set(dedupKey, row);
+      });
       if (originalRowCount % 150 === 0) await yieldToBrowser();
     }
-
+    if (!preview.sections.length)
+      blockingIssues.push(sheetName + ": nessuna sezione LUCE/GAS con colonne valide.");
+    for (const section of preview.sections)
+      if (!section.rows) preview.warnings.push("Nessun agente nel report " + section.commodity);
     await yieldToBrowser();
   }
-
   const rows = Array.from(byKey.values());
   return {
     id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 9),
-    name: file.name,
-    originalFile: file,
-    rows,
-    originalRowCount,
+    name: file.name, originalFile: file, rows, originalRowCount,
     duplicateRowsInFile: originalRowCount - rows.length,
+    sheetPreviews, blockingIssues,
   };
 }
 
