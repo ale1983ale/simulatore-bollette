@@ -14638,7 +14638,9 @@ useEffect(() => {
           .map((offer) =>
             ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURA DEDICATA" }
-              : { ...offer, nome: normalizeBalancedOffer(offer.nome), ...(isBalancedEnergyOffer(offer.nome) ? { visibile: true } : {}) }
+              : { ...offer, nome: normalizeBalancedOffer(offer.nome),
+                  ...(["BILANCIATA", "+BILANCIATA"].includes(normalizeOfferName(offer.nome))
+                    ? { visibile: true } : {}) }
           )
           .filter((offer) => !obsoleteEnergyOfferNames.has(offer.nome))
           .filter((offer, index, arr) => arr.findIndex((item) => item.nome === offer.nome) === index);
