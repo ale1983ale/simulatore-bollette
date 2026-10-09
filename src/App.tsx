@@ -2915,6 +2915,8 @@ function calcEnergia(
   const H22_base = isBalanced
     ? balancedVariableTotal + balancedFixedTotal
     : bandRows.reduce((sum, item) => sum + item.qty * (item.variable + spreadEff), 0);
+  const balancedFixedReady = !isBalanced ||
+    bandRows.every((item) => item.qty <= 0 || balancedFixedPrice(item.band) > 0);
 
   // Network losses apply to both halves, exactly once on total energy.
   const perditeEnergia = H22_base * perditaPercentuale;
@@ -3040,6 +3042,7 @@ function calcEnergia(
     H22_base,
     isBalanced,
     balancedFixedRowLabel,
+    balancedFixedReady,
     balancedVariableTotal,
     balancedFixedTotal,
     H22,
@@ -5152,6 +5155,15 @@ Base suggerito
         "anteprima",
         "Anteprima Energia",
         <>
+          {r.isBalanced && !r.balancedFixedReady && (
+            <div role="alert" style={{ color: "#991b1b", background: "#fef2f2",
+              border: "2px solid #f87171", borderRadius: 10, padding: 12,
+              fontWeight: 850, marginBottom: 12 }}>
+              ATTENZIONE: manca il prezzo fisso per una o più fasce con consumi.
+              Completa la riga {r.balancedFixedRowLabel} nel PUN-PSV, oppure
+              la QUOTA PREZZO FISSO della dedicata. Il preventivo è incompleto.
+            </div>
+          )}
           {energyReferenceRows.length > 0 &&
             previewBox(
               <>
