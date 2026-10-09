@@ -3418,6 +3418,7 @@ function Energia({
     const restored = {
       ...buildEnergyInitialState(),
       ...storedState,
+      offerta: normalizeBalancedOffer(String(storedState.offerta || "")),
       tipologiaOfferta:
         storedState.tipologiaOfferta ||
         (isSicuraOffer(String(storedState.offerta || "")) ||
@@ -7856,9 +7857,12 @@ function Listini({
 
   const saveListini = async () => {
     setSaving(true);
+    const normalizedEnergyOffers = draftEnergyOffers
+      .map((offer) => ({ ...offer, nome: normalizeBalancedOffer(offer.nome) }))
+      .filter((offer, i, all) => all.findIndex((row) => row.nome === offer.nome) === i);
 
     const payload = [
-      { key: "energyOffers", value_json: draftEnergyOffers },
+      { key: "energyOffers", value_json: normalizedEnergyOffers },
       { key: "gasOffers", value_json: draftGasOffers },
       { key: "offerVisibility", value_json: draftOfferVisibility },
       { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
@@ -7874,10 +7878,11 @@ function Listini({
     }
     setSaving(false);
 
-    setEnergyOffers(cloneEnergyOffers(draftEnergyOffers));
+    setEnergyOffers(cloneEnergyOffers(normalizedEnergyOffers));
     setGasOffers(cloneGasOffers(draftGasOffers));
     setOfferVisibility({ ...draftOfferVisibility });
     setGasAcciseSettings({ ...draftGasAcciseSettings });
+    setDraftEnergyOffers(cloneEnergyOffers(normalizedEnergyOffers));
     setDirty(false);
     alert("Listini salvati online");
   };
