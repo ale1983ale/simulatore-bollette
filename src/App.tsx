@@ -14087,6 +14087,7 @@ const [gasNetworkTariffMeta, setGasNetworkTariffMeta] = useState<GasNetworkTarif
 });
 const [gasNetworkTariffRefreshing, setGasNetworkTariffRefreshing] = useState(false);
 const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
+const [offerVisibility, setOfferVisibility] = useState<OfferVisibilitySettings>(DEFAULT_OFFER_VISIBILITY);
 
 const updateMonthlyRow = (
   index: number,
@@ -14501,6 +14502,15 @@ useEffect(() => {
         setMonthlyRows(mergedMonthlyRows);
       }
 
+      if (map.offerVisibility && typeof map.offerVisibility === "object") {
+        const v = map.offerVisibility as Partial<OfferVisibilitySettings>;
+        setOfferVisibility({
+          energyFixed: v.energyFixed !== false,
+          energyBalanced: v.energyBalanced !== false,
+          gasFixed: v.gasFixed !== false,
+          gasBalanced: v.gasBalanced === true,
+        });
+      }
       if (Array.isArray(map.energyOffers)) {
         const obsoleteEnergyOfferNames = new Set(["CASA", "CASASPECIAL", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESASPECIAL", "IMPRESAUNICA", "SCELTA", "SCELTASPECIAL", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALORESPECIAL", "VALOREUNICA"]);
         const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
@@ -14526,7 +14536,7 @@ useEffect(() => {
           .map((offer) =>
             ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURA DEDICATA" }
-              : offer
+              : { ...offer, nome: normalizeBalancedOffer(offer.nome) }
           )
           .filter((offer) => !obsoleteEnergyOfferNames.has(offer.nome))
           .filter((offer, index, arr) => arr.findIndex((item) => item.nome === offer.nome) === index);
@@ -14607,6 +14617,7 @@ const saveSettings = async () => {
     { key: "energyOffers", value_json: energyOffers },
     { key: "gasOffers", value_json: gasOffers },
     { key: "gasAcciseSettings", value_json: gasAcciseSettings },
+    { key: "offerVisibility", value_json: offerVisibility },
     { key: "punPsvRows", value_json: punPsvRows },
     
   ];
@@ -15079,6 +15090,8 @@ const renderAdminContent = () => {
           setEnergyOffers={setEnergyOffers}
           gasOffers={gasOffers}
           setGasOffers={setGasOffers}
+          offerVisibility={offerVisibility}
+          setOfferVisibility={setOfferVisibility}
           gasAcciseSettings={gasAcciseSettings}
           setGasAcciseSettings={setGasAcciseSettings}
         />
@@ -15789,6 +15802,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
       dispCpRows={dispCpRows}
       networkTariffRows={networkTariffRows}
       showAgentAssociation={Boolean(adminSession)}
+      offerVisibility={offerVisibility}
       canUseProvvigioni={canUseProvvigioni}
       onOpenProvvigioni={openProvvigioniFromSimulation}
     />
@@ -15807,6 +15821,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
       gasAcciseSettings={gasAcciseSettings}
       gasNetworkTariffRows={gasNetworkTariffRows}
       showAgentAssociation={Boolean(adminSession)}
+      offerVisibility={offerVisibility}
       canUseProvvigioni={canUseProvvigioni}
       onOpenProvvigioni={openProvvigioniFromSimulation}
     />
