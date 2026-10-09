@@ -78,6 +78,7 @@ type EnergyOffer = {
   canone: number;
   spread: number;
   maggiorazioneCapacityMarket: number;
+  maggiorazioneCapacityMarketFissa?: number;
   visibile?: boolean;
   allowedCustomerGroups?: EnergyCustomerGroup[];
   provvigioneTipo?: ProvvigioniOfferType;
@@ -2857,6 +2858,9 @@ function calcEnergia(
   const cmEff = dedicatedEnergy
     ? n(d.dedicataCapacityMarket)
     : n(off.maggiorazioneCapacityMarket);
+  const cmFixedEff = isBalancedDedicatedOffer(d.offerta)
+    ? n(d.bilanciataCapacityFissa)
+    : n(off.maggiorazioneCapacityMarketFissa);
   const quotaFissaEff = dedicatedEnergy
     ? n(d.dedicataQuotaFissa)
     : n(off.canone);
@@ -2937,7 +2941,8 @@ function calcEnergia(
   const dispCpQuantity = isDomestico ? consumiTot : consumiTotConPerdite;
   const dispCpTotale =
     dispCpQuantity * n(d.dispacciamentoCapacityMarket) +
-    consumiTotConPerdite * cmEff;
+    consumiTotConPerdite *
+      (isBalanced ? (cmEff + cmFixedEff) * 0.5 : cmEff);
 
   const H22 = H22_base + perditeEnergia + dispCpTotale;
   const H24 = n(d.reattivaImmessa) + n(d.reattivaPrelevata);
@@ -3057,6 +3062,7 @@ function calcEnergia(
     consumiMese2,
     spreadEff,
     cmEff,
+    cmFixedEff,
     quotaFissaEff,
     dispCpTotale,
     dispCpBase,
@@ -3301,6 +3307,7 @@ function Energia({
     dedicataCapacityMarket: "",
     dedicataQuotaFissa: "",
     bilanciataPrezzoFisso: "",
+    bilanciataCapacityFissa: "",
     reteMode: "AUTO",
     potenzaImpegnata: "",
     quotaConsumiRete: "",
@@ -4394,7 +4401,7 @@ return (
               )}
           </div>
 
-          {isDedicatedOffer(s.offerta) && (
+          {(isDedicatedOffer(s.offerta) || isBalancedDedicatedOffer(s.offerta)) && (
             <>
               <div style={{ height: 12 }} />
               <div
@@ -4404,6 +4411,8 @@ return (
                   gap: 12,
                 }}
               >
+                {isBalancedDedicatedOffer(s.offerta) &&
+                  field("QUOTA PREZZO FISSO (senza perdite)", s.bilanciataPrezzoFisso, (v) => set("bilanciataPrezzoFisso", v), "number")}
                 {field(isFixedDedicatedOffer(s.offerta) ? "PREZZO FISSO AD HOC SENZA PERDITE" : "Spread (senza perdite)", s.dedicataSpread, (v) => set("dedicataSpread", v), "number")}
                 {field(
                   "Maggiorazione Capacity Market (senza perdite)",
@@ -4411,6 +4420,8 @@ return (
                   (v) => set("dedicataCapacityMarket", v),
                   "number"
                 )}
+                {isBalancedDedicatedOffer(s.offerta) &&
+                  field("Maggiorazione Capacity Market parte fissa (senza perdite)", s.bilanciataCapacityFissa, (v) => set("bilanciataCapacityFissa", v), "number")}
                 {field("Quota Fissa", s.dedicataQuotaFissa, (v) => set("dedicataQuotaFissa", v), "number")}
               </div>
             </>
@@ -5149,7 +5160,9 @@ Base suggerito
           {previewBox(
             <>
               {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}
-              {row("Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
+              {row(r.isBalanced ? "Magg. CP.Mrk variabile (50%)" : "Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
+              {r.isBalanced && row("Magg. CP.Mrk fisso (50%)", numFormat(r.cmFixedEff, 3))}
+              {r.isBalanced && row("Prezzo fisso di riferimento", isBalancedDedicatedOffer(s.offerta) ? numFormat(n(s.bilanciataPrezzoFisso), 6) : r.balancedFixedRowLabel)}
               {row("Quota fissa usata", money(r.quotaFissaEff))}
             </>
           )}
@@ -5157,9 +5170,11 @@ Base suggerito
           {previewBox(
             <>
               {row(
-                isFixedDedicatedOffer(s.offerta) ? "Prezzo energia fisso" : "Pun+Spread",
+                r.isBalanced ? "50% PUN + Spread / 50% Prezzo fisso" : (isFixedDedicatedOffer(s.offerta) ? "Prezzo energia fisso" : "Pun+Spread"),
                 `${numFormat(r.H22_base, 3)} €`
               )}
+              {r.isBalanced && row("Quota variabile 50%", `${numFormat(r.balancedVariableTotal, 3)} €`)}
+              {r.isBalanced && row("Quota fissa 50%", `${numFormat(r.balancedFixedTotal, 3)} €`)}
               {row("Perdite di rete", `${numFormat(r.perditeEnergia, 3)} €`)}
               {row("DISP+CP.Mrk totale", `${numFormat(r.dispCpTotale, 3)} €`)}
               {row("Reattiva", `${numFormat(r.H24, 3)} €`)}
