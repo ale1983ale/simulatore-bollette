@@ -4014,7 +4014,7 @@ function Energia({
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
             <div class="offer-pair">
-              <div><div class="label">Tipologia offerta</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
+              <div><div class="label">Tipologia offerta</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : String(s.tipologiaOfferta || "") === "BILANCIATO" ? "Bilanciato" : "Variabile"}</div></div>
               <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
             </div>
             <div><div class="label">Tipologia cliente</div><div class="value">${energyPdfTipologia(s.tipo)}</div></div>
@@ -5941,7 +5941,7 @@ function Gas({
             <div><div class="label">Cliente</div><div class="value">${s.nome || "-"}</div></div>
             <div><div class="label">Periodo</div><div class="value">${periodo}</div></div>
             <div class="offer-pair">
-              <div><div class="label">Tipologia offerta</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : "Variabile"}</div></div>
+              <div><div class="label">Tipologia offerta</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : String(s.tipologiaOfferta || "") === "BILANCIATO" ? "Bilanciato" : "Variabile"}</div></div>
               <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
             </div>
             <div><div class="label">Uso</div><div class="value">${s.uso || "-"}</div></div>
@@ -14592,7 +14592,7 @@ useEffect(() => {
           .map((offer) =>
             ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURA DEDICATA" }
-              : { ...offer, nome: normalizeBalancedOffer(offer.nome) }
+              : { ...offer, nome: normalizeBalancedOffer(offer.nome), ...(isBalancedEnergyOffer(offer.nome) ? { visibile: true } : {}) }
           )
           .filter((offer) => !obsoleteEnergyOfferNames.has(offer.nome))
           .filter((offer, index, arr) => arr.findIndex((item) => item.nome === offer.nome) === index);
@@ -14648,7 +14648,9 @@ useEffect(() => {
       }
 
       if (Array.isArray(map.punPsvRows)) {
-        const savedPunPsvRows = map.punPsvRows as PunPsvRow[];
+        const savedPunPsvRows = (map.punPsvRows as PunPsvRow[]).map((row) =>
+          ({ ...row, mese: normalizeBalancedOffer(row.mese) })
+        );
         const mergedPunPsvRows = INITIAL_PUN_PSV_ROWS.map((baseRow) =>
           savedPunPsvRows.find((row) => row.mese === baseRow.mese) || baseRow
         );
@@ -15257,16 +15259,13 @@ const renderAdminContent = () => {
     <tbody>
       {punPsvRows
         .filter((row) => {
-          if (row.mese === "FISSO DOMESTICO" || row.mese === "FISSO BUSINESS" || row.mese === "FISSO AD HOC") return true;
+          if (isFixedCompetenceMonth(row.mese)) return true;
           return row.mese.endsWith(String(selectedYear));
         })
         .map((row) => {
           const isFirstFixed = row.mese === "FISSO DOMESTICO";
-          const isLastFixed = row.mese === "FISSO AD HOC";
-          const isFixed =
-            row.mese === "FISSO DOMESTICO" ||
-            row.mese === "FISSO BUSINESS" ||
-            row.mese === "FISSO AD HOC";
+          const isLastFixed = row.mese === "+ BILANCIATA AD HOC";
+          const isFixed = isFixedCompetenceMonth(row.mese);
 
           const fixedBandBase = isFixed
             ? {
