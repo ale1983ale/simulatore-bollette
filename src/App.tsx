@@ -7634,6 +7634,8 @@ function Listini({
   setEnergyOffers,
   gasOffers,
   setGasOffers,
+  offerVisibility,
+  setOfferVisibility,
   gasAcciseSettings,
   setGasAcciseSettings,
 }: {
@@ -7641,6 +7643,8 @@ function Listini({
   setEnergyOffers: React.Dispatch<React.SetStateAction<EnergyOffer[]>>;
   gasOffers: GasOffer[];
   setGasOffers: React.Dispatch<React.SetStateAction<GasOffer[]>>;
+  offerVisibility: OfferVisibilitySettings;
+  setOfferVisibility: React.Dispatch<React.SetStateAction<OfferVisibilitySettings>>;
   gasAcciseSettings: GasAcciseSettings;
   setGasAcciseSettings: React.Dispatch<React.SetStateAction<GasAcciseSettings>>;
 }) {
@@ -7649,6 +7653,7 @@ function Listini({
 
   const [draftEnergyOffers, setDraftEnergyOffers] = useState<EnergyOffer[]>(() => cloneEnergyOffers(energyOffers));
   const [draftGasOffers, setDraftGasOffers] = useState<GasOffer[]>(() => cloneGasOffers(gasOffers));
+  const [draftOfferVisibility, setDraftOfferVisibility] = useState<OfferVisibilitySettings>({ ...offerVisibility });
   const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -7659,8 +7664,9 @@ function Listini({
     if (dirty) return;
     setDraftEnergyOffers(cloneEnergyOffers(energyOffers));
     setDraftGasOffers(cloneGasOffers(gasOffers));
+    setDraftOfferVisibility({ ...offerVisibility });
     setDraftGasAcciseSettings({ ...gasAcciseSettings });
-  }, [energyOffers, gasOffers, gasAcciseSettings, dirty]);
+  }, [energyOffers, gasOffers, gasAcciseSettings, offerVisibility, dirty]);
 
   const markDirty = () => setDirty(true);
 
@@ -7810,6 +7816,7 @@ function Listini({
     const payload = [
       { key: "energyOffers", value_json: draftEnergyOffers },
       { key: "gasOffers", value_json: draftGasOffers },
+      { key: "offerVisibility", value_json: draftOfferVisibility },
       { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
     ];
 
@@ -7825,6 +7832,7 @@ function Listini({
 
     setEnergyOffers(cloneEnergyOffers(draftEnergyOffers));
     setGasOffers(cloneGasOffers(draftGasOffers));
+    setOfferVisibility({ ...draftOfferVisibility });
     setGasAcciseSettings({ ...draftGasAcciseSettings });
     setDirty(false);
     alert("Listini salvati online");
@@ -7881,6 +7889,39 @@ function Listini({
         >
           {saving ? "Salvataggio..." : "Salva listini"}
         </button>
+      </div>
+
+      <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+        <h2 style={{ marginTop: 0, fontSize: 18 }}>TIPOLOGIE OFFERTE VISIBILI NEL SIMULATORE</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 14 }}>
+          {([
+            { title: "LUCE", fields: [
+              ["energyFixed", "OFFERTE PREZZO FISSO"],
+              ["energyBalanced", "OFFERTE PREZZO BILANCIATO"],
+            ] },
+            { title: "GAS", fields: [
+              ["gasFixed", "OFFERTE PREZZO FISSO"],
+              ["gasBalanced", "OFFERTE PREZZO BILANCIATO"],
+            ] },
+          ] as Array<{ title: string; fields: Array<[keyof OfferVisibilitySettings, string]> }>).map((group) => (
+            <div key={group.title} style={{ display: "grid", gap: 10 }}>
+              <strong>{group.title}</strong>
+              {group.fields.map(([key, label]) => (
+                <label key={key} style={{ display: "flex", gap: 9, alignItems: "center", fontSize: 13, fontWeight: 800 }}>
+                  <input type="checkbox" checked={draftOfferVisibility[key]} onChange={(event) => {
+                    setDraftOfferVisibility((current) => ({ ...current, [key]: event.target.checked }));
+                    markDirty();
+                  }} style={{ width: 18, height: 18 }} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 12, color: "#64748b", marginBottom: 0 }}>
+          Deselezionando una tipologia, il simulatore non mostrerà quel tipo di prezzo né le offerte collegate.
+          PREZZO VARIABILE rimane sempre disponibile. Per GAS la tipologia bilanciata richiede offerte GAS dedicate.
+        </p>
       </div>
 
       <div
