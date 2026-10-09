@@ -217,7 +217,6 @@ const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
   { mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "FISSO AD HOC", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "+ BILANCIATA", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
-  { mese: "+ BILANCIATA AD HOC", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   ...PUN_PSV_MONTHS.map((mese) => ({
     mese,
     mono: 0,
@@ -316,7 +315,6 @@ function getMonthYearSortValue(label: string) {
   if (label === "FISSO BUSINESS") return Number.MAX_SAFE_INTEGER - 1;
   if (label === "FISSO AD HOC") return Number.MAX_SAFE_INTEGER - 2;
   if (label === "+ BILANCIATA") return Number.MAX_SAFE_INTEGER - 3;
-  if (label === "+ BILANCIATA AD HOC") return Number.MAX_SAFE_INTEGER - 4;
 
   const parts = String(label).trim().split(" ");
   if (parts.length < 2) return -1;
@@ -370,15 +368,6 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
   {
     nome: "+ BILANCIATA",
     canone: 18.5,
-    spread: 0,
-    maggiorazioneCapacityMarket: 0,
-    visibile: true,
-    allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
-    provvigioneTipo: "STANDARD",
-  },
-  {
-    nome: "+ BILANCIATA AD HOC",
-    canone: 0,
     spread: 0,
     maggiorazioneCapacityMarket: 0,
     visibile: true,
@@ -575,12 +564,13 @@ const isFixedDedicatedOffer = (offer: string) =>
   ["+SICURA DEDICATA", "SICURA DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+FISSO DEDICATA", "FISSO DEDICATA"].includes(normalizeOfferName(offer));
 
 const BALANCED_ENERGY_OFFERS = [
-  "+ BILANCIATA", "+ BILANCIATA AD HOC", "+ BILANCIATA DEDICATA",
+  "+ BILANCIATA", "+ BILANCIATA DEDICATA",
 ] as const;
 const normalizeBalancedOffer = (value: string) => {
   const normalized = normalizeOfferName(value).replace(/\s+/g, " ");
   if (["BILANCIATA", "+BILANCIATA", "+ BILANCIATA"].includes(normalized)) return "+ BILANCIATA";
-  if (["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(normalized)) return "+ BILANCIATA AD HOC";
+  // Le simulazioni salvate con il vecchio nome vengono riaperte nella dedicata.
+  if (["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(normalized)) return "+ BILANCIATA DEDICATA";
   if (["+BILANCIATA DEDICATA", "+ BILANCIATA DEDICATA", "+ BILANCATA DEDICATA"].includes(normalized)) return "+ BILANCIATA DEDICATA";
   return value;
 };
@@ -609,7 +599,6 @@ const FIXED_COMPETENCE_MONTHS = [
   "FISSO BUSINESS",
   "FISSO AD HOC",
   "+ BILANCIATA",
-  "+ BILANCIATA AD HOC",
 ] as const;
 
 const isFixedCompetenceMonth = (month: string) =>
@@ -2864,8 +2853,7 @@ function calcEnergia(
   const quotaFissaEff = dedicatedEnergy
     ? n(d.dedicataQuotaFissa)
     : n(off.canone);
-  const balancedFixedRowLabel = normalizeBalancedOffer(String(d.offerta || "")) === "+ BILANCIATA AD HOC"
-    ? "+ BILANCIATA AD HOC" : "+ BILANCIATA";
+  const balancedFixedRowLabel = "+ BILANCIATA";
   const balancedFixedRow = punPsvRows.find((row) => row.mese === balancedFixedRowLabel);
   const balancedFixedPrice = (band: "mono" | "f1" | "f2" | "f3") =>
     isBalancedDedicatedOffer(d.offerta)
@@ -7874,6 +7862,9 @@ function Listini({
   const saveListini = async () => {
     setSaving(true);
     const normalizedEnergyOffers = draftEnergyOffers
+      .filter((offer) => !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
+        normalizeOfferName(offer.nome).replace(/\s+/g, " ")
+      ))
       .map((offer) => ({ ...offer, nome: normalizeBalancedOffer(offer.nome) }))
       .filter((offer, i, all) => all.findIndex((row) => row.nome === offer.nome) === i);
 
@@ -14651,6 +14642,9 @@ useEffect(() => {
                   )
                 : [...ALL_ENERGY_CUSTOMER_GROUPS],
           }))
+          .filter((offer) => !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
+            normalizeOfferName(offer.nome).replace(/\s+/g, " ")
+          ))
           .map((offer) =>
             ["+FISSO DEDICATA", "FISSO DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+SICURA DEDICATA", "SICURA DEDICATA"].includes(offer.nome)
               ? { ...offer, nome: "+SICURA DEDICATA" }
@@ -14712,9 +14706,11 @@ useEffect(() => {
       }
 
       if (Array.isArray(map.punPsvRows)) {
-        const savedPunPsvRows = (map.punPsvRows as PunPsvRow[]).map((row) =>
-          ({ ...row, mese: normalizeBalancedOffer(row.mese) })
-        );
+        const savedPunPsvRows = (map.punPsvRows as PunPsvRow[])
+          .filter((row) => !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
+            normalizeOfferName(row.mese).replace(/\s+/g, " ")
+          ))
+          .map((row) => ({ ...row, mese: normalizeBalancedOffer(row.mese) }));
         const mergedPunPsvRows = INITIAL_PUN_PSV_ROWS.map((baseRow) =>
           savedPunPsvRows.find((row) => row.mese === baseRow.mese) || baseRow
         );
@@ -15328,7 +15324,7 @@ const renderAdminContent = () => {
         })
         .map((row) => {
           const isFirstFixed = row.mese === "FISSO DOMESTICO";
-          const isLastFixed = row.mese === "+ BILANCIATA AD HOC";
+          const isLastFixed = row.mese === "+ BILANCIATA";
           const isFixed = isFixedCompetenceMonth(row.mese);
 
           const fixedBandBase = isFixed
