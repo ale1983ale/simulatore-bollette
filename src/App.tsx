@@ -5323,6 +5323,7 @@ function Gas({
   gasAcciseSettings,
   gasNetworkTariffRows,
   showAgentAssociation,
+  offerVisibility,
   canUseProvvigioni,
   onOpenProvvigioni,
 }: {
@@ -5331,10 +5332,21 @@ function Gas({
   gasAcciseSettings: GasAcciseSettings;
   gasNetworkTariffRows: GasNetworkTariffRow[];
   showAgentAssociation: boolean;
+  offerVisibility: OfferVisibilitySettings;
   canUseProvvigioni: boolean;
   onOpenProvvigioni: (prefill: ProvvigioniPrefill) => void;
 }) {
   const visibleGasOffers = gasOffers.filter((offer) => offer.visibile !== false);
+  const allowedGasModes: OfferPriceMode[] = [
+    "VARIABILE",
+    ...(offerVisibility.gasFixed ? ["FISSO" as const] : []),
+    ...(offerVisibility.gasBalanced &&
+      visibleGasOffers.some((offer) => gasOfferPriceMode(offer.nome) === "BILANCIATO")
+      ? ["BILANCIATO" as const] : []),
+  ];
+  const eligibleGasOffers = visibleGasOffers.filter((offer) =>
+    allowedGasModes.includes(gasOfferPriceMode(offer.nome))
+  );
 
   const buildGasInitialState = () => ({
     iva: "10",
@@ -5344,7 +5356,7 @@ function Gas({
     fatturazione: "MENSILE",
     tipologiaOfferta: "VARIABILE",
     offerta:
-      visibleGasOffers.find((offer) => !isSicuraOffer(offer.nome))?.nome ||
+      eligibleGasOffers.find((offer) => gasOfferPriceMode(offer.nome) === "VARIABILE")?.nome ||
       "",
     periodo1: "",
     periodo2: "",
@@ -5484,8 +5496,10 @@ function Gas({
   const gasFixedMode =
     String(s.tipologiaOfferta || "VARIABILE") === "FISSO";
 
-  const fixedModeGasOffers = visibleGasOffers.filter(
-    (offer) => isSicuraOffer(offer.nome) === gasFixedMode
+  const activeGasMode: OfferPriceMode = allowedGasModes.includes(s.tipologiaOfferta as OfferPriceMode)
+    ? s.tipologiaOfferta as OfferPriceMode : "VARIABILE";
+  const fixedModeGasOffers = eligibleGasOffers.filter(
+    (offer) => gasOfferPriceMode(offer.nome) === activeGasMode
   );
 
   const selectedGasOffer =
@@ -5552,6 +5566,8 @@ function Gas({
     s.uso,
     s.tipologiaOfferta,
     gasFixedMode,
+    offerVisibility.gasFixed,
+    offerVisibility.gasBalanced,
   ]);
 
   useEffect(() => {
@@ -5793,10 +5809,9 @@ function Gas({
     setGasCompatibilityDriver("uso");
     setLastGasInputAt(Date.now());
 
-    const fixed = tipologia === "FISSO";
-    const candidateOffers = visibleGasOffers.filter(
+    const candidateOffers = eligibleGasOffers.filter(
       (offer) =>
-        isSicuraOffer(offer.nome) === fixed &&
+        gasOfferPriceMode(offer.nome) === tipologia &&
         gasOfferAllowsUse(offer, s.uso)
     );
 
@@ -6248,8 +6263,9 @@ function Gas({
                 compatibleGasUseOptions
               )}
               {offerTypeField(
-                s.tipologiaOfferta || "VARIABILE",
-                handleGasOfferTypeChange
+                activeGasMode,
+                handleGasOfferTypeChange,
+                allowedGasModes
               )}
               {field("IVA %", s.iva, (v) => set("iva", v), "number")}
               {selectField("Fatturazione", s.fatturazione, (v) => set("fatturazione", v), gasBilling)}
