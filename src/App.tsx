@@ -8008,7 +8008,7 @@ function Listini({
   >
             <thead>
               <tr>
-                {["Ordina", "Visibile", "Nome offerta", "Tipo provvigione", "Tipologie CTE", "Spread", "Maggiorazione Capacity Market", "Quota fissa"].map((h) => (
+                {["Ordina", "Visibile", "Nome offerta", "Tipo provvigione", "Tipologie CTE", "Spread", "Maggiorazione Capacity Market", "Magg. Capacity Market parte fissa (50%)", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -8213,6 +8213,18 @@ function Listini({
                       value={row.maggiorazioneCapacityMarket}
                       onChange={(e) => updateEnergyOffer(i, "maggiorazioneCapacityMarket", e.target.value)}
                     />
+                  </td>
+                  <td style={tdStyle}>
+                    {isBalancedEnergyOffer(row.nome) ? (
+                      <input
+                        type="number"
+                        step="0.000001"
+                        style={{ ...inputStyle, width: 120 }}
+                        value={row.maggiorazioneCapacityMarketFissa ?? 0}
+                        onChange={(e) => updateEnergyOffer(i, "maggiorazioneCapacityMarketFissa", e.target.value)}
+                        aria-label={"Maggiorazione Capacity Market della quota fissa " + row.nome}
+                      />
+                    ) : "—"}
                   </td>
                   <td style={tdStyle}>
                     <input
