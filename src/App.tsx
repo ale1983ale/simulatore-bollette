@@ -620,6 +620,21 @@ const isFixedCompetenceMonth = (month: string) =>
 const isSicuraOffer = (offer: string) =>
   normalizeOfferName(offer).includes("SICURA");
 
+type OfferPriceMode = "VARIABILE" | "FISSO" | "BILANCIATO";
+type OfferVisibilitySettings = {
+  energyFixed: boolean; energyBalanced: boolean;
+  gasFixed: boolean; gasBalanced: boolean;
+};
+const DEFAULT_OFFER_VISIBILITY: OfferVisibilitySettings = {
+  energyFixed: true, energyBalanced: true, gasFixed: true, gasBalanced: false,
+};
+const energyOfferPriceMode = (offer: string): OfferPriceMode =>
+  isBalancedEnergyOffer(offer) ? "BILANCIATO" :
+  isSicuraOffer(offer) ? "FISSO" : "VARIABILE";
+const gasOfferPriceMode = (offer: string): OfferPriceMode =>
+  isBalancedEnergyOffer(offer) ? "BILANCIATO" :
+  isSicuraOffer(offer) ? "FISSO" : "VARIABILE";
+
 const SIMULATION_DRAFT_IDLE_MS = 15 * 60 * 1000;
 const ENERGY_SIMULATION_DRAFT_KEY =
   "gestione_energia_energy_draft_v1";
@@ -2663,7 +2678,8 @@ function highlightedSelectField(
 
 function offerTypeField(
   value: string,
-  setValue: (v: string) => void
+  setValue: (v: string) => void,
+  modes: OfferPriceMode[] = ["FISSO", "VARIABILE"]
 ) {
   return (
     <div>
@@ -2697,8 +2713,9 @@ function offerTypeField(
           outline: "none",
         }}
       >
-        <option value="FISSO">Prezzo fisso</option>
+        {modes.includes("FISSO") && <option value="FISSO">Prezzo fisso</option>}
         <option value="VARIABILE">Prezzo variabile</option>
+        {modes.includes("BILANCIATO") && <option value="BILANCIATO">Prezzo bilanciato</option>}
       </select>
     </div>
   );
