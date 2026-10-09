@@ -3437,6 +3437,12 @@ function Energia({
   const activeEnergyMode: OfferPriceMode =
     allowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)
       ? s.tipologiaOfferta as OfferPriceMode : "VARIABILE";
+  useEffect(() => {
+    if (allowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)) return;
+    setS((prev) => ({
+      ...prev, tipologiaOfferta: "VARIABILE", offerta: "", mese1: "", mese2: "",
+    }));
+  }, [s.tipologiaOfferta, offerVisibility.energyFixed, offerVisibility.energyBalanced]);
   const fixedModeEnergyOffers = eligibleEnergyOffers.filter(
     (offer) => energyOfferPriceMode(offer.nome) === activeEnergyMode
   );
@@ -5498,6 +5504,13 @@ function Gas({
 
   const activeGasMode: OfferPriceMode = allowedGasModes.includes(s.tipologiaOfferta as OfferPriceMode)
     ? s.tipologiaOfferta as OfferPriceMode : "VARIABILE";
+  useEffect(() => {
+    if (allowedGasModes.includes(s.tipologiaOfferta as OfferPriceMode)) return;
+    setS((prev) => ({
+      ...prev, tipologiaOfferta: "VARIABILE", offerta: "",
+      periodo1: "", periodo2: "", periodo3: "", periodo4: "",
+    }));
+  }, [s.tipologiaOfferta, offerVisibility.gasFixed, offerVisibility.gasBalanced, gasOffers]);
   const fixedModeGasOffers = eligibleGasOffers.filter(
     (offer) => gasOfferPriceMode(offer.nome) === activeGasMode
   );
