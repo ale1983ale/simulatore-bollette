@@ -30,6 +30,14 @@ type ParsedProductionFile = {
     sheetName: string;
     periodLabel: string;
     sections: Array<{ commodity: Commodity; rows: number; totalConsumptionColumn: string }>;
+    rowDetails: Array<{
+      commodity: Commodity;
+      agente: string;
+      inAttivazioneCount: number;
+      inAttivazioneConsumo: number;
+      consumoTotale: number;
+      duplicate: boolean;
+    }>;
     warnings: string[];
   }>;
   blockingIssues: string[];
@@ -217,7 +225,7 @@ async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
     }) as unknown[][];
     const preview: ParsedProductionFile["sheetPreviews"][number] = {
       sheetName, periodLabel: sheetPeriod?.periodLabel || "Da intestazione",
-      sections: [], warnings: [],
+      sections: [], rowDetails: [], warnings: [],
     };
     sheetPreviews.push(preview);
     let report: ReturnType<typeof parseReportTitle> = null;
@@ -277,13 +285,19 @@ async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
       const dedupKey = [
         report.periodStart, report.periodEnd, report.commodity, agentKey, inAttivazioneCount,
       ].join("|");
-      if (!byKey.has(dedupKey)) byKey.set(dedupKey, {
+      const inAttivazioneConsumo = parseNumber(sourceRow[2]);
+      const consumoTotale = parseNumber(sourceRow[consumptionCol]);
+      const duplicate = byKey.has(dedupKey);
+      preview.rowDetails.push({
+        commodity: report.commodity, agente, inAttivazioneCount,
+        inAttivazioneConsumo, consumoTotale, duplicate,
+      });
+      if (!duplicate) byKey.set(dedupKey, {
         id: dedupKey, dedupKey,
         periodStart: report.periodStart, periodEnd: report.periodEnd,
         periodLabel: report.periodLabel, commodity: report.commodity,
         agente, agentKey, inAttivazioneCount,
-        inAttivazioneConsumo: parseNumber(sourceRow[2]),
-        consumoTotale: parseNumber(sourceRow[consumptionCol]),
+        inAttivazioneConsumo, consumoTotale,
         sourceFiles: [file.name],
       });
       if (originalRowCount % 150 === 0) await yieldToBrowser();
@@ -1200,6 +1214,23 @@ export default function Production({ view = "produzione" }: { view?: "produzione
                               {sheet.warnings.map((warning, i) => (
                                 <div key={i} style={{ marginTop: 3, fontSize: 11, color: "#92400e" }}>⚠ {warning}</div>
                               ))}
+                              {sheet.rowDetails.length > 0 && (
+                                <details style={{ marginTop: 5, fontSize: 11 }}>
+                                  <summary style={{ cursor: "pointer", fontWeight: 800, color: "#1d4ed8" }}>
+                                    Mostra tutte le {sheet.rowDetails.length} righe e i consumi
+                                  </summary>
+                                  <div style={{ marginTop: 5, maxHeight: 240, overflowY: "auto", display: "grid", gap: 3 }}>
+                                    {sheet.rowDetails.map((row, rowIndex) => (
+                                      <div key={rowIndex} style={{ borderBottom: "1px solid #e2e8f0", padding: "4px 0", color: row.duplicate ? "#92400e" : "#334155" }}>
+                                        <strong>{row.commodity}</strong> · {row.agente} · POD/PDR in attivazione: {row.inAttivazioneCount} ·
+                                        Consumo in attivazione: {row.inAttivazioneConsumo.toLocaleString("it-IT")} ·
+                                        Consumo totale: <strong>{row.consumoTotale.toLocaleString("it-IT")}</strong>
+                                        {row.duplicate ? " · Duplicato interno" : ""}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </details>
+                              )}
                             </div>
                           ))}
                         </div>
