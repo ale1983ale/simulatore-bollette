@@ -636,7 +636,7 @@ export default function Production({ view = "produzione" }: { view?: "produzione
         setParsingProgress("Analizzo file " + (i + 1) + " di " + selected.length + ": " + file.name);
         await yieldToBrowser();
         const result = await parseProductionFile(file);
-        if (result.rows.length) parsed.push(result);
+        if (result.rows.length || result.blockingIssues.length) parsed.push(result);
       }
       setPendingFiles(parsed);
       if (!parsed.length) alert("Non ho trovato righe PRODUZIONE valide nei file selezionati.");
@@ -780,6 +780,10 @@ export default function Production({ view = "produzione" }: { view?: "produzione
 
   const savePendingFiles = async () => {
     if (!pendingFiles.length) return;
+    if (pendingFiles.some((file) => file.blockingIssues.length)) {
+      alert("Importazione bloccata: controlla gli errori evidenziati nell'anteprima dei fogli.");
+      return;
+    }
     setSaving(true);
     setMessage("");
     try {
@@ -1123,7 +1127,7 @@ export default function Production({ view = "produzione" }: { view?: "produzione
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0 }}>PRODUZIONE · Carica file</h3>
             <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-              Puoi selezionare più report insieme. Una riga è considerata duplicata quando coincidono Periodo + Luce/Gas + Agente + N° POD/PDR in attivazione. Il file Excel originale viene salvato anche nel cloud.
+              Puoi caricare anche un unico Excel con più fogli e periodi Luce/Gas. Il periodo viene riconosciuto dal nome del foglio e i consumi dalle intestazioni: prima di salvare controlla l'anteprima. I duplicati già presenti vengono mantenuti senza sostituirne i valori. Il file Excel originale viene salvato nel cloud.
             </div>
             <input
               type="file"
@@ -1145,8 +1149,40 @@ export default function Production({ view = "produzione" }: { view?: "produzione
                     <div key={file.id} style={{ background: "white", border: "1px solid #dbeafe", borderRadius: 8, padding: "8px 9px" }}>
                       <strong>{file.name}</strong>
                       <div style={{ color: "#475569", fontSize: 12, marginTop: 3 }}>
+                        {file.sheetPreviews.length} fogli · {file.sheetPreviews.reduce((sum, sheet) => sum + sheet.sections.length, 0)} sezioni ·{" "}
                         {file.originalRowCount} righe lette · {file.rows.length} righe uniche · {file.duplicateRowsInFile} duplicati interni esclusi
                       </div>
+                      {file.blockingIssues.length > 0 && (
+                        <div role="alert" style={{ marginTop: 8, background: "#fef2f2", color: "#991b1b", borderRadius: 8, padding: 9 }}>
+                          <strong>IMPORTAZIONE BLOCCATA — {file.blockingIssues.length} problemi</strong>
+                          {file.blockingIssues.map((issue, index) => (
+                            <div key={index} style={{ marginTop: 3 }}>• {issue}</div>
+                          ))}
+                        </div>
+                      )}
+                      <details style={{ marginTop: 9 }}>
+                        <summary style={{ fontWeight: 900, cursor: "pointer", color: "#0f2d69" }}>
+                          ANTEPRIMA DI TUTTI I PERIODI E DEI CONSUMI ({file.sheetPreviews.length} fogli)
+                        </summary>
+                        <div style={{ maxHeight: 320, overflowY: "auto", marginTop: 7, display: "grid", gap: 5 }}>
+                          {file.sheetPreviews.map((sheet, index) => (
+                            <div key={index} style={{ padding: 8, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+                              <div style={{ fontWeight: 850, fontSize: 12 }}>{sheet.sheetName}</div>
+                              <div style={{ fontSize: 12, color: "#475569", marginTop: 3 }}>
+                                Periodo: {sheet.periodLabel} ·{" "}
+                                {sheet.sections.map((section, i) => (
+                                  <span key={i}>
+                                    {i ? " · " : ""}{section.commodity}: {section.rows} agenti (consumi colonna {section.totalConsumptionColumn})
+                                  </span>
+                                ))}
+                              </div>
+                              {sheet.warnings.map((warning, i) => (
+                                <div key={i} style={{ marginTop: 3, fontSize: 11, color: "#92400e" }}>⚠ {warning}</div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     </div>
                   ))}
                 </div>
@@ -1154,7 +1190,7 @@ export default function Production({ view = "produzione" }: { view?: "produzione
                   <button
                     type="button"
                     onClick={() => void savePendingFiles()}
-                    disabled={saving}
+                    disabled={saving || pendingFiles.some((file) => file.blockingIssues.length > 0)}
                     style={{ padding: "9px 13px", border: 0, borderRadius: 8, background: "#16a34a", color: "white", fontWeight: 900 }}
                   >
                     {saving ? "Salvataggio..." : "Salva " + pendingFiles.length + " file nell'archivio"}
