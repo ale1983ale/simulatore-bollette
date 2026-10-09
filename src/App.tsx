@@ -215,6 +215,8 @@ const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
   { mese: "FISSO DOMESTICO", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "FISSO AD HOC", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "+ BILANCIATA", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "+ BILANCIATA AD HOC", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   ...PUN_PSV_MONTHS.map((mese) => ({
     mese,
     mono: 0,
@@ -312,6 +314,8 @@ function getMonthYearSortValue(label: string) {
   if (label === "FISSO DOMESTICO") return Number.MAX_SAFE_INTEGER;
   if (label === "FISSO BUSINESS") return Number.MAX_SAFE_INTEGER - 1;
   if (label === "FISSO AD HOC") return Number.MAX_SAFE_INTEGER - 2;
+  if (label === "+ BILANCIATA") return Number.MAX_SAFE_INTEGER - 3;
+  if (label === "+ BILANCIATA AD HOC") return Number.MAX_SAFE_INTEGER - 4;
 
   const parts = String(label).trim().split(" ");
   if (parts.length < 2) return -1;
@@ -363,13 +367,31 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     provvigioneTipo: "SPECIAL",
   },
   {
-    nome: "BILANCIATA",
+    nome: "+ BILANCIATA",
     canone: 18.5,
     spread: 0,
     maggiorazioneCapacityMarket: 0,
     visibile: true,
     allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
     provvigioneTipo: "STANDARD",
+  },
+  {
+    nome: "+ BILANCIATA AD HOC",
+    canone: 0,
+    spread: 0,
+    maggiorazioneCapacityMarket: 0,
+    visibile: true,
+    allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
+    provvigioneTipo: "STANDARD",
+  },
+  {
+    nome: "+ BILANCIATA DEDICATA",
+    canone: 0,
+    spread: 0,
+    maggiorazioneCapacityMarket: 0,
+    visibile: true,
+    allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
+    provvigioneTipo: "SPECIAL",
   },
 ];
 
@@ -551,6 +573,23 @@ const normalizeOfferName = (offer: string) => String(offer || "").trim().toUpper
 const isFixedDedicatedOffer = (offer: string) =>
   ["+SICURA DEDICATA", "SICURA DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+FISSO DEDICATA", "FISSO DEDICATA"].includes(normalizeOfferName(offer));
 
+const BALANCED_ENERGY_OFFERS = [
+  "+ BILANCIATA", "+ BILANCIATA AD HOC", "+ BILANCIATA DEDICATA",
+] as const;
+const normalizeBalancedOffer = (value: string) => {
+  const normalized = normalizeOfferName(value).replace(/\s+/g, " ");
+  if (["BILANCIATA", "+BILANCIATA", "+ BILANCIATA"].includes(normalized)) return "+ BILANCIATA";
+  if (["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(normalized)) return "+ BILANCIATA AD HOC";
+  if (["+BILANCIATA DEDICATA", "+ BILANCIATA DEDICATA", "+ BILANCATA DEDICATA"].includes(normalized)) return "+ BILANCIATA DEDICATA";
+  return value;
+};
+const isBalancedEnergyOffer = (offer: string) =>
+  BALANCED_ENERGY_OFFERS.includes(
+    normalizeBalancedOffer(offer) as (typeof BALANCED_ENERGY_OFFERS)[number]
+  );
+const isBalancedDedicatedOffer = (offer: string) =>
+  normalizeBalancedOffer(offer) === "+ BILANCIATA DEDICATA";
+
 const isDedicatedOffer = (offer: string) =>
   normalizeOfferName(offer) === "DEDICATA" || isFixedDedicatedOffer(offer);
 
@@ -568,6 +607,8 @@ const FIXED_COMPETENCE_MONTHS = [
   "FISSO DOMESTICO",
   "FISSO BUSINESS",
   "FISSO AD HOC",
+  "+ BILANCIATA",
+  "+ BILANCIATA AD HOC",
 ] as const;
 
 const isFixedCompetenceMonth = (month: string) =>
