@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
 import { adminGetSetting, adminUpsertSettings } from "./adminSecurity";
 import Production from "./Production";
+import ActiveProduction from "./ActiveProduction";
 
 type Commodity = "LUCE" | "GAS" | "N/D";
 type StorageMode = "loading" | "database" | "legacy";
@@ -933,7 +934,7 @@ function MultiSelectFilter({
   );
 }
 
-export default function Archive() {
+export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?: React.ReactNode }) {
   const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [rows, setRows] = useState<RecessoRow[]>([]);
   const [legacyArchive, setLegacyArchive] = useState<LegacyArchive>({ version: 1, files: [] });
@@ -943,7 +944,9 @@ export default function Archive() {
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
-  const [archiveSection, setArchiveSection] = useState<"recessi" | "produzione" | "zone">("recessi");
+  const [archiveSection, setArchiveSection] = useState<
+    "recessi" | "produzione" | "attivo" | "reportAdmin" | "zone"
+  >("recessi");
 
   const [commodities, setCommodities] = useState<string[]>([]);
   const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
@@ -1643,6 +1646,10 @@ export default function Archive() {
                 ? "RECESSI · archivio cumulativo con eliminazione automatica dei duplicati."
                 : archiveSection === "produzione"
                 ? "PRODUZIONE · storico report e zone commerciali."
+                : archiveSection === "attivo"
+                ? "ATTIVO PRODUZIONE · confronto produzione / recessi per agente."
+                : archiveSection === "reportAdmin"
+                ? "REPORT ADMIN · stessa vista dei report agenti, con dati sempre aggiornati."
                 : "AGENTI / ZONE · assegnazione territoriale degli agenti della produzione."}
             </div>
           </div>
@@ -1700,6 +1707,40 @@ export default function Archive() {
         >
           PRODUZIONE
         </button>
+
+        <button
+          type="button"
+          onClick={() => setArchiveSection("attivo")}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 9,
+            border: archiveSection === "attivo" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+            background: archiveSection === "attivo" ? "#0f172a" : "white",
+            color: archiveSection === "attivo" ? "white" : "#0f172a",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          ATTIVO PRODUZIONE
+        </button>
+
+        {reportAdminPanel && (
+          <button
+            type="button"
+            onClick={() => setArchiveSection("reportAdmin")}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 9,
+              border: archiveSection === "reportAdmin" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+              background: archiveSection === "reportAdmin" ? "#0f172a" : "white",
+              color: archiveSection === "reportAdmin" ? "white" : "#0f172a",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            REPORT ADMIN
+          </button>
+        )}
 
         <button
           type="button"
@@ -2284,6 +2325,10 @@ export default function Archive() {
         )}
       </div>
         </>
+      ) : archiveSection === "attivo" ? (
+        <ActiveProduction />
+      ) : archiveSection === "reportAdmin" && reportAdminPanel ? (
+        <div style={{ width: "100%", minWidth: 0 }}>{reportAdminPanel}</div>
       ) : (
         <Production view={archiveSection === "zone" ? "zone" : "produzione"} />
       )}
