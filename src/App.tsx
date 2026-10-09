@@ -2833,13 +2833,23 @@ function calcEnergia(
 
   const mesi = energyMonths(d.fatturazione);
 
-  const spreadEff = isDedicatedOffer(d.offerta) ? n(d.dedicataSpread) : n(off.spread);
-  const cmEff =
-    isDedicatedOffer(d.offerta)
-      ? n(d.dedicataCapacityMarket)
-      : n(off.maggiorazioneCapacityMarket);
-  const quotaFissaEff =
-    isDedicatedOffer(d.offerta) ? n(d.dedicataQuotaFissa) : n(off.canone);
+  const isBalanced = d.tipologiaOfferta === "BILANCIATO" &&
+    isBalancedEnergyOffer(String(d.offerta || ""));
+  const dedicatedEnergy = isDedicatedOffer(d.offerta) || isBalancedDedicatedOffer(d.offerta);
+  const spreadEff = dedicatedEnergy ? n(d.dedicataSpread) : n(off.spread);
+  const cmEff = dedicatedEnergy
+    ? n(d.dedicataCapacityMarket)
+    : n(off.maggiorazioneCapacityMarket);
+  const quotaFissaEff = dedicatedEnergy
+    ? n(d.dedicataQuotaFissa)
+    : n(off.canone);
+  const balancedFixedRowLabel = normalizeBalancedOffer(String(d.offerta || "")) === "+ BILANCIATA AD HOC"
+    ? "+ BILANCIATA AD HOC" : "+ BILANCIATA";
+  const balancedFixedRow = punPsvRows.find((row) => row.mese === balancedFixedRowLabel);
+  const balancedFixedPrice = (band: "mono" | "f1" | "f2" | "f3") =>
+    isBalancedDedicatedOffer(d.offerta)
+      ? n(d.bilanciataPrezzoFisso)
+      : n(balancedFixedRow?.[band]);
 
   const prezzoMono1 = mese1IsFisso ? n(fissoRow.mono) : n(row1.mono);
   const prezzoMono2 = mese2IsFisso ? n(fissoRow.mono) : n(row2.mono);
@@ -2862,25 +2872,31 @@ function calcEnergia(
   const perditaPercentuale =
     ["MTA1", "MTA2", "MTA3"].includes(d.tipo) ? 0.038 : 0.1;
 
-  const H22_base =
-    n(d.f1Mese1) * (prezzoF11 + spreadEff) +
-    n(d.f1Mese2) * (prezzoF12 + spreadEff) +
-    n(d.f2Mese1) * (prezzoF21 + spreadEff) +
-    n(d.f2Mese2) * (prezzoF22 + spreadEff) +
-    n(d.f3Mese1) * (prezzoF31 + spreadEff) +
-    n(d.f3Mese2) * (prezzoF32 + spreadEff) +
-    n(d.monoMese1) * (prezzoMono1 + spreadEff) +
-    n(d.monoMese2) * (prezzoMono2 + spreadEff);
+  // Each band is split 50/50. The PUN + spread applies only to
+  // the variable half; the matching fixed + BILANCIATA reference
+  // (or dedicated custom price) applies only to the fixed half.
+  const bandRows = [
+    { qty: n(d.f1Mese1), variable: prezzoF11, band: "f1" as const },
+    { qty: n(d.f1Mese2), variable: prezzoF12, band: "f1" as const },
+    { qty: n(d.f2Mese1), variable: prezzoF21, band: "f2" as const },
+    { qty: n(d.f2Mese2), variable: prezzoF22, band: "f2" as const },
+    { qty: n(d.f3Mese1), variable: prezzoF31, band: "f3" as const },
+    { qty: n(d.f3Mese2), variable: prezzoF32, band: "f3" as const },
+    { qty: n(d.monoMese1), variable: prezzoMono1, band: "mono" as const },
+    { qty: n(d.monoMese2), variable: prezzoMono2, band: "mono" as const },
+  ];
+  const balancedVariableTotal = isBalanced
+    ? bandRows.reduce((sum, item) => sum + item.qty * 0.5 * (item.variable + spreadEff), 0)
+    : 0;
+  const balancedFixedTotal = isBalanced
+    ? bandRows.reduce((sum, item) => sum + item.qty * 0.5 * balancedFixedPrice(item.band), 0)
+    : 0;
+  const H22_base = isBalanced
+    ? balancedVariableTotal + balancedFixedTotal
+    : bandRows.reduce((sum, item) => sum + item.qty * (item.variable + spreadEff), 0);
 
-  const perditeEnergia =
-    n(d.f1Mese1) * perditaPercentuale * (prezzoF11 + spreadEff) +
-    n(d.f1Mese2) * perditaPercentuale * (prezzoF12 + spreadEff) +
-    n(d.f2Mese1) * perditaPercentuale * (prezzoF21 + spreadEff) +
-    n(d.f2Mese2) * perditaPercentuale * (prezzoF22 + spreadEff) +
-    n(d.f3Mese1) * perditaPercentuale * (prezzoF31 + spreadEff) +
-    n(d.f3Mese2) * perditaPercentuale * (prezzoF32 + spreadEff) +
-    n(d.monoMese1) * perditaPercentuale * (prezzoMono1 + spreadEff) +
-    n(d.monoMese2) * perditaPercentuale * (prezzoMono2 + spreadEff);
+  // Network losses apply to both halves, exactly once on total energy.
+  const perditeEnergia = H22_base * perditaPercentuale;
 
   const totDispCp1 = dispCapacityRate(dispRow1, d.tipo);
   const totDispCp2 = dispCapacityRate(dispRow2, d.tipo);
@@ -3000,6 +3016,10 @@ function calcEnergia(
 
   return {
     H22_base,
+    isBalanced,
+    balancedFixedRowLabel,
+    balancedVariableTotal,
+    balancedFixedTotal,
     H22,
     H24,
     H25,
@@ -3253,6 +3273,7 @@ function Energia({
     dedicataSpread: "",
     dedicataCapacityMarket: "",
     dedicataQuotaFissa: "",
+    bilanciataPrezzoFisso: "",
     reteMode: "AUTO",
     potenzaImpegnata: "",
     quotaConsumiRete: "",
