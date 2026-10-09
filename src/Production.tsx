@@ -771,8 +771,29 @@ export default function Production({ view = "produzione" }: { view?: "produzione
         };
       });
 
-      const { error } = await supabase.from(PROD_TABLE).upsert(payload, { onConflict: "dedup_key" });
-      if (error) throw error;
+      // Non sovrascrivere importi e consumi già archiviati: un secondo
+      // caricamento dello stesso periodo aggiunge solo eventuali fonti.
+      const fresh = payload.filter((row) => !existing.has(row.dedup_key));
+      if (fresh.length) {
+        const { error } = await supabase
+          .from(PROD_TABLE)
+          .upsert(fresh, { onConflict: "dedup_key", ignoreDuplicates: true });
+        if (error) throw error;
+      }
+      const referencesToAdd = payload.filter(
+        (row) => existing.has(row.dedup_key) &&
+          !(existing.get(row.dedup_key) || []).includes(fileName)
+      );
+      for (const row of referencesToAdd) {
+        const { error } = await supabase
+          .from(PROD_TABLE)
+          .update({
+            source_files: row.source_files,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("dedup_key", row.dedup_key);
+        if (error) throw error;
+      }
     }
 
     return { inserted, duplicates };
