@@ -10564,11 +10564,20 @@ function ReportAdmin({
 
 
   const saveEditedReport = async (report: any) => {
+    const newReportDate = editingReportForm.report_date?.trim() || "";
+    const parsedReportDate = new Date(`${newReportDate}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newReportDate) ||
+        Number.isNaN(parsedReportDate.getTime()) ||
+        parsedReportDate.toISOString().slice(0, 10) !== newReportDate) {
+      alert("Seleziona una data valida per il report.");
+      return;
+    }
     const fields = ["contracts_energia", "consumi_energia", "contracts_gas", "consumi_gas"] as const;
     if (fields.some((field) => !editingReportForm[field]?.trim() || !/^[0-9.,\\s]+$/.test(editingReportForm[field]))) {
       alert("Inserisci valori numerici validi."); return;
     }
     const updates = {
+      report_date: newReportDate,
       contracts_energia: parseItalianReportNumber(editingReportForm.contracts_energia),
       consumi_energia: parseItalianReportNumber(editingReportForm.consumi_energia),
       contracts_gas: parseItalianReportNumber(editingReportForm.contracts_gas),
@@ -10580,6 +10589,19 @@ function ReportAdmin({
     }
     setSavingReportEdit(true);
     try {
+      if (newReportDate !== String(report.report_date || "").slice(0, 10)) {
+        const { data: conflictingReport, error: conflictError } = await supabase
+          .from("reports")
+          .select("id")
+          .eq("agent_id", report.agent_id)
+          .eq("report_date", newReportDate)
+          .neq("id", report.id)
+          .limit(1);
+        if (conflictError) throw conflictError;
+        if (conflictingReport?.length) {
+          throw new Error("Questo agente ha già un report nella data selezionata. Scegli un'altra data.");
+        }
+      }
       let query = supabase.from("reports").update(updates).eq("id", report.id);
       if (adminProfile?.role !== "super_admin") query = query.eq("owner_admin_id", adminProfile?.id);
       else if (ownerFilter === "MINE") query = query.eq("owner_admin_id", adminProfile?.id);
@@ -11698,9 +11720,25 @@ function ReportAdmin({
                                   className="ge-date-cell"
                                   style={{ textAlign: "center" }}
                                 >
-                                  {formatReportDate(
-                                    r.report_date
-                                  )}
+                                  {editingReportId === Number(r.id) ? (
+                                    <input
+                                      type="date"
+                                      aria-label="Modifica data del report"
+                                      value={editingReportForm.report_date ?? ""}
+                                      onChange={(event) => setEditingReportForm((prev) => ({
+                                        ...prev,
+                                        report_date: event.target.value,
+                                      }))}
+                                      style={{
+                                        width: "100%",
+                                        minWidth: 140,
+                                        boxSizing: "border-box",
+                                        padding: 6,
+                                        border: "1px solid #60a5fa",
+                                        borderRadius: 6,
+                                      }}
+                                    />
+                                  ) : formatReportDate(r.report_date)}
                                 </td>
                                 <td
                                   data-label="Contratti energia"
@@ -11789,6 +11827,7 @@ function ReportAdmin({
                                     <button type="button" onClick={() => {
                                       setEditingReportId(Number(r.id));
                                       setEditingReportForm({
+                                        report_date: String(r.report_date || "").slice(0, 10),
                                         contracts_energia: String(r.contracts_energia ?? 0),
                                         consumi_energia: String(r.consumi_energia ?? 0),
                                         contracts_gas: String(r.contracts_gas ?? 0),
