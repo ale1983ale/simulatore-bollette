@@ -10403,6 +10403,9 @@ function ReportAdmin({
 }) {
   const [agents, setAgents] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
+  const [editingReportId, setEditingReportId] = useState<number | null>(null);
+  const [editingReportForm, setEditingReportForm] = useState<Record<string, string>>({});
+  const [savingReportEdit, setSavingReportEdit] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] =
@@ -10559,6 +10562,38 @@ function ReportAdmin({
     await loadReports(selectedAgentId);
   };
 
+
+  const saveEditedReport = async (report: any) => {
+    const fields = ["contracts_energia", "consumi_energia", "contracts_gas", "consumi_gas"] as const;
+    if (fields.some((field) => !editingReportForm[field]?.trim() || !/^[0-9.,\\s]+$/.test(editingReportForm[field]))) {
+      alert("Inserisci valori numerici validi."); return;
+    }
+    const updates = {
+      contracts_energia: parseItalianReportNumber(editingReportForm.contracts_energia),
+      consumi_energia: parseItalianReportNumber(editingReportForm.consumi_energia),
+      contracts_gas: parseItalianReportNumber(editingReportForm.contracts_gas),
+      consumi_gas: parseItalianReportNumber(editingReportForm.consumi_gas),
+      notes: editingReportForm.notes || "",
+    };
+    if (!Number.isInteger(updates.contracts_energia) || !Number.isInteger(updates.contracts_gas)) {
+      alert("Il numero dei contratti deve essere intero."); return;
+    }
+    setSavingReportEdit(true);
+    try {
+      let query = supabase.from("reports").update(updates).eq("id", report.id);
+      if (adminProfile?.role !== "super_admin") query = query.eq("owner_admin_id", adminProfile?.id);
+      else if (ownerFilter === "MINE") query = query.eq("owner_admin_id", adminProfile?.id);
+      else if (ownerFilter === "OTHERS") query = query.neq("owner_admin_id", adminProfile?.id);
+      const { data, error } = await query.select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Nessuna modifica salvata: verifica i permessi.");
+      setEditingReportId(null);
+      await loadReports(selectedAgentId);
+      alert("Report modificato e aggiornato anche nell'area agente.");
+    } catch (error: any) {
+      alert("Errore modifica report: " + (error?.message || String(error)));
+    } finally { setSavingReportEdit(false); }
+  };
   const productionToday = new Date();
   const productionStart = new Date(
     productionToday.getFullYear(),
@@ -11675,7 +11710,11 @@ function ReportAdmin({
                                     background: "#fff7ed",
                                   }}
                                 >
-                                  {r.contracts_energia}
+                                  {editingReportId === Number(r.id) ? (
+                                    <input value={editingReportForm.contracts_energia ?? ""} inputMode="decimal"
+                                      onChange={(event) => setEditingReportForm((prev) => ({ ...prev, contracts_energia: event.target.value }))}
+                                      style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
+                                  ) : ({r.contracts_energia})}
                                 </td>
                                 <td
                                   data-label="Consumi energia"
@@ -11685,10 +11724,14 @@ function ReportAdmin({
                                     background: "#fff7ed",
                                   }}
                                 >
-                                  {numFormat(
+                                  {editingReportId === Number(r.id) ? (
+                                    <input value={editingReportForm.consumi_energia ?? ""} inputMode="decimal"
+                                      onChange={(event) => setEditingReportForm((prev) => ({ ...prev, consumi_energia: event.target.value }))}
+                                      style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
+                                  ) : ({numFormat(
                                     r.consumi_energia,
                                     2
-                                  )}
+                                  )})}
                                 </td>
                                 <td
                                   data-label="Contratti gas"
@@ -11698,7 +11741,11 @@ function ReportAdmin({
                                     background: "#eff6ff",
                                   }}
                                 >
-                                  {r.contracts_gas}
+                                  {editingReportId === Number(r.id) ? (
+                                    <input value={editingReportForm.contracts_gas ?? ""} inputMode="decimal"
+                                      onChange={(event) => setEditingReportForm((prev) => ({ ...prev, contracts_gas: event.target.value }))}
+                                      style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
+                                  ) : ({r.contracts_gas})}
                                 </td>
                                 <td
                                   data-label="Consumi gas"
@@ -11708,25 +11755,51 @@ function ReportAdmin({
                                     background: "#eff6ff",
                                   }}
                                 >
-                                  {numFormat(
+                                  {editingReportId === Number(r.id) ? (
+                                    <input value={editingReportForm.consumi_gas ?? ""} inputMode="decimal"
+                                      onChange={(event) => setEditingReportForm((prev) => ({ ...prev, consumi_gas: event.target.value }))}
+                                      style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
+                                  ) : ({numFormat(
                                     r.consumi_gas,
                                     2
-                                  )}
+                                  )})}
                                 </td>
                                 <td
                                   data-label="Note"
                                   className="ge-note-cell"
                                   style={{ textAlign: "center" }}
                                 >
-                                  {r.notes || "-"}
+                                  {editingReportId === Number(r.id) ? (
+                                    <textarea rows={2} value={editingReportForm.notes ?? ""}
+                                      onChange={(event) => setEditingReportForm((prev) => ({ ...prev, notes: event.target.value }))}
+                                      style={{ width: "100%", minWidth: 130, boxSizing: "border-box" }} />
+                                  ) : (r.notes || "-")}
                                 </td>
                                 <td
                                   data-label="Azioni"
                                   className="ge-action-cell"
                                   style={{ textAlign: "center" }}
                                 >
+                                  {editingReportId === Number(r.id) ? (
+                                    <>
+                                      <button type="button" disabled={savingReportEdit} onClick={() => void saveEditedReport(r)} style={{ marginRight: 6, background: "#16a34a", color: "white", border: 0, padding: 6, borderRadius: 6 }}>SALVA</button>
+                                      <button type="button" disabled={savingReportEdit} onClick={() => setEditingReportId(null)}>ANNULLA</button>
+                                    </>
+                                  ) : (
+                                    <button type="button" onClick={() => {
+                                      setEditingReportId(Number(r.id));
+                                      setEditingReportForm({
+                                        contracts_energia: String(r.contracts_energia ?? 0),
+                                        consumi_energia: String(r.consumi_energia ?? 0),
+                                        contracts_gas: String(r.contracts_gas ?? 0),
+                                        consumi_gas: String(r.consumi_gas ?? 0),
+                                        notes: String(r.notes ?? ""),
+                                      });
+                                    }} style={{ marginRight: 6, background: "#2563eb", color: "white", border: 0, padding: 6, borderRadius: 6 }}>MODIFICA</button>
+                                  )}
                                   <button
                                     type="button"
+                                    disabled={editingReportId === Number(r.id)}
                                     onClick={() =>
                                       deleteReportAdmin(r.id)
                                     }
