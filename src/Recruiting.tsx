@@ -5658,6 +5658,8 @@ export default function Recruiting({
       }
 
       setMapView("candidates");
+      setMapShowActiveAgents(true);
+      setMapDmFilters([]);
       setMapCandidateStatusFilters((current) =>
         current.length === 0 || current.includes(candidate.status)
           ? current
@@ -5674,7 +5676,7 @@ export default function Recruiting({
 
       setSection("map");
       setMessage(
-        `${candidate.fullName} è evidenziato nella mappa NOMINATIVI IN LAVORAZIONE.`
+        `${candidate.fullName} è evidenziato nella mappa insieme agli AGENTI ATTIVI.`
       );
     } catch (error: any) {
       console.error("SHOW CANDIDATE MAP ERROR:", error);
@@ -8728,6 +8730,32 @@ export default function Recruiting({
                               ✉
                             </a>
                           )}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void showCandidateOnMap(candidate);
+                            }}
+                            disabled={mapCandidateBusyId === candidate.id}
+                            aria-label={`Mostra ${candidate.fullName} nella mappa con gli agenti attivi`}
+                            title="Apri nella mappa Recruiting con gli agenti attivi"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 32,
+                              height: 32,
+                              borderRadius: 999,
+                              background: "#fef3c7",
+                              border: "1px solid #fbbf24",
+                              color: "#92400e",
+                              fontSize: 17,
+                              cursor: mapCandidateBusyId === candidate.id ? "wait" : "pointer",
+                              opacity: mapCandidateBusyId === candidate.id ? 0.6 : 1,
+                            }}
+                          >
+                            📍
+                          </button>
                         </div>
 
                         <div
