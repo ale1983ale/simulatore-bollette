@@ -51,7 +51,7 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUserAgentString(
-            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.5"
+            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.6"
         );
 
         CookieManager.getInstance().setAcceptCookie(true);
