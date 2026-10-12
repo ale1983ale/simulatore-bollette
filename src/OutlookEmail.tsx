@@ -2050,7 +2050,7 @@ export default function OutlookEmail() {
               >
                 {androidPackageStatus.message}
               </div>
-            )
+            )}
               </>
             )}
 
