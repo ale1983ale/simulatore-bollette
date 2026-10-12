@@ -3261,10 +3261,14 @@ function Energia({
   onOpenProvvigioni: (prefill: ProvvigioniPrefill) => void;
 }) {
   const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
+  const hasVisibleBalancedEnergyOffer = visibleEnergyOffers.some(
+    (offer) => energyOfferPriceMode(offer.nome) === "BILANCIATO"
+  );
   const allowedEnergyModes: OfferPriceMode[] = [
     "VARIABILE",
     ...(offerVisibility.energyFixed ? ["FISSO" as const] : []),
-    ...(offerVisibility.energyBalanced ? ["BILANCIATO" as const] : []),
+    ...(offerVisibility.energyBalanced && hasVisibleBalancedEnergyOffer
+      ? ["BILANCIATO" as const] : []),
   ];
   const eligibleEnergyOffers = visibleEnergyOffers.filter((offer) =>
     allowedEnergyModes.includes(energyOfferPriceMode(offer.nome))
@@ -3434,7 +3438,7 @@ function Energia({
     setS((prev) => ({
       ...prev, tipologiaOfferta: "VARIABILE", offerta: "", mese1: "", mese2: "",
     }));
-  }, [s.tipologiaOfferta, offerVisibility.energyFixed, offerVisibility.energyBalanced]);
+  }, [s.tipologiaOfferta, offerVisibility.energyFixed, offerVisibility.energyBalanced, energyOffers]);
   const fixedModeEnergyOffers = eligibleEnergyOffers.filter(
     (offer) => energyOfferPriceMode(offer.nome) === activeEnergyMode
   );
