@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import JSZip from "jszip";
+import { downloadZipBlob } from "./androidDownloads";
 import * as XLSX from "xlsx";
 
 type Recipient = { agency: string; email: string; fileName?: string };
@@ -20,16 +21,7 @@ const sanitizeFileName = (value: string) =>
     .replace(/\s+/g, " ")
     .slice(0, 110) || "file";
 
-function downloadBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
+
 
 function findFileCard(input: HTMLInputElement) {
   let node: HTMLElement | null = input.parentElement;
@@ -454,7 +446,8 @@ export default function OutlookEmailAutoSendPackageSafe() {
         ].join("\r\n"));
 
         const blob = await zip.generateAsync({ type: "blob" });
-        downloadBlob(blob, `INVIO_AUTOMATICO_OUTLOOK_${new Date().toISOString().slice(0, 10)}.zip`);
+        const destination = await downloadZipBlob(blob, `INVIO_AUTOMATICO_OUTLOOK_${new Date().toISOString().slice(0, 10)}.zip`);
+        if (destination === "native") window.alert("Salvataggio del pacchetto PC richiesto in Download/Gestione Energia.");
       } catch (error: any) {
         window.alert(`Errore: ${error?.message || error}`);
       } finally {

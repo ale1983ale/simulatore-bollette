@@ -51,7 +51,7 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUserAgentString(
-            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.6"
+            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.7"
         );
 
         CookieManager.getInstance().setAcceptCookie(true);
@@ -69,10 +69,19 @@ public class MainActivity extends Activity {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme();
 
-                if (
-                    "http".equalsIgnoreCase(scheme) ||
-                    "https".equalsIgnoreCase(scheme)
-                ) {
+                if ("https".equalsIgnoreCase(scheme) &&
+                    "/Outlook-Invio-Android.apk".equals(uri.getPath()) &&
+                    Uri.parse(BuildConfig.APP_URL).getHost().equalsIgnoreCase(uri.getHost())) {
+                    try {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                        intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                        startActivity(intent);
+                    } catch (Exception error) {
+                        Toast.makeText(MainActivity.this, "Apri il link APK in Chrome.", Toast.LENGTH_LONG).show();
+                    }
+                    return true;
+                }
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
                     return false;
                 }
 
@@ -337,6 +346,30 @@ public class MainActivity extends Activity {
     }
 
     private class PdfBridge {
+        @JavascriptInterface
+        public void openExternalUrl(String url) {
+            runOnUiThread(() -> {
+                if (!bridgeAllowed()) {
+                    Toast.makeText(MainActivity.this, "Collegamento non autorizzato.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                try {
+                    Uri target = Uri.parse(url);
+                    Uri appUrl = Uri.parse(BuildConfig.APP_URL);
+                    if (!"https".equalsIgnoreCase(target.getScheme()) ||
+                        !appUrl.getHost().equalsIgnoreCase(target.getHost()) ||
+                        !"/Outlook-Invio-Android.apk".equals(target.getPath())) {
+                        throw new Exception("Indirizzo non consentito");
+                    }
+                    Intent intent = new Intent(Intent.ACTION_VIEW, target);
+                    intent.addCategory(Intent.CATEGORY_BROWSABLE);
+                    startActivity(intent);
+                } catch (Exception error) {
+                    Toast.makeText(MainActivity.this, "Non riesco ad aprire il download. Usa Chrome.", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
 
         @JavascriptInterface
         public void saveZip(String base64Data, String fileName) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import JSZip from "jszip";
+import { downloadZipBlob } from "./androidDownloads";
 import * as XLSX from "xlsx";
 import { supabaseAnonKey, supabaseUrl } from "./supabase";
 import ReportNotificationPanel from "./ReportNotificationPanel";
@@ -134,16 +135,7 @@ async function buildEml(row: PreparedRow, subject: string, body: string) {
   ].join("\r\n");
 }
 
-function downloadBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
+
 
 function readAdminSession(): AdminSession | null {
   try {
@@ -1311,7 +1303,8 @@ export default function OutlookEmail() {
         "Nessun collegamento Microsoft è stato usato.",
       ].join("\r\n"));
       const blob = await zip.generateAsync({ type: "blob" });
-      downloadBlob(blob, `BOZZE_EMAIL_${new Date().toISOString().slice(0, 10)}.zip`);
+      const destination = await downloadZipBlob(blob, `BOZZE_EMAIL_${new Date().toISOString().slice(0, 10)}.zip`);
+      if (destination === "native") window.alert("Salvataggio delle bozze richiesto. Controlla Download/Gestione Energia.");
       setNotice(`Create ${readyRows.length} email .eml. Nessuna mail è stata inviata.`);
     } catch (error: any) {
       setNotice(`Errore nella creazione delle email: ${error?.message || error}`);
@@ -1367,21 +1360,13 @@ export default function OutlookEmail() {
 
       const blob = await zip.generateAsync({ type: "blob" });
       const fileName = "PACCHETTO_ANDROID_EMAIL_" + new Date().toISOString().slice(0, 10) + ".zip";
-      const nativeFiles = (window as Window & { AndroidFiles?: { saveZip?: (data: string, name: string) => void } }).AndroidFiles;
-      if (typeof nativeFiles?.saveZip === "function") {
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        const chunks: string[] = [];
-        for (let start = 0; start < bytes.length; start += 0x8000) {
-          chunks.push(String.fromCharCode(...bytes.subarray(start, start + 0x8000)));
-        }
-        nativeFiles.saveZip(btoa(chunks.join("")), fileName);
-        setAndroidPackageStatus({ kind: "success", message: "ZIP pronto (" + recipients.length + " email). Salvataggio richiesto in Download/Gestione Energia: controlla la cartella. Nessuna email inviata." });
-      } else if (/GestioneEnergiaAndroid/i.test(navigator.userAgent)) {
-        showError("Questo APK GESTIONE ENERGIA non supporta ancora lo ZIP. Aggiorna alla versione 1.0.6 o successiva oppure usa Chrome.");
-      } else {
-        downloadBlob(blob, fileName);
-        setAndroidPackageStatus({ kind: "success", message: "Download dello ZIP avviato (" + recipients.length + " email). Controlla Download. Nessuna email inviata." });
-      }
+      const destination = await downloadZipBlob(blob, fileName);
+      setAndroidPackageStatus({
+        kind: "success",
+        message: destination === "native"
+          ? "Pacchetto preparato (" + recipients.length + " email). Salvataggio richiesto in Download/Gestione Energia; attendi la conferma di Android."
+          : "Download avviato (" + recipients.length + " email). Controlla la cartella Download.",
+      });
     } catch (error: any) {
       showError("Errore nella creazione del pacchetto Android: " + (error?.message || error));
     } finally {

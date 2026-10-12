@@ -20,7 +20,15 @@ export default function OutlookEmailAndroidHelper() {
         installButton.style.background = "#334155";
         installButton.style.color = "white";
         installButton.addEventListener("click", () => {
-          window.location.href = "/Outlook-Invio-Android.apk";
+          const downloadUrl = new URL("/Outlook-Invio-Android.apk", window.location.origin).href;
+          const native = (window as Window & { AndroidFiles?: { openExternalUrl?: (url: string) => void } }).AndroidFiles;
+          if (typeof native?.openExternalUrl === "function") {
+            native.openExternalUrl(downloadUrl);
+          } else if (/GestioneEnergiaAndroid/i.test(navigator.userAgent)) {
+            window.alert("Questa versione dell'APK non può aprire il download. Aggiorna Gestione Energia alla versione 1.0.7 oppure apri simulatore-bollette.vercel.app in Chrome per installare l'app Invio Email Agenti.");
+          } else {
+            window.location.assign(downloadUrl);
+          }
         });
         row.appendChild(installButton);
       }

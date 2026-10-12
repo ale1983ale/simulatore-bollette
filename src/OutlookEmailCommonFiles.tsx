@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import JSZip from "jszip";
+import { downloadZipBlob } from "./androidDownloads";
 
 type Recipient = { agency: string; email: string };
 
@@ -28,16 +29,7 @@ const sanitizeFileName = (value: string) =>
     .replace(/\s+/g, " ")
     .slice(0, 120) || "email";
 
-function downloadBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
+
 
 async function buildEml(recipient: Recipient, subject: string, body: string, files: File[]) {
   const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -222,7 +214,8 @@ export default function OutlookEmailCommonFiles() {
         }
         zip.file("LEGGIMI.txt", `Bozze create: ${recipients.length}\r\nAllegati uguali per tutti: ${files.length}\r\nNessuna mail è stata inviata automaticamente.`);
         const blob = await zip.generateAsync({ type: "blob" });
-        downloadBlob(blob, `BOZZE_EMAIL_STESSI_FILE_${new Date().toISOString().slice(0, 10)}.zip`);
+        const destination = await downloadZipBlob(blob, `BOZZE_EMAIL_STESSI_FILE_${new Date().toISOString().slice(0, 10)}.zip`);
+        if (destination === "native") window.alert("Salvataggio dello ZIP richiesto in Download/Gestione Energia.");
       } catch (error: any) {
         window.alert(`Errore nella creazione delle bozze: ${error?.message || error}`);
       } finally {
