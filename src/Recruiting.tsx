@@ -1268,6 +1268,34 @@ export default function Recruiting({
   const [hrIncomingCandidates, setHrIncomingCandidates] = useState<
     HrIncomingCandidate[]
   >([]);
+  const [incomingRegionsByZone, setIncomingRegionsByZone] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const missingZones = [...new Set(
+      hrIncomingCandidates
+        .filter((candidate) => !candidate.region && !regionFromProvinceCode(candidate.provinceCode))
+        .map((candidate) => candidate.operationalZone.trim())
+        .filter((zone) => zone && !(zone in incomingRegionsByZone))
+    )];
+    if (!missingZones.length) return;
+    let cancelled = false;
+    void (async () => {
+      for (const zone of missingZones) {
+        try {
+          const geo = await geocodeRecruitingCandidateZone(zone);
+          if (cancelled) return;
+          setIncomingRegionsByZone((previous) => ({
+            ...previous,
+            [zone]: geo.region || regionFromProvinceCode(geo.provinceCode) || "",
+          }));
+        } catch {
+          if (cancelled) return;
+          setIncomingRegionsByZone((previous) => ({ ...previous, [zone]: "" }));
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hrIncomingCandidates]);
   const [incomingNotificationPermission, setIncomingNotificationPermission] =
     useState<NotificationPermission>(() => {
       if (
@@ -14000,6 +14028,15 @@ export default function Recruiting({
                       <div style={labelStyle}>Città / zona</div>
                       <strong>
                         {incoming.operationalZone || "—"}
+                      </strong>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Regione</div>
+                      <strong>
+                        {incoming.region ||
+                          regionFromProvinceCode(incoming.provinceCode) ||
+                          incomingRegionsByZone[incoming.operationalZone.trim()] ||
+                          "—"}
                       </strong>
                     </div>
                     <div>
