@@ -369,6 +369,7 @@ export default function OutlookEmail() {
   const [body, setBody] = useState("Buongiorno,\n\nin allegato trasmetto il file di competenza.\n\nCordiali saluti");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [androidPackageStatus, setAndroidPackageStatus] = useState<{ kind: "error" | "working" | "success"; message: string } | null>(null);
   const [editingRecipients, setEditingRecipients] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -1323,14 +1324,19 @@ export default function OutlookEmail() {
   // I destinatari sono quelli gia' verificati da React per le bozze Outlook.
   const createAndroidPackage = async () => {
     setNotice("");
-    if (!subject.trim()) return setNotice("Inserisci l'oggetto della mail.");
-    if (!files.length) return setNotice(fileMode === "single" ? "Carica prima il file unico." : "Carica prima i file degli agenti.");
-    if (fileMode === "single" && nonAssignedSourceAgencies.length && !nonAssignedConfigured) return setNotice("Configura NON ASSEGNATI o indica le email dirette per i file non associati.");
-    if (fileMode === "single" && nonAssignedSourceAgencies.length && nonAssignedConfigured && !nonAssignedFile) return setNotice("Attendi che sia pronto il file NON ASSEGNATI.");
-    if (fileMode === "separate" && unresolvedManualSources.length) return setNotice("Ci sono file non associati: assegna un indirizzo email oppure escludili.");
-    if (filesWithMissingEmail.length) return setNotice("Mancano indirizzi email per alcuni file associati.");
-    if (!readyRows.length) return setNotice("Non ci sono email pronte.");
+    setAndroidPackageStatus(null);
+    const showError = (message: string) => setAndroidPackageStatus({ kind: "error", message });
+    if (busy) return showError("La preparazione di un pacchetto è già in corso. Attendi e riprova.");
+    if (splitBusy) return showError("Sto ancora preparando gli allegati Excel. Attendi e riprova.");
+    if (!subject.trim()) return showError("Inserisci l'oggetto della mail.");
+    if (!files.length) return showError(fileMode === "single" ? "Carica prima il file unico." : "Carica prima i file degli agenti.");
+    if (fileMode === "single" && nonAssignedSourceAgencies.length && !nonAssignedConfigured) return showError("Configura NON ASSEGNATI o indica le email dirette per i file non associati.");
+    if (fileMode === "single" && nonAssignedSourceAgencies.length && nonAssignedConfigured && !nonAssignedFile) return showError("Attendi che sia pronto il file NON ASSEGNATI.");
+    if (fileMode === "separate" && unresolvedManualSources.length) return showError("Ci sono file non associati: assegna un indirizzo email oppure escludili.");
+    if (filesWithMissingEmail.length) return showError("Mancano indirizzi email per alcuni file associati.");
+    if (!readyRows.length) return showError("Non ci sono email pronte.");
 
+    setAndroidPackageStatus({ kind: "working", message: "Sto preparando lo ZIP Android con " + readyRows.length + " email e allegati..." });
     setBusy(true);
     try {
       const zip = new JSZip();
@@ -1369,15 +1375,15 @@ export default function OutlookEmail() {
           chunks.push(String.fromCharCode(...bytes.subarray(start, start + 0x8000)));
         }
         nativeFiles.saveZip(btoa(chunks.join("")), fileName);
-        setNotice("Pacchetto Android (" + recipients.length + " email) inviato al salvataggio in Download/Gestione Energia. Nessuna email inviata.");
+        setAndroidPackageStatus({ kind: "success", message: "ZIP pronto (" + recipients.length + " email). Salvataggio richiesto in Download/Gestione Energia: controlla la cartella. Nessuna email inviata." });
       } else if (/GestioneEnergiaAndroid/i.test(navigator.userAgent)) {
-        setNotice("Questa versione dell'APK GESTIONE ENERGIA non supporta ancora lo scaricamento ZIP. Aggiorna l'APK oppure apri la webapp in Chrome.");
+        showError("Questo APK GESTIONE ENERGIA non supporta ancora lo ZIP. Aggiorna alla versione 1.0.6 o successiva oppure usa Chrome.");
       } else {
         downloadBlob(blob, fileName);
-        setNotice("Pacchetto Android scaricato: " + recipients.length + " email. Nessuna email inviata.");
+        setAndroidPackageStatus({ kind: "success", message: "Download dello ZIP avviato (" + recipients.length + " email). Controlla Download. Nessuna email inviata." });
       }
     } catch (error: any) {
-      setNotice("Errore nella creazione del pacchetto Android: " + (error?.message || error));
+      showError("Errore nella creazione del pacchetto Android: " + (error?.message || error));
     } finally {
       setBusy(false);
     }
@@ -2038,10 +2044,28 @@ export default function OutlookEmail() {
             )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30, flexWrap: "wrap" }}>
-              <button onClick={() => { setSubject(""); setBody(""); setNotice(""); }} style={{ ...button, background: "#e2e8f0" }}>Pulisci messaggio</button>
-              <button type="button" disabled={busy || splitBusy || !readyRows.length} onClick={createAndroidPackage} style={{ ...button, background: "#0f766e", color: "white", opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1 }}>📦 Scarica pacchetto Android</button>
+              <button onClick={() => { setSubject(""); setBody(""); setNotice(""); setAndroidPackageStatus(null); }} style={{ ...button, background: "#e2e8f0" }}>Pulisci messaggio</button>
+              <button type="button" data-android-package-download="true" onClick={() => void createAndroidPackage()} style={{ ...button, background: "#0f766e", color: "white" }}>📦 Scarica pacchetto Android</button>
               <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{ ...button, background: "#16a34a", color: "white", opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1 }}>{busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.zip)`}</button>
             </div>
+            {androidPackageStatus && (
+              <div
+                role="status"
+                aria-live="polite"
+                style={{
+                  padding: "10px 12px",
+                  marginTop: -20,
+                  marginBottom: 30,
+                  borderRadius: 10,
+                  background: androidPackageStatus.kind === "error" ? "#fef2f2" : "#ecfdf5",
+                  color: androidPackageStatus.kind === "error" ? "#991b1b" : "#065f46",
+                  fontWeight: 700,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {androidPackageStatus.message}
+              </div>
+            )
               </>
             )}
 
