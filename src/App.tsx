@@ -11714,7 +11714,7 @@ function ReportAdmin({
                                     <input value={editingReportForm.contracts_energia ?? ""} inputMode="decimal"
                                       onChange={(event) => setEditingReportForm((prev) => ({ ...prev, contracts_energia: event.target.value }))}
                                       style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
-                                  ) : ({r.contracts_energia})}
+                                  ) : (r.contracts_energia)}
                                 </td>
                                 <td
                                   data-label="Consumi energia"
@@ -11728,10 +11728,10 @@ function ReportAdmin({
                                     <input value={editingReportForm.consumi_energia ?? ""} inputMode="decimal"
                                       onChange={(event) => setEditingReportForm((prev) => ({ ...prev, consumi_energia: event.target.value }))}
                                       style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
-                                  ) : ({numFormat(
+                                  ) : (numFormat(
                                     r.consumi_energia,
                                     2
-                                  )})}
+                                  ))}
                                 </td>
                                 <td
                                   data-label="Contratti gas"
@@ -11745,7 +11745,7 @@ function ReportAdmin({
                                     <input value={editingReportForm.contracts_gas ?? ""} inputMode="decimal"
                                       onChange={(event) => setEditingReportForm((prev) => ({ ...prev, contracts_gas: event.target.value }))}
                                       style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
-                                  ) : ({r.contracts_gas})}
+                                  ) : (r.contracts_gas)}
                                 </td>
                                 <td
                                   data-label="Consumi gas"
@@ -11759,10 +11759,10 @@ function ReportAdmin({
                                     <input value={editingReportForm.consumi_gas ?? ""} inputMode="decimal"
                                       onChange={(event) => setEditingReportForm((prev) => ({ ...prev, consumi_gas: event.target.value }))}
                                       style={{ width: "100%", minWidth: 75, boxSizing: "border-box", padding: 6, border: "1px solid #60a5fa", borderRadius: 6 }} />
-                                  ) : ({numFormat(
+                                  ) : (numFormat(
                                     r.consumi_gas,
                                     2
-                                  )})}
+                                  ))}
                                 </td>
                                 <td
                                   data-label="Note"
