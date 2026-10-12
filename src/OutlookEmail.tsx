@@ -1319,6 +1319,70 @@ export default function OutlookEmail() {
     }
   };
 
+  // Il pacchetto dell'app "Invio Email Agenti" usa un manifest JSON e gli allegati reali.
+  // I destinatari sono quelli gia' verificati da React per le bozze Outlook.
+  const createAndroidPackage = async () => {
+    setNotice("");
+    if (!subject.trim()) return setNotice("Inserisci l'oggetto della mail.");
+    if (!files.length) return setNotice(fileMode === "single" ? "Carica prima il file unico." : "Carica prima i file degli agenti.");
+    if (fileMode === "single" && nonAssignedSourceAgencies.length && !nonAssignedConfigured) return setNotice("Configura NON ASSEGNATI o indica le email dirette per i file non associati.");
+    if (fileMode === "single" && nonAssignedSourceAgencies.length && nonAssignedConfigured && !nonAssignedFile) return setNotice("Attendi che sia pronto il file NON ASSEGNATI.");
+    if (fileMode === "separate" && unresolvedManualSources.length) return setNotice("Ci sono file non associati: assegna un indirizzo email oppure escludili.");
+    if (filesWithMissingEmail.length) return setNotice("Mancano indirizzi email per alcuni file associati.");
+    if (!readyRows.length) return setNotice("Non ci sono email pronte.");
+
+    setBusy(true);
+    try {
+      const zip = new JSZip();
+      const recipients: Array<{ agency: string; email: string; attachments: string[] }> = [];
+      for (let index = 0; index < readyRows.length; index += 1) {
+        const row = readyRows[index];
+        if (!row.file) throw new Error("Allegato mancante.");
+        if (!isValidEmail(row.email)) throw new Error("Email non valida per " + (row.agenzia || row.sourceLabel || "destinatario"));
+        const path = "allegati/" + String(index + 1).padStart(3, "0") + "_" + sanitizeFileName(row.file.name);
+        zip.file(path, row.file);
+        recipients.push({
+          agency: row.agenzia || row.sourceLabel || "Destinatario " + (index + 1),
+          email: row.email.trim(),
+          attachments: [path],
+        });
+      }
+      zip.file("manifest.json", JSON.stringify({ subject: subject.trim(), body, recipients }, null, 2));
+      zip.file("LEGGIMI.txt", [
+        "PACCHETTO ANDROID - INVIO EMAIL AGENTI",
+        "",
+        "1. Apri l'app Android 'Invio Email Agenti'.",
+        "2. Premi 'Seleziona pacchetto ZIP' e scegli questo file.",
+        "3. Apri e verifica ogni messaggio in Outlook prima di inviarlo.",
+        "",
+        "Email preparate: " + recipients.length,
+        "Nessuna email e' stata inviata automaticamente.",
+      ].join("\r\n"));
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const fileName = "PACCHETTO_ANDROID_EMAIL_" + new Date().toISOString().slice(0, 10) + ".zip";
+      const nativeFiles = (window as Window & { AndroidFiles?: { saveZip?: (data: string, name: string) => void } }).AndroidFiles;
+      if (typeof nativeFiles?.saveZip === "function") {
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const chunks: string[] = [];
+        for (let start = 0; start < bytes.length; start += 0x8000) {
+          chunks.push(String.fromCharCode(...bytes.subarray(start, start + 0x8000)));
+        }
+        nativeFiles.saveZip(btoa(chunks.join("")), fileName);
+        setNotice("Pacchetto Android (" + recipients.length + " email) inviato al salvataggio in Download/Gestione Energia. Nessuna email inviata.");
+      } else if (/GestioneEnergiaAndroid/i.test(navigator.userAgent)) {
+        setNotice("Questa versione dell'APK GESTIONE ENERGIA non supporta ancora lo scaricamento ZIP. Aggiorna l'APK oppure apri la webapp in Chrome.");
+      } else {
+        downloadBlob(blob, fileName);
+        setNotice("Pacchetto Android scaricato: " + recipients.length + " email. Nessuna email inviata.");
+      }
+    } catch (error: any) {
+      setNotice("Errore nella creazione del pacchetto Android: " + (error?.message || error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const card: React.CSSProperties = { background: "white", border: "1px solid #e2e8f0", borderRadius: 14, padding: 16, boxShadow: "0 10px 30px rgba(15,23,42,.08)" };
   const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, background: "white" };
   const smallField: React.CSSProperties = { ...field, minWidth: 170, padding: "7px 9px" };
@@ -1975,6 +2039,7 @@ export default function OutlookEmail() {
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30, flexWrap: "wrap" }}>
               <button onClick={() => { setSubject(""); setBody(""); setNotice(""); }} style={{ ...button, background: "#e2e8f0" }}>Pulisci messaggio</button>
+              <button type="button" disabled={busy || splitBusy || !readyRows.length} onClick={createAndroidPackage} style={{ ...button, background: "#0f766e", color: "white", opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1 }}>📦 Scarica pacchetto Android</button>
               <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{ ...button, background: "#16a34a", color: "white", opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1 }}>{busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.zip)`}</button>
             </div>
               </>

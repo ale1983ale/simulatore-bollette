@@ -295,7 +295,81 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    private Uri saveZipFile(String base64Data, String fileName)
+        throws Exception {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return null;
+        }
+
+        String safeName = fileName == null
+            ? "Pacchetto-Android.zip"
+            : fileName.replaceAll("[\\\\/:*?\"<>|]", "").trim();
+        if (safeName.isEmpty()) safeName = "Pacchetto-Android.zip";
+        if (!safeName.toLowerCase().endsWith(".zip")) safeName += ".zip";
+
+        byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Downloads.DISPLAY_NAME, safeName);
+        values.put(MediaStore.Downloads.MIME_TYPE, "application/zip");
+        values.put(
+            MediaStore.Downloads.RELATIVE_PATH,
+            Environment.DIRECTORY_DOWNLOADS + "/Gestione Energia"
+        );
+        values.put(MediaStore.Downloads.IS_PENDING, 1);
+        Uri uri = getContentResolver().insert(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
+        );
+        if (uri == null) return null;
+
+        try (OutputStream output = getContentResolver().openOutputStream(uri)) {
+            if (output == null) throw new Exception("Impossibile aprire il download");
+            output.write(bytes);
+            output.flush();
+        } catch (Exception error) {
+            getContentResolver().delete(uri, null, null);
+            throw error;
+        }
+        ContentValues complete = new ContentValues();
+        complete.put(MediaStore.Downloads.IS_PENDING, 0);
+        getContentResolver().update(uri, complete, null, null);
+        return uri;
+    }
+
     private class PdfBridge {
+
+        @JavascriptInterface
+        public void saveZip(String base64Data, String fileName) {
+            runOnUiThread(() -> {
+                if (!bridgeAllowed()) {
+                    Toast.makeText(
+                        MainActivity.this,
+                        "Download ZIP non consentito da questa pagina.",
+                        Toast.LENGTH_LONG
+                    ).show();
+                    return;
+                }
+                new Thread(() -> {
+                    try {
+                        Uri uri = saveZipFile(base64Data, fileName);
+                        runOnUiThread(() -> Toast.makeText(
+                            MainActivity.this,
+                            uri == null
+                                ? "Download ZIP supportato da Android 10 in poi."
+                                : "ZIP salvato in Download/Gestione Energia.",
+                            Toast.LENGTH_LONG
+                        ).show());
+                    } catch (Exception error) {
+                        error.printStackTrace();
+                        runOnUiThread(() -> Toast.makeText(
+                            MainActivity.this,
+                            "Errore nel salvataggio ZIP.",
+                            Toast.LENGTH_LONG
+                        ).show());
+                    }
+                }).start();
+            });
+        }
         @JavascriptInterface
         public void savePdf(String base64Data, String fileName) {
             runOnUiThread(() -> {
