@@ -1,8 +1,12 @@
 name: Diagnose production deployment
 on:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/diagnose-production.yml"
+      - "src/**"
+      - "package.json"
+      - "index.html"
   workflow_dispatch:
   # Manual diagnostics only; do not expose tokens in logs.
 jobs:
