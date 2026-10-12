@@ -9,6 +9,18 @@ jobs:
   check-site:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build current website
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          echo "CURRENT_VERSION_HAS_ANDROID_BUTTON:"
+          grep -l "data-android-package-download" dist/assets/*.js >/dev/null && echo "YES" || echo "NO"
       - name: Inspect deployed version and downloads
         shell: bash
         run: |
