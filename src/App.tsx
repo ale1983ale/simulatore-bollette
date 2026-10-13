@@ -14840,8 +14840,27 @@ useEffect(() => {
       }
       if (Array.isArray(map.energyOffers)) {
         const obsoleteEnergyOfferNames = new Set(["CASA", "CASASPECIAL", "CASAUNICA", "CONDOMINI 10", "CONDOMINI 15", "CONDOMINI 5", "IMPRESA", "IMPRESASPECIAL", "IMPRESAUNICA", "SCELTA", "SCELTASPECIAL", "SCELTAUNICA", "SICURABUSINESS", "SICURADOMESTICO", "VALORE", "VALORESPECIAL", "VALOREUNICA"]);
-        const savedEnergyOffers = (map.energyOffers as EnergyOffer[])
+        // Converti l'offerta storica unica in due listini indipendenti,
+        // ereditando canone, spread, visibilità e maggiorazioni.
+        const expandedEnergyOffers = (map.energyOffers as EnergyOffer[]).flatMap((offer) =>
+          isLegacyBalancedName(offer.nome)
+            ? [
+                { ...offer, nome: BALANCED_DOMESTIC_NAME,
+                  allowedCustomerGroups: ["DOMESTICI"] as EnergyCustomerGroup[],
+                  percentualeFissa: 50, percentualeVariabile: 50 },
+                { ...offer, nome: BALANCED_BUSINESS_NAME,
+                  allowedCustomerGroups: ["BTA", "MT"] as EnergyCustomerGroup[],
+                  percentualeFissa: 50, percentualeVariabile: 50 },
+              ]
+            : [offer]
+        );
+        const savedEnergyOffers = expandedEnergyOffers
           .map((offer) => ({
+            ... (balancedCustomerGroups(offer.nome)
+              ? { percentualeFissa: balancedShares(offer).fixed,
+                  percentualeVariabile: balancedShares(offer).variable }
+              : {}),
+
             ...offer,
             visibile: offer.visibile !== false,
             provvigioneTipo:
@@ -14850,15 +14869,15 @@ useEffect(() => {
               )
                 ? (offer.provvigioneTipo as ProvvigioniOfferType)
                 : getProvvigioniOfferType(offer.nome),
-            allowedCustomerGroups:
-              Array.isArray(offer.allowedCustomerGroups) &&
+            allowedCustomerGroups: balancedCustomerGroups(offer.nome) ||
+              (Array.isArray(offer.allowedCustomerGroups) &&
               offer.allowedCustomerGroups.some((group) =>
                 ALL_ENERGY_CUSTOMER_GROUPS.includes(group)
               )
                 ? offer.allowedCustomerGroups.filter((group) =>
                     ALL_ENERGY_CUSTOMER_GROUPS.includes(group)
                   )
-                : [...ALL_ENERGY_CUSTOMER_GROUPS],
+                : [...ALL_ENERGY_CUSTOMER_GROUPS]),
           }))
           .filter((offer) => !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
             normalizeOfferName(offer.nome).replace(/\s+/g, " ")
@@ -14924,13 +14943,21 @@ useEffect(() => {
       }
 
       if (Array.isArray(map.punPsvRows)) {
-        const savedPunPsvRows = (map.punPsvRows as PunPsvRow[])
-          .filter((row) => !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
-            normalizeOfferName(row.mese).replace(/\s+/g, " ")
-          ))
+        const rawPunRows = map.punPsvRows as PunPsvRow[];
+        const legacyFixedBalancedRow = rawPunRows.find((row) => isLegacyBalancedName(row.mese));
+        const savedPunPsvRows = rawPunRows
+          .filter((row) =>
+            !isLegacyBalancedName(row.mese) &&
+            !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
+              normalizeOfferName(row.mese).replace(/\s+/g, " ")
+            )
+          )
           .map((row) => ({ ...row, mese: normalizeBalancedOffer(row.mese) }));
         const mergedPunPsvRows = INITIAL_PUN_PSV_ROWS.map((baseRow) =>
-          savedPunPsvRows.find((row) => row.mese === baseRow.mese) || baseRow
+          savedPunPsvRows.find((row) => row.mese === baseRow.mese) ||
+          ((baseRow.mese === BALANCED_DOMESTIC_NAME || baseRow.mese === BALANCED_BUSINESS_NAME) && legacyFixedBalancedRow
+            ? { ...legacyFixedBalancedRow, mese: baseRow.mese }
+            : baseRow)
         );
         const extraSavedRows = savedPunPsvRows.filter(
           (row) => !mergedPunPsvRows.some((merged) => merged.mese === row.mese)
