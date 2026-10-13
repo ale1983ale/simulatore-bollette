@@ -1,0 +1,56 @@
+
+/* ATTIVO PRODUZIONE: responsive grids, native calendar inputs and mobile detail cards. */
+.ap-root, .ap-root * { box-sizing: border-box; }
+.ap-root { min-width: 0; width: 100%; }
+.ap-filters-panel, .ap-summary-card, .ap-comparison-panel { min-width: 0; }
+.ap-title-row > div { min-width: 0; }
+.ap-summary-card, .ap-metric-block { overflow-wrap: anywhere; min-width: 0; }
+.ap-saldo span { overflow-wrap: anywhere; }
+.ap-date-label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 12px; font-weight: 850; color: #334155; }
+.ap-calendar-panel { margin-top: 14px; padding: 14px; border-radius: 10px; border: 1px solid #bfdbfe; background: #eff6ff; min-width: 0; }
+.ap-calendar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ap-date-label input[type="date"] {
+  display: block;
+  background: #fff; color: #0f172a; width: 100%; min-width: 0; max-width: 100%;
+  border: 1px solid #94a3b8; border-radius: 8px; padding: 10px 8px;
+  font: inherit; font-size: 16px; min-height: 44px;
+}
+.ap-date-error, .ap-date-hint { margin-top: 12px; font-size: 12px; line-height: 1.6; }
+.ap-date-error { color: #991b1b; font-weight: 800; }
+.ap-date-hint { color: #1e3a8a; }
+.ap-desktop-table { max-width: 100%; }
+.ap-mobile-agent-list { display: none; }
+.ap-metric-block strong, .ap-agent-card strong { font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .ap-root { gap: 12px !important; }
+  .ap-filters-panel, .ap-summary-card, .ap-comparison-panel { padding: 12px !important; }
+  .ap-title-row { display: grid !important; grid-template-columns: 1fr; gap: 12px !important; }
+  .ap-title-row h2 { font-size: 19px; line-height: 1.25; }
+  .ap-refresh-button { width: 100%; min-height: 44px; font-size: 13px; }
+  .ap-filter-grid, .ap-summary-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .ap-filters-panel select { min-width: 0; width: 100%; font-size: 16px !important; }
+  .ap-summary-card { width: 100%; }
+  .ap-summary-split { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .ap-summary-split > div { min-width: 0; padding: 10px !important; }
+  .ap-summary-split > div > div:nth-child(2) { font-size: 20px !important; }
+  .ap-saldo { display: grid !important; grid-template-columns: 1fr; gap: 8px !important; font-size: 13px; }
+  .ap-desktop-table { display: none !important; }
+  .ap-mobile-agent-list { display: grid; gap: 10px; min-width: 0; }
+  .ap-agent-card { padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; min-width: 0; }
+  .ap-agent-card.ap-agent-total { background: #f8fafc; border-color: #94a3b8; }
+  .ap-agent-name { font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 10px; overflow-wrap: anywhere; }
+  .ap-agent-metrics { display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; }
+  .ap-agent-stat { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; min-width: 0; }
+  .ap-agent-stat.ap-production { background: #f0fdf4; border-color: #bbf7d0; }
+  .ap-agent-stat.ap-recess { background: #fff1f2; border-color: #fecdd3; }
+  .ap-agent-stat.ap-difference { background: #f1f5f9; border-color: #cbd5e1; }
+  .ap-agent-stat-label { font-size: 11px; letter-spacing: .025em; font-weight: 900; color: #334155; margin-bottom: 6px; }
+  .ap-agent-stat-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 3px 0; min-width: 0; font-size: 13px; }
+  .ap-agent-stat-line span { color: #475569; flex-shrink: 0; }
+  .ap-agent-stat-line strong { color: #0f172a; font-size: 15px; text-align: right; overflow-wrap: anywhere; }
+}
+@media (max-width: 410px) {
+  .ap-calendar-grid { grid-template-columns: minmax(0, 1fr); }
+  .ap-summary-split { grid-template-columns: minmax(0, 1fr) !important; }
+  .ap-summary-split > div { padding: 12px !important; }
+}
