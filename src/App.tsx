@@ -79,6 +79,8 @@ type EnergyOffer = {
   spread: number;
   maggiorazioneCapacityMarket: number;
   maggiorazioneCapacityMarketFissa?: number;
+  percentualeFissa?: number;
+  percentualeVariabile?: number;
   visibile?: boolean;
   allowedCustomerGroups?: EnergyCustomerGroup[];
   provvigioneTipo?: ProvvigioniOfferType;
@@ -216,7 +218,8 @@ const INITIAL_PUN_PSV_ROWS: PunPsvRow[] = [
   { mese: "FISSO DOMESTICO", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "FISSO BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   { mese: "FISSO AD HOC", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
-  { mese: "+ BILANCIATA", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "+ BILANCIATA DOMESTICA", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
+  { mese: "+ BILANCIATA BUSINESS", mono: 0, f1: 0, f2: 0, f3: 0, psv: 0 },
   ...PUN_PSV_MONTHS.map((mese) => ({
     mese,
     mono: 0,
@@ -314,7 +317,8 @@ function getMonthYearSortValue(label: string) {
   if (label === "FISSO DOMESTICO") return Number.MAX_SAFE_INTEGER;
   if (label === "FISSO BUSINESS") return Number.MAX_SAFE_INTEGER - 1;
   if (label === "FISSO AD HOC") return Number.MAX_SAFE_INTEGER - 2;
-  if (label === "+ BILANCIATA") return Number.MAX_SAFE_INTEGER - 3;
+  if (label === "+ BILANCIATA DOMESTICA") return Number.MAX_SAFE_INTEGER - 3;
+  if (label === "+ BILANCIATA BUSINESS") return Number.MAX_SAFE_INTEGER - 4;
 
   const parts = String(label).trim().split(" ");
   if (parts.length < 2) return -1;
@@ -366,13 +370,16 @@ const INITIAL_ENERGY_OFFERS: EnergyOffer[] = [
     provvigioneTipo: "SPECIAL",
   },
   {
-    nome: "+ BILANCIATA",
-    canone: 18.5,
-    spread: 0,
-    maggiorazioneCapacityMarket: 0,
-    visibile: true,
-    allowedCustomerGroups: ["DOMESTICI", "BTA", "MT"],
-    provvigioneTipo: "STANDARD",
+    nome: "+ BILANCIATA DOMESTICA",
+    canone: 18.5, spread: 0, maggiorazioneCapacityMarket: 0,
+    percentualeFissa: 50, percentualeVariabile: 50,
+    visibile: true, allowedCustomerGroups: ["DOMESTICI"], provvigioneTipo: "STANDARD",
+  },
+  {
+    nome: "+ BILANCIATA BUSINESS",
+    canone: 18.5, spread: 0, maggiorazioneCapacityMarket: 0,
+    percentualeFissa: 50, percentualeVariabile: 50,
+    visibile: true, allowedCustomerGroups: ["BTA", "MT"], provvigioneTipo: "STANDARD",
   },
   {
     nome: "+ BILANCIATA DEDICATA",
@@ -467,6 +474,8 @@ function energyTypeToGroup(tipo: string): EnergyCustomerGroup | null {
 function normalizedEnergyOfferGroups(
   offer: EnergyOffer
 ): EnergyCustomerGroup[] {
+  const mandatoryGroups = balancedCustomerGroups(offer.nome);
+  if (mandatoryGroups) return mandatoryGroups;
   const groups = Array.isArray(offer.allowedCustomerGroups)
     ? offer.allowedCustomerGroups.filter((group) =>
         ALL_ENERGY_CUSTOMER_GROUPS.includes(group)
@@ -563,16 +572,39 @@ const normalizeOfferName = (offer: string) => String(offer || "").trim().toUpper
 const isFixedDedicatedOffer = (offer: string) =>
   ["+SICURA DEDICATA", "SICURA DEDICATA", "+SICURADEDICATA", "SICURADEDICATA", "+FISSO DEDICATA", "FISSO DEDICATA"].includes(normalizeOfferName(offer));
 
+const BALANCED_DOMESTIC_NAME = "+ BILANCIATA DOMESTICA";
+const BALANCED_BUSINESS_NAME = "+ BILANCIATA BUSINESS";
 const BALANCED_ENERGY_OFFERS = [
-  "+ BILANCIATA", "+ BILANCIATA DEDICATA",
+  BALANCED_DOMESTIC_NAME, BALANCED_BUSINESS_NAME, "+ BILANCIATA DEDICATA",
 ] as const;
-const normalizeBalancedOffer = (value: string) => {
+const isLegacyBalancedName = (value: string) =>
+  ["BILANCIATA", "+BILANCIATA", "+ BILANCIATA"].includes(
+    normalizeOfferName(value).replace(/\s+/g, " ")
+  );
+const normalizeBalancedOffer = (value: string, energyType = "") => {
   const normalized = normalizeOfferName(value).replace(/\s+/g, " ");
-  if (["BILANCIATA", "+BILANCIATA", "+ BILANCIATA"].includes(normalized)) return "+ BILANCIATA";
-  // Le simulazioni salvate con il vecchio nome vengono riaperte nella dedicata.
+  if (isLegacyBalancedName(normalized)) {
+    return energyType && !isDomesticEnergyType(energyType)
+      ? BALANCED_BUSINESS_NAME : BALANCED_DOMESTIC_NAME;
+  }
+  if (["+BILANCIATA DOMESTICA", BALANCED_DOMESTIC_NAME].includes(normalized)) return BALANCED_DOMESTIC_NAME;
+  if (["+BILANCIATA BUSINESS", BALANCED_BUSINESS_NAME].includes(normalized)) return BALANCED_BUSINESS_NAME;
   if (["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(normalized)) return "+ BILANCIATA DEDICATA";
   if (["+BILANCIATA DEDICATA", "+ BILANCIATA DEDICATA", "+ BILANCATA DEDICATA"].includes(normalized)) return "+ BILANCIATA DEDICATA";
   return value;
+};
+const balancedCustomerGroups = (offerName: string): EnergyCustomerGroup[] | null => {
+  const name = normalizeBalancedOffer(offerName);
+  return name === BALANCED_DOMESTIC_NAME ? ["DOMESTICI"] :
+    name === BALANCED_BUSINESS_NAME ? ["BTA", "MT"] : null;
+};
+const balancedShares = (offer?: EnergyOffer) => {
+  const fixed = Number(offer?.percentualeFissa ?? 50);
+  const variable = Number(offer?.percentualeVariabile ?? 50);
+  return Number.isFinite(fixed) && Number.isFinite(variable) &&
+    fixed >= 0 && fixed <= 100 && variable >= 0 && variable <= 100 &&
+    Math.abs(fixed + variable - 100) < 0.000001
+      ? { fixed, variable } : { fixed: 50, variable: 50 };
 };
 const isBalancedEnergyOffer = (offer: string) =>
   BALANCED_ENERGY_OFFERS.includes(
@@ -598,7 +630,9 @@ const FIXED_COMPETENCE_MONTHS = [
   "FISSO DOMESTICO",
   "FISSO BUSINESS",
   "FISSO AD HOC",
-  "+ BILANCIATA",
+  BALANCED_DOMESTIC_NAME,
+  BALANCED_BUSINESS_NAME,
+  "+ BILANCIATA", // compatibilità con le vecchie simulazioni
 ] as const;
 
 const isFixedCompetenceMonth = (month: string) =>
@@ -2853,7 +2887,12 @@ function calcEnergia(
   const quotaFissaEff = dedicatedEnergy
     ? n(d.dedicataQuotaFissa)
     : n(off.canone);
-  const balancedFixedRowLabel = "+ BILANCIATA";
+  const balancedPercents = balancedShares(off);
+  const balancedFixedPercent = balancedPercents.fixed;
+  const balancedVariablePercent = balancedPercents.variable;
+  const balancedFixedRowLabel = isBalancedDedicatedOffer(d.offerta)
+    ? "+ BILANCIATA DEDICATA"
+    : isDomestico ? BALANCED_DOMESTIC_NAME : BALANCED_BUSINESS_NAME;
   const balancedFixedRow = punPsvRows.find((row) => row.mese === balancedFixedRowLabel);
   const balancedFixedPrice = (band: "mono" | "f1" | "f2" | "f3") =>
     isBalancedDedicatedOffer(d.offerta)
@@ -2881,9 +2920,8 @@ function calcEnergia(
   const perditaPercentuale =
     ["MTA1", "MTA2", "MTA3"].includes(d.tipo) ? 0.038 : 0.1;
 
-  // Each band is split 50/50. The PUN + spread applies only to
-  // the variable half; the matching fixed + BILANCIATA reference
-  // (or dedicated custom price) applies only to the fixed half.
+  // Le quote fissa/variabile seguono le percentuali del listino.
+  // Per la DEDICATA resta il prezzo fisso manuale e il default 50/50.
   const bandRows = [
     { qty: n(d.f1Mese1), variable: prezzoF11, band: "f1" as const },
     { qty: n(d.f1Mese2), variable: prezzoF12, band: "f1" as const },
@@ -2895,15 +2933,15 @@ function calcEnergia(
     { qty: n(d.monoMese2), variable: prezzoMono2, band: "mono" as const },
   ];
   const balancedVariableTotal = isBalanced
-    ? bandRows.reduce((sum, item) => sum + item.qty * 0.5 * (item.variable + spreadEff), 0)
+    ? bandRows.reduce((sum, item) => sum + item.qty * (balancedVariablePercent / 100) * (item.variable + spreadEff), 0)
     : 0;
   const balancedFixedTotal = isBalanced
-    ? bandRows.reduce((sum, item) => sum + item.qty * 0.5 * balancedFixedPrice(item.band), 0)
+    ? bandRows.reduce((sum, item) => sum + item.qty * (balancedFixedPercent / 100) * balancedFixedPrice(item.band), 0)
     : 0;
   const H22_base = isBalanced
     ? balancedVariableTotal + balancedFixedTotal
     : bandRows.reduce((sum, item) => sum + item.qty * (item.variable + spreadEff), 0);
-  const balancedFixedReady = !isBalanced ||
+  const balancedFixedReady = !isBalanced || balancedFixedPercent === 0 ||
     bandRows.every((item) => item.qty <= 0 || balancedFixedPrice(item.band) > 0);
 
   // Network losses apply to both halves, exactly once on total energy.
@@ -2932,7 +2970,10 @@ function calcEnergia(
   const dispCpTotale =
     dispCpQuantity * n(d.dispacciamentoCapacityMarket) +
     consumiTotConPerdite *
-      (isBalanced ? (cmEff + cmFixedEff) * 0.5 : cmEff);
+      (isBalanced
+        ? cmEff * (balancedVariablePercent / 100) +
+          cmFixedEff * (balancedFixedPercent / 100)
+        : cmEff);
 
   const H22 = H22_base + perditeEnergia + dispCpTotale;
   const H24 = n(d.reattivaImmessa) + n(d.reattivaPrelevata);
@@ -3031,6 +3072,8 @@ function calcEnergia(
     isBalanced,
     balancedFixedRowLabel,
     balancedFixedReady,
+    balancedFixedPercent,
+    balancedVariablePercent,
     balancedVariableTotal,
     balancedFixedTotal,
     H22,
@@ -5175,8 +5218,8 @@ Base suggerito
           {previewBox(
             <>
               {row(isFixedDedicatedOffer(s.offerta) ? "Prezzo fisso ad hoc usato" : "Spread usato", numFormat(r.spreadEff, 3))}
-              {row(r.isBalanced ? "Magg. CP.Mrk variabile (50%)" : "Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
-              {r.isBalanced && row("Magg. CP.Mrk fisso (50%)", numFormat(r.cmFixedEff, 3))}
+              {row(r.isBalanced ? `Magg. CP.Mrk variabile (${r.balancedVariablePercent}%)` : "Maggiorazione CP.Mrk", numFormat(r.cmEff, 3))}
+              {r.isBalanced && row(`Magg. CP.Mrk fisso (${r.balancedFixedPercent}%)`, numFormat(r.cmFixedEff, 3))}
               {r.isBalanced && row("Prezzo fisso di riferimento", isBalancedDedicatedOffer(s.offerta) ? numFormat(n(s.bilanciataPrezzoFisso), 6) : r.balancedFixedRowLabel)}
               {row("Quota fissa usata", money(r.quotaFissaEff))}
             </>
@@ -5185,11 +5228,11 @@ Base suggerito
           {previewBox(
             <>
               {row(
-                r.isBalanced ? "50% PUN + Spread / 50% Prezzo fisso" : (isFixedDedicatedOffer(s.offerta) ? "Prezzo energia fisso" : "Pun+Spread"),
+                r.isBalanced ? `${r.balancedVariablePercent}% PUN + Spread / ${r.balancedFixedPercent}% Prezzo fisso` : (isFixedDedicatedOffer(s.offerta) ? "Prezzo energia fisso" : "Pun+Spread"),
                 `${numFormat(r.H22_base, 3)} €`
               )}
-              {r.isBalanced && row("Quota variabile 50%", `${numFormat(r.balancedVariableTotal, 3)} €`)}
-              {r.isBalanced && row("Quota fissa 50%", `${numFormat(r.balancedFixedTotal, 3)} €`)}
+              {r.isBalanced && row(`Quota variabile ${r.balancedVariablePercent}%`, `${numFormat(r.balancedVariableTotal, 3)} €`)}
+              {r.isBalanced && row(`Quota fissa ${r.balancedFixedPercent}%`, `${numFormat(r.balancedFixedTotal, 3)} €`)}
               {row("Perdite di rete", `${numFormat(r.perditeEnergia, 3)} €`)}
               {row("DISP+CP.Mrk totale", `${numFormat(r.dispCpTotale, 3)} €`)}
               {row("Reattiva", `${numFormat(r.H24, 3)} €`)}
