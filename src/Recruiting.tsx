@@ -312,6 +312,12 @@ const CANDIDATE_STATUS: Record<
     color: "#854d0e",
     border: "#facc15",
   },
+  CHIAMATO_RICHIAMARE_PRIMA_CHIACCHIERATA: {
+    label: "CHIAMATO MA RICHIAMARE PER LA PRIMA CHIACCHIERATA",
+    background: "#ffedd5",
+    color: "#c2410c",
+    border: "#fb923c",
+  },
   INVIATO_MANDATO: {
     label: "INVIATO MANDATO",
     background: "#dbeafe",
@@ -405,6 +411,7 @@ const STATUS_COLOR_PALETTE = [
 const DEFAULT_STATUS_COLOR_KEY: Record<string, string> = {
   CHIAMATO: "purple",
   DA_CHIAMARE: "yellow",
+  CHIAMATO_RICHIAMARE_PRIMA_CHIACCHIERATA: "orange",
   INVIATO_MANDATO: "blue",
   FISSATO_APPUNTAMENTO: "orange",
   FISSATA_VIDEOCALL: "green",
@@ -2614,10 +2621,21 @@ export default function Recruiting({
         };
       });
 
-    return [...defaults, ...custom].sort((a, b) => {
+    const sorted = [...defaults, ...custom].sort((a, b) => {
       if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
       return a.label.localeCompare(b.label, "it");
     });
+
+    // Lo stato della prima richiamata deve stare subito dopo
+    // "DA CHIAMARE PER LA PRIMA VOLTA", anche con ordinamenti personalizzati.
+    const callbackCode = "CHIAMATO_RICHIAMARE_PRIMA_CHIACCHIERATA";
+    const callbackIndex = sorted.findIndex((item) => item.code === callbackCode);
+    const firstCallIndex = sorted.findIndex((item) => item.code === "DA_CHIAMARE");
+    if (callbackIndex >= 0 && firstCallIndex >= 0) {
+      const [callbackStatus] = sorted.splice(callbackIndex, 1);
+      sorted.splice(sorted.findIndex((item) => item.code === "DA_CHIAMARE") + 1, 0, callbackStatus);
+    }
+    return sorted;
   }, [statusRows]);
 
   const statusDefinitionMap = useMemo(
@@ -2716,6 +2734,7 @@ export default function Recruiting({
         .toLocaleUpperCase("it");
 
       if (code === "DA_CHIAMARE") return 0;
+      if (code === "CHIAMATO_RICHIAMARE_PRIMA_CHIACCHIERATA") return 0.5;
 
       if (
         code === "DA_RICHIAMARE" ||
@@ -2876,6 +2895,15 @@ export default function Recruiting({
       }
 
       if (candidateSortMode === "chronological") {
+        // Da chiamare prima; le prime richiamate vengono subito dopo.
+        // All'interno dei gruppi resta la cronologia (dalla più recente).
+        const chronologicalRank = (status: string) =>
+          status === "DA_CHIAMARE" ? 0 :
+          status === "CHIAMATO_RICHIAMARE_PRIMA_CHIACCHIERATA" ? 1 : 2;
+        const aRank = chronologicalRank(a.status);
+        const bRank = chronologicalRank(b.status);
+        if (aRank !== bRank) return aRank - bRank;
+
         const aLast = candidateNoteChronologyKey(a);
         const bLast = candidateNoteChronologyKey(b);
 
@@ -2904,23 +2932,20 @@ export default function Recruiting({
         return a.fullName.localeCompare(b.fullName, "it");
       }
 
-      // PRIORITÀ + CRONOLOGICO: comportamento precedente.
-      const aFirstCall = a.status === "DA_CHIAMARE";
-      const bFirstCall = b.status === "DA_CHIAMARE";
+      // PRIORITÀ + CRONOLOGICO: prima i contatti da chiamare,
+      // subito dopo chi va richiamato per la prima chiacchierata.
+      const priorityRank = (status: string) =>
+        status === "DA_CHIAMARE" ? 0 :
+        status === "CHIAMATO_RICHIAMARE_PRIMA_CHIACCHIERATA" ? 1 : 2;
+      const aPriority = priorityRank(a.status);
+      const bPriority = priorityRank(b.status);
+      if (aPriority !== bPriority) return aPriority - bPriority;
 
-      if (aFirstCall !== bFirstCall) {
-        return aFirstCall ? -1 : 1;
-      }
-
-      if (!aFirstCall && !bFirstCall) {
+      if (aPriority !== 0) {
         const aLast = candidateGeneralChronologyKey(a);
         const bLast = candidateGeneralChronologyKey(b);
-
-        if (aLast !== bLast) {
-          return bLast.localeCompare(aLast);
-        }
+        if (aLast !== bLast) return bLast.localeCompare(aLast);
       }
-
       return a.fullName.localeCompare(b.fullName, "it");
     }).sort((a, b) => {
       if (!lockedCandidateOrder?.length) return 0;
