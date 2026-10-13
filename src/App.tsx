@@ -8286,7 +8286,7 @@ function Listini({
                               <input
                                 type="checkbox"
                                 checked={checked}
-                                disabled={isLastChecked}
+                                disabled={isLastChecked || Boolean(balancedCustomerGroups(row.nome))}
                                 onChange={(e) =>
                                   updateEnergyOfferCustomerGroup(
                                     i,
@@ -8308,6 +8308,24 @@ function Listini({
                         })}
                       </div>
                     </details>
+                  </td>
+                  <td style={tdStyle}>
+                    {balancedCustomerGroups(row.nome) ? (
+                      <input type="number" min="0" max="100" step="0.01"
+                        value={row.percentualeFissa ?? 50}
+                        style={{ ...inputStyle, width: 90 }}
+                        onChange={(e) => updateBalancedPercent(i, "percentualeFissa", e.target.value)}
+                        aria-label={"Percentuale parte fissa " + row.nome} />
+                    ) : "—"}
+                  </td>
+                  <td style={tdStyle}>
+                    {balancedCustomerGroups(row.nome) ? (
+                      <input type="number" min="0" max="100" step="0.01"
+                        value={row.percentualeVariabile ?? 50}
+                        style={{ ...inputStyle, width: 90 }}
+                        onChange={(e) => updateBalancedPercent(i, "percentualeVariabile", e.target.value)}
+                        aria-label={"Percentuale parte variabile " + row.nome} />
+                    ) : "—"}
                   </td>
                   <td style={tdStyle}>
                     <input
@@ -15530,7 +15548,7 @@ const renderAdminContent = () => {
         })
         .map((row) => {
           const isFirstFixed = row.mese === "FISSO DOMESTICO";
-          const isLastFixed = row.mese === "+ BILANCIATA";
+          const isLastFixed = row.mese === BALANCED_BUSINESS_NAME;
           const isFixed = isFixedCompetenceMonth(row.mese);
 
           const fixedBandBase = isFixed
