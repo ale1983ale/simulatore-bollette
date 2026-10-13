@@ -250,25 +250,25 @@ export default function ActiveProduction() {
     const netContracts = values.production.contracts - values.recess.contracts;
     const netConsumption = values.production.consumption - values.recess.consumption;
     return (
-      <div style={{ ...card, borderColor: commodity === "luce" ? "#fdba74" : "#93c5fd" }}>
+      <div className="ap-summary-card" style={{ ...card, minWidth: 0, borderColor: commodity === "luce" ? "#fdba74" : "#93c5fd" }}>
         <div style={{ color: commodity === "luce" ? "#c2410c" : "#1d4ed8", fontWeight: 900, fontSize: 17 }}>
           {commodity === "luce" ? "⚡ LUCE" : "🔥 GAS"}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10, marginTop: 12 }}>
-          <div style={{ padding: 12, background: "#f0fdf4", borderRadius: 9 }}>
+        <div className="ap-summary-split" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,150px),1fr))", gap: 10, marginTop: 12 }}>
+          <div className="ap-metric-block" style={{ padding: 12, background: "#f0fdf4", borderRadius: 9 }}>
             <div style={{ fontWeight: 800, fontSize: 12 }}>PRODUZIONE</div>
             <div style={{ fontWeight: 900, fontSize: 22 }}>{formatValue(values.production.contracts)}</div>
             <div style={{ fontSize: 12 }}>contratti</div>
             <div style={{ marginTop: 7, fontWeight: 850 }}>{formatValue(values.production.consumption, 2)} {unit}</div>
           </div>
-          <div style={{ padding: 12, background: "#fff1f2", borderRadius: 9 }}>
+          <div className="ap-metric-block" style={{ padding: 12, background: "#fff1f2", borderRadius: 9 }}>
             <div style={{ fontWeight: 800, fontSize: 12 }}>RECESSI</div>
             <div style={{ fontWeight: 900, fontSize: 22 }}>{formatValue(values.recess.contracts)}</div>
             <div style={{ fontSize: 12 }}>contratti</div>
             <div style={{ marginTop: 7, fontWeight: 850 }}>{formatValue(values.recess.consumption, 2)} {unit}</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center",
+        <div className="ap-saldo" style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center",
           padding: "12px 2px 0", fontWeight: 900 }}>
           <span>SALDO CONTRATTI: <span style={{ color: netContracts >= 0 ? "#166534" : "#b91c1c" }}>
             {signed(netContracts)}</span></span>
@@ -286,11 +286,11 @@ export default function ActiveProduction() {
     const unit = commodity === "luce" ? "kWh" : "Smc";
     const clr = commodity === "luce" ? "#fff7ed" : "#eff6ff";
     return (
-      <div style={card}>
+      <div className="ap-comparison-panel" style={{ ...card, minWidth: 0 }}>
         <h3 style={{ marginTop: 0, color: commodity === "luce" ? "#c2410c" : "#1d4ed8" }}>
           {commodity === "luce" ? "LUCE" : "GAS"} · Confronto per agente
         </h3>
-        <div style={{ overflowX: "auto", width: "100%" }}>
+        <div className="ap-desktop-table" style={{ overflowX: "auto", width: "100%" }}>
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 950 }}>
             <thead style={{ background: clr }}>
               <tr>
@@ -337,22 +337,55 @@ export default function ActiveProduction() {
             </tbody>
           </table>
         </div>
+        <div className="ap-mobile-agent-list">
+          {[{ ...aggregate, name: "TOTALE" }, ...displayed].map((agent) => {
+            const values = agent[commodity];
+            const contractDiff = values.production.contracts - values.recess.contracts;
+            const consumptionDiff = values.production.consumption - values.recess.consumption;
+            return (
+              <div key={agent.key} className={"ap-agent-card" + (agent.key === "ALL" ? " ap-agent-total" : "")}>
+                <div className="ap-agent-name">{agent.name}</div>
+                <div className="ap-agent-metrics">
+                  {([
+                    { label: "PRODUZIONE", data: values.production, className: "ap-production" },
+                    { label: "RECESSI", data: values.recess, className: "ap-recess" },
+                  ] as const).map((part) => (
+                    <div key={part.label} className={"ap-agent-stat " + part.className}>
+                      <div className="ap-agent-stat-label">{part.label}</div>
+                      <div className="ap-agent-stat-line"><span>Contratti</span><strong>{formatValue(part.data.contracts)}</strong></div>
+                      <div className="ap-agent-stat-line"><span>{unit}</span><strong>{formatValue(part.data.consumption, 2)}</strong></div>
+                    </div>
+                  ))}
+                  <div className="ap-agent-stat ap-difference">
+                    <div className="ap-agent-stat-label">DIFFERENZA</div>
+                    <div className="ap-agent-stat-line"><span>Contratti</span>
+                      <strong style={{ color: contractDiff >= 0 ? "#166534" : "#b91c1c" }}>{signed(contractDiff)}</strong>
+                    </div>
+                    <div className="ap-agent-stat-line"><span>{unit}</span>
+                      <strong style={{ color: consumptionDiff >= 0 ? "#166534" : "#b91c1c" }}>{signed(consumptionDiff, 2)}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
         {!displayed.length && <p style={{ color: "#64748b" }}>Nessun dato per la selezione corrente.</p>}
       </div>
     );
   };
 
   return (
-    <section style={{ display: "grid", gap: 14 }}>
-      <div style={card}>
-        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+    <section className="ap-root" style={{ display: "grid", gap: 14, minWidth: 0, width: "100%" }}>
+      <div className="ap-filters-panel" style={{ ...card, minWidth: 0 }}>
+        <div className="ap-title-row" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
             <h2 style={{ margin: 0 }}>ATTIVO PRODUZIONE</h2>
             <div style={{ color: "#475569", fontSize: 13, marginTop: 5 }}>
               Produzione e recessi confrontati per mese di riferimento. Per i recessi fa fede la data in NOTA_RECESSO.
             </div>
           </div>
-          <button type="button" onClick={() => void reload()} disabled={loading}
+          <button className="ap-refresh-button" type="button" onClick={() => void reload()} disabled={loading}
             style={{ border: "1px solid #0f2d69", borderRadius: 9,
               background: "white", color: "#0f2d69", padding: "9px 14px", fontWeight: 900 }}>
             {loading ? "CARICAMENTO..." : "AGGIORNA DATI"}
@@ -361,13 +394,23 @@ export default function ActiveProduction() {
         {error && <div role="alert" style={{ color: "#991b1b", marginTop: 10, fontWeight: 800 }}>
           Non è possibile aggiornare il confronto: {error}. Riprova con AGGIORNA DATI.
         </div>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))",
+        <div className="ap-filter-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,230px),1fr))",
           gap: 12, marginTop: 16 }}>
           <label style={{ fontSize: 12, fontWeight: 850 }}>
             PERIODO DI PRODUZIONE
             <select style={{ ...field, marginTop: 5 }} value={activePeriod}
-              onChange={(e) => { setPeriodSelected(e.target.value); setAgentSelected(""); }}>
+              onChange={(e) => {
+                const next = e.target.value;
+                if (next === "CUSTOM") {
+                  const initial = currentPeriod || validPeriods[0];
+                  if (!customStart) setCustomStart(initial?.start || "");
+                  if (!customEnd) setCustomEnd(initial?.end || "");
+                }
+                setPeriodSelected(next);
+                setAgentSelected("");
+              }}>
               <option value="ALL">TUTTI I PERIODI CON DATE VALIDE</option>
+              <option value="CUSTOM">PERIODO LIBERO · CALENDARIO</option>
               {periods.map((period) => <option key={period.key} value={period.key}
                 disabled={!period.valid}>
                 {period.label}{period.valid ? "" : " · DATE DA CORREGGERE"}
@@ -384,8 +427,41 @@ export default function ActiveProduction() {
             </select>
           </label>
         </div>
+        {customMode && (
+          <div className="ap-calendar-panel">
+            <div className="ap-calendar-grid">
+              <label className="ap-date-label">
+                DAL GIORNO
+                <input type="date" aria-label="Data inizio periodo libero" value={customStart}
+                  onChange={(e) => { setCustomStart(e.target.value); setAgentSelected(""); }} />
+              </label>
+              <label className="ap-date-label">
+                AL GIORNO (INCLUSO)
+                <input type="date" aria-label="Data fine periodo libero" value={customEnd}
+                  onChange={(e) => { setCustomEnd(e.target.value); setAgentSelected(""); }} />
+              </label>
+            </div>
+            {!customValid && (
+              <div className="ap-date-error" role="alert">
+                Seleziona due date valide: la data finale deve essere uguale o successiva a quella iniziale.
+              </div>
+            )}
+            {customValid && (
+              <div className="ap-date-hint">
+                <strong>{padDate(customStart)} – {padDate(customEnd)}</strong>
+                {" · "}Report di produzione inclusi: <strong>{intervals.length}</strong>.
+                La produzione è disponibile per interi report, conteggiati alla data di fine periodo;
+                i recessi sono filtrati per il giorno indicato in NOTA_RECESSO.
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ fontSize: 12, color: "#475569", marginTop: 10 }}>
-          {currentPeriod
+          {customMode
+            ? (customValid
+              ? "Intervallo personalizzato: date incluse. Non vengono stimati importi giornalieri dai report di produzione."
+              : "Seleziona l'intervallo dal calendario.")
+            : currentPeriod
             ? <>Periodo produzione: <strong>{currentPeriod.label}</strong>. I recessi sono conteggiati nel mese
                 della data finale del periodo, usando la data presente in NOTA_RECESSO.</>
             : activePeriod === "ALL" ? "Sono confrontati soltanto i periodi di Produzione con date corrette."
@@ -404,7 +480,7 @@ export default function ActiveProduction() {
 
       {loading ? <div style={card}>Caricamento Produzione e Recessi...</div> : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(310px,1fr))", gap: 12 }}>
+          <div className="ap-summary-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,310px),1fr))", gap: 12 }}>
             {metricCards("luce")}
             {metricCards("gas")}
           </div>
