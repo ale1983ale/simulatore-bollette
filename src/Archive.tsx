@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { adminGetSetting, adminUpsertSettings } from "./adminSecurity";
 import Production from "./Production";
 import ActiveProduction from "./ActiveProduction";
+import { recessNoteText, recessReferenceMonth } from "./recessPeriod";
 
 type Commodity = "LUCE" | "GAS" | "N/D";
 type StorageMode = "loading" | "database" | "legacy";
@@ -88,6 +89,7 @@ const stringifyCell = (value: unknown) => {
 };
 
 const aliasGroups = {
+  notaRecesso: ["NOTA_RECESSO", "NOTA RECESSO", "NOTA DI RECESSO", "NOTE RECESSO"],
   validita: [
     "DATA_VALIDITA_RECESSO",
     "DATA VALIDITA RECESSO",
@@ -504,6 +506,7 @@ function toRowFromRaw(
   const commodity = inferCommodity(sourceSheet, raw);
   const dateRaw = findRawValue(raw, aliasGroups.validita);
   const parsedDate = parseDate(dateRaw);
+  const referenceMonth = recessReferenceMonth(raw);
   const agente = findRawValue(raw, aliasGroups.agente);
   const denominazione = findRawValue(raw, aliasGroups.denominazione);
   const podPdr = findRawValue(raw, aliasGroups.podPdr);
@@ -522,7 +525,7 @@ function toRowFromRaw(
     commodity,
     denominazione,
     podPdr,
-    parsedDate.monthKey,
+    referenceMonth,
     `${sourceFile}|${sourceSheet}|${rowFallback}`
   );
 
@@ -535,7 +538,7 @@ function toRowFromRaw(
     commodity,
     validita: parsedDate.display || dateRaw,
     validitaDate: parsedDate.dateKey,
-    monthKey: parsedDate.monthKey,
+    monthKey: referenceMonth,
     agente,
     denominazione,
     podPdr,
@@ -639,7 +642,7 @@ function dbRowToRecesso(row: any): RecessoRow {
     commodity: (row.commodity || "N/D") as Commodity,
     validita: String(row.validita_text || ""),
     validitaDate: String(row.validita_date || ""),
-    monthKey: String(row.month_key || ""),
+    monthKey: recessReferenceMonth(row.raw as Record<string, unknown>) || String(row.month_key || ""),
     agente: String(row.agente || ""),
     denominazione: String(row.denominazione || ""),
     podPdr: String(row.pod_pdr || ""),
@@ -665,12 +668,13 @@ function normalizeLegacyArchive(saved: any): LegacyArchive {
                 (old?.commodity || "N/D") as Commodity,
                 String(old?.denominazione || ""),
                 String(old?.podPdr || ""),
-                String(old?.monthKey || ""),
+                recessReferenceMonth(old?.raw) || String(old?.monthKey || ""),
                 `${name}|${String(old?.sourceSheet || "")}|${fileIndex}-${rowIndex}`
               );
 
               return {
                 ...old,
+                monthKey: recessReferenceMonth(old?.raw) || String(old?.monthKey || ""),
                 id: dedupKey,
                 dedupKey,
                 sourceFile: name,
@@ -1512,7 +1516,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         "LUCE/GAS": row.commodity,
         "POD/PDR": row.podPdr,
         "DATA VALIDITA": row.validita,
-        "MESE RIFERIMENTO": monthLabel(row.monthKey),
+        "NOTA RECESSO": recessNoteText(row.raw),
+        "MESE RIFERIMENTO (NOTA)": monthLabel(row.monthKey),
         AGENTE: row.agente,
         PROVINCIA: geo.provinceLabel,
         REGIONE: geo.region,
@@ -1534,7 +1539,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       "LUCE/GAS": 12,
       "POD/PDR": 20,
       "DATA VALIDITA": 15,
-      "MESE RIFERIMENTO": 18,
+      "NOTA RECESSO": 34,
+      "MESE RIFERIMENTO (NOTA)": 24,
       AGENTE: 18,
       PROVINCIA: 22,
       REGIONE: 20,
@@ -1766,7 +1772,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>RECESSI · Carica file</h3>
         <div style={{ color: "#64748b", fontSize: 13, marginBottom: 12 }}>
-          Puoi selezionare e caricare più file insieme. Se una riga ha lo stesso cliente, lo stesso POD/PDR e lo stesso mese/anno di validità di una riga già presente, viene riconosciuta come duplicato e non viene creata una seconda voce.
+          Puoi selezionare e caricare più file insieme. Il mese di riferimento viene dalla data nella colonna NOTA_RECESSO (es. NOTIFICA SW OUT_31/10/2026 = OTTOBRE 2026). La data di validità resta separata. I recessi dello stesso cliente e POD/PDR nello stesso mese di Nota recesso vengono deduplicati.
         </div>
 
         <input
@@ -2229,7 +2235,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                       "Luce/Gas",
                       "POD/PDR",
                       "Data validità",
-                      "Mese",
+                      "Nota recesso",
+                      "Mese rif. (nota)",
                       "Agente",
                       "Denominazione cliente",
                       "Tipologia cliente",
@@ -2263,6 +2270,9 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                       </td>
                       <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
                         {row.validita || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
+                        {recessNoteText(row.raw) || "—"}
                       </td>
                       <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>
                         {monthLabel(row.monthKey)}

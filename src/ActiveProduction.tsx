@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabase";
+import { recessReferenceMonth } from "./recessPeriod";
 
 type EnergyKind = "LUCE" | "GAS";
 type ProductionRecord = {
@@ -16,7 +17,8 @@ type ProductionRecord = {
 };
 type RecessRecord = {
   id: number;
-  validita_date: string | null;
+  month_key: string | null;
+  raw: Record<string, unknown> | null;
   commodity: string;
   agente: string;
   consumo: number | string | null;
@@ -108,7 +110,7 @@ export default function ActiveProduction() {
           "id",
         ),
         readEntireTable<RecessRecord>(
-          "archive_recessi", "id,validita_date,commodity,agente,consumo", "id",
+          "archive_recessi", "id,month_key,raw,commodity,agente,consumo", "id",
         ),
       ]);
       setProduction(p);
@@ -145,6 +147,12 @@ export default function ActiveProduction() {
     [activePeriod, currentPeriod, validPeriods]
   );
   const intervalSet = useMemo(() => new Set(intervals.map((p) => p.key)), [intervals]);
+  // Ogni report 11 mese precedente - 10 mese corrente confronta
+  // i recessi del mese della data finale (es. 10/10 = ottobre).
+  const referenceMonths = useMemo(
+    () => new Set(intervals.map((p) => p.end.substring(0, 7))),
+    [intervals]
+  );
 
   const agentSummaries = useMemo(() => {
     const map = new Map<string, AgentSummary>();
@@ -167,8 +175,8 @@ export default function ActiveProduction() {
       value.consumption += num(row.in_attivazione_consumo);
     }
     for (const row of recesses) {
-      const iso = String(row.validita_date || "");
-      if (!iso || !intervals.some((p) => iso >= p.start && iso <= p.end)) continue;
+      const month = recessReferenceMonth(row.raw) || String(row.month_key || "");
+      if (!month || !referenceMonths.has(month)) continue;
       const commodity = kind(row.commodity);
       if (!commodity) continue;
       const item = ensure(row.agente || "");
@@ -181,7 +189,7 @@ export default function ActiveProduction() {
       }
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "it"));
-  }, [production, recesses, intervals, intervalSet]);
+  }, [production, recesses, intervalSet, referenceMonths]);
 
   const agentOptions = useMemo(() => agentSummaries.map((item) => ({
     key: item.key, name: item.name,
@@ -314,7 +322,7 @@ export default function ActiveProduction() {
           <div>
             <h2 style={{ margin: 0 }}>ATTIVO PRODUZIONE</h2>
             <div style={{ color: "#475569", fontSize: 13, marginTop: 5 }}>
-              Produzione, recessi e saldo netto sullo stesso periodo (date incluse).
+              Produzione e recessi confrontati per mese di riferimento. Per i recessi fa fede la data in NOTA_RECESSO.
             </div>
           </div>
           <button type="button" onClick={() => void reload()} disabled={loading}
@@ -351,8 +359,8 @@ export default function ActiveProduction() {
         </div>
         <div style={{ fontSize: 12, color: "#475569", marginTop: 10 }}>
           {currentPeriod
-            ? <>Periodo selezionato: <strong>{currentPeriod.label}</strong>. Per i recessi
-                viene usata la data di validità compresa nello stesso intervallo.</>
+            ? <>Periodo produzione: <strong>{currentPeriod.label}</strong>. I recessi sono conteggiati nel mese
+                della data finale del periodo, usando la data presente in NOTA_RECESSO.</>
             : activePeriod === "ALL" ? "Sono confrontati soltanto i periodi di Produzione con date corrette."
               : "Nessun periodo mensile valido disponibile."}
         </div>
@@ -362,7 +370,7 @@ export default function ActiveProduction() {
             ⚠ {periods.filter((period) => !period.valid).length} periodi storici di Produzione
             hanno un intervallo anomalo (oltre 45 o meno di 20 giorni).
             Sono esclusi dal confronto fino alla correzione delle date in archivio,
-            per non confrontare recessi di più mesi con la produzione di uno solo.
+            per non confrontare recessi di mesi diversi con la produzione di uno solo.
           </div>
         )}
       </div>
