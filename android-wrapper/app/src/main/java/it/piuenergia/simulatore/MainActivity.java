@@ -24,6 +24,7 @@ import android.util.Base64;
 import org.json.JSONObject;
 
 import java.io.OutputStream;
+import java.util.ArrayList;
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -51,7 +52,7 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setUserAgentString(
-            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.7"
+            settings.getUserAgentString() + " GestioneEnergiaAndroid/1.0.8"
         );
 
         CookieManager.getInstance().setAcceptCookie(true);
@@ -154,12 +155,37 @@ public class MainActivity extends Activity {
     private void applyContactExtras(
         Intent intent,
         String name,
+        String givenName,
+        String familyName,
         String phone,
         String email,
         String company
     ) {
         if (!name.isEmpty()) {
             intent.putExtra(ContactsContract.Intents.Insert.NAME, name);
+        }
+        // Passa i nomi come campi strutturati, non affidarti alla
+        // separazione automatica del nome completo nella rubrica Android.
+        if (!givenName.isEmpty() || !familyName.isEmpty()) {
+            ArrayList<ContentValues> rows = new ArrayList<>();
+            ContentValues structuredName = new ContentValues();
+            structuredName.put(
+                ContactsContract.Data.MIMETYPE,
+                ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE
+            );
+            structuredName.put(
+                ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME,
+                givenName
+            );
+            structuredName.put(
+                ContactsContract.CommonDataKinds.StructuredName.FAMILY_NAME,
+                familyName
+            );
+            rows.add(structuredName);
+            intent.putParcelableArrayListExtra(
+                ContactsContract.Intents.Insert.DATA,
+                rows
+            );
         }
 
         if (!phone.isEmpty()) {
@@ -185,6 +211,8 @@ public class MainActivity extends Activity {
 
     private boolean launchContactEditor(
         String name,
+        String givenName,
+        String familyName,
         String phone,
         String email,
         String company
@@ -197,6 +225,8 @@ public class MainActivity extends Activity {
             applyContactExtras(
                 insertIntent,
                 name,
+                givenName,
+                familyName,
                 phone,
                 email,
                 company
@@ -214,6 +244,8 @@ public class MainActivity extends Activity {
                 applyContactExtras(
                     fallbackIntent,
                     name,
+                    givenName,
+                    familyName,
                     phone,
                     email,
                     company
@@ -462,12 +494,16 @@ public class MainActivity extends Activity {
                 try {
                     JSONObject json = new JSONObject(payload);
                     String name = json.optString("name", "").trim();
+                    String givenName = json.optString("givenName", "").trim();
+                    String familyName = json.optString("familyName", "").trim();
                     String phone = json.optString("phone", "").trim();
                     String email = json.optString("email", "").trim();
                     String company = json.optString("company", "").trim();
 
                     boolean opened = launchContactEditor(
                         name,
+                        givenName,
+                        familyName,
                         phone,
                         email,
                         company

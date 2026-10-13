@@ -12,6 +12,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
 import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
+import { italianProvinceFullName } from "./italianProvinces";
 import RecruitingManagement from "./RecruitingManagement";
 import {
   deleteGoogleCalendarEvent,
@@ -5464,32 +5465,60 @@ export default function Recruiting({
     const email = String(candidate.email || "").trim();
     const company = String(candidate.companyName || "").trim();
 
-    if (window.AndroidContacts?.addContact) {
-      window.AndroidContacts.addContact(
-        JSON.stringify({
-          name: fullName,
-          phone,
-          email,
-          company,
-        })
-      );
-      setMessage("Apro la schermata Nuovo contatto di Android...");
-      return;
-    }
-
     const nameParts = fullName.split(/\s+/).filter(Boolean);
-    const familyName =
+    const originalFamilyName =
       nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
     const givenName =
       nameParts.length > 1
         ? nameParts.slice(0, -1).join(" ")
         : fullName;
 
+    // Se manca la sigla, risali alla provincia dalla città senza inventarla.
+    let provinceCode = normalizeProvinceCode(candidate.provinceCode);
+    if (!italianProvinceFullName(provinceCode) && candidate.operationalZone.trim()) {
+      try {
+        const geo = await geocodeRecruitingCandidateZone(
+          candidate.operationalZone,
+          "",
+          candidate.region
+        );
+        provinceCode = normalizeProvinceCode(geo.provinceCode);
+      } catch (error) {
+        console.warn("CONTACT PROVINCE LOOKUP ERROR:", error);
+      }
+    }
+    const provinceName = italianProvinceFullName(provinceCode);
+    const familyName = [originalFamilyName, provinceName, "HR"]
+      .filter(Boolean)
+      .join(" ");
+    const contactDisplayName = [givenName, familyName]
+      .filter(Boolean)
+      .join(" ");
+
+    if (window.AndroidContacts?.addContact) {
+      window.AndroidContacts.addContact(
+        JSON.stringify({
+          name: contactDisplayName,
+          givenName,
+          familyName,
+          phone,
+          email,
+          company,
+        })
+      );
+      setMessage(
+        provinceName
+          ? "Apro la Rubrica Android con cognome, provincia per esteso e HR."
+          : "Apro la Rubrica Android con HR. Provincia non disponibile: controllala prima di salvare."
+      );
+      return;
+    }
+
     const lines = [
       "BEGIN:VCARD",
       "VERSION:3.0",
       `N:${escapeVCardValue(familyName)};${escapeVCardValue(givenName)};;;`,
-      `FN:${escapeVCardValue(fullName)}`,
+      `FN:${escapeVCardValue(contactDisplayName)}`,
     ];
 
     if (phone) {
@@ -5527,7 +5556,7 @@ export default function Recruiting({
       if (canShare) {
         await navigator.share({
           files: [file],
-          title: fullName,
+          title: contactDisplayName,
         });
 
         setMessage(
@@ -5556,7 +5585,8 @@ export default function Recruiting({
     window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 
     setMessage(
-      "Il browser non supporta la condivisione del contatto: ho preparato il file VCF da aprire con Contatti."
+      "Ho preparato il file VCF da aprire con Contatti." +
+        (!provinceName ? " Provincia non disponibile: controllala prima di salvare." : "")
     );
   };
 
