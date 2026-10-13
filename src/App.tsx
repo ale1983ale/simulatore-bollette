@@ -14856,12 +14856,11 @@ useEffect(() => {
         );
         const savedEnergyOffers = expandedEnergyOffers
           .map((offer) => ({
+            ...offer,
             ... (balancedCustomerGroups(offer.nome)
               ? { percentualeFissa: balancedShares(offer).fixed,
                   percentualeVariabile: balancedShares(offer).variable }
               : {}),
-
-            ...offer,
             visibile: offer.visibile !== false,
             provvigioneTipo:
               ["STANDARD", "UNICA", "SPECIAL"].includes(
