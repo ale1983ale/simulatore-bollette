@@ -3377,7 +3377,10 @@ function Energia({
   }
 
   const [s, setS] = useState(
-    () => energyDraftRef.current!.state
+    () => ({
+      ...energyDraftRef.current!.state,
+      offerta: normalizeBalancedOffer(energyDraftRef.current!.state.offerta, energyDraftRef.current!.state.tipo),
+    })
   );
   const [energyCompatibilityDriver, setEnergyCompatibilityDriver] =
     useState<"tipo" | "offerta">("tipo");
@@ -3456,7 +3459,7 @@ function Energia({
     const restored = {
       ...buildEnergyInitialState(),
       ...storedState,
-      offerta: normalizeBalancedOffer(String(storedState.offerta || "")),
+      offerta: normalizeBalancedOffer(String(storedState.offerta || ""), String(storedState.tipo || "")),
       tipologiaOfferta:
         storedState.tipologiaOfferta ||
         (isSicuraOffer(String(storedState.offerta || "")) ||
@@ -4065,6 +4068,7 @@ function Energia({
             <div class="offer-pair">
               <div><div class="label">Tipologia offerta</div><div class="value">${String(s.tipologiaOfferta || "VARIABILE") === "FISSO" ? "Fisso" : String(s.tipologiaOfferta || "") === "BILANCIATO" ? "Bilanciato" : "Variabile"}</div></div>
               <div><div class="label">Offerta</div><div class="value">${s.offerta || "-"}</div></div>
+              ${r.isBalanced ? `<div><div class="label">Composizione bilanciata</div><div class="value">${r.balancedFixedPercent}% fisso / ${r.balancedVariablePercent}% variabile</div></div>` : ""}
             </div>
             <div><div class="label">Tipologia cliente</div><div class="value">${energyPdfTipologia(s.tipo)}</div></div>
             <div><div class="label">Fatturazione</div><div class="value">${s.fatturazione || "-"}</div></div>
@@ -7800,6 +7804,22 @@ function Listini({
     );
     markDirty();
   };
+  const updateBalancedPercent = (
+    index: number, field: "percentualeFissa" | "percentualeVariabile", value: string
+  ) => {
+    const numeric = Number(value.replace(",", "."));
+    if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) return;
+    const percentage = Math.round(numeric * 100) / 100;
+    setDraftEnergyOffers((current) => current.map((row, i) =>
+      i !== index ? row : {
+        ...row,
+        [field]: percentage,
+        [field === "percentualeFissa" ? "percentualeVariabile" : "percentualeFissa"]:
+          Math.round((100 - percentage) * 100) / 100,
+      }
+    ));
+    markDirty();
+  };
 
   const updateEnergyOfferProvvigioneTipo = (
     index: number,
@@ -7828,6 +7848,7 @@ function Listini({
     setDraftEnergyOffers((prev) =>
       prev.map((row, i) => {
         if (i !== index) return row;
+        if (balancedCustomerGroups(row.nome)) return row;
 
         const current = normalizedEnergyOfferGroups(row);
         if (!checked && current.length === 1 && current.includes(group)) {
@@ -7907,12 +7928,27 @@ function Listini({
   };
 
   const saveListini = async () => {
+    for (const offer of draftEnergyOffers) {
+      if (!balancedCustomerGroups(offer.nome)) continue;
+      const fixed = Number(offer.percentualeFissa ?? 50);
+      const variable = Number(offer.percentualeVariabile ?? 50);
+      if (!Number.isFinite(fixed) || !Number.isFinite(variable) ||
+          fixed < 0 || fixed > 100 || variable < 0 || variable > 100 ||
+          Math.abs(fixed + variable - 100) > 0.000001) {
+        alert("Le percentuali di " + offer.nome + " devono sommare il 100%.");
+        return;
+      }
+    }
     setSaving(true);
     const normalizedEnergyOffers = draftEnergyOffers
       .filter((offer) => !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
         normalizeOfferName(offer.nome).replace(/\s+/g, " ")
       ))
-      .map((offer) => ({ ...offer, nome: normalizeBalancedOffer(offer.nome) }))
+      .map((offer) => ({
+        ...offer,
+        nome: normalizeBalancedOffer(offer.nome),
+        allowedCustomerGroups: balancedCustomerGroups(offer.nome) || offer.allowedCustomerGroups,
+      }))
       .filter((offer, i, all) => all.findIndex((row) => row.nome === offer.nome) === i);
 
     const payload = [
@@ -8073,6 +8109,11 @@ function Listini({
 
       <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
         <h2 style={{ marginTop: 0 }}>Offerte Energia</h2>
+        <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>
+          + BILANCIATA DOMESTICA e + BILANCIATA BUSINESS hanno percentuali indipendenti:
+          cambiando una quota l'altra si adegua automaticamente al 100%.
+          I prezzi fissi di riferimento sono separati nel PUN-PSV.
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table
     className="punpsv-admin-table"
@@ -8080,7 +8121,7 @@ function Listini({
   >
             <thead>
               <tr>
-                {["Ordina", "Visibile", "Nome offerta", "Tipo provvigione", "Tipologie CTE", "Spread", "Maggiorazione Capacity Market", "Magg. Capacity Market parte fissa (50%)", "Quota fissa"].map((h) => (
+                {["Ordina", "Visibile", "Nome offerta", "Tipo provvigione", "Tipologie CTE", "% parte fissa", "% parte variabile", "Spread", "Maggiorazione Capacity Market", "Magg. Capacity Market parte fissa", "Quota fissa"].map((h) => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
