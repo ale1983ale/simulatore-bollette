@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabase";
-import { recessReferenceMonth } from "./recessPeriod";
+import { recessReferenceDate, recessReferenceMonth } from "./recessPeriod";
+import "./activeProduction.css";
 
 type EnergyKind = "LUCE" | "GAS";
 type ProductionRecord = {
@@ -57,6 +58,11 @@ const padDate = (iso: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   return iso.substring(8, 10) + "/" + iso.substring(5, 7) + "/" + iso.substring(0, 4);
 };
+const isIsoDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00Z");
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
 const isValidPeriod = (start: string, end: string) => {
   const s = Date.parse(start + "T00:00:00Z");
   const e = Date.parse(end + "T00:00:00Z");
@@ -98,6 +104,8 @@ export default function ActiveProduction() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [periodSelected, setPeriodSelected] = useState<string>("");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const [agentSelected, setAgentSelected] = useState<string>("");
 
   const reload = useCallback(async () => {
@@ -137,14 +145,27 @@ export default function ActiveProduction() {
       b.end.localeCompare(a.end) || b.start.localeCompare(a.start));
   }, [production]);
   const validPeriods = useMemo(() => periods.filter((x) => x.valid), [periods]);
-  const activePeriod = periodSelected === "ALL" ? "ALL" :
-    validPeriods.some((x) => x.key === periodSelected)
+  const activePeriod = periodSelected === "ALL" || periodSelected === "CUSTOM"
+    ? periodSelected
+    : validPeriods.some((x) => x.key === periodSelected)
       ? periodSelected
       : validPeriods[0]?.key || "";
+  const customMode = activePeriod === "CUSTOM";
+  const customValid = isIsoDate(customStart) && isIsoDate(customEnd) &&
+    customStart <= customEnd;
   const currentPeriod = periods.find((x) => x.key === activePeriod);
+  // I report di Produzione sono totali indivisibili: nel periodo libero
+  // si includono soltanto i report la cui data FINE cade nell'intervallo.
+  // Non si ripartiscono artificialmente contratti o consumi per giorno.
   const intervals = useMemo(
-    () => activePeriod === "ALL" ? validPeriods : currentPeriod ? [currentPeriod] : [],
-    [activePeriod, currentPeriod, validPeriods]
+    () => activePeriod === "ALL"
+      ? validPeriods
+      : activePeriod === "CUSTOM"
+        ? (customValid ? validPeriods.filter(
+            (period) => period.end >= customStart && period.end <= customEnd
+          ) : [])
+        : currentPeriod ? [currentPeriod] : [],
+    [activePeriod, currentPeriod, validPeriods, customValid, customStart, customEnd]
   );
   const intervalSet = useMemo(() => new Set(intervals.map((p) => p.key)), [intervals]);
   // Ogni report 11 mese precedente - 10 mese corrente confronta
@@ -175,8 +196,14 @@ export default function ActiveProduction() {
       value.consumption += num(row.in_attivazione_consumo);
     }
     for (const row of recesses) {
-      const month = recessReferenceMonth(row.raw) || String(row.month_key || "");
-      if (!month || !referenceMonths.has(month)) continue;
+      if (customMode) {
+        if (!customValid) continue;
+        const noteDate = recessReferenceDate(row.raw);
+        if (!noteDate || noteDate < customStart || noteDate > customEnd) continue;
+      } else {
+        const month = recessReferenceMonth(row.raw) || String(row.month_key || "");
+        if (!month || !referenceMonths.has(month)) continue;
+      }
       const commodity = kind(row.commodity);
       if (!commodity) continue;
       const item = ensure(row.agente || "");
@@ -189,7 +216,7 @@ export default function ActiveProduction() {
       }
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "it"));
-  }, [production, recesses, intervalSet, referenceMonths]);
+  }, [production, recesses, intervalSet, referenceMonths, customMode, customValid, customStart, customEnd]);
 
   const agentOptions = useMemo(() => agentSummaries.map((item) => ({
     key: item.key, name: item.name,
