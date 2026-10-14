@@ -17,6 +17,7 @@ type ProductionRecord = {
   in_attivazione_consumo: number | string | null;
   consumo_totale: number | string | null;
 };
+type AgentReportFlag = { agent_key: string; include_in_report: boolean | null };
 type RecessRecord = {
   id: number;
   month_key: string | null;
@@ -102,6 +103,7 @@ async function readEntireTable<T>(table: string, columns: string, order: string)
 export default function ActiveProduction() {
   const [production, setProduction] = useState<ProductionRecord[]>([]);
   const [recesses, setRecesses] = useState<RecessRecord[]>([]);
+  const [excludedAgentKeys, setExcludedAgentKeys] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError] = useState("");
@@ -113,7 +115,7 @@ export default function ActiveProduction() {
   const reload = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [p, r] = await Promise.all([
+      const [p, r, flags] = await Promise.all([
         readEntireTable<ProductionRecord>(
           "archive_produzione",
           "id,period_start,period_end,period_label,commodity,agente,agent_key,in_attivazione_count,in_attivazione_consumo,consumo_totale",
@@ -122,7 +124,14 @@ export default function ActiveProduction() {
         readEntireTable<RecessRecord>(
           "archive_recessi", "id,month_key,raw,commodity,agente,consumo", "id",
         ),
+        readEntireTable<AgentReportFlag>(
+          "production_agent_zones", "agent_key,include_in_report", "agent_key",
+        ),
       ]);
+      setExcludedAgentKeys(new Set(
+        flags.filter((item) => item.include_in_report === false)
+          .map((item) => keyForAgent(item.agent_key))
+      ));
       setProduction(p);
       setRecesses(r);
     } catch (err) {
@@ -186,6 +195,7 @@ export default function ActiveProduction() {
     };
 
     for (const row of production) {
+      if (excludedAgentKeys.has(keyForAgent(row.agent_key || row.agente))) continue;
       if (!intervalSet.has(row.period_start + "|" + row.period_end)) continue;
       const commodity = kind(row.commodity);
       if (!commodity) continue;
@@ -198,6 +208,7 @@ export default function ActiveProduction() {
       value.consumption += num(row.in_attivazione_consumo);
     }
     for (const row of recesses) {
+      if (excludedAgentKeys.has(keyForAgent(row.agente))) continue;
       if (customMode) {
         if (!customValid) continue;
         const noteDate = recessReferenceDate(row.raw);
@@ -218,7 +229,7 @@ export default function ActiveProduction() {
       }
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "it"));
-  }, [production, recesses, intervalSet, referenceMonths, customMode, customValid, customStart, customEnd]);
+  }, [production, recesses, excludedAgentKeys, intervalSet, referenceMonths, customMode, customValid, customStart, customEnd]);
 
   const agentOptions = useMemo(() => agentSummaries.map((item) => ({
     key: item.key, name: item.name,
