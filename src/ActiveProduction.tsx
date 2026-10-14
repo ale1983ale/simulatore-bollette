@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabase";
 import { recessReferenceDate, recessReferenceMonth } from "./recessPeriod";
+import { exportFilteredA4Pdf, pdfNumber } from "./filteredReportsPdf";
 import "./activeProduction.css";
 
 type EnergyKind = "LUCE" | "GAS";
@@ -102,6 +103,7 @@ export default function ActiveProduction() {
   const [production, setProduction] = useState<ProductionRecord[]>([]);
   const [recesses, setRecesses] = useState<RecessRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError] = useState("");
   const [periodSelected, setPeriodSelected] = useState<string>("");
   const [customStart, setCustomStart] = useState("");
@@ -244,6 +246,77 @@ export default function ActiveProduction() {
   const missingTotal = aggregate.luce.recess.missingConsumption +
     aggregate.gas.recess.missingConsumption;
 
+  const exportPdf = async () => {
+    if (loading || error || !displayed.length || exportingPdf || (customMode && !customValid)) return;
+    setExportingPdf(true);
+    try {
+      const periodLabel = customMode && customValid
+        ? padDate(customStart) + " - " + padDate(customEnd)
+        : currentPeriod?.label || "Tutti i periodi validi";
+      const periodFile = customMode && customValid
+        ? customStart + "_" + customEnd
+        : currentPeriod ? currentPeriod.start + "_" + currentPeriod.end : "tutti";
+      const dataRows = displayed.flatMap((agent) =>
+        (["luce", "gas"] as const).map((sector) => {
+          const v = agent[sector];
+          return [
+            agent.name, sector === "luce" ? "LUCE" : "GAS",
+            pdfNumber(v.production.contracts, 0),
+            pdfNumber(v.production.consumption),
+            pdfNumber(v.recess.contracts, 0),
+            pdfNumber(v.recess.consumption),
+            (v.production.contracts - v.recess.contracts > 0 ? "+" : "") +
+              pdfNumber(v.production.contracts - v.recess.contracts, 0),
+            (v.production.consumption - v.recess.consumption > 0 ? "+" : "") +
+              pdfNumber(v.production.consumption - v.recess.consumption),
+          ];
+        })
+      );
+      await exportFilteredA4Pdf({
+        title: "ATTIVO PRODUZIONE - STORICO",
+        subtitle: "Confronto tra produzione, recessi e saldo netto per agente e settore.",
+        filename: "ATTIVO_PRODUZIONE_" + periodFile +
+          (selectedAgent ? "_" + selectedAgent : "") + ".pdf",
+        filters: [
+          "Periodo: " + periodLabel,
+          "Agente: " + (selectedAgent
+            ? displayed[0]?.name || "Selezionato" : "Tutti"),
+          customMode
+            ? "Periodo libero: report Produzione inclusi per data finale; recessi per data in NOTA_RECESSO."
+            : "Recessi attribuiti al mese in NOTA_RECESSO, corrispondente al mese finale del report.",
+          "Report produzione compresi: " + intervals.length +
+            "   /   Agenti: " + displayed.length,
+        ],
+        stats: [
+          { label: "LUCE - SALDO CONTRATTI", value: (aggregate.luce.production.contracts - aggregate.luce.recess.contracts > 0 ? "+" : "") +
+              pdfNumber(aggregate.luce.production.contracts - aggregate.luce.recess.contracts, 0), detail: "POD in attivazione - recessi" },
+          { label: "LUCE - SALDO CONSUMO", value: pdfNumber(aggregate.luce.production.consumption - aggregate.luce.recess.consumption) + " kWh" },
+          { label: "GAS - SALDO CONTRATTI", value: (aggregate.gas.production.contracts - aggregate.gas.recess.contracts > 0 ? "+" : "") +
+              pdfNumber(aggregate.gas.production.contracts - aggregate.gas.recess.contracts, 0), detail: "PDR in attivazione - recessi" },
+          { label: "GAS - SALDO CONSUMO", value: pdfNumber(aggregate.gas.production.consumption - aggregate.gas.recess.consumption) + " Smc" },
+        ],
+        columns: [
+          { label: "AGENTE", width: 52 },
+          { label: "LUCE / GAS", width: 22 },
+          { label: "PROD. CONTRATTI", width: 30, align: "right" },
+          { label: "PROD. kWh / Smc", width: 35, align: "right" },
+          { label: "RECESSI CONTRATTI", width: 30, align: "right" },
+          { label: "RECESSI kWh / Smc", width: 35, align: "right" },
+          { label: "SALDO CONTRATTI", width: 30, align: "right" },
+          { label: "SALDO kWh / Smc", width: 35, align: "right" },
+        ],
+        rows: dataRows,
+        note: "Saldo = produzione meno recessi. I consumi dei report sono indivisibili: nel periodo libero non sono stimati giorni intermedi. LUCE e GAS sono riportati separatamente.",
+      });
+    } catch (err) {
+      console.error("PDF ATTIVO PRODUZIONE ERROR", err);
+      alert("Non è stato possibile esportare il PDF: " +
+        (err instanceof Error ? err.message : "Errore sconosciuto"));
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const metricCards = (commodity: "luce" | "gas") => {
     const values = aggregate[commodity];
     const unit = commodity === "luce" ? "kWh" : "Smc";
@@ -385,11 +458,20 @@ export default function ActiveProduction() {
               Produzione e recessi confrontati per mese di riferimento. Per i recessi fa fede la data in NOTA_RECESSO.
             </div>
           </div>
-          <button className="ap-refresh-button" type="button" onClick={() => void reload()} disabled={loading}
-            style={{ border: "1px solid #0f2d69", borderRadius: 9,
-              background: "white", color: "#0f2d69", padding: "9px 14px", fontWeight: 900 }}>
-            {loading ? "CARICAMENTO..." : "AGGIORNA DATI"}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="ap-refresh-button" type="button" onClick={() => void reload()} disabled={loading}
+              style={{ border: "1px solid #0f2d69", borderRadius: 9,
+                background: "white", color: "#0f2d69", padding: "9px 14px", fontWeight: 900 }}>
+              {loading ? "CARICAMENTO..." : "AGGIORNA DATI"}
+            </button>
+            <button className="ap-refresh-button" type="button" onClick={() => void exportPdf()}
+              disabled={loading || !!error || !displayed.length || exportingPdf || (customMode && !customValid)}
+              style={{ border: 0, borderRadius: 9, padding: "9px 14px", fontWeight: 900,
+                background: loading || !!error || !displayed.length || exportingPdf || (customMode && !customValid)
+                  ? "#cbd5e1" : "#b91c1c", color: "white" }}>
+              {exportingPdf ? "Preparazione PDF..." : "📄 ESPORTA PDF A4"}
+            </button>
+          </div>
         </div>
         {error && <div role="alert" style={{ color: "#991b1b", marginTop: 10, fontWeight: 800 }}>
           Non è possibile aggiornare il confronto: {error}. Riprova con AGGIORNA DATI.
