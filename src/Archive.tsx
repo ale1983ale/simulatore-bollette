@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { adminGetSetting, adminUpsertSettings } from "./adminSecurity";
 import Production from "./Production";
 import ActiveProduction from "./ActiveProduction";
+import { exportFilteredA4Pdf, pdfNumber, pdfSelection } from "./filteredReportsPdf";
 import { recessNoteText, recessReferenceMonth } from "./recessPeriod";
 
 type Commodity = "LUCE" | "GAS" | "N/D";
@@ -947,6 +948,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [parsing, setParsing] = useState(false);
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
   const [archiveSection, setArchiveSection] = useState<
     "recessi" | "produzione" | "attivo" | "reportAdmin" | "zone"
@@ -1504,6 +1506,80 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     setPeriodStart("");
     setPeriodEnd("");
     setSearch("");
+  };
+
+  const exportPdf = async () => {
+    if (!filteredRows.length || exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const ordered = [...filteredRows].sort((a, b) =>
+        b.monthKey.localeCompare(a.monthKey) ||
+        a.agente.localeCompare(b.agente, "it") ||
+        a.denominazione.localeCompare(b.denominazione, "it")
+      );
+      const provinceLabels = provincesSelected.map((key) =>
+        provinces.find((p) => p.code === key)?.label || key
+      );
+      const from = ordered[ordered.length - 1].monthKey;
+      const to = ordered[0].monthKey;
+      const filePeriod = from === to ? to : from + "_a_" + to;
+      await exportFilteredA4Pdf({
+        title: "RECESSI - ARCHIVIO FILTRATO",
+        subtitle: "Recessi associati al mese della data in NOTA_RECESSO. La data di validità resta informativa.",
+        filename: "RECESSI_" + filePeriod + ".pdf",
+        filters: [
+          pdfSelection("Periodo selezionato", monthsSelected.map(monthLabel), periodStart || periodEnd
+            ? (periodStart || "Inizio") + " / " + (periodEnd || "Fine") : "Tutti i mesi"),
+          "Limiti periodo: " + (periodStart || "nessuno") + " - " + (periodEnd || "nessuno"),
+          pdfSelection("Fornitura", commodities, "Luce e Gas"),
+          pdfSelection("Agente", agentsSelected, "Tutti gli agenti"),
+          pdfSelection("Provincia", provinceLabels, "Tutte"),
+          pdfSelection("Regione", regionsSelected, "Tutte"),
+          "Cliente: " + (customerName || "Tutti") +
+            "   /   Tipologia: " + (customerTypesSelected.join(", ") || "Tutte"),
+          "Consumo min/max: " + (consumptionMin || "-") + " / " + (consumptionMax || "-") +
+            "   /   Ricerca: " + (search || "Nessuna"),
+          "Risultati esportati: " + pdfNumber(ordered.length, 0) + " su " + pdfNumber(rows.length, 0),
+        ],
+        stats: [
+          { label: "RECESSI LUCE", value: pdfNumber(totals.luceCount, 0), detail: "Contratti" },
+          { label: "CONSUMI LUCE", value: pdfNumber(totals.luce) + " kWh", detail: "Consumo annuo" },
+          { label: "RECESSI GAS", value: pdfNumber(totals.gasCount, 0), detail: "Contratti" },
+          { label: "CONSUMI GAS", value: pdfNumber(totals.gas) + " Smc", detail: "Consumo annuo" },
+        ],
+        columns: [
+          { label: "MESE NOTA RECESSO", width: 25 },
+          { label: "LUCE/GAS", width: 16 },
+          { label: "DENOMINAZIONE CLIENTE", width: 48 },
+          { label: "POD / PDR", width: 35 },
+          { label: "AGENTE", width: 36 },
+          { label: "NOTA RECESSO", width: 45 },
+          { label: "DATA VALIDITA", width: 23 },
+          { label: "TIPO CLIENTE", width: 26 },
+          { label: "CONSUMO", width: 25, align: "right" },
+          { label: "PROVINCIA", width: 24 },
+        ],
+        rows: ordered.map((row) => [
+          monthLabel(row.monthKey),
+          row.commodity,
+          row.denominazione,
+          row.podPdr,
+          row.agente,
+          recessNoteText(row.raw),
+          row.validita,
+          row.tipoCliente,
+          row.consumo === null ? "N/D" : pdfNumber(row.consumo),
+          deriveLegalSeatGeo(row.raw).provinceLabel,
+        ]),
+        note: "Il mese di riferimento deriva dalla data in NOTA_RECESSO, non dalla data di validità. I consumi LUCE (kWh) e GAS (Smc) sono riepilogati separatamente. Sono esportati tutti i risultati filtrati, non soltanto i primi 500 visualizzati.",
+      });
+    } catch (error) {
+      console.error("PDF RECESSI ERROR", error);
+      alert("Non è stato possibile creare il PDF Recessi: " +
+        (error instanceof Error ? error.message : "Errore sconosciuto"));
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const exportFiltered = () => {
@@ -2152,22 +2228,31 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={exportFiltered}
-            disabled={!filteredRows.length}
-            style={{
-              padding: "9px 13px",
-              borderRadius: 8,
-              border: 0,
-              background: filteredRows.length ? "#0f172a" : "#cbd5e1",
-              color: "white",
-              fontWeight: 800,
-              cursor: filteredRows.length ? "pointer" : "default",
-            }}
-          >
-            Esporta risultati Excel
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={exportFiltered}
+              disabled={!filteredRows.length}
+              style={{
+                padding: "9px 13px", borderRadius: 8, border: 0,
+                background: filteredRows.length ? "#0f172a" : "#cbd5e1",
+                color: "white", fontWeight: 800,
+                cursor: filteredRows.length ? "pointer" : "default",
+              }}
+            >
+              Esporta risultati Excel
+            </button>
+            <button type="button" onClick={() => void exportPdf()}
+              disabled={!filteredRows.length || exportingPdf}
+              style={{
+                padding: "9px 13px", borderRadius: 8, border: 0,
+                background: filteredRows.length && !exportingPdf ? "#b91c1c" : "#cbd5e1",
+                color: "white", fontWeight: 900,
+                cursor: filteredRows.length && !exportingPdf ? "pointer" : "default",
+              }}>
+              {exportingPdf ? "Preparazione PDF..." : "📄 ESPORTA PDF A4"}
+            </button>
+          </div>
         </div>
 
         <div
