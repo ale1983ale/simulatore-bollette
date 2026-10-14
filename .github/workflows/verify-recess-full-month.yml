@@ -1,0 +1,26 @@
+name: Verify recess reference month
+on:
+  push:
+    branches: [fix/attivo-produzione-recessi-mese-fine-periodo]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Verify full-month selection
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const source=fs.readFileSync('src/ActiveProduction.tsx','utf8');
+          assert(source.includes('new Set(intervals.map((p) => p.end.substring(0, 7)))'));
+          assert(source.includes('if (!month || !referenceMonths.has(month)) continue;'));
+          assert(!source.includes('noteDate < customStart'));
+          assert(source.includes('recessi sono conteggiati per tutto il mese'));
+          console.log('Correct: production 11 Sept–10 Oct => October recesses, including 31 Oct');
+          JS
