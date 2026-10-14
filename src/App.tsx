@@ -655,6 +655,26 @@ const DEFAULT_OFFER_VISIBILITY: OfferVisibilitySettings = {
 const energyOfferPriceMode = (offer: string): OfferPriceMode =>
   isBalancedEnergyOffer(offer) ? "BILANCIATO" :
   isSicuraOffer(offer) ? "FISSO" : "VARIABILE";
+
+// Per abilitare PREZZO BILANCIATO non basta un'offerta qualsiasi:
+// deve essere visibile l'offerta bilanciata specifica del tipo cliente.
+// La DEDICATA, anche se visibile, non sblocca un prodotto DOMESTICO/BUSINESS assente.
+const hasAvailableBalancedEnergyForType = (
+  energyOffers: EnergyOffer[],
+  visibility: OfferVisibilitySettings,
+  customerType: string
+): boolean => {
+  if (!visibility.energyBalanced) return false;
+  const customerGroup = energyTypeToGroup(customerType);
+  if (!customerGroup) return false;
+  const requiredOffer = customerGroup === "DOMESTICI"
+    ? BALANCED_DOMESTIC_NAME : BALANCED_BUSINESS_NAME;
+  return energyOffers.some((offer) =>
+    offer.visibile !== false &&
+    normalizeBalancedOffer(offer.nome) === requiredOffer &&
+    energyOfferAllowsType(offer, customerType)
+  );
+};
 const gasOfferPriceMode = (offer: string): OfferPriceMode =>
   isBalancedEnergyOffer(offer) ? "BILANCIATO" :
   isSicuraOffer(offer) ? "FISSO" : "VARIABILE";
@@ -3476,15 +3496,21 @@ function Energia({
   const energyFixedMode =
     String(s.tipologiaOfferta || "VARIABILE") === "FISSO";
 
+  const balancedAvailableForCustomer = hasAvailableBalancedEnergyForType(
+    energyOffers, offerVisibility, s.tipo
+  );
+  const customerAllowedEnergyModes: OfferPriceMode[] = allowedEnergyModes.filter(
+    (mode) => mode !== "BILANCIATO" || balancedAvailableForCustomer
+  );
   const activeEnergyMode: OfferPriceMode =
-    allowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)
+    customerAllowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)
       ? s.tipologiaOfferta as OfferPriceMode : "VARIABILE";
   useEffect(() => {
-    if (allowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)) return;
+    if (customerAllowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)) return;
     setS((prev) => ({
       ...prev, tipologiaOfferta: "VARIABILE", offerta: "", mese1: "", mese2: "",
     }));
-  }, [s.tipologiaOfferta, offerVisibility.energyFixed, offerVisibility.energyBalanced, energyOffers]);
+  }, [s.tipologiaOfferta, s.tipo, offerVisibility.energyFixed, offerVisibility.energyBalanced, energyOffers]);
   const fixedModeEnergyOffers = eligibleEnergyOffers.filter(
     (offer) => energyOfferPriceMode(offer.nome) === activeEnergyMode
   );
@@ -3508,6 +3534,10 @@ function Energia({
       : fixedModeEnergyOffers;
 
   useEffect(() => {
+    // Se la modalità era BILANCIATO ma l'offerta del cliente non esiste,
+    // attendi il ripristino a VARIABILE senza spostare il cliente su BTA/MT.
+    if (!customerAllowedEnergyModes.includes(s.tipologiaOfferta as OfferPriceMode)) return;
+
     const currentOffer = fixedModeEnergyOffers.find(
       (offer) => offer.nome === s.offerta
     );
@@ -3872,6 +3902,9 @@ function Energia({
   };
 
   const handleEnergyOfferTypeChange = (tipologia: string) => {
+    // Protezione aggiuntiva oltre alla tendina: impedisce selezioni non
+    // disponibili anche a fronte di eventi UI o dati salvati obsoleti.
+    if (!customerAllowedEnergyModes.includes(tipologia as OfferPriceMode)) return;
     setEnergyCompatibilityDriver("tipo");
     setLastEnergyInputAt(Date.now());
     setDispCpAutoMode(true);
@@ -3896,19 +3929,23 @@ function Energia({
     setLastEnergyInputAt(Date.now());
     setDispCpAutoMode(true);
 
-    const currentOffer = fixedModeEnergyOffers.find(
-      (offer) => offer.nome === s.offerta
+    const nextMode: OfferPriceMode =
+      s.tipologiaOfferta === "BILANCIATO" &&
+      !hasAvailableBalancedEnergyForType(energyOffers, offerVisibility, tipo)
+        ? "VARIABILE" : activeEnergyMode;
+    const candidateOffers = eligibleEnergyOffers.filter(
+      (offer) =>
+        energyOfferPriceMode(offer.nome) === nextMode &&
+        energyOfferAllowsType(offer, tipo)
     );
-    const nextOffer =
-      currentOffer && energyOfferAllowsType(currentOffer, tipo)
-        ? currentOffer
-        : fixedModeEnergyOffers.find((offer) =>
-            energyOfferAllowsType(offer, tipo)
-          );
+    const nextOffer = candidateOffers.find((offer) => offer.nome === s.offerta)
+      || candidateOffers[0];
 
     setS((prev) => ({
       ...prev,
       tipo,
+      tipologiaOfferta: nextMode,
+      ...(nextMode !== activeEnergyMode ? { mese1: "", mese2: "" } : {}),
       iva: ["RESIDENTE", "NON RESIDENTE", "RESIDENTE CANONE ESENTE"].includes(
         tipo
       )
@@ -4437,7 +4474,7 @@ return (
             {offerTypeField(
               activeEnergyMode,
               handleEnergyOfferTypeChange,
-              allowedEnergyModes
+              customerAllowedEnergyModes
             )}
             {selectField(
               "Offerta",
