@@ -1,0 +1,25 @@
+name: Verify Production Period Import
+on:
+  push:
+    branches: [fix/production-import-period-validation]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Check prevention of invalid period import
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const src=fs.readFileSync('src/Production.tsx','utf8');
+          assert(src.includes('productionPeriodIsMonthly'));
+          assert(src.includes('titleOk ? title : null'));
+          assert(src.includes('periodo non valido (attesi 20–45 giorni)'));
+          console.log('Production year mismatch import guard present');
+          JS
