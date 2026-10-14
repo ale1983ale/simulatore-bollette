@@ -160,6 +160,13 @@ function formatIsoDate(iso: string) {
   return match[3] + "/" + match[2] + "/" + match[1];
 }
 
+function productionPeriodIsMonthly(periodStart: string, periodEnd: string) {
+  const start = Date.parse(periodStart + "T00:00:00Z");
+  const end = Date.parse(periodEnd + "T00:00:00Z");
+  const days = (end - start) / 86400000;
+  return Number.isFinite(days) && days >= 20 && days <= 45;
+}
+
 function parseReportTitle(value: unknown) {
   const valueText = stringifyCell(value);
   const match = valueText.match(
@@ -240,14 +247,28 @@ async function parseProductionFile(file: File): Promise<ParsedProductionFile> {
       const titleType = firstCell.match(/^REPORT\s+(LUCE|GAS)\b/i);
       if (titleType) {
         const title = parseReportTitle(firstCell);
-        report = sheetPeriod
-          ? { ...sheetPeriod, commodity: titleType[1].toUpperCase() as Commodity }
-          : title;
-        if (!report) blockingIssues.push(sheetName + ": periodo REPORT non riconosciuto.");
+        const titleOk = !!title && productionPeriodIsMonthly(title.periodStart, title.periodEnd);
+        const sheetOk = !!sheetPeriod && productionPeriodIsMonthly(sheetPeriod.periodStart, sheetPeriod.periodEnd);
+        // Un foglio con date anomale non deve prevalere su un titolo corretto.
+        // Bloccare la sezione se né il titolo né il foglio hanno un periodo mensile valido.
+        report = sheetOk
+          ? { ...sheetPeriod!, commodity: titleType[1].toUpperCase() as Commodity }
+          : titleOk ? title : null;
+        if (!report) {
+          blockingIssues.push(
+            sheetName + " · " + titleType[1].toUpperCase() +
+            ": periodo non valido (attesi 20–45 giorni). Controllare gli anni di inizio/fine nel file Excel."
+          );
+        } else {
+          preview.periodLabel = report.periodLabel;
+        }
         if (title && sheetPeriod &&
             (title.periodStart !== sheetPeriod.periodStart || title.periodEnd !== sheetPeriod.periodEnd)) {
           preview.warnings.push("Titolo " + titleType[1].toUpperCase() +
-            " con date diverse: usato il periodo del foglio.");
+            " con date diverse: " +
+            (sheetOk ? "usato il periodo del foglio." : titleOk
+              ? "foglio anomalo, usato il periodo del titolo."
+              : "intervallo non valido, importazione bloccata."));
         }
         inData = false;
         consumptionCol = -1;
