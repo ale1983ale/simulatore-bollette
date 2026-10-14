@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
+import { exportFilteredA4Pdf, pdfNumber, pdfSelection } from "./filteredReportsPdf";
 
 type Commodity = "LUCE" | "GAS";
 
@@ -497,6 +498,7 @@ export default function Production({ view = "produzione" }: { view?: "produzione
   const [parsing, setParsing] = useState(false);
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [message, setMessage] = useState("");
   const [zonesDirty, setZonesDirty] = useState(false);
   const [savingZones, setSavingZones] = useState(false);
@@ -962,6 +964,67 @@ export default function Production({ view = "produzione" }: { view?: "produzione
     setZonesSelected([]);
   };
 
+  const exportPdf = async () => {
+    if (!filteredRows.length || exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const ordered = [...filteredRows].sort((a, b) =>
+        b.periodEnd.localeCompare(a.periodEnd) ||
+        a.agente.localeCompare(b.agente, "it") ||
+        a.commodity.localeCompare(b.commodity)
+      );
+      const selectedPeriods = periodsSelected.map((key) =>
+        periods.find((period) => period.value === key)?.label || key
+      );
+      const filePeriod = selectedPeriods.length === 1
+        ? selectedPeriods[0]
+        : ordered[ordered.length - 1].periodStart + "_al_" + ordered[0].periodEnd;
+      await exportFilteredA4Pdf({
+        title: "PRODUZIONE - STORICO REPORT",
+        subtitle: "Report completo dei dati di produzione che soddisfano i filtri selezionati.",
+        filename: "PRODUZIONE_STORICO_" + filePeriod + ".pdf",
+        filters: [
+          pdfSelection("Periodo report", selectedPeriods, "Tutti i periodi"),
+          pdfSelection("Fornitura", commoditiesSelected, "Luce e Gas"),
+          pdfSelection("Agenti", agentsSelected, "Tutti gli agenti"),
+          pdfSelection("Zona", zonesSelected, "Tutte le zone"),
+          "Risultati esportati: " + pdfNumber(ordered.length, 0) + " su " + pdfNumber(rows.length, 0),
+        ],
+        stats: [
+          { label: "LUCE - CONTRATTI", value: pdfNumber(totals.luce.attivazioni, 0), detail: "POD in attivazione" },
+          { label: "LUCE - CONSUMI", value: pdfNumber(totals.luce.consumoAttivazione) + " kWh", detail: "Consumi in attivazione" },
+          { label: "GAS - CONTRATTI", value: pdfNumber(totals.gas.attivazioni, 0), detail: "PDR in attivazione" },
+          { label: "GAS - CONSUMI", value: pdfNumber(totals.gas.consumoAttivazione) + " Smc", detail: "Consumi in attivazione" },
+        ],
+        columns: [
+          { label: "PERIODO REPORT", width: 42 },
+          { label: "TIPO", width: 17 },
+          { label: "AGENTE", width: 47 },
+          { label: "ZONA", width: 25 },
+          { label: "POD/PDR IN ATT.", width: 24, align: "right" },
+          { label: "CONSUMO IN ATT. kWh/Smc", width: 38, align: "right" },
+          { label: "CONSUMO TOTALE kWh/Smc", width: 37, align: "right" },
+          { label: "FILE DI ORIGINE", width: 43 },
+        ],
+        rows: ordered.map((row) => [
+          row.periodLabel, row.commodity, row.agente,
+          zoneByAgentKey.get(row.agentKey) || "-",
+          pdfNumber(row.inAttivazioneCount, 0),
+          pdfNumber(row.inAttivazioneConsumo),
+          pdfNumber(row.consumoTotale),
+          row.sourceFiles.join(", "),
+        ]),
+        note: "I totali LUCE e GAS sono mantenuti separati per non sommare kWh e Smc. Ogni riga corrisponde a un risultato filtrato, senza il limite di 500 righe della tabella video.",
+      });
+    } catch (error) {
+      console.error("PDF PRODUZIONE ERROR", error);
+      alert("Non è stato possibile creare il PDF Produzione: " +
+        (error instanceof Error ? error.message : "Errore sconosciuto"));
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const exportFiltered = () => {
     if (!filteredRows.length) return;
     const exportRows = filteredRows.map((row) => ({
@@ -1311,9 +1374,18 @@ export default function Production({ view = "produzione" }: { view?: "produzione
                 <h3 style={{ margin: 0 }}>Risultati PRODUZIONE</h3>
                 <div style={{ marginTop: 5, color: "#64748b", fontSize: 13 }}>{filteredRows.length} risultati su {rows.length} righe uniche</div>
               </div>
-              <button type="button" onClick={exportFiltered} disabled={!filteredRows.length} style={{ padding: "9px 13px", borderRadius: 8, border: 0, background: filteredRows.length ? "#0f172a" : "#cbd5e1", color: "white", fontWeight: 900 }}>
-                Esporta risultati Excel
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={exportFiltered} disabled={!filteredRows.length}
+                  style={{ padding: "9px 13px", borderRadius: 8, border: 0, background: filteredRows.length ? "#0f172a" : "#cbd5e1", color: "white", fontWeight: 900 }}>
+                  Esporta risultati Excel
+                </button>
+                <button type="button" onClick={() => void exportPdf()} disabled={!filteredRows.length || exportingPdf}
+                  style={{ padding: "9px 13px", borderRadius: 8, border: 0,
+                    background: filteredRows.length && !exportingPdf ? "#b91c1c" : "#cbd5e1",
+                    color: "white", fontWeight: 900, cursor: filteredRows.length && !exportingPdf ? "pointer" : "default" }}>
+                  {exportingPdf ? "Preparazione PDF..." : "📄 ESPORTA PDF A4"}
+                </button>
+              </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 10, marginTop: 14 }}>
