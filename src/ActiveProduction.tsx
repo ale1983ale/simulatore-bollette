@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabase";
-import { recessReferenceDate, recessReferenceMonth } from "./recessPeriod";
+import { recessReferenceMonth } from "./recessPeriod";
 import { exportFilteredA4Pdf, pdfNumber } from "./filteredReportsPdf";
 import "./activeProduction.css";
 
@@ -209,14 +209,11 @@ export default function ActiveProduction() {
     }
     for (const row of recesses) {
       if (excludedAgentKeys.has(keyForAgent(row.agente))) continue;
-      if (customMode) {
-        if (!customValid) continue;
-        const noteDate = recessReferenceDate(row.raw);
-        if (!noteDate || noteDate < customStart || noteDate > customEnd) continue;
-      } else {
-        const month = recessReferenceMonth(row.raw) || String(row.month_key || "");
-        if (!month || !referenceMonths.has(month)) continue;
-      }
+      // Anche nel periodo libero, il recesso appartiene al mese di FINE
+      // del report Produzione selezionato (es. 11/09-10/10 => ottobre
+      // intero, compreso NOTA_RECESSO 31/10).
+      const month = recessReferenceMonth(row.raw) || String(row.month_key || "");
+      if (!month || !referenceMonths.has(month)) continue;
       const commodity = kind(row.commodity);
       if (!commodity) continue;
       const item = ensure(row.agente || "");
@@ -229,7 +226,7 @@ export default function ActiveProduction() {
       }
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "it"));
-  }, [production, recesses, excludedAgentKeys, intervalSet, referenceMonths, customMode, customValid, customStart, customEnd]);
+  }, [production, recesses, excludedAgentKeys, intervalSet, referenceMonths]);
 
   const agentOptions = useMemo(() => agentSummaries.map((item) => ({
     key: item.key, name: item.name,
@@ -293,7 +290,7 @@ export default function ActiveProduction() {
           "Agente: " + (selectedAgent
             ? displayed[0]?.name || "Selezionato" : "Tutti"),
           customMode
-            ? "Periodo libero: report Produzione inclusi per data finale; recessi per data in NOTA_RECESSO."
+            ? "Periodo libero: report Produzione inclusi per data finale; recessi di tutti i giorni del mese finale di ciascun report, da NOTA_RECESSO."
             : "Recessi attribuiti al mese in NOTA_RECESSO, corrispondente al mese finale del report.",
           "Report produzione compresi: " + intervals.length +
             "   /   Agenti: " + displayed.length,
@@ -544,7 +541,8 @@ export default function ActiveProduction() {
                 <strong>{padDate(customStart)} – {padDate(customEnd)}</strong>
                 {" · "}Report di produzione inclusi: <strong>{intervals.length}</strong>.
                 La produzione è disponibile per interi report, conteggiati alla data di fine periodo;
-                i recessi sono filtrati per il giorno indicato in NOTA_RECESSO.
+                i recessi sono conteggiati per tutto il mese della fine di ogni report incluso,
+                in base a NOTA_RECESSO (compreso il 31 del mese).
               </div>
             )}
           </div>
@@ -552,7 +550,7 @@ export default function ActiveProduction() {
         <div style={{ fontSize: 12, color: "#475569", marginTop: 10 }}>
           {customMode
             ? (customValid
-              ? "Intervallo personalizzato: date incluse. Non vengono stimati importi giornalieri dai report di produzione."
+              ? "Intervallo personalizzato: seleziona i report per data finale; per ogni report vengono considerati i recessi dell’intero mese finale, anche oltre il giorno 10."
               : "Seleziona l'intervallo dal calendario.")
             : currentPeriod
             ? <>Periodo produzione: <strong>{currentPeriod.label}</strong>. I recessi sono conteggiati nel mese
