@@ -16,6 +16,43 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
   const [live, setLive] = useState<{PUN?: {date?: string;value?:number;value_native?:number;unit?:string;unit_native?:string}; PSV?: {date?:string;value?:number;value_native?:number;unit?:string;unit_native?:string}}>({});
   const [status, setStatus] = useState("Caricamento dati...");
   const [updated, setUpdated] = useState("");
+  const [forwardRows, setForwardRows] = useState<Record<string,{pun?:string;psv?:string;source?:string;date?:string}>>({});
+  const [importText, setImportText] = useState("");
+  const [importMessage, setImportMessage] = useState("");
+  useEffect(() => {
+    try {
+      const stored=window.localStorage.getItem("pun-psv-forward-manual-v1");
+      if (stored) setForwardRows(JSON.parse(stored));
+    } catch { /* no local storage */ }
+  }, []);
+  const updateForward=(month:string, field:"pun"|"psv"|"source"|"date", value:string) => {
+    setForwardRows(previous => {
+      const next={...previous,[month]:{...previous[month],[field]:value}};
+      try {window.localStorage.setItem("pun-psv-forward-manual-v1",JSON.stringify(next));} catch { /* storage unavailable */ }
+      return next;
+    });
+  };
+  const importCsv=()=>{
+    const parsed:Record<string,{pun?:string;psv?:string;source?:string;date?:string}>={};
+    const lines=importText.trim().split(/\r?\n/);
+    for (const line of lines) {
+      const columns=line.split(";").map(x=>x.trim());
+      if (columns.length<3 || !/^\d{4}-\d{2}$/.test(columns[0])) continue;
+      const [year,month]=columns[0].split("-").map(Number);
+      if (month<1||month>12) continue;
+      const key=MONTHS[month-1]+" "+year;
+      const valid=(v:string)=>!v || (/^\d+(?:[.,]\d+)?$/.test(v)&&Number(v.replace(",","."))>0);
+      if (!valid(columns[1])||!valid(columns[2])) continue;
+      parsed[key]={pun:columns[1],psv:columns[2],source:columns[3]||"Importazione manuale",date:columns[4]||""};
+    }
+    if (!Object.keys(parsed).length) {setImportMessage("Nessuna riga valida. Formato: AAAA-MM;PUN €/kWh;PSV €/Smc;fonte;data");return;}
+    setForwardRows(previous=>{
+      const next={...previous,...parsed};
+      try {window.localStorage.setItem("pun-psv-forward-manual-v1",JSON.stringify(next));} catch { /* storage unavailable */ }
+      return next;
+    });
+    setImportMessage(Object.keys(parsed).length+" mesi importati su questo dispositivo.");
+  };
   const [monthly, setMonthly] = useState<{pun?:number;psv?:number;punDays?:number;psvDays?:number}>({});
   const [monthlyStatus, setMonthlyStatus] = useState("Verifica disponibilità serie giornaliere...");
   const [punProvisional, setPunProvisional] = useState<{value:number;date:string}|null>(null);
@@ -88,10 +125,22 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
     </div>
     {current && <p style={{fontSize:12,color:"#64748b",margin:"12px 0 0"}}>Nell'archivio mensile esistente: PUN {num(current.mono,3)} €/kWh · PSV {num(current.psv,6)} €/Smc. Questi valori non sono presentati come media progressiva verificata.</p>}
     <h4 style={{margin:"20px 0 8px"}}>Previsionale 12 mesi</h4>
-    <p style={{fontSize:13,color:"#475569",margin:"0 0 12px"}}>Le quotazioni futures mensili e le previsioni a 12 mesi non sono disponibili da una API gratuita attiva e verificata. Energy Index indica il proprio endpoint a 12 mesi come «in arrivo» e riservato al piano Pro. Non vengono generati numeri ipotetici. Consulta <a href={SOURCES.powerForward} style={linkStyle} target="_blank" rel="noopener noreferrer">EEX energia Italia</a> e <a href={SOURCES.gasForward} style={linkStyle} target="_blank" rel="noopener noreferrer">ICE PSV gas</a>. Nessuna interpolazione non dichiarata.</p>
+    <p style={{fontSize:13,color:"#475569"}}>Inserisci quotazioni da una fonte di cui disponi dei diritti di utilizzo. Valori manuali, non aggiornati automaticamente. Per prodotti trimestrali o annuali, indicare nella fonte che si tratta di una ripartizione, non di una quotazione mensile. Dati salvati soltanto nel browser corrente.</p>
+    <p style={{fontSize:12}}><a href={SOURCES.powerForward} target="_blank" rel="noopener noreferrer" style={linkStyle}>EEX energia</a> · <a href={SOURCES.gasForward} target="_blank" rel="noopener noreferrer" style={linkStyle}>ICE PSV</a> · <a href="https://gme.mercatoelettrico.org/Home/InterfacciaAPI" target="_blank" rel="noopener noreferrer" style={linkStyle}>Condizioni API GME</a></p>
     <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:13,textAlign:"left"}}>
-      <thead><tr><th style={{padding:8,borderBottom:"1px solid #cbd5e1"}}>Mese</th><th style={{padding:8,borderBottom:"1px solid #cbd5e1"}}>PUN previsto (€/kWh)</th><th style={{padding:8,borderBottom:"1px solid #cbd5e1"}}>PSV previsto (€/Smc)</th></tr></thead>
-      <tbody>{months.map(m=><tr key={m}><td style={{padding:8,borderBottom:"1px solid #e2e8f0"}}>{m}</td><td style={{padding:8,borderBottom:"1px solid #e2e8f0"}}>Non disponibile</td><td style={{padding:8,borderBottom:"1px solid #e2e8f0"}}>Non disponibile</td></tr>)}</tbody>
+      <thead><tr>{["Mese","PUN previsto €/kWh","PSV previsto €/Smc","Fonte / metodo","Data quotazione"].map(label=><th key={label} style={{padding:8,borderBottom:"1px solid #cbd5e1"}}>{label}</th>)}</tr></thead>
+      <tbody>{months.map(m=><tr key={m}>
+        <td style={{padding:8,borderBottom:"1px solid #e2e8f0",whiteSpace:"nowrap"}}>{m}</td>
+        {(["pun","psv","source","date"] as const).map(field=><td key={field} style={{padding:5,borderBottom:"1px solid #e2e8f0"}}>
+          <input aria-label={field+" "+m} type={field==="date"?"date":"text"} inputMode={field==="pun"||field==="psv"?"decimal":undefined} placeholder={field==="source"?"Fonte e tipo contratto":"—"} value={forwardRows[m]?.[field]||""} onChange={e=>updateForward(m,field,e.target.value)} style={{width:field==="source"?190:field==="date"?140:120,maxWidth:"100%",padding:8,border:"1px solid #cbd5e1",borderRadius:7}} />
+        </td>)}
+      </tr>)}</tbody>
     </table></div>
+    <div style={{marginTop:16}}>
+      <strong>Importa valori autorizzati da CSV</strong>
+      <p style={{fontSize:12,color:"#64748b"}}>Una riga per mese: AAAA-MM;PUN €/kWh;PSV €/Smc;fonte;AAAA-MM-GG. Separatore punto e virgola, virgola o punto per i decimali.</p>
+      <textarea value={importText} onChange={e=>setImportText(e.target.value)} rows={3} placeholder="2026-11;0,115;0,45;Futures mensile - fonte autorizzata;2026-10-15" style={{width:"100%",maxWidth:700,border:"1px solid #cbd5e1",borderRadius:8,padding:10}} />
+      <div><button type="button" onClick={importCsv} style={{background:"#0f172a",color:"white",border:0,borderRadius:8,padding:"10px 16px",cursor:"pointer",fontWeight:700}}>IMPORTA CSV</button> <small>{importMessage}</small></div>
+    </div>
   </section>;
 }
