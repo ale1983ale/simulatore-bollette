@@ -4,6 +4,25 @@ import { downloadZipBlob } from "./androidDownloads";
 import * as XLSX from "xlsx";
 
 type Recipient = { agency: string; email: string; fileName?: string };
+type QuickPcRecipient = { agency: string; email: string; file: File | null };
+type QuickPcSnapshot = {
+  subject: string;
+  body: string;
+  rows: QuickPcRecipient[];
+  error?: string;
+};
+
+// Richiede in modo sincrono lo stato corrente del componente React.
+function getQuickPcSnapshot(commonMode: boolean): QuickPcSnapshot | null {
+  let snapshot: QuickPcSnapshot | null = null;
+  window.dispatchEvent(new CustomEvent("outlook-email-quick-pc-request", {
+    detail: {
+      commonMode,
+      respond: (result: QuickPcSnapshot) => { snapshot = result; },
+    },
+  }));
+  return snapshot;
+}
 type GroupData = { label: string; sheets: Map<string, unknown[][]> };
 
 const normalize = (value: string) =>
@@ -384,11 +403,15 @@ export default function OutlookEmailAutoSendPackageSafe() {
 
     const makePackage = async (button: HTMLButtonElement) => {
       if (busyRef.current) return;
-      const { subject, body } = readMessage();
-      if (!subject) return window.alert("Inserisci prima l'oggetto della mail.");
       const commonMode = commonModeIsActive();
-      const recipients = readRecipients(!commonMode);
-      if (!recipients.length) return window.alert("Non trovo email pronte da preparare.");
+      const snapshot = getQuickPcSnapshot(commonMode);
+      if (!snapshot) return window.alert(
+        "Impossibile leggere le email preparate. Aggiorna la pagina e riapri INVIO EMAIL."
+      );
+      if (snapshot.error) return window.alert(snapshot.error);
+      const { subject, body } = snapshot;
+      const recipients = snapshot.rows;
+      if (!recipients.length) return window.alert("Non ci sono destinatari validi da preparare.");
 
       busyRef.current = true;
       const oldText = button.textContent || "";
@@ -410,20 +433,14 @@ export default function OutlookEmailAutoSendPackageSafe() {
           }
           recipients.forEach((row) => manifestRecipients.push({ agency: row.agency, email: row.email, attachments: paths }));
         } else {
-          let available = separateFilesRef.current;
-          if (sourceFileRef.current) available = await splitWorkbook(sourceFileRef.current, recipients);
-          if (!available.size) throw new Error("Ricarica il file unico o i file separati e riprova.");
+          // File e associazioni provengono dalle stesse readyRows già usate
+          // per "Scarica bozze Outlook": includono i nominativi diretti
+          // e l'eventuale riepilogo NON ASSEGNATI.
           for (let i = 0; i < recipients.length; i += 1) {
             const row = recipients[i];
-            const requestedKey = normalize(row.fileName || "");
-            const file =
-              available.get(requestedKey) ||
-              (normalize(row.agency) === "NONASSEGNATI"
-                ? Array.from(available.entries()).find(([key]) => key.startsWith("NONASSEGNATI"))?.[1]
-                : undefined);
-            if (!file) throw new Error(`Non trovo l'allegato per ${row.agency}: ${row.fileName || "file non indicato"}`);
-            const rel = `allegati/${String(i + 1).padStart(3, "0")}_${sanitizeFileName(file.name)}`;
-            zip.file(rel, file);
+            if (!row.file) throw new Error(`Allegato mancante per ${row.agency}`);
+            const rel = `allegati/${String(i + 1).padStart(3, "0")}_${sanitizeFileName(row.file.name)}`;
+            zip.file(rel, row.file);
             manifestRecipients.push({ agency: row.agency, email: row.email, attachments: [rel] });
           }
         }
