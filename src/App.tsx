@@ -12203,6 +12203,7 @@ const ADMIN_DASHBOARD_CHOICES: Array<{ key: string; label: string }> = [
   { key: "gas", label: "GAS" },
   { key: "report", label: "REPORT" },
   { key: "punpsvPublic", label: "PUN-PSV" },
+  { key: "punpsvForecast", label: "PREVISIONALE PUN-PSV" },
   { key: "ateco", label: "ATECO" },
   { key: "calendarAdmin", label: "CALENDARIO" },
   { key: "recruiting", label: "RECRUITING" },
@@ -12228,7 +12229,7 @@ function getAdminDashboardPermissions(profile: AdminProfile | null): Set<string>
     return new Set(ADMIN_DASHBOARD_CHOICES.filter((item) => item.key !== "provvigioni").map((item) => item.key));
   }
   // Compatibilità con gli admin precedentemente limitati da "Tutte le schede".
-  return new Set(["energia", "gas", "report", "punpsvPublic", "ateco", "driveArchive", "reportAdmin"]);
+  return new Set(["energia", "gas", "report", "punpsvPublic", "punpsvForecast", "ateco", "driveArchive", "reportAdmin"]);
 }
 
 function canAdminAccessTab(profile: AdminProfile | null, requestedTab: string): boolean {
@@ -13346,6 +13347,7 @@ function AdminDashboard({
         {canShow("energia") && <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />}
         {canShow("gas") && <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />}
         {canShow("punpsvPublic") && <DashboardCard title="PUN-PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />}
+        {canShow("punpsvForecast") && <DashboardCard title="PREVISIONALE PUN-PSV" description="Giornalieri, medie e previsionale a 12 mesi." icon="📊" className="ge-card-pun" onClick={() => navigate("punpsvForecast")} />}
         {canShow("ateco") && <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />}
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
@@ -16147,6 +16149,13 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </button>
           )}
 
+          {(!adminSession || canAdminAccessTab(adminProfile, "punpsvForecast")) && (
+          <button onClick={() => navigateTo("punpsvForecast")} style={{...mainNavBtn,...(tab === "punpsvForecast" ? activeBtn : {})}}>
+            <span className="ge-main-nav__label-desktop">PREVISIONALE PUN-PSV</span>
+            <span className="ge-main-nav__label-mobile">PREVISIONALE</span>
+          </button>
+          )}
+
           {(!adminSession || canAdminAccessTab(adminProfile, "ateco")) && (
           <button
             onClick={() => navigateTo("ateco")}
@@ -16346,6 +16355,11 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             />
             <Ateco />
           </>
+        ) : tab === "punpsvForecast" ? (
+          <div style={{background:"white",padding:24,borderRadius:16,border:"1px solid #e2e8f0"}}>
+            <SectionHero title="PREVISIONALE PUN-PSV" subtitle="Monitoraggio giornaliero, medie e prezzi a termine." icon="📊" variant="pun" />
+            <PunPsvMonitoringPanel rows={publicPunPsvOptions} />
+          </div>
         ) : tab === "punpsvPublic" ? (
           <div
             style={{
@@ -16362,7 +16376,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               icon="📈"
               variant="pun"
             />
-            <PunPsvMonitoringPanel rows={publicPunPsvOptions} />
+
         
             <div
               style={{
