@@ -958,6 +958,68 @@ export default function OutlookEmail() {
     [unmatchedManualSources, excludedUnmatchedKeys, unmatchedDirectEmails]
   );
 
+  // Il pulsante "INVIO RAPIDO PC" vive in un componente ausiliario: gli
+  // passiamo le righe realmente pronte di React, con i File originali.
+  // La tabella "Controllo abbinamento" non è montata nella vista Invio Email,
+  // quindi leggerne il DOM produceva falsamente zero destinatari.
+  useEffect(() => {
+    type QuickRow = { agency: string; email: string; file: File | null };
+    type QuickResponse = {
+      subject: string;
+      body: string;
+      rows: QuickRow[];
+      error?: string;
+    };
+    const respondToQuickPcRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        commonMode?: boolean;
+        respond?: (response: QuickResponse) => void;
+      }>).detail;
+      if (typeof detail?.respond !== "function") return;
+      const answer = (error: string, rows: QuickRow[] = []) =>
+        detail.respond!({ subject: subject.trim(), body, rows, error });
+
+      if (!open || activeView !== "email") return answer("Apri la sezione INVIO EMAIL e riprova.");
+      if (busy || splitBusy) return answer("Attendi che la preparazione dei file sia terminata.");
+      if (!subject.trim()) return answer("Inserisci prima l'oggetto della mail.");
+
+      if (detail.commonMode) {
+        const rows = agents
+          .filter((agent, index) => !removedRows.has(index) && isValidEmail(agent.email))
+          .map((agent) => ({ agency: agent.agenzia, email: agent.email.trim(), file: null }));
+        if (!rows.length) return answer("Non ci sono destinatari con indirizzi email validi.");
+        return answer("", rows);
+      }
+
+      if (!files.length) return answer("Carica prima il file unico oppure i file separati.");
+      if (fileMode === "single" && nonAssignedSourceAgencies.length && !nonAssignedConfigured) {
+        return answer("Configura NON ASSEGNATI oppure indica le email dirette per i file non abbinati.");
+      }
+      if (fileMode === "single" && nonAssignedSourceAgencies.length &&
+          nonAssignedConfigured && !nonAssignedFile) {
+        return answer("Attendi che sia pronto il file NON ASSEGNATI.");
+      }
+      if (fileMode === "separate" && unresolvedManualSources.length) {
+        return answer("Ci sono file non abbinati: assegna un'email oppure escludili.");
+      }
+      if (filesWithMissingEmail.length) return answer("Alcuni file associati non hanno un indirizzo email.");
+      if (readyRows.some((row) => !isValidEmail(row.email))) {
+        return answer("Correggi gli indirizzi email non validi prima di preparare il pacchetto.");
+      }
+      const rows = readyRows
+        .filter((row) => row.file)
+        .map((row) => ({ agency: row.agenzia, email: row.email.trim(), file: row.file }));
+      if (!rows.length) return answer("Non ci sono email con allegati pronte da preparare.");
+      answer("", rows);
+    };
+    window.addEventListener("outlook-email-quick-pc-request", respondToQuickPcRequest);
+    return () => window.removeEventListener("outlook-email-quick-pc-request", respondToQuickPcRequest);
+  }, [
+    open, activeView, busy, splitBusy, subject, body, agents, removedRows,
+    files, fileMode, nonAssignedSourceAgencies, nonAssignedConfigured,
+    nonAssignedFile, unresolvedManualSources, filesWithMissingEmail, readyRows,
+  ]);
+
   const recipientsWithoutSourceData = useMemo(
     () => agents.filter((agent, agentIndex) => !isNonAssignedAgent(agent) && !assignment.byAgent.has(agentIndex)),
     [agents, assignment]
