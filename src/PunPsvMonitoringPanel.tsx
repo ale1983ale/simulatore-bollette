@@ -6,6 +6,7 @@ const MONTHS = ["GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO","LUGLIO"
 const SOURCES = {
   pun: "https://gme.mercatoelettrico.org/it-it/Home/Pubblicazioni/Indici-GME/PUNIndexGme",
   gas: "https://gme.mercatoelettrico.org/it-it/Home/Pubblicazioni/Indici-GME/IGIndexGmeStatistiche",
+  psvMonthly: "https://www.abbassalebollette.it/glossario/psv/",
   powerForward: "https://www.eex.com/en/markets/power/power-futures",
   gasForward: "https://www.ice.com/products/49321531/Italian-PSV-Natural-Gas-Futures/expiry"
 };
@@ -83,7 +84,7 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
       <div style={cellStyle}><strong>PUN giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{live.PUN && Number.isFinite(live.PUN.value) ? num(live.PUN.value,5)+" €/kWh" : "—"}</div><small>{live.PUN?.date ? "Data "+live.PUN.date+" · " : "Non disponibile · "}<a style={linkStyle} href={SOURCES.pun} target="_blank" rel="noopener noreferrer">GME</a></small></div>
       <div style={cellStyle}><strong>PSV giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{live.PSV && Number.isFinite(live.PSV.value_native) ? num(live.PSV.value_native,3)+" €/MWh" : "—"}</div><small>{live.PSV?.date ? "Data "+live.PSV.date+" · " : "Non disponibile · "}<a style={linkStyle} href={SOURCES.gas} target="_blank" rel="noopener noreferrer">GME IG Index</a> · €/Smc non convertiti senza PCS</small></div>
       <div style={cellStyle}><strong>PUN medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{punProvisional ? num(punProvisional.value,5)+" €/kWh" : monthly.pun !== undefined ? num(monthly.pun,5)+" €/kWh" : "—"}</div><small>{punProvisional ? "Provvisorio "+punProvisional.date+" · AbbassaLeBollette.it" : monthly.punDays ? monthly.punDays+" giorni pubblicati" : monthlyStatus}</small></div>
-      <div style={cellStyle}><strong>PSV medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{monthly.psv !== undefined ? num(monthly.psv,3)+" €/MWh" : "—"}</div><small>{monthly.psvDays ? monthly.psvDays+" giorni pubblicati" : monthlyStatus} · €/Smc richiede PCS</small></div>
+      <div style={cellStyle}><strong>PSV medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{monthly.psv !== undefined ? num(monthly.psv,3)+" €/MWh" : "—"}</div><small>{monthly.psvDays ? monthly.psvDays+" giorni pubblicati" : monthlyStatus} · <a href={SOURCES.psvMonthly} style={linkStyle} target="_blank" rel="noopener noreferrer">Consulta stima PSV del mese (€/Smc)</a></small></div>
     </div>
     {current && <p style={{fontSize:12,color:"#64748b",margin:"12px 0 0"}}>Nell'archivio mensile esistente: PUN {num(current.mono,3)} €/kWh · PSV {num(current.psv,6)} €/Smc. Questi valori non sono presentati come media progressiva verificata.</p>}
     <h4 style={{margin:"20px 0 8px"}}>Previsionale 12 mesi</h4>
