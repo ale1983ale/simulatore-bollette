@@ -17,6 +17,7 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
   const [updated, setUpdated] = useState("");
   const [monthly, setMonthly] = useState<{pun?:number;psv?:number;punDays?:number;psvDays?:number}>({});
   const [monthlyStatus, setMonthlyStatus] = useState("Verifica disponibilità serie giornaliere...");
+  const [punProvisional, setPunProvisional] = useState<{value:number;date:string}|null>(null);
   const getMonthAverage = async (asset:"pun"|"psv") => {
     const date = new Date();
     const from = date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-01";
@@ -29,6 +30,15 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
     const points = data.points.filter((p:{date?:string;value?:number}) => typeof p.date==="string" && p.date>=from && p.date<=to && typeof p.value==="number" && Number.isFinite(p.value));
     if (!points.length) throw new Error("Nessun giorno valido per "+asset.toUpperCase());
     return {average:points.reduce((sum:number,p:{value:number})=>sum+p.value,0)/points.length,days:points.length};
+  };
+  const refreshPunProvisional = async () => {
+    try {
+      const response = await fetch("/api/pun-month-current", {cache:"no-store"});
+      if (!response.ok) throw new Error("HTTP "+response.status);
+      const data = await response.json();
+      if (typeof data.value !== "number" || !Number.isFinite(data.value)) throw new Error("Valore non valido");
+      setPunProvisional({value:data.value,date:data.asOf || ""});
+    } catch { setPunProvisional(null); }
   };
   const refreshMonthly = async () => {
     const results = await Promise.allSettled([getMonthAverage("pun"),getMonthAverage("psv")]);
@@ -53,7 +63,7 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
       setStatus("Dati non raggiungibili: " + (error instanceof Error ? error.message : "errore di rete"));
     }
   };
-  useEffect(() => { void refresh(); void refreshMonthly(); const interval = window.setInterval(() => { void refresh(); void refreshMonthly(); }, 15*60*1000); return () => window.clearInterval(interval); }, []);
+  useEffect(() => { void refresh(); void refreshMonthly(); void refreshPunProvisional(); const interval = window.setInterval(() => { void refresh(); void refreshMonthly(); void refreshPunProvisional(); }, 15*60*1000); return () => window.clearInterval(interval); }, []);
   const now = new Date();
   const currentLabel = MONTHS[now.getMonth()] + " " + now.getFullYear();
   const current = rows.find(r => String(r.mese || "").toUpperCase().trim() === currentLabel);
@@ -68,11 +78,11 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
   return <section aria-label="Monitoraggio e previsionale PUN-PSV" style={{border:"1px solid #dbeafe",borderRadius:16,padding:18,margin:"16px 0 24px",background:"#fff"}}>
     <h3 style={{margin:"0 0 8px",color:"#0f172a"}}>MONITORAGGIO E PREVISIONALE PUN-PSV</h3>
     <p style={{fontSize:13,color:"#475569",margin:"0 0 14px"}}>Ultimi dati giornalieri tramite API pubblica Energy Index (fonte dichiarata GME). Aggiornamento ogni 15 minuti. Le medie mensili vengono calcolate solo se il fornitore rende disponibile la serie giornaliera; il previsionale a 12 mesi richiede un feed futures o forecast autorizzato.</p>
-    <p style={{fontSize:12,color:"#475569"}}>{status} {updated && "· Verificato: "+updated} · <button type="button" onClick={() => { void refresh(); void refreshMonthly(); }} style={{cursor:"pointer",color:"#2563eb",border:"none",background:"transparent",fontWeight:700}}>Aggiorna ora</button> · <a href="https://energyindex.it/it/api" target="_blank" rel="noopener noreferrer" style={linkStyle}>Energy Index</a></p>
+    <p style={{fontSize:12,color:"#475569"}}>{status} {updated && "· Verificato: "+updated} · <button type="button" onClick={() => { void refresh(); void refreshMonthly(); void refreshPunProvisional(); }} style={{cursor:"pointer",color:"#2563eb",border:"none",background:"transparent",fontWeight:700}}>Aggiorna ora</button> · <a href="https://energyindex.it/it/api" target="_blank" rel="noopener noreferrer" style={linkStyle}>Energy Index</a></p>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
       <div style={cellStyle}><strong>PUN giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{live.PUN && Number.isFinite(live.PUN.value) ? num(live.PUN.value,5)+" €/kWh" : "—"}</div><small>{live.PUN?.date ? "Data "+live.PUN.date+" · " : "Non disponibile · "}<a style={linkStyle} href={SOURCES.pun} target="_blank" rel="noopener noreferrer">GME</a></small></div>
       <div style={cellStyle}><strong>PSV giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{live.PSV && Number.isFinite(live.PSV.value_native) ? num(live.PSV.value_native,3)+" €/MWh" : "—"}</div><small>{live.PSV?.date ? "Data "+live.PSV.date+" · " : "Non disponibile · "}<a style={linkStyle} href={SOURCES.gas} target="_blank" rel="noopener noreferrer">GME IG Index</a> · €/Smc non convertiti senza PCS</small></div>
-      <div style={cellStyle}><strong>PUN medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{monthly.pun !== undefined ? num(monthly.pun,5)+" €/kWh" : "—"}</div><small>{monthly.punDays ? monthly.punDays+" giorni pubblicati" : monthlyStatus}</small></div>
+      <div style={cellStyle}><strong>PUN medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{punProvisional ? num(punProvisional.value,5)+" €/kWh" : monthly.pun !== undefined ? num(monthly.pun,5)+" €/kWh" : "—"}</div><small>{punProvisional ? "Provvisorio "+punProvisional.date+" · AbbassaLeBollette.it" : monthly.punDays ? monthly.punDays+" giorni pubblicati" : monthlyStatus}</small></div>
       <div style={cellStyle}><strong>PSV medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{monthly.psv !== undefined ? num(monthly.psv,3)+" €/MWh" : "—"}</div><small>{monthly.psvDays ? monthly.psvDays+" giorni pubblicati" : monthlyStatus} · €/Smc richiede PCS</small></div>
     </div>
     {current && <p style={{fontSize:12,color:"#64748b",margin:"12px 0 0"}}>Nell'archivio mensile esistente: PUN {num(current.mono,3)} €/kWh · PSV {num(current.psv,6)} €/Smc. Questi valori non sono presentati come media progressiva verificata.</p>}
