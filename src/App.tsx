@@ -58,6 +58,7 @@ import {
   type GasNetworkTariffRow,
 } from "./gasNetworkTariffs";
 import "./dashboard.css";
+import { last12MarketAverage, marketAverageChartY } from "./marketAverages";
 
 
 type MonthlyRow = {
@@ -327,6 +328,49 @@ function getChartCoords(values: number[], width: number, height: number) {
     return { x, y, value: v };
   });
 }
+/** Linea e cartiglio della media, comuni a vista normale, zoom e PDF. */
+function MarketAverageGuide({
+  label, average, values, color, background, decimals,
+}: {
+  label: string;
+  average: number | null;
+  values: number[];
+  color: string;
+  background: string;
+  decimals: number;
+}) {
+  if (average === null || values.length < 12) return null;
+  const y = marketAverageChartY(values, average);
+  // Il cartiglio resta all'interno del grafico anche se la media e vicina
+  // al minimo o al massimo della scala.
+  const boxY = y >= 95
+    ? Math.max(22, y - 65)
+    : Math.min(127, y + 18);
+  const boxX = 90;
+  const boxWidth = 224;
+  const boxHeight = 44;
+  const anchorX = 202;
+  const lineStart = boxY > y ? boxY : boxY + boxHeight;
+  const value = average.toFixed(decimals);
+  return (
+    <g role="img" aria-label={`${label}: ${value}`}>
+      <line x1="0" x2="760" y1={y} y2={y} stroke={color}
+        strokeOpacity=".13" strokeWidth="10" />
+      <line x1="0" x2="760" y1={y} y2={y} stroke={color}
+        strokeWidth="2.5" strokeDasharray="9 6" strokeLinecap="round" />
+      <line x1={anchorX} x2={anchorX} y1={lineStart} y2={y}
+        stroke={color} strokeOpacity=".82" strokeWidth="1.3" />
+      <circle cx={anchorX} cy={y} r="4.5" fill={color} />
+      <rect x={boxX} y={boxY} width={boxWidth} height={boxHeight} rx="8"
+        fill={background} stroke={color} strokeWidth="1.4" />
+      <text x={boxX + boxWidth / 2} y={boxY + 17} textAnchor="middle"
+        fill={color} fontSize="12" fontWeight="800">{label}</text>
+      <text x={boxX + boxWidth / 2} y={boxY + 35} textAnchor="middle"
+        fill={color} fontSize="17" fontWeight="900">{value}</text>
+    </g>
+  );
+}
+
 const MESI = [
   "GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO",
   "LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"
@@ -14273,13 +14317,22 @@ export default function App() {
     return validPunPsvRowsChronological.slice(startIndex, endIndex);
   }
 
-  const chartPunPsvRows = getCentered12PunPsvRows(activePunPsvMonth);
+  // Ultimi dodici mesi TERMINANTI nel mese selezionato: non includere
+  // mesi futuri quando si sceglie una data storica.
+  const effectivePunPsvMonth = validPunPsvRowsChronological.some(
+    (row) => normalizeMonthLabel(row.mese) === normalizeMonthLabel(activePunPsvMonth)
+  ) ? activePunPsvMonth : validPunPsvRowsChronological[validPunPsvRowsChronological.length - 1]?.mese || "";
+  const chartPunPsvRows = getLast12PunPsvRows(validPunPsvRowsChronological, effectivePunPsvMonth);
   const visiblePunPsvRows = chartPunPsvRows;
   const tablePunPsvRows = [...chartPunPsvRows].reverse();
   const validMonthOptions = [...validPunPsvRowsChronological].reverse();
 
 const punValues = chartPunPsvRows.map(r => Number(r.mono || 0));
 const psvValues = chartPunPsvRows.map(r => Number(r.psv || 0));
+// Medie aritmetiche, solo con 12 mesi consecutivi e valori disponibili.
+// Sono ricalcolate automaticamente al cambio del mese selezionato.
+const punMean12 = last12MarketAverage(chartPunPsvRows, "mono");
+const psvMean12 = last12MarketAverage(chartPunPsvRows, "psv");
 const punPolyline = getSvgPoints(punValues, 760, 220);
 const psvPolyline = getSvgPoints(psvValues, 760, 220);
 const punCoords = getChartCoords(punValues, 760, 220);
@@ -16585,6 +16638,10 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                         filter="url(#punGlow)"
                       />
 
+                      <MarketAverageGuide label="PUN medio ultimi 12 mesi"
+                        average={punMean12} values={punValues}
+                        color="#ea580c" background="#fff1e6" decimals={3} />
+
                       {punCoords.map((p, i) => {
                         const isSelected = i === selectedChartIndex;
                         return (
@@ -16758,6 +16815,10 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                         points={psvPolyline}
                         filter="url(#psvGlow)"
                       />
+
+                      <MarketAverageGuide label="PSV medio ultimi 12 mesi"
+                        average={psvMean12} values={psvValues}
+                        color="#0284c7" background="#eaf8ff" decimals={6} />
 
                       {psvCoords.map((p, i) => {
                         const isSelected = i === selectedChartIndex;
@@ -17393,6 +17454,16 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             }
           />
 
+          {expandedMarketChart === "pun" ? (
+            <MarketAverageGuide label="PUN medio ultimi 12 mesi"
+              average={punMean12} values={punValues}
+              color="#ea580c" background="#fff1e6" decimals={3} />
+          ) : (
+            <MarketAverageGuide label="PSV medio ultimi 12 mesi"
+              average={psvMean12} values={psvValues}
+              color="#0284c7" background="#eaf8ff" decimals={6} />
+          )}
+
           {(expandedMarketChart === "pun"
             ? punCoords
             : psvCoords
@@ -17781,6 +17852,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         {[40,80,120,160].map((y) => <line key={y} x1="0" x2="760" y1={y} y2={y} stroke="#dbe3ea" />)}
         <polygon points={`${punPolyline} 732,180 28,180`} fill="url(#pdfPunAreaGradient)" />
         <polyline fill="none" stroke="#f97316" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" points={punPolyline} />
+        <MarketAverageGuide label="PUN medio ultimi 12 mesi"
+          average={punMean12} values={punValues}
+          color="#ea580c" background="#fff1e6" decimals={3} />
         {punCoords.map((p,i) => {
           const isLast=i===punCoords.length-1;
           return (
@@ -17830,6 +17904,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         {[40,80,120,160].map((y) => <line key={y} x1="0" x2="760" y1={y} y2={y} stroke="#dbe3ea" />)}
         <polygon points={`${psvPolyline} 732,180 28,180`} fill="url(#pdfPsvAreaGradient)" />
         <polyline fill="none" stroke="#0ea5e9" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" points={psvPolyline} />
+        <MarketAverageGuide label="PSV medio ultimi 12 mesi"
+          average={psvMean12} values={psvValues}
+          color="#0284c7" background="#eaf8ff" decimals={6} />
         {psvCoords.map((p,i) => {
           const isLast=i===psvCoords.length-1;
           return (
