@@ -1,3 +1,4 @@
+import PunPsvMonitoringPanel from "./PunPsvMonitoringPanel";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -16361,6 +16362,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               icon="📈"
               variant="pun"
             />
+            <PunPsvMonitoringPanel rows={publicPunPsvOptions} />
         
             <div
               style={{
