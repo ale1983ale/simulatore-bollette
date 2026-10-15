@@ -280,7 +280,7 @@ function buildVbsScript(
 ) {
   const rows = recipients
     .map((item, index) => {
-      const attachmentList = item.attachments.map((rel) => rel.replace(/\//g, "\\\\")).join("|");
+      const attachmentList = item.attachments.map((rel) => rel.replace(/\//g, "\\")).join("|");
       return [
         `recipients(${index}) = Array(${vbString(item.agency)}, ${vbString(item.email)}, ${vbString(attachmentList)})`,
       ].join("");
@@ -297,6 +297,14 @@ function buildVbsScript(
     "Dim rels, rel, fullPath, sent, bodyHtml",
     "Set fso = CreateObject(\"Scripting.FileSystemObject\")",
     "root = fso.GetParentFolderName(WScript.ScriptFullName)",
+    "",
+    // Explorer estrae solo il .vbs in una cartella Temp/*.zip.* quando
+    // l'utente esegue lo script dentro lo ZIP: gli allegati restano nell'archivio.
+    'If InStr(1, root, ".zip.", vbTextCompare) > 0 Then',
+    '  MsgBox "Lo script e stato aperto direttamente dentro il file ZIP." & vbCrLf & vbCrLf & "Chiudi questa finestra, trova lo ZIP in Download, scegli ESTRAI TUTTO, apri la cartella estratta e avvia INVIA_EMAIL_OUTLOOK.vbs da li." & vbCrLf & vbCrLf & "Nessuna email e stata inviata.", vbExclamation, "Estrai prima il pacchetto ZIP"',
+    "  WScript.Quit 1",
+    "End If",
+    "",
     `ReDim recipients(${Math.max(0, recipients.length - 1)})`,
     rows,
     "",
@@ -313,6 +321,27 @@ function buildVbsScript(
     "Else",
     "  maxItems = UBound(recipients) + 1",
     "End If",
+    "",
+    // Controlla tutti gli allegati PRIMA di aprire Outlook: se il pacchetto
+    // non e stato estratto correttamente, il TEST non lascia messaggi vuoti
+    // e INVIA non puo completare un invio parziale.
+    'If Not fso.FolderExists(fso.BuildPath(root, "allegati")) Then',
+    '  MsgBox "Cartella allegati non trovata." & vbCrLf & vbCrLf & "Estrai TUTTO il contenuto dello ZIP in una cartella, non avviare il .vbs dentro lo ZIP." & vbCrLf & "Nessuna email e stata inviata.", vbCritical, "Allegati non estratti"',
+    "  WScript.Quit 1",
+    "End If",
+    "For i = 0 To maxItems - 1",
+    "  item = recipients(i)",
+    '  rels = Split(CStr(item(2)), "|")',
+    "  For Each rel In rels",
+    '    If Len(Trim(CStr(rel))) > 0 Then',
+    "      fullPath = fso.BuildPath(root, CStr(rel))",
+    "      If Not fso.FileExists(fullPath) Then",
+    '        MsgBox "Allegato mancante per " & CStr(item(0)) & ":" & vbCrLf & fullPath & vbCrLf & vbCrLf & "Estrai TUTTO il file ZIP prima di avviare lo script. Nessuna email e stata inviata.", vbCritical, "Controllo allegati"',
+    "        WScript.Quit 1",
+    "      End If",
+    "    End If",
+    "  Next",
+    "Next",
     "",
     'confirm = MsgBox("Stai per inviare " & maxItems & " email tramite Outlook." & vbCrLf & vbCrLf & "Oggetto: " & ' + vbString(subject) + ' & vbCrLf & vbCrLf & "Continuare?", vbYesNo + vbQuestion + vbDefaultButton2, "Conferma invio")',
     "If confirm <> vbYes Then WScript.Quit 0",
@@ -450,8 +479,12 @@ export default function OutlookEmailAutoSendPackageSafe() {
         zip.file("LEGGIMI.txt", [
           "INVIO RAPIDO CON OUTLOOK CLASSICO",
           "",
+          "IMPORTANTE: NON aprire INVIA_EMAIL_OUTLOOK.vbs direttamente dentro lo ZIP.",
+          "Dal file ZIP in Download scegli ESTRAI TUTTO e apri la cartella estratta.",
+          "Controlla che INVIA_EMAIL_OUTLOOK.vbs e la cartella allegati siano vicini.",
+          "",
           "1) Estrai completamente lo ZIP in una cartella.",
-          "2) Fai doppio clic su INVIA_EMAIL_OUTLOOK.vbs.",
+          "2) Dalla cartella estratta fai doppio clic su INVIA_EMAIL_OUTLOOK.vbs.",
           "3) Scrivi TEST per inviare solo la prima email.",
           "4) Se il test e corretto, riapri lo stesso file e scrivi INVIA.",
           "5) Conferma nella finestra che compare.",
