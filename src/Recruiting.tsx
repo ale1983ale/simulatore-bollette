@@ -590,6 +590,59 @@ async function copyPlainText(value: string) {
   }
 }
 
+/** Pulsante copia email condiviso da Contatti e Contatti esterni (desktop e mobile). */
+function CopyEmailButton({ email }: { email: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  const timeoutRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+  }, []);
+  if (!email.trim()) return null;
+  return (
+    <button
+      type="button"
+      aria-label={state === "copied" ? "Email copiata" : `Copia email ${email.trim()}`}
+      title={state === "copied" ? "Email copiata!" : state === "error"
+        ? "Impossibile copiare l'email" : "Copia indirizzo email"}
+      onClick={async (event) => {
+        event.stopPropagation();
+        const copied = await copyPlainText(email.trim());
+        setState(copied ? "copied" : "error");
+        if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = window.setTimeout(() => setState("idle"), 2200);
+      }}
+      onKeyDown={(event) => event.stopPropagation()}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 34,
+        height: 34,
+        flexShrink: 0,
+        padding: 0,
+        border: state === "copied" ? "1px solid #86efac" : "1px solid #93c5fd",
+        borderRadius: 9,
+        background: state === "copied" ? "#dcfce7" : "#eff6ff",
+        color: state === "copied" ? "#166534" : state === "error" ? "#b91c1c" : "#1d4ed8",
+        cursor: "pointer",
+        fontSize: 17,
+        fontWeight: 900,
+        lineHeight: 1,
+        verticalAlign: "middle",
+      }}
+    >
+      {state === "copied" ? "✓" : state === "error" ? "!" : (
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
+          strokeLinejoin="round" aria-hidden="true">
+          <rect x="8" y="8" width="12" height="12" rx="2" />
+          <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function normalizePlaceName(value: string) {
   return String(value || "")
     .trim()
@@ -8763,27 +8816,30 @@ export default function Recruiting({
                           )}
 
                           {candidate.email && (
-                            <a
-                              href={emailHref(candidate.email)}
-                              aria-label={`Invia email a ${candidate.fullName}`}
-                              title={`Invia email a ${candidate.email}`}
-                              onClick={(event) => event.stopPropagation()}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 30,
-                                height: 30,
-                                borderRadius: 999,
-                                background: "#dbeafe",
-                                border: "1px solid #93c5fd",
-                                color: "#1d4ed8",
-                                textDecoration: "none",
-                                fontSize: 16,
-                              }}
-                            >
-                              ✉
-                            </a>
+                            <>
+                              <a
+                                href={emailHref(candidate.email)}
+                                aria-label={`Invia email a ${candidate.fullName}`}
+                                title={`Invia email a ${candidate.email}`}
+                                onClick={(event) => event.stopPropagation()}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: 30,
+                                  height: 30,
+                                  borderRadius: 999,
+                                  background: "#dbeafe",
+                                  border: "1px solid #93c5fd",
+                                  color: "#1d4ed8",
+                                  textDecoration: "none",
+                                  fontSize: 16,
+                                }}
+                              >
+                                ✉
+                              </a>
+                              <CopyEmailButton email={candidate.email} />
+                            </>
                           )}
                           <button
                             type="button"
@@ -9438,18 +9494,22 @@ export default function Recruiting({
                         <div style={{ minWidth: 0 }}>
                           <label style={labelStyle}>Email</label>
                           {selectedCandidate.email ? (
-                            <a
-                              href={emailHref(selectedCandidate.email)}
-                              style={{
-                                color: "#1d4ed8",
-                                textDecoration: "underline",
-                                fontWeight: 800,
-                                overflowWrap: "anywhere",
-                                wordBreak: "break-word",
-                              }}
-                            >
-                              {selectedCandidate.email}
-                            </a>
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                              <a
+                                href={emailHref(selectedCandidate.email)}
+                                style={{
+                                  color: "#1d4ed8",
+                                  textDecoration: "underline",
+                                  fontWeight: 800,
+                                  overflowWrap: "anywhere",
+                                  wordBreak: "break-word",
+                                  minWidth: 0,
+                                }}
+                              >
+                                {selectedCandidate.email}
+                              </a>
+                              <CopyEmailButton email={selectedCandidate.email} />
+                            </div>
                           ) : (
                             <div>—</div>
                           )}
