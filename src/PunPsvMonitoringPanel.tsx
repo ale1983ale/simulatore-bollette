@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type MarketRow = { mese?: string; mono?: number | string; psv?: number | string };
 
@@ -12,6 +12,25 @@ const SOURCES = {
 const linkStyle: React.CSSProperties = {color:"#2563eb",fontWeight:700,textDecoration:"underline"};
 const cellStyle: React.CSSProperties = {border:"1px solid #e2e8f0",borderRadius:12,padding:14,background:"#f8fafc",minWidth:0};
 export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
+  const [live, setLive] = useState<{PUN?: {date?: string;value?:number;value_native?:number;unit?:string;unit_native?:string}; PSV?: {date?:string;value?:number;value_native?:number;unit?:string;unit_native?:string}}>({});
+  const [status, setStatus] = useState("Caricamento dati...");
+  const [updated, setUpdated] = useState("");
+  const refresh = async () => {
+    try {
+      setStatus("Aggiornamento...");
+      const response = await fetch("https://energyindex.it/api/v1/today", {cache:"no-store"});
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const json = await response.json();
+      const values = json?.values || {};
+      if (!values.PUN && !values.PSV) throw new Error("Nessun dato disponibile");
+      setLive(values);
+      setUpdated(new Date().toLocaleString("it-IT"));
+      setStatus("Ultimi prezzi pubblicati (non quotazioni in tempo reale)");
+    } catch (error) {
+      setStatus("Dati non raggiungibili: " + (error instanceof Error ? error.message : "errore di rete"));
+    }
+  };
+  useEffect(() => { void refresh(); const interval = window.setInterval(() => { void refresh(); }, 15*60*1000); return () => window.clearInterval(interval); }, []);
   const now = new Date();
   const currentLabel = MONTHS[now.getMonth()] + " " + now.getFullYear();
   const current = rows.find(r => String(r.mese || "").toUpperCase().trim() === currentLabel);
@@ -25,10 +44,11 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
   };
   return <section aria-label="Monitoraggio e previsionale PUN-PSV" style={{border:"1px solid #dbeafe",borderRadius:16,padding:18,margin:"16px 0 24px",background:"#fff"}}>
     <h3 style={{margin:"0 0 8px",color:"#0f172a"}}>MONITORAGGIO E PREVISIONALE PUN-PSV</h3>
-    <p style={{fontSize:13,color:"#475569",margin:"0 0 14px"}}>Riquadro informativo escluso dai PDF. Le quotazioni giornaliere e futures richiedono un feed dati autorizzato: nessun valore viene stimato o presentato come aggiornato in tempo reale.</p>
+    <p style={{fontSize:13,color:"#475569",margin:"0 0 14px"}}>Ultimi dati giornalieri tramite API pubblica Energy Index (fonte dichiarata GME). Aggiornamento ogni 15 minuti. Le medie progressive e i futures restano separati finché non è disponibile un feed verificato.</p>
+    <p style={{fontSize:12,color:"#475569"}}>{status} {updated && "· Verificato: "+updated} · <button type="button" onClick={() => void refresh()} style={{cursor:"pointer",color:"#2563eb",border:"none",background:"transparent",fontWeight:700}}>Aggiorna ora</button> · <a href="https://energyindex.it/it/api" target="_blank" rel="noopener noreferrer" style={linkStyle}>Energy Index</a></p>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>
-      <div style={cellStyle}><strong>PUN giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>—</div><small>Non collegato · <a style={linkStyle} href={SOURCES.pun} target="_blank" rel="noopener noreferrer">GME</a></small></div>
-      <div style={cellStyle}><strong>PSV giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>—</div><small>Non collegato · <a style={linkStyle} href={SOURCES.gas} target="_blank" rel="noopener noreferrer">GME IG Index</a></small></div>
+      <div style={cellStyle}><strong>PUN giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{live.PUN && Number.isFinite(live.PUN.value) ? num(live.PUN.value,5)+" €/kWh" : "—"}</div><small>{live.PUN?.date ? "Data "+live.PUN.date+" · " : "Non disponibile · "}<a style={linkStyle} href={SOURCES.pun} target="_blank" rel="noopener noreferrer">GME</a></small></div>
+      <div style={cellStyle}><strong>PSV giornaliero</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>{live.PSV && Number.isFinite(live.PSV.value_native) ? num(live.PSV.value_native,3)+" €/MWh" : "—"}</div><small>{live.PSV?.date ? "Data "+live.PSV.date+" · " : "Non disponibile · "}<a style={linkStyle} href={SOURCES.gas} target="_blank" rel="noopener noreferrer">GME IG Index</a> · €/Smc non convertiti senza PCS</small></div>
       <div style={cellStyle}><strong>PUN medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>—</div><small>Media progressiva giornaliera non disponibile</small></div>
       <div style={cellStyle}><strong>PSV medio {currentLabel.toLowerCase()}</strong><div style={{fontSize:24,fontWeight:800,margin:"8px 0"}}>—</div><small>Media progressiva giornaliera non disponibile</small></div>
     </div>
