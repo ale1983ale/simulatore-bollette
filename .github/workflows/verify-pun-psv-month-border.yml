@@ -1,0 +1,35 @@
+name: Verify PUN PSV Selected Border
+on:
+  push:
+    branches: [fix/pun-psv-bordo-mese-sopra-colonne]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Check selected borders in PUN and PSV tables and PDFs
+        run: |
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import fs from "node:fs";
+          const src=fs.readFileSync("src/App.tsx","utf8");
+          for(const needle of [
+            'function punPsvSelectedCellBorder(',
+            'inset 0 2px 0',
+            'inset 0 -2px 0',
+            'punPsvSelectedCellBorder(isSelected, "#f97316", true, false)',
+            'punPsvSelectedCellBorder(isSelected, "#f97316", false, valueIndex === 3)',
+            'punPsvSelectedCellBorder(isSelected, "#0ea5e9", true, false)',
+            'punPsvSelectedCellBorder(isSelected, "#0ea5e9", false, true)',
+            'punPsvSelectedCellBorder(index === 0, "#fb923c", false, valueIndex === 3)',
+            'punPsvSelectedCellBorder(index === 0, "#38bdf8", false, true)'
+          ]) assert(src.includes(needle), 'Missing border check: '+needle);
+          assert(!src.includes('inset 0 0 0 2px #f97316, 0 0 12px'));
+          assert(!src.includes('inset 0 0 0 2px #0ea5e9, 0 0 12px'));
+          console.log("PUN/PSV selected month outlines rendered on top of every cell including PDFs");
+          JS
