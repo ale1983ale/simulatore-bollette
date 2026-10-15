@@ -140,6 +140,27 @@ type PunPsvRow = {
   psv: number;
 };
 
+// Disegna il bordo del mese evidenziato sopra lo sfondo di OGNI cella.
+// Evita il bordo sul <tr>: con colonne colorate e border-collapse viene coperto.
+function punPsvSelectedCellBorder(
+  selected: boolean,
+  color: string,
+  firstCell: boolean,
+  lastCell: boolean
+): React.CSSProperties {
+  if (!selected) return {};
+  return {
+    position: "relative",
+    zIndex: 1,
+    boxShadow: [
+      `inset 0 2px 0 ${color}`,
+      `inset 0 -2px 0 ${color}`,
+      ...(firstCell ? [`inset 2px 0 0 ${color}`] : []),
+      ...(lastCell ? [`inset -2px 0 0 ${color}`] : []),
+    ].join(", "),
+  };
+}
+
 const PUN_PSV_MONTHS = [
 "GENNAIO 2024",
 "FEBBRAIO 2024",
@@ -16897,7 +16918,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           <table
             style={{
               width: "100%",
-              borderCollapse: "collapse",
+              borderCollapse: "separate",
+              borderSpacing: 0,
               tableLayout: "fixed",
               background: "transparent",
               minWidth: 620,
@@ -16952,9 +16974,6 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                       : index % 2 === 0
                         ? "rgba(255,255,255,.84)"
                         : "rgba(255,247,237,.64)",
-                    boxShadow: isSelected
-                      ? "inset 0 0 0 2px #f97316, 0 0 12px rgba(249,115,22,.12)"
-                      : "none",
                   }}
                 >
                   <td
@@ -16964,6 +16983,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                       color: "#334155",
                       fontWeight: 750,
                       whiteSpace: "nowrap",
+                      ...punPsvSelectedCellBorder(isSelected, "#f97316", true, false),
                     }}
                   >
                     {row.mese}
@@ -16981,6 +17001,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                         fontWeight: valueIndex === 0 ? 850 : 650,
                         fontVariantNumeric: "tabular-nums",
                         whiteSpace: "nowrap",
+                        ...punPsvSelectedCellBorder(isSelected, "#f97316", false, valueIndex === 3),
                       }}
                     >
                       {Number(value || 0).toFixed(3)}
@@ -17064,7 +17085,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           <table
             style={{
               width: "100%",
-              borderCollapse: "collapse",
+              borderCollapse: "separate",
+              borderSpacing: 0,
               tableLayout: "fixed",
               background: "transparent",
             }}
@@ -17119,9 +17141,6 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                       : index % 2 === 0
                         ? "rgba(255,255,255,.84)"
                         : "rgba(240,249,255,.70)",
-                    boxShadow: isSelected
-                      ? "inset 0 0 0 2px #0ea5e9, 0 0 12px rgba(14,165,233,.12)"
-                      : "none",
                   }}
                 >
                   <td
@@ -17131,6 +17150,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                       color: "#334155",
                       fontWeight: 750,
                       whiteSpace: "nowrap",
+                      ...punPsvSelectedCellBorder(isSelected, "#0ea5e9", true, false),
                     }}
                   >
                     {row.mese}
@@ -17145,6 +17165,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                       fontWeight: 850,
                       fontVariantNumeric: "tabular-nums",
                       whiteSpace: "nowrap",
+                      ...punPsvSelectedCellBorder(isSelected, "#0ea5e9", false, true),
                     }}
                   >
                     {Number(row.psv || 0).toFixed(6)}
@@ -17558,7 +17579,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: 12 }}>
+      <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", fontSize: 12 }}>
         <colgroup>
           <col style={{ width: "28%" }} />
           <col style={{ width: "18%" }} />
@@ -17592,9 +17613,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                 style={{
                   padding: "7px 9px",
                   fontWeight: index === 0 ? 900 : 700,
-                  borderTop: index === 0 ? "2px solid #fb923c" : undefined,
-                  borderBottom: index === 0 ? "2px solid #fb923c" : undefined,
-                  borderLeft: index === 0 ? "2px solid #fb923c" : undefined,
+                  ...punPsvSelectedCellBorder(index === 0, "#fb923c", true, false),
                 }}
               >
                 {row.mese}
@@ -17613,12 +17632,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                         : "#334155",
                     fontWeight: valueIndex === 0 ? 900 : 650,
                     fontVariantNumeric: "tabular-nums",
-                    borderTop: index === 0 ? "2px solid #fb923c" : undefined,
-                    borderBottom: index === 0 ? "2px solid #fb923c" : undefined,
-                    borderRight:
-                      index === 0 && valueIndex === 3
-                        ? "2px solid #fb923c"
-                        : undefined,
+                    ...punPsvSelectedCellBorder(index === 0, "#fb923c", false, valueIndex === 3),
                   }}
                 >
                   {Number(value || 0).toFixed(3)}
@@ -17673,7 +17687,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: 12 }}>
+      <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed", fontSize: 12 }}>
         <colgroup>
           <col style={{ width: "55%" }} />
           <col style={{ width: "45%" }} />
@@ -17701,9 +17715,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                 style={{
                   padding: "7px 9px",
                   fontWeight: index === 0 ? 900 : 700,
-                  borderTop: index === 0 ? "2px solid #38bdf8" : undefined,
-                  borderBottom: index === 0 ? "2px solid #38bdf8" : undefined,
-                  borderLeft: index === 0 ? "2px solid #38bdf8" : undefined,
+                  ...punPsvSelectedCellBorder(index === 0, "#38bdf8", true, false),
                 }}
               >
                 {row.mese}
@@ -17715,9 +17727,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                   color: index === 0 ? "#0369a1" : "#0284c7",
                   fontWeight: 900,
                   fontVariantNumeric: "tabular-nums",
-                  borderTop: index === 0 ? "2px solid #38bdf8" : undefined,
-                  borderBottom: index === 0 ? "2px solid #38bdf8" : undefined,
-                  borderRight: index === 0 ? "2px solid #38bdf8" : undefined,
+                  ...punPsvSelectedCellBorder(index === 0, "#38bdf8", false, true),
                 }}
               >
                 {Number(row.psv || 0).toFixed(6)}
