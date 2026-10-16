@@ -17851,7 +17851,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPunAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
@@ -17903,7 +17903,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPsvAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
