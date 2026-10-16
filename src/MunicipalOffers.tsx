@@ -8,8 +8,36 @@ const inputStyle:React.CSSProperties={width:"100%",padding:"10px 12px",border:"1
 const fmt=(v:number,d=2)=>v.toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d});
 const docText=(pdf:jsPDF,text:string,x:number,y:number,width=170)=>{const lines=pdf.splitTextToSize(text,width);pdf.text(lines,x,y);return y+lines.length*5.2+5};
 async function savePdf(pdf:jsPDF,name:string){
+ const nativeFiles=(window as any).AndroidFiles;
+ if(nativeFiles&&typeof nativeFiles.savePdf==="function"){
+   try{
+     const data=pdf.output("datauristring");
+     const base64=data.slice(data.indexOf(",")+1);
+     nativeFiles.savePdf(base64,name);
+     return;
+   }catch(error){console.error("Salvataggio PDF nativo non riuscito",error);}
+ }
  const android=/Android/i.test(navigator.userAgent);
- if(android&&navigator.share){const file=new File([pdf.output("blob")],name,{type:"application/pdf"});try{if(!navigator.canShare||navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}catch(e){if(e instanceof DOMException&&e.name==="AbortError")return}}
+ if(android){
+   try{
+     const file=new File([pdf.output("blob")],name,{type:"application/pdf"});
+     if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+       await navigator.share({files:[file],title:name});
+       return;
+     }
+   }catch(error){
+     if(error instanceof DOMException&&error.name==="AbortError")return;
+     console.warn("Condivisione PDF non disponibile",error);
+   }
+   const blob=pdf.output("blob");
+   const url=URL.createObjectURL(blob);
+   const link=document.createElement("a");
+   link.href=url;link.download=name;link.style.display="none";
+   document.body.appendChild(link);link.click();link.remove();
+   window.setTimeout(()=>URL.revokeObjectURL(url),120000);
+   alert("Se il PDF non viene salvato dall'APK, apri la webapp in Chrome per scaricarlo.");
+   return;
+ }
  pdf.save(name);
 }
 export default function MunicipalOffers(){
