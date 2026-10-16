@@ -12232,7 +12232,7 @@ function getAdminDashboardPermissions(profile: AdminProfile | null): Set<string>
     return new Set(ADMIN_DASHBOARD_CHOICES.filter((item) => item.key !== "provvigioni").map((item) => item.key));
   }
   // Compatibilità con gli admin precedentemente limitati da "Tutte le schede".
-  return new Set(["energia", "gas", "report", "punpsvPublic", "ateco", "driveArchive", "reportAdmin"]);
+  return new Set(["energia", "gas", "report", "punpsvPublic", "ateco", "driveArchive", "reportAdmin", "municipalOffers"]);
 }
 
 function canAdminAccessTab(profile: AdminProfile | null, requestedTab: string): boolean {
