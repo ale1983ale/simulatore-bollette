@@ -1,3 +1,4 @@
+import MunicipalOffers from "./MunicipalOffers";
 import PunPsvMonitoringPanel from "./PunPsvMonitoringPanel";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
@@ -12206,6 +12207,7 @@ const ADMIN_DASHBOARD_CHOICES: Array<{ key: string; label: string }> = [
   { key: "report", label: "REPORT" },
   { key: "punpsvPublic", label: "PUN-PSV" },
   { key: "ateco", label: "ATECO" },
+  { key: "municipalOffers", label: "OFFERTE PER I COMUNI" },
   { key: "calendarAdmin", label: "CALENDARIO" },
   { key: "recruiting", label: "RECRUITING" },
   { key: "appointments", label: "APPUNTAMENTI" },
@@ -13348,6 +13350,7 @@ function AdminDashboard({
         {canShow("energia") && <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />}
         {canShow("gas") && <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />}
         {canShow("punpsvPublic") && <DashboardCard title="PUN-PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />}
+        {canShow("municipalOffers") && <DashboardCard title="OFFERTE PER I COMUNI" description="Comparazioni energia e gas e lettere commerciali." icon="🏛️" className="ge-card-energy" onClick={() => navigate("municipalOffers")} />}
         {canShow("ateco") && <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />}
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
@@ -16298,6 +16301,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
   ) : (
     <AgentDashboard navigate={navigateTo} />
   )
+) : tab === "municipalOffers" ? (
+  <MunicipalOffers />
 ) : tab === "energia" ? (
   <>
     <SectionHero
