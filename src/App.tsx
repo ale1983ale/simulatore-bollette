@@ -331,7 +331,7 @@ function getChartCoords(values: number[], width: number, height: number) {
 }
 /** Linea e cartiglio della media, comuni a vista normale, zoom e PDF. */
 function MarketAverageGuide({
-  label, average, values, color, background, decimals,
+  label, average, values, color, background, decimals, topPlacement = false,
 }: {
   label: string;
   average: number | null;
@@ -339,18 +339,19 @@ function MarketAverageGuide({
   color: string;
   background: string;
   decimals: number;
+  topPlacement?: boolean;
 }) {
   if (average === null || values.length < 12) return null;
   const y = marketAverageChartY(values, average);
   // Il cartiglio resta all'interno del grafico anche se la media e vicina
   // al minimo o al massimo della scala.
-  const boxY = y >= 95
+  const boxY = topPlacement ? -49 : (y >= 95
     ? Math.max(22, y - 65)
-    : Math.min(127, y + 18);
-  const boxX = 90;
+    : Math.min(127, y + 18));
+  const boxX = topPlacement ? 12 : 90;
   const boxWidth = 224;
   const boxHeight = 44;
-  const anchorX = 202;
+  const anchorX = boxX + boxWidth / 2;
   const lineStart = boxY > y ? boxY : boxY + boxHeight;
   const value = average.toFixed(decimals);
   return (
@@ -360,7 +361,7 @@ function MarketAverageGuide({
       <line x1="0" x2="760" y1={y} y2={y} stroke={color}
         strokeWidth="2.5" strokeDasharray="9 6" strokeLinecap="round" />
       <line x1={anchorX} x2={anchorX} y1={lineStart} y2={y}
-        stroke={color} strokeOpacity=".82" strokeWidth="1.3" />
+        stroke={color} strokeOpacity=".82" strokeWidth="1.5" strokeDasharray={topPlacement ? "6 4" : undefined} />
       <circle cx={anchorX} cy={y} r="4.5" fill={color} />
       <rect x={boxX} y={boxY} width={boxWidth} height={boxHeight} rx="8"
         fill={background} stroke={color} strokeWidth="1.4" />
@@ -14104,7 +14105,8 @@ export default function App() {
 
   const exportPunPsvPdf = async () => {
     try {
-      const canvas = await capturePunPsvPdfPage("both");
+      const mode = punPsvView === "pun" || punPsvView === "psv" ? punPsvView : "both";
+      const canvas = await capturePunPsvPdfPage(mode);
 
       const pdf = new jsPDF({
         orientation: "landscape",
@@ -14122,7 +14124,7 @@ export default function App() {
         .replace(/\s+/g, "-")
         .toUpperCase();
 
-      pdf.save(`Report-PUN-PSV-${meseNome}.pdf`);
+      pdf.save(`Report-${mode === "both" ? "PUN-PSV" : mode.toUpperCase()}-${meseNome}.pdf`);
     } catch (error) {
       console.error("PUN PSV PDF ERROR:", error);
       alert("Errore esportazione PDF");
@@ -16595,7 +16597,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                     </div>
         
                     <svg
-                      viewBox="0 0 760 240"
+                      viewBox="0 -55 760 295"
                       onClick={() => openExpandedMarketChart("pun")}
                       title="Apri grafico PUN"
                       style={{
@@ -16647,7 +16649,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
 
                       <MarketAverageGuide label="PUN medio ultimi 12 mesi"
                         average={punMean12} values={punValues}
-                        color="#ea580c" background="#fff1e6" decimals={3} />
+                        color="#ea580c" background="#fff1e6" topPlacement decimals={3} />
 
                       {punCoords.map((p, i) => {
                         const isSelected = i === selectedChartIndex;
@@ -16773,7 +16775,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                     </div>
         
                     <svg
-                      viewBox="0 0 760 240"
+                      viewBox="0 -55 760 295"
                       onClick={() => openExpandedMarketChart("psv")}
                       title="Apri grafico PSV"
                       style={{
@@ -16825,7 +16827,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
 
                       <MarketAverageGuide label="PSV medio ultimi 12 mesi"
                         average={psvMean12} values={psvValues}
-                        color="#0284c7" background="#eaf8ff" decimals={6} />
+                        color="#0284c7" background="#eaf8ff" topPlacement decimals={6} />
 
                       {psvCoords.map((p, i) => {
                         const isSelected = i === selectedChartIndex;
