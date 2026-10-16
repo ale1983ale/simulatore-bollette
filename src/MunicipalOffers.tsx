@@ -2,7 +2,7 @@ import React,{useState} from "react";
 import {jsPDF} from "jspdf";
 type Mode="comparison-energy"|"comparison-gas"|"letter-energy"|"letter-gas";
 const orange="#ff5200", navy="#112448";
-const number=(v:string)=>Number(v.replace(/\s/g,"").replace(/\./g,"").replace(",","."))||0;
+const number=(v:string)=>{const x=v.trim().replace(/\s/g,"");if(x.includes(",")&&x.includes("."))return Number(x.lastIndexOf(",")>x.lastIndexOf(".")?x.split(".").join("").replace(",","."):x.split(",").join(""))||0;return Number(x.replace(",","."))||0;};
 const money=(v:number)=>v.toLocaleString("it-IT",{style:"currency",currency:"EUR"});
 const inputStyle:React.CSSProperties={width:"100%",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:7,boxSizing:"border-box",fontSize:15};
 const fmt=(v:number,d=2)=>v.toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d});
