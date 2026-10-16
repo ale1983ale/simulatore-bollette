@@ -353,7 +353,7 @@ function MarketAverageGuide({
   const boxWidth = 224;
   const boxHeight = 44;
   const anchorX = topPlacement ? boxX + boxWidth : boxX + boxWidth / 2;
-  const lineStart = pdfHeader ? 0 : boxY > y ? boxY : boxY + boxHeight;
+  const lineStart = pdfHeader ? -94 : boxY > y ? boxY : boxY + boxHeight;
   const value = average.toFixed(decimals);
   return (
     <g role="img" aria-label={`${label}: ${value}`}>
@@ -17882,8 +17882,10 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <div style={{display:"flex",justifyContent:"flex-end",marginTop:12,marginBottom:22}}><div style={{minWidth:235,textAlign:"center",padding:"8px 14px",border:"1.5px solid #ea580c",borderRadius:9,background:"#fff1e6",color:"#ea580c",fontWeight:900,fontSize:13}}>PUN medio ultimi 12 mesi<div style={{fontSize:19}}>{punMean12 === null ? "—" : punMean12.toFixed(3)}</div></div></div>
-      <svg data-pdf-chart="PUN" viewBox="0 0 780 240" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 306, display: "block" }}>
+      <div style={{position:"relative",marginTop:18}}>
+      <div style={{position:"absolute",top:0,right:0,zIndex:1,display:"flex",justifyContent:"flex-end"}}><div style={{minWidth:235,textAlign:"center",padding:"8px 14px",border:"1.5px solid #ea580c",borderRadius:9,background:"#fff1e6",color:"#ea580c",fontWeight:900,fontSize:13}}>PUN medio ultimi 12 mesi<div style={{fontSize:19}}>{punMean12 === null ? "—" : punMean12.toFixed(3)}</div></div></div>
+      
+      <svg data-pdf-chart="PUN" viewBox="0 -110 780 350" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPunAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
@@ -17911,6 +17913,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           );
         })}
       </svg>
+      </div>
     </div>
 
     <div
@@ -17935,8 +17938,10 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <div style={{display:"flex",justifyContent:"flex-end",marginTop:12,marginBottom:22}}><div style={{minWidth:235,textAlign:"center",padding:"8px 14px",border:"1.5px solid #0284c7",borderRadius:9,background:"#eaf8ff",color:"#0284c7",fontWeight:900,fontSize:13}}>PSV medio ultimi 12 mesi<div style={{fontSize:19}}>{psvMean12 === null ? "—" : psvMean12.toFixed(6)}</div></div></div>
-      <svg data-pdf-chart="PSV" viewBox="0 0 780 240" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 306, display: "block" }}>
+      <div style={{position:"relative",marginTop:18}}>
+      <div style={{position:"absolute",top:0,right:0,zIndex:1,display:"flex",justifyContent:"flex-end"}}><div style={{minWidth:235,textAlign:"center",padding:"8px 14px",border:"1.5px solid #0284c7",borderRadius:9,background:"#eaf8ff",color:"#0284c7",fontWeight:900,fontSize:13}}>PSV medio ultimi 12 mesi<div style={{fontSize:19}}>{psvMean12 === null ? "—" : psvMean12.toFixed(6)}</div></div></div>
+      
+      <svg data-pdf-chart="PSV" viewBox="0 -110 780 350" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPsvAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
@@ -17964,6 +17969,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           );
         })}
       </svg>
+      </div>
     </div>
   </div>
 </div>
