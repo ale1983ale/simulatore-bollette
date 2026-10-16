@@ -331,7 +331,7 @@ function getChartCoords(values: number[], width: number, height: number) {
 }
 /** Linea e cartiglio della media, comuni a vista normale, zoom e PDF. */
 function MarketAverageGuide({
-  label, average, values, color, background, decimals, topPlacement = false,
+  label, average, values, color, background, decimals, topPlacement = false, pdfHeader = false,
 }: {
   label: string;
   average: number | null;
@@ -340,6 +340,7 @@ function MarketAverageGuide({
   background: string;
   decimals: number;
   topPlacement?: boolean;
+  pdfHeader?: boolean;
 }) {
   if (average === null || values.length < 12) return null;
   const y = marketAverageChartY(values, average);
@@ -352,7 +353,7 @@ function MarketAverageGuide({
   const boxWidth = 224;
   const boxHeight = 44;
   const anchorX = topPlacement ? boxX + boxWidth : boxX + boxWidth / 2;
-  const lineStart = boxY > y ? boxY : boxY + boxHeight;
+  const lineStart = pdfHeader ? 0 : boxY > y ? boxY : boxY + boxHeight;
   const value = average.toFixed(decimals);
   return (
     <g role="img" aria-label={`${label}: ${value}`}>
@@ -363,12 +364,12 @@ function MarketAverageGuide({
       <line x1={anchorX} x2={anchorX} y1={lineStart} y2={y}
         stroke={color} strokeOpacity=".82" strokeWidth="1.5" strokeDasharray={topPlacement ? "6 4" : undefined} />
       <circle cx={anchorX} cy={y} r="4.5" fill={color} />
-      <rect x={boxX} y={boxY} width={boxWidth} height={boxHeight} rx="8"
-        fill={background} stroke={color} strokeWidth="1.4" />
-      <text x={boxX + boxWidth / 2} y={boxY + 17} textAnchor="middle"
-        fill={color} fontSize="12" fontWeight="800">{label}</text>
-      <text x={boxX + boxWidth / 2} y={boxY + 35} textAnchor="middle"
-        fill={color} fontSize="17" fontWeight="900">{value}</text>
+      {!pdfHeader && <rect x={boxX} y={boxY} width={boxWidth} height={boxHeight} rx="8"
+        fill={background} stroke={color} strokeWidth="1.4" />}
+      {!pdfHeader && <text x={boxX + boxWidth / 2} y={boxY + 17} textAnchor="middle"
+        fill={color} fontSize="12" fontWeight="800">{label}</text>}
+      {!pdfHeader && <text x={boxX + boxWidth / 2} y={boxY + 35} textAnchor="middle"
+        fill={color} fontSize="17" fontWeight="900">{value}</text>}
     </g>
   );
 }
@@ -17881,7 +17882,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:12,marginBottom:22}}><div style={{minWidth:235,textAlign:"center",padding:"8px 14px",border:"1.5px solid #ea580c",borderRadius:9,background:"#fff1e6",color:"#ea580c",fontWeight:900,fontSize:13}}>PUN medio ultimi 12 mesi<div style={{fontSize:19}}>{punMean12 === null ? "—" : punMean12.toFixed(3)}</div></div></div>
+      <svg data-pdf-chart="PUN" viewBox="0 0 780 240" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPunAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
@@ -17893,7 +17895,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         <polyline fill="none" stroke="#f97316" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" points={punPolyline} />
         <MarketAverageGuide label="PUN medio ultimi 12 mesi"
           average={punMean12} values={punValues}
-          color="#ea580c" background="#fff1e6" topPlacement decimals={3} />
+          color="#ea580c" background="#fff1e6" topPlacement pdfHeader decimals={3} />
         {punCoords.map((p,i) => {
           const isLast=i===punCoords.length-1;
           return (
@@ -17933,7 +17935,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:12,marginBottom:22}}><div style={{minWidth:235,textAlign:"center",padding:"8px 14px",border:"1.5px solid #0284c7",borderRadius:9,background:"#eaf8ff",color:"#0284c7",fontWeight:900,fontSize:13}}>PSV medio ultimi 12 mesi<div style={{fontSize:19}}>{psvMean12 === null ? "—" : psvMean12.toFixed(6)}</div></div></div>
+      <svg data-pdf-chart="PSV" viewBox="0 0 780 240" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPsvAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
@@ -17945,7 +17948,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         <polyline fill="none" stroke="#0ea5e9" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" points={psvPolyline} />
         <MarketAverageGuide label="PSV medio ultimi 12 mesi"
           average={psvMean12} values={psvValues}
-          color="#0284c7" background="#eaf8ff" topPlacement decimals={6} />
+          color="#0284c7" background="#eaf8ff" topPlacement pdfHeader decimals={6} />
         {psvCoords.map((p,i) => {
           const isLast=i===psvCoords.length-1;
           return (
