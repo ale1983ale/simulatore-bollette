@@ -348,10 +348,10 @@ function MarketAverageGuide({
   const boxY = topPlacement ? -49 : (y >= 95
     ? Math.max(22, y - 65)
     : Math.min(127, y + 18));
-  const boxX = topPlacement ? 12 : 90;
+  const boxX = topPlacement ? 530 : 90;
   const boxWidth = 224;
   const boxHeight = 44;
-  const anchorX = boxX + boxWidth / 2;
+  const anchorX = topPlacement ? boxX + boxWidth : boxX + boxWidth / 2;
   const lineStart = boxY > y ? boxY : boxY + boxHeight;
   const value = average.toFixed(decimals);
   return (
@@ -16597,7 +16597,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                     </div>
         
                     <svg
-                      viewBox="0 -55 760 295"
+                      viewBox="0 -55 780 295"
                       onClick={() => openExpandedMarketChart("pun")}
                       title="Apri grafico PUN"
                       style={{
@@ -16775,7 +16775,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                     </div>
         
                     <svg
-                      viewBox="0 -55 760 295"
+                      viewBox="0 -55 780 295"
                       onClick={() => openExpandedMarketChart("psv")}
                       title="Apri grafico PSV"
                       style={{
@@ -17393,7 +17393,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
 
         <svg
-          viewBox="0 0 760 240"
+          viewBox="0 -55 780 295"
           style={{
             width: "100%",
             height: "min(620px, 64vh)",
@@ -17466,11 +17466,11 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           {expandedMarketChart === "pun" ? (
             <MarketAverageGuide label="PUN medio ultimi 12 mesi"
               average={punMean12} values={punValues}
-              color="#ea580c" background="#fff1e6" decimals={3} />
+              color="#ea580c" background="#fff1e6" topPlacement decimals={3} />
           ) : (
             <MarketAverageGuide label="PSV medio ultimi 12 mesi"
               average={psvMean12} values={psvValues}
-              color="#0284c7" background="#eaf8ff" decimals={6} />
+              color="#0284c7" background="#eaf8ff" topPlacement decimals={6} />
           )}
 
           {(expandedMarketChart === "pun"
@@ -17851,7 +17851,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -55 760 295" style={{ width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -55 780 295" style={{ width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPunAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
@@ -17903,7 +17903,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -55 760 295" style={{ width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -55 780 295" style={{ width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPsvAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
