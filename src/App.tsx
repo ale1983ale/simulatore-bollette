@@ -17851,7 +17851,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 0 760 240" style={{ width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -55 760 295" style={{ width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPunAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
@@ -17863,7 +17863,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         <polyline fill="none" stroke="#f97316" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" points={punPolyline} />
         <MarketAverageGuide label="PUN medio ultimi 12 mesi"
           average={punMean12} values={punValues}
-          color="#ea580c" background="#fff1e6" decimals={3} />
+          color="#ea580c" background="#fff1e6" topPlacement decimals={3} />
         {punCoords.map((p,i) => {
           const isLast=i===punCoords.length-1;
           return (
@@ -17903,7 +17903,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 0 760 240" style={{ width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -55 760 295" style={{ width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPsvAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
@@ -17915,7 +17915,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         <polyline fill="none" stroke="#0ea5e9" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" points={psvPolyline} />
         <MarketAverageGuide label="PSV medio ultimi 12 mesi"
           average={psvMean12} values={psvValues}
-          color="#0284c7" background="#eaf8ff" decimals={6} />
+          color="#0284c7" background="#eaf8ff" topPlacement decimals={6} />
         {psvCoords.map((p,i) => {
           const isLast=i===psvCoords.length-1;
           return (
