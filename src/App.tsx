@@ -13350,10 +13350,10 @@ function AdminDashboard({
         {canShow("energia") && <DashboardCard title="ENERGIA" description="Simula una fattura di energia elettrica." icon="⚡" className="ge-card-energy" spanMobile onClick={() => navigate("energia")} />}
         {canShow("gas") && <DashboardCard title="GAS" description="Simula una fattura di gas metano." icon="🔥" className="ge-card-gas" spanMobile onClick={() => navigate("gas")} />}
         {canShow("punpsvPublic") && <DashboardCard title="PUN-PSV" description="Analizza e monitora i dati PUN e PSV." icon="📈" className="ge-card-pun" onClick={() => navigate("punpsvPublic")} />}
-        {canShow("municipalOffers") && <DashboardCard title="OFFERTE PER I COMUNI" description="Comparazioni energia e gas e lettere commerciali." icon="🏛️" className="ge-card-energy" onClick={() => navigate("municipalOffers")} />}
         {canShow("ateco") && <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />}
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
+        {canShow("municipalOffers") && <DashboardCard title="OFFERTE PER I COMUNI" description="Comparazioni energia e gas e lettere commerciali." icon="🏛️" className="ge-card-energy" compact onClick={() => navigate("municipalOffers")} />}
         {showReportCard && canShow("report") && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
         {canShow("calendarAdmin") && <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />}
         {canShow("recruiting") && <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />}
