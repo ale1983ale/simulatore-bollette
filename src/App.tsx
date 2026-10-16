@@ -14103,6 +14103,38 @@ export default function App() {
     });
   };
 
+  const savePunPsvPdf = async (pdf: jsPDF, filename: string) => {
+    // Android WebView often ignores jsPDF's synthetic download click.
+    // Prefer the Android share sheet (Save to Files/Drive) where supported.
+    const android = /Android/i.test(navigator.userAgent);
+    if (!android) {
+      pdf.save(filename);
+      return;
+    }
+    const blob = pdf.output("blob");
+    const file = new File([blob], filename, { type: "application/pdf" });
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+      try {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.warn("Android PDF share unavailable, trying browser download", error);
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Keep the URL alive long enough for Android's download manager to access it.
+    window.setTimeout(() => URL.revokeObjectURL(url), 120000);
+    alert("PDF generato. Se il download non parte nell'APK, apri la webapp in Chrome e ripeti il salvataggio.");
+  };
+
   const exportPunPsvPdf = async () => {
     try {
       const mode = punPsvView === "pun" || punPsvView === "psv" ? punPsvView : "both";
@@ -14124,7 +14156,7 @@ export default function App() {
         .replace(/\s+/g, "-")
         .toUpperCase();
 
-      pdf.save(`Report-${mode === "both" ? "PUN-PSV" : mode.toUpperCase()}-${meseNome}.pdf`);
+      await savePunPsvPdf(pdf, `Report-${mode === "both" ? "PUN-PSV" : mode.toUpperCase()}-${meseNome}.pdf`);
     } catch (error) {
       console.error("PUN PSV PDF ERROR:", error);
       alert("Errore esportazione PDF");
@@ -14171,9 +14203,7 @@ export default function App() {
         .replace(/\s+/g, "-")
         .toUpperCase();
 
-      pdf.save(
-        `Report-PUN-PSV-3-Pagine-${meseNome}.pdf`
-      );
+      await savePunPsvPdf(pdf, `Report-PUN-PSV-3-Pagine-${meseNome}.pdf`);
     } catch (error) {
       console.error("PUN PSV 3 PAGE PDF ERROR:", error);
       alert("Errore esportazione PDF a 3 pagine");
