@@ -345,7 +345,7 @@ function MarketAverageGuide({
   const y = marketAverageChartY(values, average);
   // Il cartiglio resta all'interno del grafico anche se la media e vicina
   // al minimo o al massimo della scala.
-  const boxY = topPlacement ? -49 : (y >= 95
+  const boxY = topPlacement ? -105 : (y >= 95
     ? Math.max(22, y - 65)
     : Math.min(127, y + 18));
   const boxX = topPlacement ? 530 : 90;
@@ -16597,10 +16597,10 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                     </div>
         
                     <svg
-                      viewBox="0 -55 780 295"
+                      viewBox="0 -110 780 350"
                       onClick={() => openExpandedMarketChart("pun")}
                       title="Apri grafico PUN"
-                      style={{
+                      style={{ marginTop: -55, marginBottom: 55,
                         width: "100%",
                         height: 280,
                         display: "block",
@@ -16775,10 +16775,10 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
                     </div>
         
                     <svg
-                      viewBox="0 -55 780 295"
+                      viewBox="0 -110 780 350"
                       onClick={() => openExpandedMarketChart("psv")}
                       title="Apri grafico PSV"
-                      style={{
+                      style={{ marginTop: -55, marginBottom: 55,
                         width: "100%",
                         height: 280,
                         display: "block",
@@ -17393,8 +17393,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
 
         <svg
-          viewBox="0 -55 780 295"
-          style={{
+          viewBox="0 -110 780 350"
+          style={{ marginTop: -55, marginBottom: 55,
             width: "100%",
             height: "min(620px, 64vh)",
             minHeight: 360,
@@ -17851,7 +17851,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -55 780 295" style={{ width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPunAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fb923c" stopOpacity="0.38" />
@@ -17903,7 +17903,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         </div>
       </div>
 
-      <svg viewBox="0 -55 780 295" style={{ width: "100%", height: 306, display: "block" }}>
+      <svg viewBox="0 -110 780 350" style={{ marginTop: -55, marginBottom: 55, marginTop: -55, marginBottom: 55, width: "100%", height: 306, display: "block" }}>
         <defs>
           <linearGradient id="pdfPsvAreaGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.38" />
