@@ -17881,6 +17881,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </span>
         </div>
         <div style={{minWidth:210,textAlign:"center",padding:"5px 10px",border:"1.5px solid #ea580c",borderRadius:8,background:"#fff1e6",color:"#ea580c",fontWeight:900,fontSize:12}}>PUN medio ultimi 12 mesi<div style={{fontSize:16}}>{punMean12 === null ? "—" : punMean12.toFixed(3)}</div></div>
+        </div>
       </div>
 
       <svg data-pdf-chart="PUN" viewBox="0 0 780 240" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 280, display: "block" }}>
@@ -17935,6 +17936,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </span>
         </div>
         <div style={{minWidth:210,textAlign:"center",padding:"5px 10px",border:"1.5px solid #0284c7",borderRadius:8,background:"#eaf8ff",color:"#0284c7",fontWeight:900,fontSize:12}}>PSV medio ultimi 12 mesi<div style={{fontSize:16}}>{psvMean12 === null ? "—" : psvMean12.toFixed(6)}</div></div>
+        </div>
       </div>
 
       <svg data-pdf-chart="PSV" viewBox="0 0 780 240" style={{ marginTop: 0, marginBottom: 0, width: "100%", height: 280, display: "block" }}>
