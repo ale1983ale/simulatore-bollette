@@ -396,6 +396,12 @@ select optgroup {
   background: linear-gradient(135deg, #effff4 0%, #d8fbe4 52%, #baf0cb 100%);
 }
 
+.ge-card-comuni {
+  color: #9a4800;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 52%, #fed7aa 100%);
+  border-color: #fdba74;
+}
+
 .ge-card-personale {
   color: #5b21b6;
   background: linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 100%);
