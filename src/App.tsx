@@ -13353,7 +13353,6 @@ function AdminDashboard({
         {canShow("ateco") && <DashboardCard title="ATECO" description="Analizza i dati ATECO." icon="🧾" className="ge-card-ateco" onClick={() => navigate("ateco")} />}
       </div>
       <div className="ge-dashboard-secondary ge-dashboard-secondary--admin">
-        {canShow("municipalOffers") && <DashboardCard title="OFFERTE PER I COMUNI" description="Comparazioni energia e gas e lettere commerciali." icon="🏛️" className="ge-card-energy" compact onClick={() => navigate("municipalOffers")} />}
         {showReportCard && canShow("report") && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
         {canShow("calendarAdmin") && <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />}
         {canShow("recruiting") && <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />}
@@ -13365,6 +13364,7 @@ function AdminDashboard({
         {canShow("reportAdmin") && <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />}
         {canShow("recruitingWaiting") && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
         {canShow("personale") && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
+        {canShow("municipalOffers") && <DashboardCard title="OFFERTE PER I COMUNI" description="Comparazioni energia e gas e lettere commerciali." icon="🏛️" className="ge-card-comuni" compact onClick={() => navigate("municipalOffers")} />}
       </div>
     </div>
   );
