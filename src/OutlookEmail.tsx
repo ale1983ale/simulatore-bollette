@@ -373,6 +373,8 @@ export default function OutlookEmail() {
   const [excludedUnmatchedKeys, setExcludedUnmatchedKeys] = useState<Set<string>>(new Set());
   const [unmatchedDirectEmails, setUnmatchedDirectEmails] = useState<Record<string, string>>({});
   const [editingUnmatchedEmailKey, setEditingUnmatchedEmailKey] = useState<string | null>(null);
+  const [bulkUnmatchedEmail,setBulkUnmatchedEmail]=useState("");
+  const [bulkUnmatchedOpen,setBulkUnmatchedOpen]=useState(false);
 
   useEffect(() => {
     const onOpenEmail = (event: Event) => {
@@ -1329,6 +1331,21 @@ export default function OutlookEmail() {
     });
   };
 
+  const bulkExcludeUnmatched=()=>{
+    setExcludedUnmatchedKeys(current=>new Set([...current,...emailUnmatchedSummary.map(item=>item.key)]));
+    setEditingUnmatchedEmailKey(null);
+    setNotice("Tutti i file non abbinati sono stati esclusi dall'invio. Puoi ripristinarli singolarmente.");
+  };
+  const bulkAssignUnmatched=()=>{
+    const email=bulkUnmatchedEmail.trim();
+    if(!isValidEmail(email)){setNotice("Inserisci un indirizzo email valido per l'assegnazione collettiva.");return;}
+    const keys=emailUnmatchedSummary.map(item=>item.key);
+    setUnmatchedDirectEmails(current=>({...current,...Object.fromEntries(keys.map(key=>[key,email]))}));
+    setExcludedUnmatchedKeys(current=>{const next=new Set(current);keys.forEach(key=>next.delete(key));return next;});
+    setBulkUnmatchedOpen(false);
+    setNotice(keys.length+" file non abbinati assegnati a "+email+".");
+  };
+
   const createLocalDrafts = async () => {
     setNotice("");
     if (!subject.trim()) return setNotice("Inserisci l'oggetto della mail.");
@@ -1906,6 +1923,23 @@ export default function OutlookEmail() {
                       </span>
                     </div>
 
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+                      <button type="button" onClick={bulkExcludeUnmatched} disabled={!emailUnmatchedSummary.some(item=>!excludedUnmatchedKeys.has(item.key))}
+                        style={{...button,background:"#fee2e2",color:"#991b1b",padding:"9px 12px",fontWeight:800}}>
+                        ✕ ELIMINA TUTTI
+                      </button>
+                      <button type="button" onClick={()=>setBulkUnmatchedOpen(open=>!open)}
+                        style={{...button,background:"#dbeafe",color:"#1d4ed8",padding:"9px 12px",fontWeight:800}}>
+                        ✉ ASSEGNA A TUTTI LA STESSA EMAIL
+                      </button>
+                    </div>
+                    {bulkUnmatchedOpen && <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",background:"white",padding:10,borderRadius:10,marginBottom:12}}>
+                      <input type="email" aria-label="Email per tutti i file non abbinati" value={bulkUnmatchedEmail}
+                        onChange={event=>setBulkUnmatchedEmail(event.target.value)}
+                        onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();bulkAssignUnmatched();}}}
+                        placeholder="Indirizzo email unico" style={{padding:9,border:"1px solid #cbd5e1",borderRadius:8,minWidth:230,flex:1}}/>
+                      <button type="button" onClick={bulkAssignUnmatched} style={{...button,background:"#16a34a",color:"white",padding:"9px 12px"}}>CONFERMA ASSEGNAZIONE</button>
+                    </div>}
                     {fileMode === "single" && (
                       <div
                         style={{
