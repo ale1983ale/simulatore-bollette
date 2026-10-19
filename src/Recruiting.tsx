@@ -148,6 +148,7 @@ type Candidate = {
   longitude: number | null;
   waitingRoomNew: boolean;
   isFavorite: boolean;
+  isHighlighted?: boolean;
 };
 
 type ContactNote = {
@@ -974,6 +975,7 @@ function candidateFromRow(row: any): Candidate {
         : Number(row.longitude),
     waitingRoomNew: Boolean(row.waiting_room_new),
     isFavorite: Boolean(row.is_favorite),
+    isHighlighted: Boolean(row.is_highlighted),
   };
 }
 
@@ -1411,6 +1413,7 @@ export default function Recruiting({
   const [forwardedToFilter, setForwardedToFilter] = useState("");
   const [calledByMeFilter, setCalledByMeFilter] = useState<"" | "SI" | "NO">("");
   const [favoriteFilter, setFavoriteFilter] = useState<"" | "SI">("");
+  const [highlightFilter,setHighlightFilter]=useState<""|"SI">("");
   const [lockedCandidateOrder, setLockedCandidateOrder] =
     useState<string[] | null>(null);
   const [mobileExtraFiltersOpen, setMobileExtraFiltersOpen] =
@@ -1760,7 +1763,7 @@ export default function Recruiting({
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,referrer,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new,is_favorite")
+        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,referrer,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new,is_favorite,is_highlighted")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -2921,6 +2924,7 @@ export default function Recruiting({
       }
 
       if (favoriteFilter === "SI" && !candidate.isFavorite) return false;
+      if (highlightFilter === "SI" && !candidate.isHighlighted) return false;
 
       const calledByMe = calledByMeCandidateIds.has(candidate.id);
       if (calledByMeFilter === "SI" && !calledByMe) return false;
@@ -3029,6 +3033,7 @@ export default function Recruiting({
     excludedStatusFilters,
     forwardedToFilter,
     favoriteFilter,
+    highlightFilter,
     calledByMeFilter,
     calledByMeCandidateIds,
     lockedCandidateOrder,
@@ -3520,6 +3525,24 @@ export default function Recruiting({
         "Errore nel salvataggio del preferito: " +
           (error?.message || error)
       );
+    }
+  };
+
+  const toggleCandidateHighlight=async(candidate:Candidate)=>{
+    if(!ctx)return;
+    const nextValue=!candidate.isHighlighted;
+    setCandidates(current=>current.map(item=>item.id===candidate.id?{...item,isHighlighted:nextValue}:item));
+    setAllCandidates(current=>current.map(item=>item.id===candidate.id?{...item,isHighlighted:nextValue}:item));
+    try{
+      const {error}=await ctx.client.from("recruiting_candidates")
+        .update({is_highlighted:nextValue,updated_at:new Date().toISOString()})
+        .eq("id",candidate.id).eq("owner_key",ctx.ownerKey);
+      if(error)throw error;
+      setMessage(nextValue?"Contatto evidenziato con il fulmine.":"Evidenza fulmine rimossa.");
+    }catch(error:any){
+      setCandidates(current=>current.map(item=>item.id===candidate.id?{...item,isHighlighted:candidate.isHighlighted}:item));
+      setAllCandidates(current=>current.map(item=>item.id===candidate.id?{...item,isHighlighted:candidate.isHighlighted}:item));
+      setMessage("Errore nel salvataggio dell'evidenza: "+(error?.message||error));
     }
   };
 
@@ -8469,6 +8492,14 @@ export default function Recruiting({
                   >
                     {favoriteFilter === "SI" ? "★" : "☆"}
                   </button>
+                  <button type="button"
+                    title={highlightFilter==="SI"?"Mostra tutti i nominativi":"Mostra solo i contatti con fulmine"}
+                    aria-label={highlightFilter==="SI"?"Mostra tutti i nominativi":"Mostra solo i contatti evidenziati"}
+                    aria-pressed={highlightFilter==="SI"}
+                    onClick={()=>setHighlightFilter(current=>current==="SI"?"":"SI")}
+                    style={{width:36,height:36,padding:0,borderRadius:999,border:highlightFilter==="SI"?"2px solid #7c3aed":"1px solid #cbd5e1",background:highlightFilter==="SI"?"#ede9fe":"#fff",color:highlightFilter==="SI"?"#7c3aed":"#94a3b8",fontSize:22,cursor:"pointer",display:"grid",placeItems:"center"}}>
+                    ⚡
+                  </button>
                 </div>
 
                 <div className="recruiting-contact-list-controls">
@@ -8724,6 +8755,13 @@ export default function Recruiting({
                           }}
                         >
                           {candidate.isFavorite ? "★" : "☆"}
+                        </button>
+                        <button type="button"
+                          title={candidate.isHighlighted?"Rimuovi evidenza temporanea":"Evidenzia temporaneamente"}
+                          aria-label={(candidate.isHighlighted?"Rimuovi fulmine da ":"Aggiungi fulmine a ")+candidate.fullName}
+                          onClick={event=>{event.stopPropagation();void toggleCandidateHighlight(candidate);}}
+                          style={{position:"absolute",top:7,right:45,zIndex:3,width:32,height:32,padding:0,borderRadius:999,border:candidate.isHighlighted?"1px solid #7c3aed":"1px solid #cbd5e1",background:candidate.isHighlighted?"#ede9fe":"#fff",color:candidate.isHighlighted?"#7c3aed":"#94a3b8",fontSize:19,cursor:"pointer"}}>
+                          ⚡
                         </button>
 
                         <div
@@ -9275,6 +9313,13 @@ export default function Recruiting({
                           {selectedCandidate.isFavorite
                             ? "★ PREFERITO"
                             : "☆ PREFERITO"}
+                        </button>
+
+                        <button type="button"
+                          onClick={()=>void toggleCandidateHighlight(selectedCandidate)}
+                          title={selectedCandidate.isHighlighted?"Rimuovi evidenza temporanea":"Evidenzia temporaneamente"}
+                          style={{...buttonStyle,padding:"7px 10px",minWidth:42,background:selectedCandidate.isHighlighted?"#ede9fe":"#f8fafc",color:selectedCandidate.isHighlighted?"#7c3aed":"#64748b",border:selectedCandidate.isHighlighted?"1px solid #7c3aed":"1px solid #cbd5e1",fontSize:16}}>
+                          ⚡ {selectedCandidate.isHighlighted?"EVIDENZIATO":"EVIDENZIA"}
                         </button>
 
                         <button
