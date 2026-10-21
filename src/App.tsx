@@ -10280,7 +10280,7 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
 
     const { error } = await supabase
       .from("reports")
-      .upsert(payload, { onConflict: "agent_id,report_date" });
+      .insert(payload);
 
     setSaving(false);
 
@@ -10801,19 +10801,6 @@ function ReportAdmin({
     }
     setSavingReportEdit(true);
     try {
-      if (newReportDate !== String(report.report_date || "").slice(0, 10)) {
-        const { data: conflictingReport, error: conflictError } = await supabase
-          .from("reports")
-          .select("id")
-          .eq("agent_id", report.agent_id)
-          .eq("report_date", newReportDate)
-          .neq("id", report.id)
-          .limit(1);
-        if (conflictError) throw conflictError;
-        if (conflictingReport?.length) {
-          throw new Error("Questo agente ha già un report nella data selezionata. Scegli un'altra data.");
-        }
-      }
       let query = supabase.from("reports").update(updates).eq("id", report.id);
       if (adminProfile?.role !== "super_admin") query = query.eq("owner_admin_id", adminProfile?.id);
       else if (ownerFilter === "MINE") query = query.eq("owner_admin_id", adminProfile?.id);
