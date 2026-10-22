@@ -951,9 +951,17 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [exportingPdf, setExportingPdf] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
   const [archiveSection, setArchiveSection] = useState<
-    "recessi" | "produzione" | "attivo" | "reportAdmin" | "zone"
+    "recessi" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone"
   >("recessi");
 
+  const [detailAgent, setDetailAgent] = useState("");
+  const [detailRegion, setDetailRegion] = useState("");
+  const [detailProvince, setDetailProvince] = useState("");
+  const [detailMonth, setDetailMonth] = useState("");
+  const [detailCommodity, setDetailCommodity] = useState("");
+  const [detailSearch, setDetailSearch] = useState("");
+  const [detailExpanded, setDetailExpanded] = useState<string | null>(null);
+  const [detailLimit, setDetailLimit] = useState(100);
   const [commodities, setCommodities] = useState<string[]>([]);
   const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
   const [agentsSelected, setAgentsSelected] = useState<string[]>([]);
@@ -1202,6 +1210,24 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name, "it"));
   }, [rows]);
+
+  const detailRows = useMemo(() => rows.filter(row => {
+    const geo = deriveLegalSeatGeo(row.raw);
+    if (detailAgent && row.agente !== detailAgent) return false;
+    if (detailRegion && geo.region !== detailRegion) return false;
+    if (detailProvince && geo.provinceCode !== detailProvince) return false;
+    if (detailMonth && row.monthKey !== detailMonth) return false;
+    if (detailCommodity && row.commodity !== detailCommodity) return false;
+    if (detailSearch) {
+      const needle = detailSearch.toLocaleLowerCase("it").trim();
+      const haystack = [row.denominazione, row.podPdr, row.agente, row.tipoCliente,
+        row.validita, row.sourceFiles.join(" "), geo.region, geo.provinceLabel,
+        ...Object.values(row.raw)].join(" ").toLocaleLowerCase("it");
+      if (!haystack.includes(needle)) return false;
+    }
+    return true;
+  }).sort((a,b) => b.monthKey.localeCompare(a.monthKey) || a.denominazione.localeCompare(b.denominazione, "it")),
+  [rows, detailAgent, detailRegion, detailProvince, detailMonth, detailCommodity, detailSearch]);
 
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
@@ -1730,6 +1756,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                 ? "PRODUZIONE · storico report e zone commerciali."
                 : archiveSection === "attivo"
                 ? "ATTIVO PRODUZIONE · confronto produzione / recessi per agente."
+                : archiveSection === "dettaglioRecessi"
+                ? "DETTAGLIO RECESSI · elenco completo dei singoli recessi archiviati."
                 : archiveSection === "reportAdmin"
                 ? "REPORT ADMIN · stessa vista dei report agenti, con dati sempre aggiornati."
                 : "AGENTI / ZONE · assegnazione territoriale degli agenti della produzione."}
@@ -1805,6 +1833,13 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         >
           ATTIVO PRODUZIONE
         </button>
+
+        <button type="button" onClick={() => setArchiveSection("dettaglioRecessi")}
+          style={{ padding: "10px 18px", borderRadius: 9,
+            border: archiveSection === "dettaglioRecessi" ? "1px solid #0f172a" : "1px solid #cbd5e1",
+            background: archiveSection === "dettaglioRecessi" ? "#0f172a" : "white",
+            color: archiveSection === "dettaglioRecessi" ? "white" : "#0f172a",
+            fontWeight: 900, cursor: "pointer" }}>DETTAGLIO RECESSI</button>
 
         {reportAdminPanel && (
           <button
@@ -2420,6 +2455,73 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         )}
       </div>
         </>
+      ) : archiveSection === "dettaglioRecessi" ? (
+        <div style={cardStyle}>
+          <h3 style={{ marginTop: 0 }}>DETTAGLIO RECESSI · ELENCO NOMINATIVI</h3>
+          <div style={{ color: "#64748b", marginBottom: 14, fontSize: 13 }}>
+            Tutti i recessi salvati nell'archivio, con filtri indipendenti e dettaglio originale di ogni riga.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 10, marginBottom: 14 }}>
+            <label>RICERCA GENERALE<input style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", boxSizing: "border-box" }} placeholder="Cliente, POD/PDR, note..." value={detailSearch} onChange={e => {setDetailSearch(e.target.value);setDetailLimit(100);}} /></label>
+            {([
+              ["AGENTE", detailAgent, setDetailAgent, agents.map(x=>[x,x])],
+              ["REGIONE", detailRegion, setDetailRegion, regions.map(x=>[x,x])],
+              ["PROVINCIA / ZONA", detailProvince, setDetailProvince, provinces.map(x=>[x.code,x.label])],
+              ["MESE RECESSO", detailMonth, setDetailMonth, months.map(x=>[x,x])],
+              ["FORNITURA", detailCommodity, setDetailCommodity, [["LUCE","LUCE"],["GAS","GAS"],["N/D","N/D"]]]
+            ] as Array<[string,string,(value:string)=>void,string[][]]>).map(([label,value,setValue,options])=>(
+              <label key={label}>{label}<select value={value} onChange={e=>{setValue(e.target.value);setDetailLimit(100);}}
+                style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", boxSizing: "border-box" }}>
+                <option value="">TUTTI</option>{options.map(([key,text])=><option key={key} value={key}>{text}</option>)}
+              </select></label>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+            <button type="button" onClick={()=>{setDetailSearch("");setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity("");setDetailLimit(100);}}
+              style={{ padding: "9px 14px", borderRadius: 9, border: "1px solid #cbd5e1", background: "white", cursor: "pointer", fontWeight: 800 }}>AZZERA FILTRI</button>
+            <strong>{detailRows.length.toLocaleString("it-IT")} recessi trovati</strong>
+            <span style={{ color: "#64748b", fontSize: 13 }}>su {rows.length.toLocaleString("it-IT")} archiviati</span>
+          </div>
+          <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 850, fontSize: 13 }}>
+              <thead style={{ background: "#f1f5f9" }}><tr>
+                {["MESE RECESSO","AGENTE","NOMINATIVO","POD / PDR","LUCE / GAS","CONSUMO","PROVINCIA","DETTAGLI"].map(label=>
+                  <th key={label} style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #cbd5e1" }}>{label}</th>)}
+              </tr></thead>
+              <tbody>{detailRows.slice(0,detailLimit).map(row=>{
+                const geo=deriveLegalSeatGeo(row.raw);
+                return <React.Fragment key={row.id}>
+                  <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: 9, whiteSpace: "nowrap" }}>{row.monthKey || "—"}</td>
+                    <td style={{ padding: 9 }}>{row.agente || "—"}</td>
+                    <td style={{ padding: 9, fontWeight: 750 }}>{row.denominazione || "—"}</td>
+                    <td style={{ padding: 9 }}>{row.podPdr || "—"}</td>
+                    <td style={{ padding: 9 }}>{row.commodity}</td>
+                    <td style={{ padding: 9 }}>{row.consumo === null ? "—" : row.consumo.toLocaleString("it-IT")}</td>
+                    <td style={{ padding: 9 }}>{geo.provinceLabel || geo.provinceCode || "—"}</td>
+                    <td style={{ padding: 9 }}><button type="button" onClick={()=>setDetailExpanded(v=>v===row.id?null:row.id)}
+                      style={{ border: "1px solid #bfdbfe", borderRadius: 8, padding: "7px 11px", background: "#eff6ff", color: "#1d4ed8", fontWeight: 800, cursor: "pointer" }}>
+                      {detailExpanded===row.id?"CHIUDI":"SCHEDA"}</button></td>
+                  </tr>
+                  {detailExpanded===row.id && <tr><td colSpan={8} style={{ padding: 14, background: "#f8fafc" }}>
+                    <strong>DATI ORIGINALI DEL RECESSO</strong>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 9, marginTop: 10 }}>
+                      {Object.entries(row.raw).map(([key,value])=><div key={key} style={{ overflowWrap: "anywhere" }}>
+                        <div style={{ color: "#64748b", fontSize: 11, fontWeight: 800 }}>{key}</div>
+                        <div>{String(value || "—")}</div>
+                      </div>)}
+                    </div>
+                  </td></tr>}
+                </React.Fragment>;
+              })}</tbody>
+            </table>
+          </div>
+          {detailRows.length>detailLimit && <button type="button" onClick={()=>setDetailLimit(v=>v+100)}
+            style={{ marginTop: 14, padding: "11px 18px", background: "#2563eb", color: "white", border: 0, borderRadius: 10, fontWeight: 800, cursor: "pointer" }}>
+            MOSTRA ALTRI 100 · {Math.min(detailLimit,detailRows.length)} di {detailRows.length}
+          </button>}
+          {!detailRows.length && <p>Nessun recesso corrisponde ai filtri selezionati.</p>}
+        </div>
       ) : archiveSection === "attivo" ? (
         <ActiveProduction />
       ) : archiveSection === "reportAdmin" && reportAdminPanel ? (
