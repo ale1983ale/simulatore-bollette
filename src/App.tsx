@@ -13396,8 +13396,10 @@ function AdminDashboard({
 
 function AgentDashboard({
   navigate,
+  productionAllowed,
 }: {
   navigate: DashboardNavigate;
+  productionAllowed: boolean;
 }) {
   return (
     <div className="ge-dashboard ge-dashboard--agent">
@@ -13454,6 +13456,17 @@ function AgentDashboard({
           spanMobile
           onClick={() => navigate("report")}
         />
+        {productionAllowed && (
+          <DashboardCard
+            title="PRODUZIONE"
+            description="Consulta i tuoi dati di produzione e recessi."
+            icon="📊"
+            className="ge-card-agent-dashboard-report"
+            compact
+            spanMobile
+            onClick={() => navigate("agentProduction")}
+          />
+        )}
       </div>
     </div>
   );
@@ -16255,9 +16268,6 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </button>
           )}
 
-          {!adminSession && agentSession && agentProductionAllowed && (
-            <button onClick={()=>navigateTo("agentProduction")} style={{...mainNavBtn,...(tab==="agentProduction"?activeBtn:{})}}>📊 PRODUZIONE</button>
-          )}
           {(!adminSession || canAdminAccessTab(adminProfile, "report")) && (
           <button
             onClick={() => navigateTo("report")}
@@ -16404,7 +16414,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
   adminSession ? (
     renderAdminContent()
   ) : (
-    <AgentDashboard navigate={navigateTo} />
+    <AgentDashboard navigate={navigateTo} productionAllowed={agentProductionAllowed} />
   )
 ) : tab === "municipalOffers" ? (
   <MunicipalOffers />
