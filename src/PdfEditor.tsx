@@ -75,10 +75,14 @@ export default function PdfEditor({base64,documentId,filename}:Props){
   return <text key={index} x={mark.x*1000} y={mark.y*1000} fill={mark.color} fontSize="25" fontWeight="bold">{mark.text}</text>;
  };
  return <div style={{display:"grid",gap:12,...(full?{position:"fixed" as const,inset:0,zIndex:30000,background:"#f8fafc",padding:10,overflow:"hidden",gridTemplateRows:"auto auto minmax(0,1fr) auto"}:{})}}>
-  <div style={{display:"flex",alignItems:"center",gap:6,padding:full?"6px 7px":"8px",background:full?"#172235":"#f1f5f9",borderRadius:12,minWidth:0,position:"relative",flexWrap:"nowrap"}}>
-    {!full&&<strong style={{flex:"1 1 auto",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📄 {filename} · {pages.length} pagine</strong>}
-    {!full&&<button type="button" style={{...toolButton,background:"#f97316",color:"white",padding:"9px 11px",flex:"0 0 auto"}} onClick={()=>{setFull(true);setMenu(null);setLens(null);}}>⛶</button>}
-    <div style={{display:"flex",flex:"1 1 auto",minWidth:0,gap:4,justifyContent:full?"space-between":"flex-end",alignItems:"center"}}>
+  <div style={{display:"flex",alignItems:"center",gap:6,padding:full?"6px 7px":"10px",background:full?"#172235":"#f1f5f9",borderRadius:12,minWidth:0,position:"relative",flexDirection:"column"}}>
+    {!full&&<div style={{display:"flex",width:"100%",alignItems:"center",gap:8,justifyContent:"space-between",minWidth:0}}>
+      <strong style={{fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>📄 {filename} · {pages.length} pagine</strong>
+      <button type="button" style={{...toolButton,background:"#f97316",color:"white",padding:"9px 12px",flex:"0 0 auto"}} onClick={()=>{setFull(true);setMenu(null);setLens(null);}}>⛶</button>
+    </div>}
+
+
+    <div style={{display:"grid",width:"100%",gridTemplateColumns:full?"repeat(7,minmax(0,1fr))":"repeat(4,minmax(0,1fr))",gap:full?5:8,alignItems:"center"}}>
       {([
        {id:"magnify",symbol:"🔎",name:"Lente",color:"#38bdf8"},
        {id:"pen",symbol:"🖊",name:"Pennarello",color:penColor},
@@ -87,17 +91,17 @@ export default function PdfEditor({base64,documentId,filename}:Props){
        {id:"undo",symbol:"↶",name:"Annulla",color:"#c4b5fd"},
        {id:"move",symbol:"✋",name:"Sposta",color:"#7dd3fc"},
        {id:"save",symbol:"💾",name:"Salva",color:"#86efac"}
-      ] as const).map(item=><div key={item.id} style={{position:"relative",flex:full?"1 1 0":"0 1 auto",minWidth:0}}>
+      ] as const).map(item=><div key={item.id} style={{position:"relative",minWidth:0}}>
        <button type="button" title={item.name} aria-label={item.name} disabled={item.id==="save"&&(!dirty||busy)}
         onClick={()=>{setMenu(null);if(item.id==="save"){void save();return;}if(item.id==="undo"){const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});return;}setTool(item.id);setLens(null);}}
-        style={{width:"100%",minWidth:full?0:32,height:full?43:37,borderRadius:9,border:tool===item.id?"2px solid #f97316":full?"1px solid #475569":"1px solid #cbd5e1",background:tool===item.id?(full?"#334155":"#ffedd5"):(full?"#24344c":"white"),cursor:"pointer",opacity:item.id==="save"&&(!dirty||busy)?.45:1,padding:"3px 1px",position:"relative"}}>
+        style={{width:"100%",minWidth:0,height:full?43:46,borderRadius:9,border:tool===item.id?"2px solid #f97316":full?"1px solid #475569":"1px solid #cbd5e1",background:tool===item.id?(full?"#334155":"#ffedd5"):(full?"#24344c":"white"),cursor:"pointer",opacity:item.id==="save"&&(!dirty||busy)?.45:1,padding:"3px 1px",position:"relative"}}>
         {item.id==="highlight"?<svg aria-hidden="true" viewBox="0 0 24 24" width={full?26:23} height={full?26:23} style={{transform:"rotate(-35deg)"}}><path d="M7 2h10v13H7z" fill={highlightColor} stroke="#475569" strokeWidth="1.3"/><path d="M7 15h10l-2 4H9z" fill="#64748b"/><path d="M9 19h6l-1 3h-4z" fill={highlightColor}/><path d="M9 5h6" stroke="#fff" strokeWidth="1.4"/></svg>:item.id==="pen"?<svg aria-hidden="true" viewBox="0 0 24 24" width={full?26:23} height={full?26:23} style={{transform:"rotate(35deg)"}}><path d="M8 2h8v16H8z" fill={penColor} stroke={penColor==="#111827"?"#f8fafc":"#334155"} strokeWidth="1.2"/><path d="M8 18h8l-4 5z" fill="#e2e8f0"/><path d="M10 5h4" stroke="#fff" strokeWidth="1.4"/></svg>:<span aria-hidden="true" style={{fontSize:full?"clamp(18px,4.5vw,25px)":"20px",lineHeight:1.1,color:item.color,fontWeight:900}}>{item.symbol}</span>}
        </button>
        {(item.id==="magnify"||item.id==="pen"||item.id==="highlight")&&<button type="button" aria-label={"Opzioni "+item.name} title={"Opzioni "+item.name}
          onClick={()=>setMenu(m=>m===item.id?null:item.id)} style={{position:"absolute",top:0,right:0,border:0,borderRadius:6,background:"#f97316",color:"white",fontSize:11,fontWeight:900,lineHeight:"15px",width:17,height:17,cursor:"pointer",padding:0}}>⌄</button>}
       </div>)}
     </div>
-    {full?<button type="button" aria-label="Chiudi schermo intero" onClick={()=>{setFull(false);setMenu(null);setLens(null);}} style={{flex:"0 0 auto",background:"#7f1d1d",color:"white",border:0,borderRadius:8,height:43,width:28,fontWeight:900,fontSize:22,cursor:"pointer"}}>×</button>:null}
+    {full?<button type="button" aria-label="Chiudi schermo intero" onClick={()=>{setFull(false);setMenu(null);setLens(null);}} style={{position:"absolute",right:4,top:4,background:"#7f1d1d",color:"white",border:0,borderRadius:8,height:23,width:23,fontWeight:900,fontSize:18,cursor:"pointer",zIndex:2}}>×</button>:null}
     {menu&&<div style={{position:"absolute",right:5,top:"calc(100% + 5px)",zIndex:32000,background:"white",border:"1px solid #cbd5e1",borderRadius:12,padding:10,boxShadow:"0 8px 25px #0003",minWidth:190}}>
      <div style={{fontSize:12,fontWeight:900,marginBottom:7,color:"#0f172a"}}>{menu==="magnify"?"INGRANDIMENTO LENTE":menu==="pen"?"COLORE PENNARELLO":"COLORE EVIDENZIATORE"}</div>
      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
