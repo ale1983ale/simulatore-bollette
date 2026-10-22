@@ -5238,6 +5238,7 @@ export default function Recruiting({
       setMessage("Errore nell'eliminazione attività: " + error.message);
       return;
     }
+    setEventModalId(null);
     await loadAll(ctx);
   };
 
@@ -12672,6 +12673,13 @@ export default function Recruiting({
                 </button>
               )}
 
+              <button type="button"
+                onClick={() => {
+                  if (!window.confirm("Eliminare questo evento Google? Aprirò Google Calendar per completare l'eliminazione sul calendario originale.")) return;
+                  if (googleDetailEvent.html_link) window.open(googleDetailEvent.html_link, "_blank", "noopener,noreferrer");
+                  else setMessage("Questo evento Google non ha un collegamento per l'eliminazione. Apri Google Calendar e cancellalo da lì.");
+                }}
+                style={{ ...buttonStyle, background: "#fee2e2", color: "#b91c1c" }}>🗑 ELIMINA IN GOOGLE</button>
               <button
                 type="button"
                 onClick={() => {
@@ -13121,6 +13129,17 @@ export default function Recruiting({
                       </div>
                     </div>
 
+                    <button type="button" disabled={busy}
+                      onClick={async () => {
+                        if (!ctx || !window.confirm("Eliminare questo appuntamento CRM dal Calendario? L'eliminazione sarà definitiva nella copia del Calendario.")) return;
+                        setBusy(true);
+                        const { error } = await ctx.client.from("recruiting_crm_events")
+                          .delete().eq("id", crmDetailEvent.id);
+                        setBusy(false);
+                        if (error) setMessage("Errore eliminazione appuntamento CRM: " + error.message);
+                        else { setCrmDetailEventId(null); await loadAll(ctx); }
+                      }}
+                      style={{ ...buttonStyle, background: "#fee2e2", color: "#b91c1c" }}>🗑 ELIMINA</button>
                     <button
                       type="button"
                       onClick={() => setCrmDetailEventId(null)}
@@ -13458,6 +13477,11 @@ export default function Recruiting({
                     }}
                   >
                     MODIFICA ATTIVITÀ
+                  </button>
+                  <button type="button" disabled={busy}
+                    onClick={() => void deleteEvent(eventModalEvent)}
+                    style={{ ...buttonStyle, background: "#fee2e2", color: "#b91c1c" }}>
+                    🗑 ELIMINA
                   </button>
                 </div>
               </div>
