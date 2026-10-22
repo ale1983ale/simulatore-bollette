@@ -6,9 +6,9 @@ import {getAdminSessionToken} from "./adminSecurity";
 pdfjs.GlobalWorkerOptions.workerSrc=pdfWorker;
 type Mark={kind:"pen"|"highlight"|"text";points?:number[][];x:number;y:number;w?:number;h?:number;text?:string;color:string};
 type Marks=Record<string,Mark[]>;
-type Props={base64:string;documentId:number;filename:string};
+type Props={base64:string;documentId:number;filename:string;driveFileId?:string};
 const toolButton:React.CSSProperties={border:"1px solid #cbd5e1",borderRadius:10,padding:"10px 12px",background:"white",fontWeight:800,color:"#0f172a",cursor:"pointer"};
-export default function PdfEditor({base64,documentId,filename}:Props){
+export default function PdfEditor({base64,documentId,filename,driveFileId}:Props){
  const [pdf,setPdf]=useState<any>(null),[pages,setPages]=useState<number[]>([]),[zoom,setZoom]=useState(100),[tool,setTool]=useState<"move"|"magnify"|"pen"|"highlight"|"text">("move"),[marks,setMarks]=useState<Marks>({}),[dirty,setDirty]=useState(false),[status,setStatus]=useState(""),[busy,setBusy]=useState(false);
  const [full,setFull]=useState(false);
  const [lensScale,setLensScale]=useState(2);
@@ -31,12 +31,12 @@ export default function PdfEditor({base64,documentId,filename}:Props){
   if(cancelled)return;
   pdfRef.current=loaded;setPdf(loaded);setPages(Array.from({length:loaded.numPages},(_,i)=>i+1));
   const token=await getAdminSessionToken();
-  const {data,error}=await supabase.rpc("provvigioni_presentazioni_annotations_get",{p_session_token:token,p_id:documentId});
+  const {data,error}=await supabase.rpc(driveFileId?"provvigioni_drive_annotations_get":"provvigioni_presentazioni_annotations_get",driveFileId?{p_session_token:token,p_file_id:driveFileId}:{p_session_token:token,p_id:documentId});
   if(error)throw error;
   if(!cancelled){const saved=data&&typeof data==="object"?data:{};marksRef.current=saved;setMarks(saved);}
  }catch(e:any){if(!cancelled)setStatus("Errore PDF: "+e.message);}})();
  return()=>{cancelled=true;pdfRef.current=null;try{void task?.destroy();}catch{}};
- },[base64,documentId]);
+ },[base64,documentId,driveFileId]);
  useEffect(()=>{if(!pdf)return;let cancelled=false;const tasks:any[]=[];
  (async()=>{for(const pageNumber of pages){
   if(cancelled)return;
@@ -53,7 +53,7 @@ export default function PdfEditor({base64,documentId,filename}:Props){
  return()=>{cancelled=true;tasks.forEach(t=>{try{t.cancel();}catch{}});};
  },[pdf,pages,viewerWidth]);
  useEffect(()=>{if(!lens||!lensCanvas.current)return;const source=canvasRefs.current[lens.page];const target=lensCanvas.current;if(!source)return;const ctx=target.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,280,280);const sx=lens.x*source.width,sy=lens.y*source.height;const sample=260/lensScale;ctx.fillStyle="white";ctx.fillRect(0,0,280,280);ctx.drawImage(source,Math.max(0,sx-sample/2),Math.max(0,sy-sample/2),Math.min(sample,source.width-Math.max(0,sx-sample/2)),Math.min(sample,source.height-Math.max(0,sy-sample/2)),0,0,280,280);},[lens]);
- const save=async()=>{setBusy(true);setStatus("");try{const token=await getAdminSessionToken();const {error}=await supabase.rpc("provvigioni_presentazioni_annotations_save",{p_session_token:token,p_id:documentId,p_annotazioni:marksRef.current});if(error)throw error;setDirty(false);setStatus("Annotazioni salvate.");}catch(e:any){setStatus("Errore salvataggio: "+e.message);}finally{setBusy(false);}};
+ const save=async()=>{setBusy(true);setStatus("");try{const token=await getAdminSessionToken();const {error}=await supabase.rpc(driveFileId?"provvigioni_drive_annotations_save":"provvigioni_presentazioni_annotations_save",driveFileId?{p_session_token:token,p_file_id:driveFileId,p_annotazioni:marksRef.current}:{p_session_token:token,p_id:documentId,p_annotazioni:marksRef.current});if(error)throw error;setDirty(false);setStatus("Annotazioni salvate.");}catch(e:any){setStatus("Errore salvataggio: "+e.message);}finally{setBusy(false);}};
  const start=(event:React.PointerEvent<SVGSVGElement>,page:number)=>{
   if(tool==="move"||tool==="magnify")return;
   const bounds=event.currentTarget.getBoundingClientRect();const x=(event.clientX-bounds.left)/bounds.width,y=(event.clientY-bounds.top)/bounds.height;
