@@ -28,6 +28,18 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    title: "", dateFrom: "", dateTo: "", timeFrom: "", timeTo: "",
+    contact: "", body: "", priority: "all", status: "pending"
+  });
+  const updateFilter = (key: keyof typeof filters, value: string) =>
+    setFilters(current => ({ ...current, [key]: value }));
+  const normalized = (value: string) => value.toLocaleLowerCase("it").trim();
+  const filteredContacts = [...contacts]
+    .filter(contact => normalized(contact.name).includes(normalized(contactSearch)))
+    .sort((a, b) => a.name.localeCompare(b.name, "it"));
   const load = useCallback(async () => {
     if (!ctx) return;
     const { data, error } = await ctx.client.from("recruiting_todos").select("*").eq("owner_key", ctx.ownerKey).order("created_at", { ascending: true });
@@ -37,7 +49,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   useEffect(() => { if (visible) void load(); }, [visible, load]);
   useEffect(() => {
     if (!draft) return;
-    setForm(draft); setPriority(false); setEditing(null); setFormOpen(true); onDraftConsumed();
+    setForm(draft); setContactSearch(""); setPriority(false); setEditing(null); setFormOpen(true); onDraftConsumed();
   }, [draft, onDraftConsumed]);
   const save = async () => {
     if (!ctx || !form.title?.trim()) { setMessage("L'OGGETTO è obbligatorio."); return; }
@@ -64,38 +76,75 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     if (error) setMessage(error.message); else await load();
   };
   const startEdit = (item: Todo) => {
-    setEditing(item.id); setPriority(item.priority);
+    setEditing(item.id); setContactSearch(""); setPriority(item.priority);
     setForm({ title: item.title, dueDate: item.due_date || "", dueTime: item.due_time?.slice(0,5) || "",
       body: item.body, linkedKind: item.linked_kind || undefined, linkedId: item.linked_id || undefined,
       linkedName: item.linked_name, sourceKey: item.source_key || undefined });
     setFormOpen(true);
   };
-  const sorted = [...items].filter(x => showCompleted || !x.completed).sort((a,b) =>
+  const sorted = [...items].filter(x => {
+    if (filters.status === "pending" && x.completed) return false;
+    if (filters.status === "done" && !x.completed) return false;
+    if (filters.priority === "yes" && !x.priority) return false;
+    if (filters.priority === "no" && x.priority) return false;
+    if (filters.title && !normalized(x.title).includes(normalized(filters.title))) return false;
+    if (filters.body && !normalized(x.body).includes(normalized(filters.body))) return false;
+    if (filters.contact && !normalized(x.linked_name).includes(normalized(filters.contact))) return false;
+    if (filters.dateFrom && (!x.due_date || x.due_date < filters.dateFrom)) return false;
+    if (filters.dateTo && (!x.due_date || x.due_date > filters.dateTo)) return false;
+    if (filters.timeFrom && (!x.due_time || x.due_time.slice(0, 5) < filters.timeFrom)) return false;
+    if (filters.timeTo && (!x.due_time || x.due_time.slice(0, 5) > filters.timeTo)) return false;
+    return true;
+  }).sort((a,b) =>
     Number(!b.completed && b.priority) - Number(!a.completed && a.priority) ||
     a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   return <div style={{ background: "white", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, marginTop: 12 }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
       <h2 style={{ margin: 0 }}>☑ COSE DA FARE</h2>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button style={action} onClick={() => setShowCompleted(v => !v)}>{showCompleted ? "NASCONDI FATTE" : "MOSTRA FATTE"}</button>
-        <button style={{ ...action, background: "#2563eb", color: "white" }} onClick={() => { setForm(empty); setPriority(false); setEditing(null); setFormOpen(true); }}>＋ NUOVA COSA DA FARE</button>
+        <button style={action} onClick={() => setFiltersOpen(v => !v)}>{filtersOpen ? "NASCONDI FILTRI" : "⌕ FILTRI E RICERCA"}</button>
+        <button style={action} onClick={() => { const next = !showCompleted; setShowCompleted(next); updateFilter("status", next ? "all" : "pending"); }}>{showCompleted ? "NASCONDI FATTE" : "MOSTRA FATTE"}</button>
+        <button style={{ ...action, background: "#2563eb", color: "white" }} onClick={() => { setForm(empty); setContactSearch(""); setPriority(false); setEditing(null); setFormOpen(true); }}>＋ NUOVA COSA DA FARE</button>
       </div>
     </div>
     {message && <p role="alert" style={{ color: "#b91c1c" }}>{message}</p>}
+    {filtersOpen && <div style={{ background: "#f1f5f9", padding: 14, borderRadius: 12, marginTop: 14 }}>
+      <strong>FILTRA COSE DA FARE</strong>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: 10, marginTop: 10 }}>
+        <label>OGGETTO<input style={field} placeholder="Cerca oggetto" value={filters.title} onChange={e=>updateFilter("title",e.target.value)} /></label>
+        <label>CONTATTO<input style={field} placeholder="Nome o cognome" value={filters.contact} onChange={e=>updateFilter("contact",e.target.value)} /></label>
+        <label>CORPO / DESCRIZIONE<input style={field} placeholder="Cerca nel testo" value={filters.body} onChange={e=>updateFilter("body",e.target.value)} /></label>
+        <label>DATA DA<input type="date" style={field} value={filters.dateFrom} onChange={e=>updateFilter("dateFrom",e.target.value)} /></label>
+        <label>DATA A<input type="date" style={field} value={filters.dateTo} onChange={e=>updateFilter("dateTo",e.target.value)} /></label>
+        <label>ORA DA<input type="time" style={field} value={filters.timeFrom} onChange={e=>updateFilter("timeFrom",e.target.value)} /></label>
+        <label>ORA A<input type="time" style={field} value={filters.timeTo} onChange={e=>updateFilter("timeTo",e.target.value)} /></label>
+        <label>PRIORITÀ<select style={field} value={filters.priority} onChange={e=>updateFilter("priority",e.target.value)}>
+          <option value="all">Tutte</option><option value="yes">Solo prioritarie</option><option value="no">Non prioritarie</option>
+        </select></label>
+        <label>STATO<select style={field} value={filters.status} onChange={e=>{ updateFilter("status",e.target.value); setShowCompleted(e.target.value!=="pending"); }}>
+          <option value="pending">Da fare</option><option value="done">Fatte</option><option value="all">Tutte</option>
+        </select></label>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+        <button style={action} onClick={()=>{setFilters({title:"",dateFrom:"",dateTo:"",timeFrom:"",timeTo:"",contact:"",body:"",priority:"all",status:"pending"});setShowCompleted(false);}}>AZZERA FILTRI</button>
+        <span style={{ color: "#475569", fontSize: 13 }}>{sorted.length} attività trovate</span>
+      </div>
+    </div>}
     {formOpen && <div style={{ background: "#f8fafc", padding: 15, borderRadius: 12, marginTop: 14, display: "grid", gap: 10 }}>
       <label>OGGETTO *<input style={field} value={form.title} onChange={e => setForm(v => ({...v,title:e.target.value}))} required /></label>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <label style={{ flex: "1 1 170px" }}>DATA (opzionale)<input type="date" style={field} value={form.dueDate || ""} onChange={e => setForm(v => ({...v,dueDate:e.target.value}))} /></label>
         <label style={{ flex: "1 1 130px" }}>ORA (opzionale)<input type="time" style={field} value={form.dueTime || ""} onChange={e => setForm(v => ({...v,dueTime:e.target.value}))} /></label>
       </div>
-      <label>AGENTE O CONTATTO COLLEGATO (opzionale)
+      <label>CONTATTO COLLEGATO (opzionale)
+        <input style={{ ...field, marginTop: 5, marginBottom: 7 }} placeholder="⌕ Cerca per nome o cognome..." value={contactSearch} onChange={e=>setContactSearch(e.target.value)} />
         <select style={field} value={form.linkedKind && form.linkedId ? form.linkedKind+":"+form.linkedId : ""} onChange={e => {
           const found=contacts.find(x=>x.kind+":"+x.id===e.target.value);
           setForm(v=>({...v,linkedKind:found?.kind,linkedId:found?.id,linkedName:found?.name || ""}));
         }}>
           <option value="">Nessun collegamento</option>
           {form.linkedId && !contacts.some(x=>x.id===form.linkedId && x.kind===form.linkedKind) && <option value={form.linkedKind+":"+form.linkedId}>{form.linkedName}</option>}
-          {contacts.map(x=><option key={x.kind+":"+x.id} value={x.kind+":"+x.id}>{x.kind==="agent"?"AGENTE":"CONTATTO"} · {x.name}</option>)}
+          {filteredContacts.map(x=><option key={x.kind+":"+x.id} value={x.kind+":"+x.id}>{x.name}</option>)}
         </select>
       </label>
       <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
