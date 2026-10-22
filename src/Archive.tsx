@@ -951,9 +951,15 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [saving, setSaving] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
-  const [archiveSection, setArchiveSection] = useState<
-    "recessi" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone"
-  >("recessi");
+  type ArchiveSection = "recessi" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone";
+  const [archiveSection, setArchiveSection] = useState<ArchiveSection>(() => {
+    const value = window.sessionStorage.getItem("ge_archive_section");
+    return value === "produzione" || value === "attivo" || value === "dettaglioRecessi" ||
+      value === "reportAdmin" || value === "zone" ? value : "recessi";
+  });
+  useEffect(() => {
+    window.sessionStorage.setItem("ge_archive_section", archiveSection);
+  }, [archiveSection]);
 
   const [detailAgent, setDetailAgent] = useState("");
   const [detailRegion, setDetailRegion] = useState("");
