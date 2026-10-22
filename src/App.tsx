@@ -13643,8 +13643,9 @@ export default function App() {
 
   useEffect(() => {
     const openTodoCalendar = (event: Event) => {
-      const date = (event as CustomEvent<{ date?: string | null }>).detail?.date;
-      if (date) window.sessionStorage.setItem("ge_calendar_open_date", date);
+      const detail = (event as CustomEvent<{ date?: string | null; sourceKey?: string | null }>).detail;
+      if (detail?.date) window.sessionStorage.setItem("ge_calendar_open_date", detail.date);
+      if (detail?.sourceKey) window.sessionStorage.setItem("ge_calendar_open_source", detail.sourceKey);
       navigateTo("calendarAdmin");
     };
     window.addEventListener("ge:open-recruiting-calendar", openTodoCalendar);
