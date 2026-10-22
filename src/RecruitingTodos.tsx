@@ -1,3 +1,4 @@
+import { confirmAction } from "./confirmAction";
 import React, { useCallback, useEffect, useState } from "react";
 import type { RecruitingContext } from "./recruitingClient";
 
@@ -240,7 +241,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           <button style={action} onClick={()=>void change(item,{completed:!item.completed})}>{item.completed?"↶ RIAPRI":"✓ FATTA"}</button>
           <button style={action} onClick={()=>startEdit(item)}>MODIFICA</button>
           <button style={action} onClick={()=>void change(item,{priority:!item.priority})}>{item.priority?"TOGLI PRIORITÀ":"★ PRIORITÀ"}</button>
-          <button style={{...action,color:"#b91c1c"}} onClick={async()=>{if(!ctx || !window.confirm("Eliminare questa cosa da fare?"))return;const {error}=await ctx.client.from("recruiting_todos").delete().eq("owner_key",ctx.ownerKey).eq("id",item.id);if(error)setMessage(error.message);else await load();}}>ELIMINA</button>
+          <button style={{...action,color:"#b91c1c"}} onClick={async()=>{if(!ctx || !await confirmAction("Eliminare questa cosa da fare?"))return;const {error}=await ctx.client.from("recruiting_todos").delete().eq("owner_key",ctx.ownerKey).eq("id",item.id);if(error)setMessage(error.message);else await load();}}>ELIMINA</button>
           {!item.source_key && <button type="button" style={{ ...action, background: "#dcfce7", color: "#166534", borderColor: "#86efac" }} onClick={() => startCalendarAppointment(item)}>📅 AGGIUNGI AL CALENDARIO</button>}
           {item.source_key && /^(hr|crm|google):/.test(item.source_key) && (
             <button type="button" title="Apri scheda originale nel Calendario" aria-label="Apri scheda originale nel Calendario"
