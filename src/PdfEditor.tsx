@@ -66,7 +66,7 @@ export default function PdfEditor({base64,documentId,filename}:Props){
    <strong style={{width:"100%",overflowWrap:"anywhere"}}>📄 {filename} · {pages.length} pagine</strong>
    <button style={toolButton} onClick={()=>setZoom(v=>Math.max(50,v-25))}>−</button><strong>{zoom}%</strong><button style={toolButton} onClick={()=>setZoom(v=>Math.min(200,v+25))}>＋</button>
    {([["move","✋ SPOSTA"],["pen","✏️ DISEGNA"],["highlight","🟨 EVIDENZIA"],["text","🔤 SCRIVI"]] as const).map(([id,title])=><button key={id} onClick={()=>setTool(id)} style={{...toolButton,background:tool===id?"#0f172a":"white",color:tool===id?"white":"#0f172a"}}>{title}</button>)}
-   <button style={toolButton} onClick={()=>{const last=pages.findLast?.(p=>(marksRef.current[p]||[]).length>0);if(last){changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});}}}>↶ ANNULLA ULTIMA</button>
+   <button style={toolButton} onClick={()=>{const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last){changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});}}}>↶ ANNULLA ULTIMA</button>
    <button disabled={!dirty||busy} onClick={()=>void save()} style={{...toolButton,background:"#16a34a",color:"white",opacity:!dirty||busy?.55:1}}>💾 SALVA ANNOTAZIONI</button>
   </div>
   {status&&<p role="status" style={{fontWeight:700,color:status.startsWith("Errore")?"#b91c1c":"#15803d"}}>{status}</p>}
