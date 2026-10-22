@@ -8717,6 +8717,19 @@ function AgentsAdmin({
   adminProfile: AdminProfile | null;
 }) {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [productionPermissions,setProductionPermissions]=useState<Record<string,boolean>>({});
+  const loadProductionPermissions=async()=>{
+    const token=await getAdminSessionToken();
+    const {data,error}=await supabase.rpc("admin_agent_production_permissions",{p_session_token:token});
+    if(!error)setProductionPermissions(data||{});
+  };
+  const toggleProductionPermission=async(id:number,enabled:boolean)=>{
+    const token=await getAdminSessionToken();
+    const {error}=await supabase.rpc("admin_agent_production_permission",{p_session_token:token,p_agent_id:id,p_enabled:enabled});
+    if(error){alert("Errore PRODUZ: "+error.message);return;}
+    setProductionPermissions(v=>({...v,[id]:enabled}));
+  };
+
   const [admins, setAdmins] = useState<AdminProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -8768,6 +8781,7 @@ function AgentsAdmin({
   useEffect(() => {
     loadAgents();
     loadAdmins();
+    void loadProductionPermissions();
 
     if (adminProfile?.role === "super_admin") {
       setSelectedOwnerAdminId(adminProfile?.id || "");
@@ -9239,6 +9253,7 @@ function AgentsAdmin({
                     ...(adminProfile?.role === "super_admin"
                       ? ["Admin", "Provvigione"]
                       : []),
+                    "PRODUZ",
                     "Azioni",
                   ].map((h) => (
                     <th
@@ -9324,6 +9339,7 @@ function AgentsAdmin({
   </>
 )}
   
+                    <td style={{padding:8,textAlign:"center"}}><input type="checkbox" aria-label={"PRODUZ "+a.nome+" "+a.cognome} checked={Boolean(productionPermissions[String(a.id)])} onChange={e=>{if(a.id)void toggleProductionPermission(a.id,e.target.checked);}} /></td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
