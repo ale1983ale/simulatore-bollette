@@ -5386,6 +5386,34 @@ export default function Recruiting({
       (event) => event.id === crmDetailEventId
     ) || null;
 
+  // Apri direttamente la scheda dell'evento originale proveniente dalle Cose da fare.
+  // I dati possono arrivare dopo il primo render: attendiamo che le fonti siano caricate.
+  useEffect(() => {
+    if (section !== "calendar") return;
+    const sourceKey = window.sessionStorage.getItem("ge_calendar_open_source");
+    if (!sourceKey) return;
+    const separator = sourceKey.indexOf(":");
+    const origin = sourceKey.slice(0, separator);
+    const identifier = sourceKey.slice(separator + 1);
+    if (origin === "hr") {
+      const found = events.find(event => event.id === identifier);
+      if (!found) return;
+      openEventModal(found, "view");
+    } else if (origin === "crm") {
+      const found = crmCalendarEvents.find(event => event.crmEventId === identifier || event.id === identifier);
+      if (!found) return;
+      setCrmDetailEventId(found.id);
+    } else if (origin === "google") {
+      const found = googleExternalEvents.find(event => sourceKey === "google:" + event.calendar_id + ":" + event.id);
+      if (!found) return;
+      setGoogleDetailEvent(found);
+    } else {
+      window.sessionStorage.removeItem("ge_calendar_open_source");
+      return;
+    }
+    window.sessionStorage.removeItem("ge_calendar_open_source");
+  }, [section, events, crmCalendarEvents, googleExternalEvents]);
+
   const calendarContactPreview =
     allCandidates.find(
       (candidate) => candidate.id === calendarContactPreviewId
