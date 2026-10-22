@@ -27,8 +27,20 @@ export default function AgentProduction({ token }: { token: string }) {
  };
  const recessi=useMemo(()=>(data?.recessi||[]).filter(r=>matches(r,false)),[data,from,to,commodity,search]);
  const produzione=useMemo(()=>(data?.produzione||[]).filter(r=>matches(r,true)),[data,from,to,commodity,search]);
- const open=(r:Item)=>{setDetailMode("scheda");setDetail(r);setNote(String(r.note||""));setRecovered(Boolean(r.recuperato));setMessage("");};
+ const open=(r:Item,mode:"scheda"|"note"="scheda")=>{setDetailMode(mode);setDetail(r);setNote(String(r.note||""));setRecovered(Boolean(r.recuperato));setMessage("");};
  const save=async()=>{if(!detail)return;setSaving(true);setMessage("");const {error:e}=await supabase.rpc("agent_recesso_save_note",{p_session_token:token,p_recesso_id:Number(detail.id),p_note:note,p_recuperato:recovered});if(e)setMessage("Errore: "+e.message);else{setMessage("Note salvate");setDetail({...detail,note,recuperato:recovered});await refresh();}setSaving(false);};
+ const setRecoveredDirect=async(r:Item)=>{
+  if(saving)return;
+  setSaving(true);setError("");
+  const next=!Boolean(r.recuperato);
+  const {error:failure}=await supabase.rpc("agent_recesso_save_note",{
+   p_session_token:token,p_recesso_id:Number(r.id),p_note:String(r.note||""),p_recuperato:next
+  });
+  if(failure)setError("Errore aggiornamento recesso: "+failure.message);
+  else await refresh();
+  setSaving(false);
+ };
+ const actionStyle:React.CSSProperties={border:0,borderRadius:10,padding:"10px 13px",fontWeight:850,cursor:"pointer",whiteSpace:"nowrap",boxShadow:"0 2px 5px #0f172a15"};
  const months=useMemo(()=>{
   const valid=(v:string)=>/^\d{4}-(0[1-9]|1[0-2])$/.test(v);
   const sources=[...(data?.recessi||[]).map(r=>String(r.month_key||r.validita_date||"").slice(0,7)),...(data?.produzione||[]).map(r=>String(r.period_end||r.period_start||"").slice(0,7))].filter(valid);
@@ -98,7 +110,14 @@ export default function AgentProduction({ token }: { token: string }) {
     {recessSummary.length===0&&<p>Nessun recesso nel periodo selezionato.</p>}
     <p style={{color:"#64748b",fontSize:13}}>Per aprire un singolo recesso, consultare la sottoscheda DETTAGLIO RECESSI.</p>
    </div>}
-   {tab==="DETTAGLIO RECESSI"&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}><thead><tr>{["MESE","CLIENTE","POD/PDR","FORNITURA","CONSUMO","NOTE","DETTAGLIO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{recessi.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{monthLabel(r.month_key)||date(r.validita_date)}</td><td>{field(r,"denominazione")}</td><td>{field(r,"pod_pdr")}</td><td>{field(r,"commodity")}</td><td>{number(r.consumo)}</td><td>{r.note||"—"}</td><td><button onClick={()=>open(r)}>APRI</button></td></tr>)}</tbody></table></div>}
+   {tab==="DETTAGLIO RECESSI"&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}><thead><tr>{["MESE","CLIENTE","POD/PDR","FORNITURA","CONSUMO","NOTE","DETTAGLIO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{recessi.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{monthLabel(r.month_key)||date(r.validita_date)}</td><td>{field(r,"denominazione")}</td><td>{field(r,"pod_pdr")}</td><td>{field(r,"commodity")}</td><td>{number(r.consumo)}</td><td>{r.note||"—"}</td><td><div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+ <button type="button" onClick={()=>open(r)} style={{...actionStyle,background:"#2563eb",color:"white"}}>📋 APRI</button>
+ <button type="button" onClick={()=>open(r,"note")} style={{...actionStyle,background:"#ffedd5",color:"#9a3412"}}>📝 NOTE</button>
+ <button type="button" disabled={saving} onClick={()=>void setRecoveredDirect(r)}
+  title={r.recuperato?"Segna come non recuperato":"Segna come recuperato"}
+  style={{...actionStyle,background:r.recuperato?"#dcfce7":"#f1f5f9",color:r.recuperato?"#166534":"#334155",border:r.recuperato?"1px solid #86efac":"1px solid #cbd5e1",opacity:saving?.65:1}}>
+  {r.recuperato?"✓ RECUPERATO":"○ RECUPERATO"}
+ </button></div></td></tr>)}</tbody></table></div>}
    {detail&&<div role="presentation" onClick={()=>{if(!saving)setDetail(null);}}
      style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:14}}>
      <div role="dialog" aria-modal="true" aria-label="Dettaglio recesso" onClick={e=>e.stopPropagation()}
