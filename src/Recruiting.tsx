@@ -1,3 +1,4 @@
+import { confirmAction } from "./confirmAction";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 declare global {
@@ -2198,7 +2199,7 @@ export default function Recruiting({
 
   const disconnectPerforma = async () => {
     if (
-      !window.confirm(
+      !await confirmAction(
         "Scollegare Performa Recruit? I nominativi già accettati e la base degli ID già visti resteranno memorizzati."
       )
     ) {
@@ -2285,7 +2286,7 @@ export default function Recruiting({
 
   const disconnectGoogle = async () => {
     if (
-      !window.confirm(
+      !await confirmAction(
         "Scollegare Google Calendar? Gli eventi già creati su Google non verranno eliminati."
       )
     ) {
@@ -3416,7 +3417,7 @@ export default function Recruiting({
       ? `Eliminare lo stato "${status.label}"? I ${affectedCount} contatti che lo usano passeranno automaticamente a "${replacement.label}".`
       : `Eliminare lo stato "${status.label}"?`;
 
-    if (!window.confirm(confirmation)) return;
+    if (!await confirmAction(confirmation)) return;
 
     setBusy(true);
     try {
@@ -4071,7 +4072,7 @@ export default function Recruiting({
     if (!ctx) return;
 
     if (
-      !window.confirm(
+      !await confirmAction(
         `Eliminare "${name}" dai suggerimenti INOLTRATO A? Verrà rimosso anche dalle schede che lo utilizzano.`
       )
     ) {
@@ -4656,7 +4657,7 @@ export default function Recruiting({
   };
 
   const deleteNote = async (note: ContactNote) => {
-    if (!ctx || !window.confirm("Eliminare questa nota?")) return;
+    if (!ctx || !await confirmAction("Eliminare questa nota?")) return;
     lockCurrentCandidateListOrder();
     const { error } = await ctx.client.from("recruiting_notes").delete().eq("id", note.id);
     if (error) {
@@ -4678,7 +4679,7 @@ export default function Recruiting({
       candidate?.fullName || "questo nominativo";
 
     if (
-      !window.confirm(
+      !await confirmAction(
         `Confermi che la nota di ${candidateName} è stata sincronizzata su HR Specialist?`
       )
     ) {
@@ -4752,7 +4753,7 @@ export default function Recruiting({
       candidate?.fullName || "questo nominativo";
 
     if (
-      !window.confirm(
+      !await confirmAction(
         `Confermi che lo stato di ${candidateName} è stato sincronizzato su HR Specialist?`
       )
     ) {
@@ -4791,7 +4792,7 @@ export default function Recruiting({
     if (!ctx) return;
 
     if (
-      !window.confirm(
+      !await confirmAction(
         `Accettare ${incoming.fullName} e inserirlo nei CONTATTI con tutte le note importate?`
       )
     ) {
@@ -4832,7 +4833,7 @@ export default function Recruiting({
     if (!ctx) return;
 
     if (
-      !window.confirm(
+      !await confirmAction(
         `Scartare ${incoming.fullName}? Non verrà inserito nei CONTATTI.`
       )
     ) {
@@ -5216,7 +5217,7 @@ export default function Recruiting({
   };
 
   const deleteEvent = async (event: RecruitingEvent) => {
-    if (!ctx || !window.confirm("Eliminare questa attività dal calendario?")) return;
+    if (!ctx || !await confirmAction("Eliminare questa attività dal calendario?")) return;
 
     if (
       googleCalendarConnected &&
@@ -12674,8 +12675,8 @@ export default function Recruiting({
               )}
 
               <button type="button"
-                onClick={() => {
-                  if (!window.confirm("Eliminare questo evento Google? Aprirò Google Calendar per completare l'eliminazione sul calendario originale.")) return;
+                onClick={async () => {
+                  if (!await confirmAction("Eliminare questo evento Google? Aprirò Google Calendar per completare l'eliminazione sul calendario originale.")) return;
                   if (googleDetailEvent.html_link) window.open(googleDetailEvent.html_link, "_blank", "noopener,noreferrer");
                   else setMessage("Questo evento Google non ha un collegamento per l'eliminazione. Apri Google Calendar e cancellalo da lì.");
                 }}
@@ -13131,7 +13132,7 @@ export default function Recruiting({
 
                     <button type="button" disabled={busy}
                       onClick={async () => {
-                        if (!ctx || !window.confirm("Eliminare questo appuntamento CRM dal Calendario? L'eliminazione sarà definitiva nella copia del Calendario.")) return;
+                        if (!ctx || !await confirmAction("Eliminare questo appuntamento CRM dal Calendario? L'eliminazione sarà definitiva nella copia del Calendario.")) return;
                         setBusy(true);
                         const { error } = await ctx.client.from("recruiting_crm_events")
                           .delete().eq("id", crmDetailEvent.id);
