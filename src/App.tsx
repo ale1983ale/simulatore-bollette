@@ -12226,6 +12226,7 @@ function getAdminDashboardPermissions(profile: AdminProfile | null): Set<string>
 function canAdminAccessTab(profile: AdminProfile | null, requestedTab: string): boolean {
   if (!profile || profile.role === "super_admin" || requestedTab === "dashboard") return true;
   if (Array.isArray(profile.dashboard_tabs)) {
+    if (requestedTab === "todos") return profile.dashboard_tabs.includes("todos") || profile.dashboard_tabs.includes("recruiting");
     return profile.dashboard_tabs.includes(requestedTab);
   }
   if (profile.full_access !== false) return requestedTab !== "provvigioni";
@@ -13344,7 +13345,7 @@ function AdminDashboard({
         {showReportCard && canShow("report") && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
         {canShow("calendarAdmin") && <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />}
         {canShow("recruiting") && <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />}
-        {canShow("todos") && <DashboardCard title="COSE DA FARE" description="Organizza e completa le attività con priorità e filtri." icon="☑️" className="ge-card-appointments" compact onClick={() => navigate("todos")} />}
+        {(canShow("todos") || canShow("recruiting")) && <DashboardCard title="COSE DA FARE" description="Organizza e completa le attività con priorità e filtri." icon="☑️" className="ge-card-appointments" compact onClick={() => navigate("todos")} />}
          {canShow("appointments") && <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />}
         {canShow("archive") && <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />}
         {canShow("email") && <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />}
