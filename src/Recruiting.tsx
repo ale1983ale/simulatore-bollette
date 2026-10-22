@@ -8697,6 +8697,8 @@ export default function Recruiting({
                         border: `${candidate.waitingRoomNew ? 8 : 6}px solid ${statusStyle.border}`,
                         background: candidate.status === "KO"
                           ? "#fee2e2"
+                          : candidate.status === "DA_CHIAMARE"
+                          ? "#fef9c3"
                           : candidate.waitingRoomNew
                           ? statusStyle.background
                           : "#ffffff",
