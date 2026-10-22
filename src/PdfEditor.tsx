@@ -157,17 +157,17 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
      </div>
     </div>}
    </div>
-  {stickyOpen&&<div style={{position:full?"absolute":"relative",top:full?88:undefined,right:full?12:undefined,zIndex:full?31000:10,width:full?"min(420px,calc(100% - 24px))":"100%",maxWidth:full?420:undefined,boxSizing:"border-box",background:"#fff176",border:"2px solid #eab308",borderRadius:9,boxShadow:"0 8px 24px #0003",padding:12,color:"#111827",display:"grid",gap:9}}>
+  {stickyOpen&&<div style={{position:full?"absolute":"relative",top:full?88:undefined,right:full?12:undefined,zIndex:full?31000:10,width:full?"min(420px,calc(100% - 24px))":"100%",maxWidth:full?420:undefined,boxSizing:"border-box",background:"#fff4a8",backgroundImage:"repeating-linear-gradient(to bottom, transparent 0px, transparent 30px, #d9bc6940 31px, transparent 32px)",border:"1px solid #e4c45c",borderRadius:"4px 4px 19px 5px",boxShadow:"3px 7px 0 #e2bd53, 8px 14px 24px #0004",padding:15,color:"#27210f",display:"grid",gap:12}}>
    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
-    <strong style={{fontSize:16}}>🗒️ APPUNTI · {stickyPage+1}/{sticky.pages.length}</strong>
+    <strong style={{fontSize:20,fontFamily:"cursive"}}>✎ I miei appunti <span style={{fontSize:13,color:"#85641c"}}>{stickyPage+1}/{sticky.pages.length}</span></strong>
     <div style={{display:"flex",gap:6}}>
-     <button type="button" onClick={()=>{if(window.confirm("Cancellare tutti gli appunti?"))clearSticky();}} style={{...toolButton,padding:"5px 8px",background:"#fef9c3"}}>🗑 ELIMINA</button>
+     <button type="button" onClick={()=>{if(window.confirm("Cancellare tutti gli appunti?"))clearSticky();}} style={{...toolButton,padding:"5px 8px",background:"#fef9c3"}} aria-label="Elimina appunti" title="Elimina appunti">🗑️</button>
      <button type="button" onClick={()=>setStickyOpen(false)} aria-label="Chiudi appunti" style={{...toolButton,padding:"5px 10px"}}>✕</button>
     </div>
    </div>
    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-    <button type="button" onClick={()=>setStickyMode("keyboard")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="keyboard"?"#f59e0b":"white"}}>⌨️ TASTIERA</button>
-    <button type="button" onClick={()=>setStickyMode("hand")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="hand"?"#f59e0b":"white"}}>✍️ A MANO</button>
+    <button type="button" onClick={()=>setStickyMode("keyboard")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="keyboard"?"#f59e0b":"white"}} aria-label="Tastiera" title="Tastiera">⌨️</button>
+    <button type="button" onClick={()=>setStickyMode("hand")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="hand"?"#f59e0b":"white"}} aria-label="Mano libera" title="Mano libera">✍️</button>
    </div>
    {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:180,maxHeight:full?"35vh":280,resize:"vertical",background:"#fff9a6",border:"1px solid #d4a500",borderRadius:5,padding:10,color:"#111827",fontSize:16,lineHeight:1.5,fontFamily:"inherit"}}/>:<canvas ref={stickyCanvas} width={600} height={420} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",background:"#fff9a6",border:"1px solid #d4a500",borderRadius:5,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
    <div style={{display:"flex",gap:7,alignItems:"center",justifyContent:"space-between"}}>
