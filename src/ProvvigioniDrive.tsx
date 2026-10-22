@@ -1,5 +1,5 @@
 import React,{useEffect,useState} from "react";
-import {getGoogleDriveArchiveConfig,listGoogleDriveFolder,getPresentationDriveConfig,setPresentationDriveFolder,listPresentationDrivePdfs,readPresentationDrivePdf,type GoogleDriveItem} from "./googleDrive";
+import {listGoogleDriveFolder,getPresentationDriveConfig,setPresentationDriveFolder,listPresentationDrivePdfs,readPresentationDrivePdf,type GoogleDriveItem} from "./googleDrive";
 import PdfEditor from "./PdfEditor";
 const btn:React.CSSProperties={border:"1px solid #cbd5e1",background:"white",borderRadius:10,padding:"10px 13px",fontWeight:850,cursor:"pointer",color:"#0f172a"};
 export default function ProvvigioniDrive(){
