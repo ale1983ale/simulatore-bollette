@@ -9,19 +9,36 @@ type Marks=Record<string,Mark[]>;
 type Props={base64:string;documentId:number;filename:string;driveFileId?:string};
 const STICKY_KEY="provvigioni_pdf_postit_shared_v1";
 const STICKY_TTL=30*60*1000;
-function readSticky():{text:string;updated:number}{
- try{const raw=localStorage.getItem(STICKY_KEY);if(!raw)return {text:"",updated:0};const value=JSON.parse(raw);if(!value||typeof value.text!=="string"||typeof value.updated!=="number"||Date.now()-value.updated>=STICKY_TTL){localStorage.removeItem(STICKY_KEY);return {text:"",updated:0};}return {text:value.text,updated:value.updated};}catch{return {text:"",updated:0};}
+type StickyPage={text:string;strokes:number[][][]};
+type StickyData={pages:StickyPage[];updated:number};
+const emptyPage=():StickyPage=>({text:"",strokes:[]});
+function readSticky():StickyData{
+ try{const raw=localStorage.getItem(STICKY_KEY);if(!raw)return {pages:[emptyPage()],updated:0};const value=JSON.parse(raw);
+  if(!value||typeof value.updated!=="number"||Date.now()-value.updated>=STICKY_TTL){localStorage.removeItem(STICKY_KEY);return {pages:[emptyPage()],updated:0};}
+  if(Array.isArray(value.pages))return {pages:value.pages.length?value.pages:[emptyPage()],updated:value.updated};
+  if(typeof value.text==="string")return {pages:[{text:value.text,strokes:[]}],updated:value.updated};
+  return {pages:[emptyPage()],updated:0};
+ }catch{return {pages:[emptyPage()],updated:0};}
 }
 const toolButton:React.CSSProperties={border:"1px solid #cbd5e1",borderRadius:10,padding:"10px 12px",background:"white",fontWeight:800,color:"#0f172a",cursor:"pointer"};
 export default function PdfEditor({base64,documentId,filename,driveFileId}:Props){
  const [pdf,setPdf]=useState<any>(null),[pages,setPages]=useState<number[]>([]),[zoom,setZoom]=useState(100),[tool,setTool]=useState<"move"|"magnify"|"pen"|"highlight"|"text">("move"),[marks,setMarks]=useState<Marks>({}),[dirty,setDirty]=useState(false),[status,setStatus]=useState(""),[busy,setBusy]=useState(false);
  const [full,setFull]=useState(false);
  const [stickyOpen,setStickyOpen]=useState(false);
- const [sticky,setSticky]=useState(()=>readSticky());
- const changeSticky=(value:string)=>{const next={text:value,updated:Date.now()};setSticky(next);if(value)localStorage.setItem(STICKY_KEY,JSON.stringify(next));else localStorage.removeItem(STICKY_KEY);};
- const clearSticky=()=>{localStorage.removeItem(STICKY_KEY);setSticky({text:"",updated:0});};
- useEffect(()=>{const check=()=>{const next=readSticky();setSticky(current=>current.text===next.text&&current.updated===next.updated?current:next);};const timer=window.setInterval(check,10000);window.addEventListener("storage",check);return()=>{window.clearInterval(timer);window.removeEventListener("storage",check);};},[]);
-
+ const [sticky,setSticky]=useState<StickyData>(()=>readSticky());
+ const [stickyPage,setStickyPage]=useState(0);
+ const [stickyMode,setStickyMode]=useState<"keyboard"|"hand">("keyboard");
+ const stickyCanvas=useRef<HTMLCanvasElement|null>(null);
+ const drawing=useRef<number[][]|null>(null);
+ const saveSticky=(pages:StickyPage[])=>{const next={pages,updated:Date.now()};setSticky(next);localStorage.setItem(STICKY_KEY,JSON.stringify(next));};
+ const changeStickyPage=(patch:Partial<StickyPage>)=>saveSticky(sticky.pages.map((p,i)=>i===stickyPage?{...p,...patch}:p));
+ const clearSticky=()=>{localStorage.removeItem(STICKY_KEY);setSticky({pages:[emptyPage()],updated:0});setStickyPage(0);};
+ useEffect(()=>{const check=()=>{const next=readSticky();setSticky(current=>JSON.stringify(current)===JSON.stringify(next)?current:next);setStickyPage(p=>Math.min(p,next.pages.length-1));};const timer=window.setInterval(check,10000);window.addEventListener("storage",check);return()=>{window.clearInterval(timer);window.removeEventListener("storage",check);};},[]);
+ useEffect(()=>{if(!stickyOpen||stickyMode!=="hand"||!stickyCanvas.current)return;const canvas=stickyCanvas.current;const ctx=canvas.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle="#111827";ctx.lineWidth=2.5;ctx.lineCap="round";ctx.lineJoin="round";for(const stroke of sticky.pages[stickyPage]?.strokes||[]){if(!stroke.length)continue;ctx.beginPath();ctx.moveTo(stroke[0][0]*canvas.width,stroke[0][1]*canvas.height);if(stroke.length===1){ctx.lineTo(stroke[0][0]*canvas.width+.1,stroke[0][1]*canvas.height+.1);}else for(const point of stroke.slice(1))ctx.lineTo(point[0]*canvas.width,point[1]*canvas.height);ctx.stroke();}},[stickyOpen,stickyMode,sticky,stickyPage]);
+ const handPoint=(e:React.PointerEvent<HTMLCanvasElement>)=>{const b=e.currentTarget.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-b.left)/b.width)),Math.max(0,Math.min(1,(e.clientY-b.top)/b.height))];};
+ const handStart=(e:React.PointerEvent<HTMLCanvasElement>)=>{e.currentTarget.setPointerCapture(e.pointerId);drawing.current=[handPoint(e)];};
+ const handMove=(e:React.PointerEvent<HTMLCanvasElement>)=>{if(!drawing.current)return;const point=handPoint(e);drawing.current.push(point);const ctx=e.currentTarget.getContext("2d");if(ctx&&drawing.current.length>1){const prev=drawing.current[drawing.current.length-2];ctx.strokeStyle="#111827";ctx.lineWidth=2.5;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(prev[0]*e.currentTarget.width,prev[1]*e.currentTarget.height);ctx.lineTo(point[0]*e.currentTarget.width,point[1]*e.currentTarget.height);ctx.stroke();}};
+ const handEnd=()=>{if(!drawing.current)return;changeStickyPage({strokes:[...(sticky.pages[stickyPage]?.strokes||[]),drawing.current]});drawing.current=null;};
  const [lensScale,setLensScale]=useState(2);
  const [penColor,setPenColor]=useState("#111827");
  const [highlightColor,setHighlightColor]=useState("#fde047");
@@ -116,10 +133,10 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
        {id:"pen",symbol:"🖊",name:"Pennarello",color:penColor},
        {id:"highlight",symbol:"🖍",name:"Evidenziatore",color:highlightColor},
        {id:"text",symbol:"T",name:"Scrivi",color:"#fbbf24"},
+       {id:"sticky",symbol:"🗒️",name:"Appunti",color:"#facc15"},
        {id:"undo",symbol:"↶",name:"Annulla",color:"#c4b5fd"},
        {id:"move",symbol:"✋",name:"Sposta",color:"#7dd3fc"},
-       {id:"save",symbol:"💾",name:"Salva",color:"#86efac"},
-       {id:"sticky",symbol:"🗒️",name:"Appunti",color:"#facc15"}
+       {id:"save",symbol:"💾",name:"Salva",color:"#86efac"}
       ] as const).map(item=><div key={item.id} style={{position:"relative",minWidth:0}}>
        <button type="button" title={item.name} aria-label={item.name} disabled={item.id==="save"&&(!dirty||busy)}
         onClick={()=>{setMenu(null);if(item.id==="sticky"){setStickyOpen(v=>!v);return;}if(item.id==="save"){void save();return;}if(item.id==="undo"){const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});return;}setTool(item.id);setLens(null);}}
@@ -140,16 +157,25 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
      </div>
     </div>}
    </div>
-  {stickyOpen&&<div style={{position:full?"absolute":"relative",top:full?88:undefined,right:full?12:undefined,zIndex:full?31000:10,width:full?"min(350px,calc(100% - 24px))":"100%",maxWidth:full?350:undefined,boxSizing:"border-box",background:"#fff176",border:"2px solid #eab308",borderRadius:9,boxShadow:"0 8px 24px #0003",padding:12,color:"#111827",display:"grid",gap:9}}>
-   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-    <strong style={{fontSize:16}}>🗒️ APPUNTI</strong>
-    <div style={{display:"flex",gap:7}}>
-     <button type="button" onClick={()=>{if(window.confirm("Cancellare tutti gli appunti?"))clearSticky();}} style={{...toolButton,padding:"5px 9px",background:"#fef9c3"}}>🗑 ELIMINA</button>
+  {stickyOpen&&<div style={{position:full?"absolute":"relative",top:full?88:undefined,right:full?12:undefined,zIndex:full?31000:10,width:full?"min(420px,calc(100% - 24px))":"100%",maxWidth:full?420:undefined,boxSizing:"border-box",background:"#fff176",border:"2px solid #eab308",borderRadius:9,boxShadow:"0 8px 24px #0003",padding:12,color:"#111827",display:"grid",gap:9}}>
+   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+    <strong style={{fontSize:16}}>🗒️ APPUNTI · {stickyPage+1}/{sticky.pages.length}</strong>
+    <div style={{display:"flex",gap:6}}>
+     <button type="button" onClick={()=>{if(window.confirm("Cancellare tutti gli appunti?"))clearSticky();}} style={{...toolButton,padding:"5px 8px",background:"#fef9c3"}}>🗑 ELIMINA</button>
      <button type="button" onClick={()=>setStickyOpen(false)} aria-label="Chiudi appunti" style={{...toolButton,padding:"5px 10px"}}>✕</button>
     </div>
    </div>
-   <textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.text} onChange={e=>changeSticky(e.target.value)} style={{boxSizing:"border-box",width:"100%",minHeight:160,maxHeight:full?"35vh":260,resize:"vertical",background:"#fff9a6",border:"1px solid #d4a500",borderRadius:5,padding:10,color:"#111827",fontSize:16,lineHeight:1.5,fontFamily:"inherit"}}/>
-   <span style={{fontSize:12,color:"#713f12"}}>Appunti condivisi tra tutti i PDF su questo dispositivo. Si cancellano dopo 30 minuti senza modifiche.</span>
+   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+    <button type="button" onClick={()=>setStickyMode("keyboard")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="keyboard"?"#f59e0b":"white"}}>⌨️ TASTIERA</button>
+    <button type="button" onClick={()=>setStickyMode("hand")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="hand"?"#f59e0b":"white"}}>✍️ A MANO</button>
+   </div>
+   {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:180,maxHeight:full?"35vh":280,resize:"vertical",background:"#fff9a6",border:"1px solid #d4a500",borderRadius:5,padding:10,color:"#111827",fontSize:16,lineHeight:1.5,fontFamily:"inherit"}}/>:<canvas ref={stickyCanvas} width={600} height={420} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",background:"#fff9a6",border:"1px solid #d4a500",borderRadius:5,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
+   <div style={{display:"flex",gap:7,alignItems:"center",justifyContent:"space-between"}}>
+    <button type="button" disabled={stickyPage===0} onClick={()=>setStickyPage(p=>p-1)} style={{...toolButton,padding:"7px 10px"}}>← PREC.</button>
+    <button type="button" onClick={()=>{saveSticky([...sticky.pages,emptyPage()]);setStickyPage(sticky.pages.length);}} style={{...toolButton,padding:"7px 10px",background:"#fde047"}}>＋ PAGINA</button>
+    <button type="button" disabled={stickyPage>=sticky.pages.length-1} onClick={()=>setStickyPage(p=>p+1)} style={{...toolButton,padding:"7px 10px"}}>SUCC. →</button>
+   </div>
+   <span style={{fontSize:12,color:"#713f12"}}>Pagine condivise tra tutti i PDF su questo dispositivo. Cancellazione automatica dopo 30 minuti senza modifiche.</span>
   </div>}
   {status&&<p role="status" style={{fontWeight:700,color:status.startsWith("Errore")?"#b91c1c":"#15803d"}}>{status}</p>}
   <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
