@@ -1,5 +1,5 @@
 import React,{useEffect,useState} from "react";
-import {listGoogleDriveFolder,getPresentationDriveConfig,setPresentationDriveFolder,listPresentationDrivePdfs,readPresentationDrivePdf,type GoogleDriveItem} from "./googleDrive";
+import {listGoogleDriveFolder,getPresentationDriveConfig,setPresentationDriveFolder,listPresentationDrivePdfs,readPresentationDrivePdf,startGoogleDriveConnection,type GoogleDriveItem} from "./googleDrive";
 import PdfEditor from "./PdfEditor";
 const btn:React.CSSProperties={border:"1px solid #cbd5e1",background:"white",borderRadius:10,padding:"10px 13px",fontWeight:850,cursor:"pointer",color:"#0f172a"};
 export default function ProvvigioniDrive(){
@@ -10,13 +10,17 @@ export default function ProvvigioniDrive(){
  useEffect(()=>{void load().catch(e=>setError(e.message)).finally(()=>setLoading(false));},[]);
  const browseFolder=async(id:string,name:string,nextStack?:{id:string;name:string}[])=>{setBusy(true);setError("");try{const result=await listGoogleDriveFolder(id);setFolders((result.items||[]).filter(x=>x.is_folder));setStack(nextStack||[...stack,{id,name:result.folder.name||name}]);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const choose=async()=>{const folder=stack[stack.length-1];if(!folder)return;setBusy(true);setError("");try{await setPresentationDriveFolder(folder.id);setBrowse(false);setSelected(null);setPdf("");await load();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
+ const reconnect=async()=>{setBusy(true);setError("");try{const url=await startGoogleDriveConnection();window.location.assign(url);}catch(e:any){setError(e.message);setBusy(false);}};
  const open=async(item:GoogleDriveItem)=>{setBusy(true);setError("");try{const value=await readPresentationDrivePdf(item.id);setSelected(item);setPdf(value);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  return <div style={{display:"grid",gap:13}}>
   <div style={{padding:15,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
    <div><strong>📁 CARTELLA GOOGLE DRIVE</strong><div style={{fontSize:13,color:"#475569",marginTop:5}}>{config?.folder_name||"Nessuna cartella selezionata"} · PDF sincronizzati quando apri la scheda o premi Aggiorna</div></div>
    <div style={{display:"flex",gap:7,flexWrap:"wrap"}}><button style={btn} disabled={busy} onClick={()=>void load().catch(e=>setError(e.message))}>↻ AGGIORNA DA DRIVE</button><button style={{...btn,background:"#2563eb",color:"white"}} disabled={busy} onClick={()=>{setBrowse(true);void browseFolder("root","Il mio Drive",[{id:"root",name:"Il mio Drive"}]);}}>📂 SCEGLI CARTELLA</button></div>
   </div>
-  {error&&<div role="alert" style={{color:"#b91c1c",fontWeight:750}}>{error}</div>}
+  {error&&<div role="alert" style={{display:"grid",gap:10,justifyItems:"start"}}>
+    <span style={{color:"#b91c1c",fontWeight:750}}>{/token has been expired or revoked|invalid_grant|token.*revoked/i.test(error)?"L'autorizzazione Google è scaduta o revocata. Ricollega Google per visualizzare i PDF.":error}</span>
+    {/token has been expired or revoked|invalid_grant|token.*revoked/i.test(error)&&<button style={{...btn,background:"#2563eb",color:"white"}} disabled={busy} onClick={()=>void reconnect()}>🔄 RICOLLEGA GOOGLE</button>}
+  </div>}
   {loading&&<p>Caricamento Google Drive…</p>}
   {browse&&<div style={{padding:14,borderRadius:14,border:"2px solid #93c5fd",background:"white"}}>
    <strong>SELEZIONA CARTELLA PRESENTAZIONI</strong>
