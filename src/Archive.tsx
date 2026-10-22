@@ -962,6 +962,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [detailSearch, setDetailSearch] = useState("");
   const [detailExpanded, setDetailExpanded] = useState<string | null>(null);
   const [detailLimit, setDetailLimit] = useState(100);
+  const [detailSort, setDetailSort] = useState<"month" | "agent" | "name" | "pod" | "commodity" | "consumption" | "province">("month");
+  const [detailSortAsc, setDetailSortAsc] = useState(false);
   const [commodities, setCommodities] = useState<string[]>([]);
   const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
   const [agentsSelected, setAgentsSelected] = useState<string[]>([]);
@@ -1226,8 +1228,21 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       if (!haystack.includes(needle)) return false;
     }
     return true;
-  }).sort((a,b) => b.monthKey.localeCompare(a.monthKey) || a.denominazione.localeCompare(b.denominazione, "it")),
-  [rows, detailAgent, detailRegion, detailProvince, detailMonth, detailCommodity, detailSearch]);
+  }).sort((a,b) => {
+    if (detailSort === "consumption") {
+      const av = a.consumo, bv = b.consumo;
+      if (av === null) return bv === null ? 0 : 1;
+      if (bv === null) return -1;
+      return (av - bv) * (detailSortAsc ? 1 : -1);
+    }
+    const value = (row: RecessoRow) => detailSort === "month" ? row.monthKey :
+      detailSort === "agent" ? row.agente : detailSort === "name" ? row.denominazione :
+      detailSort === "pod" ? row.podPdr : detailSort === "commodity" ? row.commodity :
+      deriveLegalSeatGeo(row.raw).provinceLabel;
+    const comparison = value(a).localeCompare(value(b), "it", { numeric: true, sensitivity: "base" });
+    return comparison * (detailSortAsc ? 1 : -1) || a.denominazione.localeCompare(b.denominazione, "it");
+  }),
+  [rows, detailAgent, detailRegion, detailProvince, detailMonth, detailCommodity, detailSearch, detailSort, detailSortAsc]);
 
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
@@ -2485,8 +2500,14 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 850, fontSize: 13 }}>
               <thead style={{ background: "#f1f5f9" }}><tr>
-                {["MESE RECESSO","AGENTE","NOMINATIVO","POD / PDR","LUCE / GAS","CONSUMO","PROVINCIA","DETTAGLI"].map(label=>
-                  <th key={label} style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #cbd5e1" }}>{label}</th>)}
+                {([["MESE RECESSO","month"],["AGENTE","agent"],["NOMINATIVO","name"],["POD / PDR","pod"],["LUCE / GAS","commodity"],["CONSUMO","consumption"],["PROVINCIA","province"],["DETTAGLI",""]] as const).map(([label,key])=>
+                  <th key={label} style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #cbd5e1" }}>
+                    {key ? <button type="button" title={"Ordina per " + label}
+                      onClick={()=>{if(detailSort===key)setDetailSortAsc(v=>!v);else {setDetailSort(key);setDetailSortAsc(key==="name"||key==="agent"||key==="province"||key==="pod"||key==="commodity");}setDetailLimit(100);}}
+                      style={{ background: "transparent", border: 0, cursor: "pointer", fontWeight: 900, color: detailSort===key?"#2563eb":"#0f172a", padding: 0 }}>
+                      {label} {detailSort===key?(detailSortAsc?"▲":"▼"):"↕"}
+                    </button> : label}
+                  </th>)}
               </tr></thead>
               <tbody>{detailRows.slice(0,detailLimit).map(row=>{
                 const geo=deriveLegalSeatGeo(row.raw);
