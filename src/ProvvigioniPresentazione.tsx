@@ -52,5 +52,5 @@ export default function ProvvigioniPresentazione(){
     {pdfBase64&&selected!==null?<PdfEditor key={selected} base64={pdfBase64} documentId={selected} filename={selectedName}/>:<div style={{minHeight:360,display:"grid",placeItems:"center",background:"#f8fafc",borderRadius:12,color:"#64748b",textAlign:"center",padding:20}}>{busy?"Caricamento PDF…":"Seleziona un documento per visualizzarlo qui."}</div>}
    </div>
   </div>
- </div></div>;
+ </div>}</div>;
 }
