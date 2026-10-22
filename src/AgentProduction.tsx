@@ -15,7 +15,7 @@ const field = (row: Item, key: string) => row[key] == null || row[key] === "" ? 
 
 export default function AgentProduction({ token }: { token: string }) {
  const [data,setData]=useState<Data|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true);
- const [tab,setTab]=useState("RECESSI"),[search,setSearch]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[commodity,setCommodity]=useState("TUTTE");
+ const [tab,setTab]=useState("RECESSI"),[selectedRecessMonth,setSelectedRecessMonth]=useState(""),[search,setSearch]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[commodity,setCommodity]=useState("TUTTE");
  const [detail,setDetail]=useState<Item|null>(null),[detailMode,setDetailMode]=useState<"scheda"|"note">("scheda"),[note,setNote]=useState(""),[recovered,setRecovered]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState("");
  const refresh=async()=>{setLoading(true);setError("");const {data:result,error:failure}=await supabase.rpc("agent_production_data",{p_session_token:token});if(failure)setError(failure.message);else setData(result as Data);setLoading(false);};
  useEffect(()=>{void refresh();},[token]);
@@ -27,6 +27,7 @@ export default function AgentProduction({ token }: { token: string }) {
  };
  const recessi=useMemo(()=>(data?.recessi||[]).filter(r=>matches(r,false)),[data,from,to,commodity,search]);
  const produzione=useMemo(()=>(data?.produzione||[]).filter(r=>matches(r,true)),[data,from,to,commodity,search]);
+ const detailRecessi=useMemo(()=>selectedRecessMonth?recessi.filter(r=>String(r.month_key||r.validita_date||"").slice(0,7)===selectedRecessMonth):recessi,[recessi,selectedRecessMonth]);
  const open=(r:Item,mode:"scheda"|"note"="scheda")=>{setDetailMode(mode);setDetail(r);setNote(String(r.note||""));setRecovered(Boolean(r.recuperato));setMessage("");};
  const save=async()=>{if(!detail)return;setSaving(true);setMessage("");const {error:e}=await supabase.rpc("agent_recesso_save_note",{p_session_token:token,p_recesso_id:Number(detail.id),p_note:note,p_recuperato:recovered});if(e)setMessage("Errore: "+e.message);else{setMessage("Note salvate");setDetail({...detail,note,recuperato:recovered});await refresh();}setSaving(false);};
  const setRecoveredDirect=async(r:Item)=>{
@@ -89,7 +90,7 @@ export default function AgentProduction({ token }: { token: string }) {
   {error&&<p role="alert" style={{color:"#b91c1c"}}>{error}</p>}
   {loading&&<p>Caricamento dati…</p>}
   {data&&<>
-   <nav style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{["RECESSI","PRODUZIONE","ATTIVO PRODUZIONE","DETTAGLIO RECESSI"].map(t=><button key={t} onClick={()=>setTab(t)} style={{padding:"13px 18px",borderRadius:12,border:tab===t?"1px solid #f97316":"1px solid #cbd5e1",fontWeight:900,cursor:"pointer",background:tab===t?"#0f172a":"white",color:tab===t?"white":"#334155",boxShadow:tab===t?"0 5px 16px #0f172a24":"0 1px 3px #0f172a0d"}}>{t}</button>)}</nav>
+   <nav style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{["RECESSI","PRODUZIONE","ATTIVO PRODUZIONE","DETTAGLIO RECESSI"].map(t=><button key={t} onClick={()=>{setTab(t);if(t==="DETTAGLIO RECESSI")setSelectedRecessMonth("");}} style={{padding:"13px 18px",borderRadius:12,border:tab===t?"1px solid #f97316":"1px solid #cbd5e1",fontWeight:900,cursor:"pointer",background:tab===t?"#0f172a":"white",color:tab===t?"white":"#334155",boxShadow:tab===t?"0 5px 16px #0f172a24":"0 1px 3px #0f172a0d"}}>{t}</button>)}</nav>
    <div style={{display:"flex",flexWrap:"wrap",gap:14,alignItems:"end",marginBottom:18,padding:16,background:"white",border:"1px solid #e2e8f0",borderRadius:14,boxShadow:"0 2px 8px #0f172a0a"}}>
     <label>Dal mese<input aria-label="Dal mese" type="month" value={from} onChange={e=>setFrom(e.target.value)} style={{display:"block",padding:9}}/></label>
     <label>Al mese<input aria-label="Al mese" type="month" value={to} onChange={e=>setTo(e.target.value)} style={{display:"block",padding:9}}/></label>
@@ -106,18 +107,23 @@ export default function AgentProduction({ token }: { token: string }) {
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:10,marginBottom:16}}>
      {[["TOTALE RECESSI",recessTotals.count],["LUCE",recessTotals.luce],["GAS",recessTotals.gas],["RECUPERATI",recessTotals.recovered],["CONSUMO COMPLESSIVO",number(recessTotals.consumo)]].map(([name,value])=><div key={String(name)} style={{padding:18,background:"white",border:"1px solid #e2e8f0",borderLeft:"4px solid #f97316",borderRadius:14,boxShadow:"0 4px 14px #0f172a0a"}}><div style={{fontSize:12,fontWeight:800,color:"#475569"}}>{name}</div><div style={{fontSize:24,fontWeight:900}}>{value}</div></div>)}
     </div>
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",minWidth:520,borderCollapse:"collapse"}}><thead><tr>{["MESE","FORNITURA","NUM. RECESSI","CONSUMO","RECUPERATI"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{recessSummary.map(g=><tr key={g.month+g.commodity} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{monthLabel(g.month)}</td><td>{g.commodity}</td><td>{g.count}</td><td>{number(g.consumo)}</td><td>{g.recovered}</td></tr>)}</tbody></table></div>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",minWidth:520,borderCollapse:"collapse"}}><thead><tr>{["MESE","FORNITURA","NUM. RECESSI","CONSUMO","RECUPERATI"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{recessSummary.map(g=><tr key={g.month+g.commodity} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}><button type="button" onClick={()=>{setSelectedRecessMonth(g.month);setTab("DETTAGLIO RECESSI");}} title={"Apri i recessi di "+monthLabel(g.month)} style={{border:0,borderRadius:9,padding:"9px 12px",background:"#eff6ff",color:"#1d4ed8",fontWeight:850,cursor:"pointer",textDecoration:"underline",textUnderlineOffset:3}}>{monthLabel(g.month)} ↗</button></td><td>{g.commodity}</td><td>{g.count}</td><td>{number(g.consumo)}</td><td>{g.recovered}</td></tr>)}</tbody></table></div>
     {recessSummary.length===0&&<p>Nessun recesso nel periodo selezionato.</p>}
     <p style={{color:"#64748b",fontSize:13}}>Per aprire un singolo recesso, consultare la sottoscheda DETTAGLIO RECESSI.</p>
    </div>}
-   {tab==="DETTAGLIO RECESSI"&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}><thead><tr>{["MESE","CLIENTE","POD/PDR","FORNITURA","CONSUMO","NOTE","DETTAGLIO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{recessi.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{monthLabel(r.month_key)||date(r.validita_date)}</td><td>{field(r,"denominazione")}</td><td>{field(r,"pod_pdr")}</td><td>{field(r,"commodity")}</td><td>{number(r.consumo)}</td><td>{r.note||"—"}</td><td><div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+   {tab==="DETTAGLIO RECESSI"&&<div>
+    {selectedRecessMonth&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap",padding:13,marginBottom:12,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:12}}>
+     <strong>📅 RECESSI DI {monthLabel(selectedRecessMonth).toUpperCase()} · {detailRecessi.length} risultati</strong>
+     <button type="button" onClick={()=>setSelectedRecessMonth("")} style={{padding:"9px 13px",border:0,borderRadius:9,background:"#1d4ed8",color:"white",fontWeight:800,cursor:"pointer"}}>MOSTRA TUTTI I MESI</button>
+    </div>}
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}><thead><tr>{["MESE","CLIENTE","POD/PDR","FORNITURA","CONSUMO","NOTE","DETTAGLIO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{detailRecessi.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{monthLabel(r.month_key)||date(r.validita_date)}</td><td>{field(r,"denominazione")}</td><td>{field(r,"pod_pdr")}</td><td>{field(r,"commodity")}</td><td>{number(r.consumo)}</td><td>{r.note||"—"}</td><td><div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
  <button type="button" onClick={()=>open(r)} style={{...actionStyle,background:"#2563eb",color:"white"}}>📋 APRI</button>
  <button type="button" onClick={()=>open(r,"note")} style={{...actionStyle,background:"#ffedd5",color:"#9a3412"}}>📝 NOTE</button>
  <button type="button" disabled={saving} onClick={()=>void setRecoveredDirect(r)}
   title={r.recuperato?"Segna come non recuperato":"Segna come recuperato"}
   style={{...actionStyle,background:r.recuperato?"#dcfce7":"#f1f5f9",color:r.recuperato?"#166534":"#334155",border:r.recuperato?"1px solid #86efac":"1px solid #cbd5e1",opacity:saving?.65:1}}>
   {r.recuperato?"✓ RECUPERATO":"○ RECUPERATO"}
- </button></div></td></tr>)}</tbody></table></div>}
+ </button></div></td></tr>)}</tbody></table></div></div>}
    {detail&&<div role="presentation" onClick={()=>{if(!saving)setDetail(null);}}
      style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:14}}>
      <div role="dialog" aria-modal="true" aria-label="Dettaglio recesso" onClick={e=>e.stopPropagation()}
