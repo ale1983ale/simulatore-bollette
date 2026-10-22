@@ -12197,6 +12197,7 @@ const ADMIN_DASHBOARD_CHOICES: Array<{ key: string; label: string }> = [
   { key: "municipalOffers", label: "OFFERTE PER I COMUNI" },
   { key: "calendarAdmin", label: "CALENDARIO" },
   { key: "recruiting", label: "RECRUITING" },
+  { key: "todos", label: "COSE DA FARE" },
   { key: "appointments", label: "APPUNTAMENTI" },
   { key: "archive", label: "DATI PRODUZIONE" },
   { key: "email", label: "INVIO EMAIL" },
@@ -13343,7 +13344,8 @@ function AdminDashboard({
         {showReportCard && canShow("report") && <DashboardCard title="REPORT" description="Inserisci e consulta i report personali." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("report")} />}
         {canShow("calendarAdmin") && <DashboardCard title="CALENDARIO" description="Gestisci il tuo calendario e le attività." icon="📅" className="ge-card-calendar" compact onClick={() => navigate("calendarAdmin")} />}
         {canShow("recruiting") && <DashboardCard title="RECRUITING" description="Gestisci candidati e nuove risorse." icon="👥" className="ge-card-recruiting" compact onClick={() => navigate("recruiting")} />}
-        {canShow("appointments") && <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />}
+        {canShow("todos") && <DashboardCard title="COSE DA FARE" description="Organizza e completa le attività con priorità e filtri." icon="☑️" className="ge-card-appointments" compact onClick={() => navigate("todos")} />}
+         {canShow("appointments") && <DashboardCard title="APPUNTAMENTI" description="Organizza e monitora gli appuntamenti." icon="✓" className="ge-card-appointments" compact onClick={() => navigate("appointments")} />}
         {canShow("archive") && <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />}
         {canShow("email") && <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />}
         {canShow("driveArchive") && <DashboardCard title="ARCHIVIO DRIVE" description="Consulta documenti e file condivisi." icon="📁" className="ge-card-drive" compact onClick={() => navigate("driveArchive")} />}
@@ -14656,7 +14658,7 @@ useEffect(() => {
       setAdminMenuOpen(false);
     }
   }, [tab, adminMenuOpen]);
-  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "driveArchive", "recruiting", "recruitingWaiting", "appointments", "provvigioni", "personale", ...databaseAdminTabs, "adminUsers"];
+  const adminTabs = ["dashboard", "calendarAdmin", "reportAdmin", "archive", "driveArchive", "recruiting", "todos", "recruitingWaiting", "appointments", "provvigioni", "personale", ...databaseAdminTabs, "adminUsers"];
 
   const adminSectionMeta: Record<
     string,
@@ -14684,6 +14686,12 @@ useEffect(() => {
       title: "RECRUITING",
       subtitle: "Gestisci contatti, candidati e attività di recruiting.",
       icon: "👥",
+      variant: "recruiting",
+    },
+    todos: {
+      title: "COSE DA FARE",
+      subtitle: "Gestisci attività, priorità e scadenze.",
+      icon: "☑️",
       variant: "recruiting",
     },
     recruitingWaiting: {
@@ -15385,6 +15393,10 @@ const renderAdminContent = () => {
           variant={currentAdminSection.variant}
           action={
             tab === "calendarAdmin" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button type="button" className="ge-section-hero__today-button"
+                title="Apri Cose da fare" aria-label="Apri Cose da fare"
+                onClick={() => navigateTo("todos")}>☑️</button>
               <button
                 type="button"
                 className="ge-section-hero__today-button"
@@ -15398,6 +15410,7 @@ const renderAdminContent = () => {
               >
                 👁
               </button>
+              </div>
             ) : undefined
           }
         />
@@ -15423,6 +15436,12 @@ const renderAdminContent = () => {
             onOpenAppointment={openAppointmentFromCalendar}
             onAddToAgents={openNewAgentFromRecruiting}
           />
+        </div>
+      )}
+
+      {tab === "todos" && (
+        <div style={{ width: "100%", minWidth: 0 }}>
+          <Recruiting initialSection="todos" hideNavigation onAddToAgents={openNewAgentFromRecruiting} />
         </div>
       )}
 
