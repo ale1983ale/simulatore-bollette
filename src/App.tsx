@@ -8718,6 +8718,19 @@ function AgentsAdmin({
   adminProfile: AdminProfile | null;
 }) {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [reportPermissions,setReportPermissions]=useState<Record<string,boolean>>({});
+  const loadReportPermissions=async()=>{
+    const token=await getAdminSessionToken();
+    const {data,error}=await supabase.rpc("admin_agent_report_permissions",{p_session_token:token});
+    if(!error)setReportPermissions(data||{});
+  };
+  const toggleReportPermission=async(id:number,enabled:boolean)=>{
+    const token=await getAdminSessionToken();
+    const {error}=await supabase.rpc("admin_agent_report_permission",{p_session_token:token,p_agent_id:id,p_enabled:enabled});
+    if(error){alert("Errore REPORT: "+error.message);return;}
+    setReportPermissions(v=>({...v,[id]:enabled}));
+    window.dispatchEvent(new Event("email-recipient-list-updated"));
+  };
   const [productionPermissions,setProductionPermissions]=useState<Record<string,boolean>>({});
   const loadProductionPermissions=async()=>{
     const token=await getAdminSessionToken();
@@ -8783,6 +8796,7 @@ function AgentsAdmin({
     loadAgents();
     loadAdmins();
     void loadProductionPermissions();
+    void loadReportPermissions();
 
     if (adminProfile?.role === "super_admin") {
       setSelectedOwnerAdminId(adminProfile?.id || "");
@@ -9255,6 +9269,7 @@ function AgentsAdmin({
                       ? ["Admin", "Provvigione"]
                       : []),
                     "PRODUZ",
+                    "REPORT",
                     "Azioni",
                   ].map((h) => (
                     <th
@@ -9341,6 +9356,7 @@ function AgentsAdmin({
 )}
   
                     <td style={{padding:8,textAlign:"center"}}><input type="checkbox" aria-label={"PRODUZ "+a.nome+" "+a.cognome} checked={Boolean(productionPermissions[String(a.id)])} onChange={e=>{if(a.id)void toggleProductionPermission(a.id,e.target.checked);}} /></td>
+                    <td style={{padding:8,textAlign:"center"}}><input type="checkbox" aria-label={"REPORT "+a.nome+" "+a.cognome} checked={Boolean(reportPermissions[String(a.id)])} onChange={e=>{if(a.id)void toggleReportPermission(a.id,e.target.checked);}} /></td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
