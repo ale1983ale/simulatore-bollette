@@ -225,6 +225,8 @@ export default function UnifiedAgentManagement({
 }) {
   const [loginAgents, setLoginAgents] = useState<SafeAgentRecord[]>([]);
   const [productionPermissions,setProductionPermissions]=useState<Record<string,boolean>>({});
+  const [pendingProduction,setPendingProduction]=useState<Record<string,boolean>>({});
+  const hasPendingProduction=Object.keys(pendingProduction).length>0;
   const loadProductionPermissions=async()=>{
     const token=await getAdminSessionToken();
     const {data,error}=await supabase.rpc("admin_agent_production_permissions",{p_session_token:token});
@@ -257,7 +259,7 @@ export default function UnifiedAgentManagement({
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const [savedDraftSnapshot,setSavedDraftSnapshot]=useState("");
-  const hasUnsavedChanges=Boolean(draft&&savedDraftSnapshot&&JSON.stringify(draft)!==savedDraftSnapshot);
+  const hasUnsavedChanges=Boolean((draft&&savedDraftSnapshot&&JSON.stringify(draft)!==savedDraftSnapshot)||hasPendingProduction);
   useEffect(()=>{const handler=(event:BeforeUnloadEvent)=>{if(hasUnsavedChanges){event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",handler);return()=>window.removeEventListener("beforeunload",handler);},[hasUnsavedChanges]);
   const [createOpen, setCreateOpen] = useState(false);
   const [createSource, setCreateSource] =
@@ -1298,6 +1300,30 @@ export default function UnifiedAgentManagement({
     }
   };
 
+  const savePendingProduction=async()=>{
+    const pending=Object.entries(pendingProduction);
+    if(!pending.length)return true;
+    setBusy(true);
+    try{
+      const token=await getAdminSessionToken();
+      for(const [id,enabled] of pending){
+        const {error}=await supabase.rpc("admin_agent_production_permission",{p_session_token:token,p_agent_id:Number(id),p_enabled:enabled});
+        if(error)throw error;
+        setProductionPermissions(v=>({...v,[id]:enabled}));
+        setPendingProduction(v=>{const next={...v};delete next[id];return next;});
+      }
+      setNotice("Permessi Produzione salvati.");
+      return true;
+    }catch(error:any){setNotice("Errore salvataggio Produzione: "+(error?.message||error));return false;}
+    finally{setBusy(false);}
+  };
+  const saveAllChanges=async()=>{
+    if(draft&&savedDraftSnapshot&&JSON.stringify(draft)!==savedDraftSnapshot){
+      const row=rows.find(item=>Number(item.agent.id)===expandedId);
+      if(row)await saveRow(row);
+    }
+    if(hasPendingProduction)await savePendingProduction();
+  };
   const saveRow = async (row: (typeof rows)[number]) => {
     if (!draft || !row.agent.id) return;
 
@@ -2710,7 +2736,7 @@ export default function UnifiedAgentManagement({
 
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginLeft:"auto"}}>
             {hasUnsavedChanges&&<strong style={{color:"#b45309",fontSize:12}}>● MODIFICHE NON SALVATE</strong>}
-            <button type="button" disabled={busy||!hasUnsavedChanges} onClick={()=>{const row=rows.find(item=>Number(item.agent.id)===expandedId);if(row)void saveRow(row);}} style={{...buttonStyle,background:hasUnsavedChanges?"#16a34a":"#94a3b8",color:"white",fontSize:16,fontWeight:950,padding:"13px 24px",boxShadow:hasUnsavedChanges?"0 3px 12px #16a34a66":"none",cursor:hasUnsavedChanges?"pointer":"not-allowed",opacity:1}}>{busy?"SALVATAGGIO...":"💾 SALVA MODIFICHE"}</button>
+            <button type="button" disabled={busy||!hasUnsavedChanges} onClick={()=>void saveAllChanges()} style={{...buttonStyle,background:hasUnsavedChanges?"#16a34a":"#94a3b8",color:"white",fontSize:16,fontWeight:950,padding:"13px 24px",boxShadow:hasUnsavedChanges?"0 3px 12px #16a34a66":"none",cursor:hasUnsavedChanges?"pointer":"not-allowed",opacity:1}}>{busy?"SALVATAGGIO...":"💾 SALVA MODIFICHE"}</button>
           </div>
 
           <div style={{ flex: "1 1 100%" }}>
@@ -3403,7 +3429,7 @@ export default function UnifiedAgentManagement({
                         {row.email?.report_notify ? "✅" : "—"}
                       </td>
                       <td style={{padding:"10px 9px",textAlign:"center",borderBottom:"1px solid #f1f5f9"}}>
-                        <input type="checkbox" aria-label={"PRODUZ "+row.fullName} title="Abilita la scheda PRODUZIONE" checked={Boolean(productionPermissions[String(id)])} disabled={busy} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();void toggleProduction(id,e.target.checked);}} style={{width:18,height:18,cursor:"pointer"}} />
+                        <input type="checkbox" aria-label={"PRODUZ "+row.fullName} title="Abilita la scheda PRODUZIONE" checked={pendingProduction[String(id)]??Boolean(productionPermissions[String(id)])} disabled={busy} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();const enabled=e.target.checked;setPendingProduction(v=>{const next={...v};if(enabled===Boolean(productionPermissions[String(id)]))delete next[String(id)];else next[String(id)]=enabled;return next;});}} style={{width:18,height:18,cursor:"pointer"}} />
                       </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         {row.recruiting?.phone || "-"}
