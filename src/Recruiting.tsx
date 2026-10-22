@@ -14,6 +14,7 @@ import { getRecruitingContext, type RecruitingContext } from "./recruitingClient
 import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
 import { italianProvinceFullName } from "./italianProvinces";
 import RecruitingManagement from "./RecruitingManagement";
+import RecruitingTodos, { type TodoDraft } from "./RecruitingTodos";
 import {
   deleteGoogleCalendarEvent,
   disconnectGoogleCalendar,
@@ -1257,6 +1258,7 @@ type RecruitingSection =
   | "contacts"
   | "external_contacts"
   | "calendar"
+  | "todos"
   | "map"
   | "hr_notes"
   | "management"
@@ -1306,6 +1308,8 @@ export default function Recruiting({
     initialSection
   );
   const [loading, setLoading] = useState(true);
+  const [todoDraft, setTodoDraft] = useState<TodoDraft | null>(null);
+  const openTodoDraft = (draft: TodoDraft) => { setTodoDraft(draft); setSection("todos"); };
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [googleCalendarConfigured, setGoogleCalendarConfigured] = useState(false);
@@ -7270,6 +7274,7 @@ export default function Recruiting({
             ["contacts", "CONTATTI", "CONTATTI"],
             ["external_contacts", "CONTATTI ESTERNI", "ESTERNI"],
             ["calendar", "CALENDARIO", "CALENDARIO"],
+            ["todos", "☑ COSE DA FARE", "☑ DA FARE"],
             ["map", "MAPPA", "MAPPA"],
           ].map(([key, label, mobileLabel]) => (
             <button
@@ -10471,8 +10476,23 @@ export default function Recruiting({
         </>
       )}
 
+      {section === "todos" && (
+        <RecruitingTodos ctx={ctx} visible={section === "todos"} draft={todoDraft}
+          onDraftConsumed={() => setTodoDraft(null)}
+          contacts={[
+            ...allCandidates.map(c => ({ id: c.id, name: c.fullName, kind: "candidate" as const })),
+            ...activeAgents.map(a => ({ id: a.id, name: [a.firstName,a.lastName].filter(Boolean).join(" "), kind: "agent" as const }))
+          ]} />
+      )}
+
       {section === "calendar" && (
         <>
+          <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 8 }}>
+            <button type="button" title="Apri Cose da fare" onClick={() => setSection("todos")}
+              style={{ ...buttonStyle, background: "#fef3c7", color: "#92400e", border: "1px solid #f59e0b" }}>
+              ☑ COSE DA FARE
+            </button>
+          </div>
           <div
             style={{
               ...cardStyle,
@@ -11331,6 +11351,15 @@ export default function Recruiting({
                                     ? "Riapri"
                                     : "Fatto"}
                                 </button>
+                                <button type="button" title="Aggiungi alle cose da fare"
+                                  onClick={(e) => { e.stopPropagation(); openTodoDraft({
+                                    title: [eventDisplayLabel(event), candidateName(event.candidateId)].filter(Boolean).join(" · "),
+                                    dueDate: event.eventDate, dueTime: event.eventTime?.slice(0,5),
+                                    body: event.notes, linkedKind: event.candidateId ? "candidate" : undefined,
+                                    linkedId: event.candidateId || undefined, linkedName: candidateName(event.candidateId),
+                                    sourceKey: "hr:"+event.id
+                                  }); }}
+                                  style={{ ...buttonStyle, padding: "3px 6px", fontSize: 10, background: "#fef3c7" }}>☑ DA FARE</button>
                                 <button
                                   type="button"
                                   onClick={(clickEvent) => {
@@ -11497,6 +11526,14 @@ export default function Recruiting({
                                   SCHEDA
                                 </button>
 
+                                <button type="button" title="Aggiungi alle cose da fare"
+                                  onClick={e => { e.stopPropagation(); openTodoDraft({
+                                    title: event.title || cleanClient, dueDate: event.startDate,
+                                    dueTime: event.startTime?.slice(0,5),
+                                    body: [event.notes, "Cliente: "+cleanClient, zone ? "Zona: "+zone : "", event.assignedTo ? "Assegnato a: "+event.assignedTo : ""].filter(Boolean).join("\\n"),
+                                    sourceKey: "crm:"+event.crmEventId
+                                  }); }}
+                                  style={{ border: 0, borderRadius: 5, padding: "4px 6px", background: "#fef3c7", color: "#92400e", fontSize: 9, fontWeight: 900, cursor: "pointer" }}>☑ DA FARE</button>
                                 {phones.length > 0 && (
                                   <button
                                     type="button"
@@ -11589,6 +11626,14 @@ export default function Recruiting({
                                 flexWrap: "wrap",
                               }}
                             >
+                              <button type="button" title="Aggiungi alle cose da fare"
+                                onClick={e => { e.stopPropagation(); openTodoDraft({
+                                  title: event.summary || "Evento Google", dueDate: cell.dateKey,
+                                  dueTime: event.all_day ? "" : event.start_time?.slice(0,5),
+                                  body: [event.description, event.location ? "Luogo: "+event.location : "", "Calendario: "+event.calendar_name].filter(Boolean).join("\\n"),
+                                  sourceKey: "google:"+event.calendar_id+":"+event.id
+                                }); }}
+                                style={{ border: 0, borderRadius: 6, padding: "4px 7px", background: "#fef3c7", color: "#92400e", fontSize: 10, fontWeight: 900, cursor: "pointer" }}>☑ DA FARE</button>
                               <button
                                 type="button"
                                 onClick={(clickEvent) => {
