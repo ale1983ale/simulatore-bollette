@@ -24,17 +24,46 @@ export default function AgentProduction({ token }: { token: string }) {
  const produzione=useMemo(()=>(data?.produzione||[]).filter(r=>matches(r,true)),[data,from,to,commodity,search]);
  const open=(r:Item)=>{setDetailMode("scheda");setDetail(r);setNote(String(r.note||""));setRecovered(Boolean(r.recuperato));setMessage("");};
  const save=async()=>{if(!detail)return;setSaving(true);setMessage("");const {error:e}=await supabase.rpc("agent_recesso_save_note",{p_session_token:token,p_recesso_id:Number(detail.id),p_note:note,p_recuperato:recovered});if(e)setMessage("Errore: "+e.message);else{setMessage("Note salvate");setDetail({...detail,note,recuperato:recovered});await refresh();}setSaving(false);};
+ const months=useMemo(()=>{
+  const valid=(v:string)=>/^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+  const sources=[...(data?.recessi||[]).map(r=>String(r.month_key||r.validita_date||"").slice(0,7)),...(data?.produzione||[]).map(r=>String(r.period_end||r.period_start||"").slice(0,7))].filter(valid);
+  const first=from||sources.sort()[0]||new Date().toISOString().slice(0,7);
+  const last=to||new Date().toISOString().slice(0,7);
+  if(!valid(first)||!valid(last)||first>last)return [] as string[];
+  const result:string[]=[];
+  let year=Number(first.slice(0,4)),month=Number(first.slice(5,7));
+  const max=Number(last.slice(0,4))*12+Number(last.slice(5,7));
+  while(year*12+month<=max&&result.length<240){
+   result.push(String(year)+"-"+String(month).padStart(2,"0"));
+   month++;if(month>12){month=1;year++;}
+  }
+  return result.reverse();
+ },[data,from,to]);
+ const kinds=commodity==="TUTTE"?["LUCE","GAS"]:[commodity];
  const recessSummary=useMemo(()=>{
   const groups=new Map<string,{month:string,commodity:string,count:number,consumo:number,recovered:number}>();
+  for(const month of months)for(const kind of kinds)groups.set(month+"|"+kind,{month,commodity:kind,count:0,consumo:0,recovered:0});
   for(const r of recessi){
-   const month=String(r.month_key||r.validita_date||"SENZA MESE").slice(0,7);
+   const month=String(r.month_key||r.validita_date||"").slice(0,7);
    const kind=String(r.commodity||"N/D").toUpperCase();
    const key=month+"|"+kind;
    const g=groups.get(key)||{month,commodity:kind,count:0,consumo:0,recovered:0};
    g.count++;g.consumo+=Number(r.consumo||0);if(r.recuperato)g.recovered++;groups.set(key,g);
   }
   return Array.from(groups.values()).sort((a,b)=>b.month.localeCompare(a.month)||a.commodity.localeCompare(b.commodity));
- },[recessi]);
+ },[recessi,months,commodity]);
+ const productionSummary=useMemo(()=>{
+  const groups=new Map<string,{month:string,commodity:string,count:number,consumo:number,activation:number}>();
+  for(const month of months)for(const kind of kinds)groups.set(month+"|"+kind,{month,commodity:kind,count:0,consumo:0,activation:0});
+  for(const r of produzione){
+   const month=String(r.period_end||r.period_start||"").slice(0,7);
+   const kind=String(r.commodity||"N/D").toUpperCase();
+   const key=month+"|"+kind;
+   const g=groups.get(key)||{month,commodity:kind,count:0,consumo:0,activation:0};
+   g.count+=Number(r.in_attivazione_count||0);g.consumo+=Number(r.consumo_totale||0);g.activation+=Number(r.in_attivazione_consumo||0);groups.set(key,g);
+  }
+  return Array.from(groups.values()).sort((a,b)=>b.month.localeCompare(a.month)||a.commodity.localeCompare(b.commodity));
+ },[produzione,months,commodity]);
  const recessTotals={count:recessi.length,luce:recessi.filter(r=>String(r.commodity).toUpperCase()==="LUCE").length,gas:recessi.filter(r=>String(r.commodity).toUpperCase()==="GAS").length,consumo:recessi.reduce((n,r)=>n+Number(r.consumo||0),0),recovered:recessi.filter(r=>r.recuperato).length};
  const totalProd=produzione.reduce((n,r)=>n+Number(r.in_attivazione_count||0),0);
  const totalRecessi=recessi.length;
@@ -53,7 +82,7 @@ export default function AgentProduction({ token }: { token: string }) {
    </div>
    <p style={{fontWeight:700}}>Produzione: {totalProd} contratti in attivazione · Recessi: {totalRecessi}</p>
    {tab==="ATTIVO PRODUZIONE" ? <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:15}}><div>Contratti in attivazione: <strong>{totalProd}</strong></div><div>Recessi: <strong>{totalRecessi}</strong></div><div>Differenza: <strong>{totalProd-totalRecessi}</strong></div><div>Consumo produzione: <strong>{number(produzione.reduce((n,r)=>n+Number(r.consumo_totale||0),0))}</strong></div><div>Consumo recessi: <strong>{number(recessi.reduce((n,r)=>n+Number(r.consumo||0),0))}</strong></div></div> : null}
-   {tab==="PRODUZIONE" || tab==="ATTIVO PRODUZIONE" ? <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:640}}><thead><tr>{["PERIODO","FORNITURA","CONTRATTI","CONSUMO TOTALE","IN ATTIVAZIONE CONSUMO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{produzione.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{r.period_label||date(r.period_start)}</td><td>{field(r,"commodity")}</td><td>{number(r.in_attivazione_count)}</td><td>{number(r.consumo_totale)}</td><td>{number(r.in_attivazione_consumo)}</td></tr>)}</tbody></table></div> : null}
+   {tab==="PRODUZIONE" || tab==="ATTIVO PRODUZIONE" ? <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:640}}><thead><tr>{["PERIODO","FORNITURA","CONTRATTI","CONSUMO TOTALE","IN ATTIVAZIONE CONSUMO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{productionSummary.map(r=><tr key={r.month+"|"+r.commodity} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{r.month}</td><td>{r.commodity}</td><td>{number(r.count)}</td><td>{number(r.consumo)}</td><td>{number(r.activation)}</td></tr>)}</tbody></table></div> : null}
    {tab==="RECESSI"&&<div style={{marginTop:14}}>
     <h3>RIEPILOGO RECESSI · PERIODO SELEZIONATO</h3>
     <p style={{color:"#64748b"}}>{from||"Inizio archivio"} — {to||"Ultimo mese disponibile"} · Solo i recessi dell'agente collegato</p>
