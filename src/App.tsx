@@ -1,3 +1,4 @@
+import { confirmAction } from "./confirmAction";
 import MunicipalOffers from "./MunicipalOffers";
 import PunPsvMonitoringPanel from "./PunPsvMonitoringPanel";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -1642,7 +1643,7 @@ function SavedSimulationsModal({
   ) => {
     if (archiveView !== "personal") return;
     if (
-      !window.confirm(
+      !await confirmAction(
         `Vuoi eliminare la simulazione "${simulation.name}"?`
       )
     ) {
@@ -1674,7 +1675,7 @@ function SavedSimulationsModal({
     if (archiveView !== "personal" || items.length === 0) return;
 
     if (
-      !window.confirm(
+      !await confirmAction(
         `Vuoi eliminare tutte le simulazioni ${type === "energy" ? "Energia" : "Gas"} salvate?`
       )
     ) {
@@ -1682,7 +1683,7 @@ function SavedSimulationsModal({
     }
 
     if (
-      !window.confirm(
+      !await confirmAction(
         "Conferma definitiva: questa operazione non può essere annullata."
       )
     ) {
@@ -3502,9 +3503,9 @@ function Energia({
     return () => window.clearTimeout(timer);
   }, [lastEnergyInputAt]);
 
-  const resetEnergySimulation = () => {
+  const resetEnergySimulation = async () => {
     if (
-      !window.confirm(
+      !await confirmAction(
         "Vuoi iniziare una nuova simulazione Energia? Tutti i dati inseriti verranno cancellati."
       )
     ) return;
@@ -5602,9 +5603,9 @@ function Gas({
     return () => window.clearTimeout(timer);
   }, [lastGasInputAt]);
 
-  const resetGasSimulation = () => {
+  const resetGasSimulation = async () => {
     if (
-      !window.confirm(
+      !await confirmAction(
         "Vuoi iniziare una nuova simulazione Gas? Tutti i dati inseriti verranno cancellati."
       )
     ) return;
@@ -8879,7 +8880,7 @@ function AgentsAdmin({
   const deleteAgent = async (agentId?: number) => {
     if (!agentId) return;
 
-    const ok = window.confirm("Vuoi eliminare questo agente?");
+    const ok = await confirmAction("Vuoi eliminare questo agente?");
     if (!ok) return;
 
     try {
@@ -8976,13 +8977,13 @@ function AgentsAdmin({
     });
 
     if (missing.length) {
-      const ok = window.confirm(
+      const ok = await confirmAction(
         `Ci sono ${missing.length} account con password ancora vuota. Vuoi salvare comunque le altre password modificate?`
       );
       if (!ok) return;
     }
 
-    const ok = window.confirm(
+    const ok = await confirmAction(
       `Vuoi aggiornare ${changed.length} password agente?`
     );
     if (!ok) return;
@@ -10296,7 +10297,7 @@ function ReportAgent({ agentSession }: { agentSession: any }) {
   const deleteReport = async (reportId: number) => {
     if (!agentSession) return;
 
-    const ok = window.confirm("Vuoi davvero cancellare questo report?");
+    const ok = await confirmAction("Vuoi davvero cancellare questo report?");
     if (!ok) return;
 
     const { error } = await supabase
@@ -10748,7 +10749,7 @@ function ReportAdmin({
   }, [mode, dateFrom, dateTo]);
 
   const deleteReportAdmin = async (reportId: number) => {
-    const ok = window.confirm("Vuoi davvero cancellare questo report?");
+    const ok = await confirmAction("Vuoi davvero cancellare questo report?");
     if (!ok) return;
 
     let query = supabase.from("reports").delete().eq("id", reportId);
@@ -12350,7 +12351,7 @@ function AdminUsersManager({
   const deleteAdmin = async (adminId?: number) => {
     if (!adminId) return;
 
-    const ok = window.confirm("Vuoi eliminare questo admin?");
+    const ok = await confirmAction("Vuoi eliminare questo admin?");
     if (!ok) return;
 
     try {
@@ -12428,7 +12429,7 @@ function AdminUsersManager({
       return;
     }
 
-    const ok = window.confirm(
+    const ok = await confirmAction(
       `Vuoi aggiornare ${changed.length} password admin?`
     );
     if (!ok) return;
