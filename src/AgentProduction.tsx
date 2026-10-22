@@ -11,7 +11,7 @@ const field = (row: Item, key: string) => row[key] == null || row[key] === "" ? 
 export default function AgentProduction({ token }: { token: string }) {
  const [data,setData]=useState<Data|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true);
  const [tab,setTab]=useState("RECESSI"),[search,setSearch]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[commodity,setCommodity]=useState("TUTTE");
- const [detail,setDetail]=useState<Item|null>(null),[note,setNote]=useState(""),[recovered,setRecovered]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState("");
+ const [detail,setDetail]=useState<Item|null>(null),[detailMode,setDetailMode]=useState<"scheda"|"note">("scheda"),[note,setNote]=useState(""),[recovered,setRecovered]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState("");
  const refresh=async()=>{setLoading(true);setError("");const {data:result,error:failure}=await supabase.rpc("agent_production_data",{p_session_token:token});if(failure)setError(failure.message);else setData(result as Data);setLoading(false);};
  useEffect(()=>{void refresh();},[token]);
  const isProduction=tab==="PRODUZIONE";
@@ -22,7 +22,7 @@ export default function AgentProduction({ token }: { token: string }) {
  };
  const recessi=useMemo(()=>(data?.recessi||[]).filter(r=>matches(r,false)),[data,from,to,commodity,search]);
  const produzione=useMemo(()=>(data?.produzione||[]).filter(r=>matches(r,true)),[data,from,to,commodity,search]);
- const open=(r:Item)=>{setDetail(r);setNote(String(r.note||""));setRecovered(Boolean(r.recuperato));setMessage("");};
+ const open=(r:Item)=>{setDetailMode("scheda");setDetail(r);setNote(String(r.note||""));setRecovered(Boolean(r.recuperato));setMessage("");};
  const save=async()=>{if(!detail)return;setSaving(true);setMessage("");const {error:e}=await supabase.rpc("agent_recesso_save_note",{p_session_token:token,p_recesso_id:Number(detail.id),p_note:note,p_recuperato:recovered});if(e)setMessage("Errore: "+e.message);else{setMessage("Note salvate");setDetail({...detail,note,recuperato:recovered});await refresh();}setSaving(false);};
  const recessSummary=useMemo(()=>{
   const groups=new Map<string,{month:string,commodity:string,count:number,consumo:number,recovered:number}>();
@@ -65,13 +65,53 @@ export default function AgentProduction({ token }: { token: string }) {
     <p style={{color:"#64748b",fontSize:13}}>Per aprire un singolo recesso, consultare la sottoscheda DETTAGLIO RECESSI.</p>
    </div>}
    {tab==="DETTAGLIO RECESSI"&&<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}><thead><tr>{["MESE","CLIENTE","POD/PDR","FORNITURA","CONSUMO","NOTE","DETTAGLIO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{recessi.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{r.month_key||date(r.validita_date)}</td><td>{field(r,"denominazione")}</td><td>{field(r,"pod_pdr")}</td><td>{field(r,"commodity")}</td><td>{number(r.consumo)}</td><td>{r.note||"—"}</td><td><button onClick={()=>open(r)}>APRI</button></td></tr>)}</tbody></table></div>}
-   {detail&&<div role="presentation" onClick={()=>setDetail(null)} style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.5)",display:"grid",placeItems:"center",padding:12}}><div role="dialog" aria-modal="true" aria-label="Dettaglio recesso" onClick={e=>e.stopPropagation()} style={{background:"white",borderRadius:14,padding:20,width:"min(760px,100%)",maxHeight:"90vh",overflow:"auto"}}><div style={{display:"flex",justifyContent:"space-between"}}><h3>DETTAGLIO RECESSO</h3><button onClick={()=>setDetail(null)}>CHIUDI ✕</button></div>
-    <dl style={{display:"grid",gridTemplateColumns:"minmax(110px,1fr) 2fr",gap:8}}>{Object.entries(detail).filter(([k])=>!["note_history","note","recuperato"].includes(k)).map(([k,v])=><React.Fragment key={k}><dt style={{fontWeight:700}}>{label(k)}</dt><dd style={{margin:0,overflowWrap:"anywhere"}}>{typeof v==="object"?JSON.stringify(v):String(v??"—")}</dd></React.Fragment>)}</dl>
-    <label style={{display:"block",fontWeight:700}}>NOTE<textarea rows={4} value={note} onChange={e=>setNote(e.target.value)} style={{display:"block",width:"100%",padding:10,boxSizing:"border-box"}}/></label>
-    <label style={{display:"block",margin:"12px 0"}}><input type="checkbox" checked={recovered} onChange={e=>setRecovered(e.target.checked)}/> RECESSO RECUPERATO</label>
-    <button disabled={saving} onClick={()=>void save()} style={{padding:12,fontWeight:800}}>{saving?"SALVATAGGIO…":"SALVA NOTE E STATO"}</button>{message&&<p role="status">{message}</p>}
-    <h4>STORICO NOTE</h4>{(detail.note_history||[]).map((h:Item,i:number)=><p key={i} style={{borderBottom:"1px solid #ddd",padding:8}}>{date(h.created_at)} — {h.note}</p>)}
-   </div></div>}
+   {detail&&<div role="presentation" onClick={()=>{if(!saving)setDetail(null);}}
+     style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:14}}>
+     <div role="dialog" aria-modal="true" aria-label="Dettaglio recesso" onClick={e=>e.stopPropagation()}
+      style={{width:"min(760px,100%)",maxHeight:"90vh",overflowY:"auto",background:"white",borderRadius:18,padding:22,boxSizing:"border-box",boxShadow:"0 20px 70px #0004"}}>
+      <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center"}}>
+       <h3 style={{margin:0}}>{detailMode==="note"?"📝 NOTE RECESSO":"📋 SCHEDA RECESSO"}</h3>
+       <button type="button" disabled={saving} onClick={()=>setDetail(null)}
+        style={{border:0,borderRadius:9,padding:"9px 13px",background:"#e2e8f0",cursor:"pointer"}}>✕ CHIUDI</button>
+      </div>
+      <p style={{fontWeight:800,color:"#334155"}}>{detail.denominazione}</p>
+      {detailMode==="scheda"?<>
+       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12}}>
+        {Object.entries(detail.raw&&typeof detail.raw==="object"?detail.raw:{
+         "DATA VALIDITÀ":date(detail.validita_date),"MESE RECESSO":detail.month_key,
+         "AGENTE":detail.agente,"CLIENTE":detail.denominazione,"POD/PDR":detail.pod_pdr,
+         "FORNITURA":detail.commodity,"CONSUMO":detail.consumo
+        }).map(([key,value])=><div key={key} style={{overflowWrap:"anywhere",padding:9,background:"#f8fafc",borderRadius:9}}>
+         <div style={{fontSize:11,fontWeight:800,color:"#64748b"}}>{key}</div>
+         <div>{String(value||"—")}</div>
+        </div>)}
+       </div>
+       <div style={{marginTop:16,padding:12,background:"#f0f9ff",borderRadius:10}}>
+        <strong>STORICO NOTE · DALLA PIÙ RECENTE</strong>
+        {(detail.note_history||[]).map((h:Item,i:number)=><div key={i} style={{padding:"9px 0",borderBottom:"1px solid #cbd5e1"}}>
+         <div style={{fontSize:12,color:"#64748b"}}>{h.created_at?new Date(h.created_at).toLocaleString("it-IT"):"—"}</div>
+         <div style={{whiteSpace:"pre-wrap"}}>{h.note}</div>
+        </div>)}
+        {!(detail.note_history||[]).length&&<p style={{fontSize:13,color:"#64748b"}}>Nessuna nota nello storico.</p>}
+       </div>
+       <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
+        <button type="button" onClick={()=>setDetailMode("note")}
+         style={{border:0,borderRadius:10,padding:"12px 16px",background:"#ffedd5",color:"#9a3412",fontWeight:850,cursor:"pointer"}}>📝 NOTE</button>
+       </div>
+      </>:<div style={{display:"grid",gap:12}}>
+       <textarea rows={6} value={note} onChange={e=>setNote(e.target.value)}
+        placeholder="Scrivi qui le note relative al recesso..."
+        style={{width:"100%",padding:12,borderRadius:10,border:"1px solid #cbd5e1",boxSizing:"border-box",font:"inherit"}}/>
+       <label><input type="checkbox" checked={recovered} onChange={e=>setRecovered(e.target.checked)}/> RECESSO RECUPERATO</label>
+       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <button type="button" onClick={()=>setDetailMode("scheda")} style={{padding:12,borderRadius:10,border:0}}>← SCHEDA RECESSO</button>
+        <button type="button" disabled={saving} onClick={()=>void save()}
+         style={{border:0,borderRadius:10,padding:12,background:"#16a34a",color:"white",fontWeight:850,cursor:"pointer"}}>{saving?"SALVATAGGIO…":"SALVA NOTE"}</button>
+       </div>
+       {message&&<p role="status">{message}</p>}
+      </div>}
+     </div>
+    </div>}
   </>}
  </section>;
 }
