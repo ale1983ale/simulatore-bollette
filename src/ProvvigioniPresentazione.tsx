@@ -1,18 +1,19 @@
 import React,{useEffect,useRef,useState} from "react";
 import {supabase} from "./supabase";
 import {getAdminSessionToken} from "./adminSecurity";
+import PdfEditor from "./PdfEditor";
 
 type Document={id:number;nome:string;dimensione_bytes:number;creato_il:string};
 const button:React.CSSProperties={padding:"10px 14px",borderRadius:10,border:"1px solid #cbd5e1",background:"white",color:"#0f172a",fontWeight:800,cursor:"pointer"};
 const toBase64=(file:File)=>new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("Lettura PDF non riuscita"));reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");reader.readAsDataURL(file);});
 export default function ProvvigioniPresentazione(){
- const [documents,setDocuments]=useState<Document[]>([]),[selected,setSelected]=useState<number|null>(null),[url,setUrl]=useState(""),[zoom,setZoom]=useState(100),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [documents,setDocuments]=useState<Document[]>([]),[selected,setSelected]=useState<number|null>(null),[url,setUrl]=useState(""),[pdfBase64,setPdfBase64]=useState(""),[zoom,setZoom]=useState(100),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const objectUrl=useRef("");
- const clearUrl=()=>{if(objectUrl.current){URL.revokeObjectURL(objectUrl.current);objectUrl.current="";}setUrl("");};
+ const clearUrl=()=>{if(objectUrl.current){URL.revokeObjectURL(objectUrl.current);objectUrl.current="";}setUrl("");setPdfBase64("");};
  useEffect(()=>()=>{if(objectUrl.current)URL.revokeObjectURL(objectUrl.current);},[]);
  const list=async()=>{const token=await getAdminSessionToken();const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_list",{p_session_token:token});if(e)throw e;setDocuments(Array.isArray(data)?data:[]);};
  useEffect(()=>{void list().catch(e=>setError(e.message));},[]);
- const open=async(id:number)=>{setBusy(true);setError("");clearUrl();try{const token=await getAdminSessionToken();const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_get",{p_session_token:token,p_id:id});if(e)throw e;const bytes=Uint8Array.from(atob(String(data)),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:"application/pdf"});objectUrl.current=URL.createObjectURL(blob);setUrl(objectUrl.current);setSelected(id);setZoom(100);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
+ const open=async(id:number)=>{setBusy(true);setError("");clearUrl();try{const token=await getAdminSessionToken();const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_get",{p_session_token:token,p_id:id});if(e)throw e;const bytes=Uint8Array.from(atob(String(data)),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:"application/pdf"});objectUrl.current=URL.createObjectURL(blob);setUrl(objectUrl.current);setPdfBase64(String(data));setSelected(id);setZoom(100);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const upload=async(event:React.ChangeEvent<HTMLInputElement>)=>{const file=event.target.files?.[0];event.target.value="";if(!file)return;if(file.size>8388608){setError("Dimensione massima: 8 MB per PDF.");return;}setBusy(true);setError("");setNotice("");try{const head=new Uint8Array(await file.slice(0,5).arrayBuffer());if(String.fromCharCode(...head)!=="%PDF-")throw new Error("Seleziona un file PDF valido.");const token=await getAdminSessionToken();const b64=await toBase64(file);const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_add",{p_session_token:token,p_nome:file.name,p_pdf_base64:b64});if(e)throw e;await list();setNotice("PDF caricato correttamente.");if(data)await open(Number(data));}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const remove=async(doc:Document)=>{if(!window.confirm("Eliminare definitivamente "+doc.nome+"?"))return;setBusy(true);setError("");try{const token=await getAdminSessionToken();const {error:e}=await supabase.rpc("provvigioni_presentazioni_delete",{p_session_token:token,p_id:doc.id});if(e)throw e;if(selected===doc.id){setSelected(null);clearUrl();}await list();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const selectedName=documents.find(d=>d.id===selected)?.nome||"";
@@ -39,18 +40,9 @@ export default function ProvvigioniPresentazione(){
    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:14,minWidth:0}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",marginBottom:12}}>
      <strong style={{overflowWrap:"anywhere"}}>{selectedName||"ANTEPRIMA PDF"}</strong>
-     {url&&<div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-      <button style={button} onClick={()=>setZoom(v=>Math.max(50,v-25))} title="Riduci">−</button>
-      <strong>{zoom}%</strong>
-      <button style={button} onClick={()=>setZoom(v=>Math.min(200,v+25))} title="Ingrandisci">＋</button>
-      <button style={button} onClick={()=>setZoom(100)}>100%</button>
-      <a href={url} target="_blank" rel="noopener noreferrer" style={{...button,textDecoration:"none"}}>↗ SCHERMO INTERO</a>
-     </div>}
+     {url&&<a href={url} target="_blank" rel="noopener noreferrer" style={{...button,textDecoration:"none"}}>↗ APRI ORIGINALE</a>}
     </div>
-    {url?<div style={{height:"min(76vh,950px)",minHeight:460,overflow:"auto",border:"1px solid #cbd5e1",borderRadius:10,background:"#e2e8f0"}}>
-      <iframe key={selected+"-"+zoom} title={"PDF "+selectedName} src={url+"#toolbar=1&navpanes=0&zoom="+zoom} style={{width:"100%",height:"100%",border:0}}/>
-     </div>:<div style={{minHeight:360,display:"grid",placeItems:"center",background:"#f8fafc",borderRadius:12,color:"#64748b",textAlign:"center",padding:20}}>{busy?"Caricamento PDF…":"Seleziona un documento per visualizzarlo qui."}</div>}
-    {url&&<p style={{fontSize:12,color:"#64748b",marginBottom:0}}>Puoi usare ricerca, selezione del testo e strumenti di annotazione disponibili nel visualizzatore PDF del tuo browser. Le evidenziazioni dipendono dal browser e non vengono salvate nell'archivio.</p>}
+    {pdfBase64&&selected!==null?<PdfEditor key={selected} base64={pdfBase64} documentId={selected} filename={selectedName}/>:<div style={{minHeight:360,display:"grid",placeItems:"center",background:"#f8fafc",borderRadius:12,color:"#64748b",textAlign:"center",padding:20}}>{busy?"Caricamento PDF…":"Seleziona un documento per visualizzarlo qui."}</div>}
    </div>
   </div>
  </div>;
