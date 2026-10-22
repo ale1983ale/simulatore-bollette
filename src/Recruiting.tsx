@@ -1273,6 +1273,7 @@ type CandidateSortMode =
 
 export default function Recruiting({
   initialSection = "contacts",
+  calendarOpenRequest,
   contactScope = "internal",
   contactsOnly = false,
   hideNavigation = false,
@@ -1281,6 +1282,7 @@ export default function Recruiting({
   onAddToAgents,
 }: {
   initialSection?: RecruitingSection;
+  calendarOpenRequest?: { sourceKey: string; date: string | null; requestId: number } | null;
   contactScope?: RecruitingContactScope;
   contactsOnly?: boolean;
   hideNavigation?: boolean;
@@ -5386,15 +5388,19 @@ export default function Recruiting({
       (event) => event.id === crmDetailEventId
     ) || null;
 
-  // Apri direttamente la scheda dell'evento originale proveniente dalle Cose da fare.
-  // I dati possono arrivare dopo il primo render: attendiamo che le fonti siano caricate.
+  // Apri il dettaglio originale quando gli eventi sono disponibili.
+  const openedCalendarRequestRef = useRef<number | null>(null);
   useEffect(() => {
-    if (section !== "calendar") return;
-    const sourceKey = window.sessionStorage.getItem("ge_calendar_open_source");
-    if (!sourceKey) return;
+    if (section !== "calendar" || !calendarOpenRequest) return;
+    if (openedCalendarRequestRef.current === calendarOpenRequest.requestId) return;
+    const sourceKey = calendarOpenRequest.sourceKey;
     const separator = sourceKey.indexOf(":");
     const origin = sourceKey.slice(0, separator);
     const identifier = sourceKey.slice(separator + 1);
+    if (calendarOpenRequest.date && /^\d{4}-\d{2}-\d{2}$/.test(calendarOpenRequest.date)) {
+      setCalendarMonth(calendarOpenRequest.date.slice(0, 7));
+      setCalendarDate(calendarOpenRequest.date);
+    }
     if (origin === "hr") {
       const found = events.find(event => event.id === identifier);
       if (!found) return;
@@ -5408,11 +5414,10 @@ export default function Recruiting({
       if (!found) return;
       setGoogleDetailEvent(found);
     } else {
-      window.sessionStorage.removeItem("ge_calendar_open_source");
-      return;
+      setMessage("Origine evento non riconosciuta.");
     }
-    window.sessionStorage.removeItem("ge_calendar_open_source");
-  }, [section, events, crmCalendarEvents, googleExternalEvents]);
+    openedCalendarRequestRef.current = calendarOpenRequest.requestId;
+  }, [section, calendarOpenRequest, events, crmCalendarEvents, googleExternalEvents]);
 
   const calendarContactPreview =
     allCandidates.find(
