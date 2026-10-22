@@ -44,7 +44,7 @@ export default function PdfEditor({base64,documentId,filename}:Props){
  })();
  return()=>{cancelled=true;tasks.forEach(t=>{try{t.cancel();}catch{}});};
  },[pdf,pages,zoom]);
- useEffect(()=>{if(!lens||!lensCanvas.current)return;const source=canvasRefs.current[lens.page];const target=lensCanvas.current;if(!source)return;const ctx=target.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,200,200);const sx=lens.x*source.width,sy=lens.y*source.height;const sample=65;ctx.fillStyle="white";ctx.fillRect(0,0,200,200);ctx.drawImage(source,Math.max(0,sx-sample/2),Math.max(0,sy-sample/2),Math.min(sample,source.width-Math.max(0,sx-sample/2)),Math.min(sample,source.height-Math.max(0,sy-sample/2)),0,0,200,200);},[lens]);
+ useEffect(()=>{if(!lens||!lensCanvas.current)return;const source=canvasRefs.current[lens.page];const target=lensCanvas.current;if(!source)return;const ctx=target.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,280,280);const sx=lens.x*source.width,sy=lens.y*source.height;const sample=130;ctx.fillStyle="white";ctx.fillRect(0,0,280,280);ctx.drawImage(source,Math.max(0,sx-sample/2),Math.max(0,sy-sample/2),Math.min(sample,source.width-Math.max(0,sx-sample/2)),Math.min(sample,source.height-Math.max(0,sy-sample/2)),0,0,280,280);},[lens]);
  const save=async()=>{setBusy(true);setStatus("");try{const token=await getAdminSessionToken();const {error}=await supabase.rpc("provvigioni_presentazioni_annotations_save",{p_session_token:token,p_id:documentId,p_annotazioni:marksRef.current});if(error)throw error;setDirty(false);setStatus("Annotazioni salvate.");}catch(e:any){setStatus("Errore salvataggio: "+e.message);}finally{setBusy(false);}};
  const start=(event:React.PointerEvent<SVGSVGElement>,page:number)=>{
   if(tool==="move"||tool==="magnify")return;
@@ -71,14 +71,32 @@ export default function PdfEditor({base64,documentId,filename}:Props){
   return <text key={index} x={mark.x*1000} y={mark.y*1000} fill={mark.color} fontSize="25" fontWeight="bold">{mark.text}</text>;
  };
  return <div style={{display:"grid",gap:12,...(full?{position:"fixed" as const,inset:0,zIndex:30000,background:"#f8fafc",padding:10,overflow:"hidden",gridTemplateRows:"auto auto minmax(0,1fr) auto"}:{})}}>
-  <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:12,background:"#f1f5f9",borderRadius:12}}>
-   <strong style={{flex:"1 1 190px",overflowWrap:"anywhere"}}>📄 {filename} · {pages.length} pagine</strong>
-   <button style={{...toolButton,background:full?"#fee2e2":"#f97316",color:full?"#991b1b":"white"}} onClick={()=>{setFull(v=>!v);setLens(null);}}>{full?"✕ CHIUDI SCHERMO INTERO":"⛶ APRI A SCHERMO INTERO"}</button>
-   <button style={toolButton} onClick={()=>setZoom(v=>Math.max(50,v-25))}>−</button><strong>{zoom}%</strong><button style={toolButton} onClick={()=>setZoom(v=>Math.min(200,v+25))}>＋</button>
-   {([["move","✋ SPOSTA"],["magnify","🔎 LENTE 3×"],["pen","✏️ DISEGNA"],["highlight","🟨 EVIDENZIA"],["text","🔤 SCRIVI"]] as const).map(([id,title])=><button key={id} onClick={()=>setTool(id)} style={{...toolButton,background:tool===id?"#0f172a":"white",color:tool===id?"white":"#0f172a"}}>{title}</button>)}
-   <button style={toolButton} onClick={()=>{const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last){changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});}}}>↶ ANNULLA ULTIMA</button>
-   <button disabled={!dirty||busy} onClick={()=>void save()} style={{...toolButton,background:"#16a34a",color:"white",opacity:!dirty||busy?.55:1}}>💾 SALVA ANNOTAZIONI</button>
-  </div>
+  {full?<div style={{display:"flex",alignItems:"center",gap:5,padding:"7px 5px",background:"#172235",borderRadius:12,overflow:"hidden",minWidth:0}}>
+    {([
+      {id:"magnify",symbol:"🔎",name:"Lente 2×",color:"#38bdf8"},
+      {id:"pen",symbol:"🖍️",name:"Penna",color:"#fb7185"},
+      {id:"highlight",symbol:"🖊️",name:"Evidenzia",color:"#fde047"},
+      {id:"undo",symbol:"↶",name:"Annulla",color:"#c4b5fd"},
+      {id:"text",symbol:"𝐓",name:"Scrivi",color:"#fbbf24"},
+      {id:"move",symbol:"✋",name:"Sposta",color:"#7dd3fc"},
+      {id:"save",symbol:"💾",name:"Salva",color:"#86efac"}
+    ] as const).map(item=><button key={item.id} type="button" title={item.name} aria-label={item.name}
+      disabled={(item.id==="save"&&(!dirty||busy))}
+      onClick={()=>{if(item.id==="save"){void save();return;}if(item.id==="undo"){const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});return;}setTool(item.id);setLens(null);}}
+      style={{flex:"1 1 0",minWidth:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 1px",borderRadius:9,border:tool===item.id?"2px solid #f97316":"1px solid #475569",background:tool===item.id?"#334155":"#24344c",cursor:"pointer",opacity:item.id==="save"&&(!dirty||busy)?.5:1}}>
+      <span aria-hidden="true" style={{fontSize:"clamp(16px,4.4vw,23px)",lineHeight:1.15,color:item.color,fontWeight:900}}>{item.symbol}</span>
+      <span style={{fontSize:"clamp(8px,2vw,11px)",fontWeight:800,color:"#ffffff",whiteSpace:"nowrap"}}>{item.name}</span>
+    </button>)}
+    <button type="button" title="Chiudi schermo intero" aria-label="Chiudi schermo intero" onClick={()=>{setFull(false);setLens(null);}}
+      style={{border:0,borderRadius:9,background:"#7f1d1d",color:"white",fontSize:20,fontWeight:900,padding:"9px 7px",flex:"0 0 auto",cursor:"pointer"}}>×</button>
+   </div>:<div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:12,background:"#f1f5f9",borderRadius:12}}>
+    <strong style={{flex:"1 1 190px",overflowWrap:"anywhere"}}>📄 {filename} · {pages.length} pagine</strong>
+    <button style={{...toolButton,background:"#f97316",color:"white"}} onClick={()=>{setFull(true);setLens(null);}}>⛶ APRI A SCHERMO INTERO</button>
+    <button style={toolButton} onClick={()=>setZoom(v=>Math.max(50,v-25))}>−</button><strong>{zoom}%</strong><button style={toolButton} onClick={()=>setZoom(v=>Math.min(200,v+25))}>＋</button>
+    {([["move","✋ SPOSTA"],["magnify","🔎 LENTE 2×"],["pen","🖍️ DISEGNA"],["highlight","🟨 EVIDENZIA"],["text","🔤 SCRIVI"]] as const).map(([id,title])=><button key={id} onClick={()=>setTool(id)} style={{...toolButton,background:tool===id?"#0f172a":"white",color:tool===id?"white":"#0f172a"}}>{title}</button>)}
+    <button style={toolButton} onClick={()=>{const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});}}>↶ ANNULLA</button>
+    <button disabled={!dirty||busy} onClick={()=>void save()} style={{...toolButton,background:"#16a34a",color:"white",opacity:!dirty||busy?.55:1}}>💾 SALVA</button>
+   </div>}
   {status&&<p role="status" style={{fontWeight:700,color:status.startsWith("Errore")?"#b91c1c":"#15803d"}}>{status}</p>}
   <div style={{height:full?"100%":"min(75vh,980px)",minHeight:full?0:450,overflow:"auto",background:"#cbd5e1",padding:12,borderRadius:12}}>
    {pages.map(page=><div key={page} style={{position:"relative",width:"fit-content",maxWidth:"none",margin:"0 auto 18px",background:"white",boxShadow:"0 3px 14px #0f172a30"}}>
@@ -89,7 +107,7 @@ export default function PdfEditor({base64,documentId,filename}:Props){
     </svg>
     <div style={{position:"absolute",bottom:8,right:8,background:"#0f172acb",color:"white",borderRadius:8,padding:"3px 8px",fontSize:12,pointerEvents:"none"}}>Pagina {page}</div>
    </div>)}
-   {tool==="magnify"&&lens&&<div style={{position:"fixed",left:Math.min(lens.screenX+22,window.innerWidth-216),top:Math.max(12,Math.min(lens.screenY-220,window.innerHeight-216)),width:200,height:200,border:"4px solid #f97316",borderRadius:"50%",overflow:"hidden",pointerEvents:"none",boxShadow:"0 8px 25px #0006",zIndex:31000,background:"white"}}><canvas ref={lensCanvas} width={200} height={200} style={{width:200,height:200}}/></div>}
+   {tool==="magnify"&&lens&&<div style={{position:"fixed",left:Math.min(lens.screenX+22,window.innerWidth-296),top:Math.max(12,Math.min(lens.screenY-300,window.innerHeight-296)),width:280,height:280,border:"4px solid #f97316",borderRadius:"50%",overflow:"hidden",pointerEvents:"none",boxShadow:"0 8px 25px #0006",zIndex:31000,background:"white"}}><canvas ref={lensCanvas} width={280} height={280} style={{width:280,height:280}}/></div>}
    {!pdf&&<p style={{textAlign:"center",padding:30}}>Caricamento pagine PDF…</p>}
   </div>
   <p style={{fontSize:12,color:"#64748b"}}>Disegni, evidenziazioni e testi sono salvati separatamente dal PDF originale e visibili riaprendo il documento. Tocca SALVA ANNOTAZIONI prima di uscire.</p>
