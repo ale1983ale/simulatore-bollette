@@ -161,13 +161,6 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           <strong style={{ textDecoration: item.completed?"line-through":"none" }}>{item.priority&&!item.completed?"★ ":""}{item.title}</strong>
           <span style={{ color: "#475569", fontSize: 12 }}>{item.due_date ? item.due_date.split("-").reverse().join("/") : "Senza data"} {item.due_time?.slice(0,5)||""}</span>
         </div>
-        {item.source_key && /^(hr|crm|google):/.test(item.source_key) && (
-          <button type="button" title="Apri Calendario" aria-label="Apri Calendario"
-            onClick={() => window.dispatchEvent(new CustomEvent("ge:open-recruiting-calendar", { detail: { date: item.due_date } }))}
-            style={{ ...action, marginTop: 7, background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }}>
-            📅 CALENDARIO
-          </button>
-        )}
         {item.linked_name && <div style={{ fontSize: 13, marginTop: 5 }}>👤 {item.linked_name}</div>}
         {item.body && <div style={{ marginTop: 7, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.body}</div>}
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 10 }}>
@@ -175,6 +168,13 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           <button style={action} onClick={()=>startEdit(item)}>MODIFICA</button>
           <button style={action} onClick={()=>void change(item,{priority:!item.priority})}>{item.priority?"TOGLI PRIORITÀ":"★ PRIORITÀ"}</button>
           <button style={{...action,color:"#b91c1c"}} onClick={async()=>{if(!ctx || !window.confirm("Eliminare questa cosa da fare?"))return;const {error}=await ctx.client.from("recruiting_todos").delete().eq("owner_key",ctx.ownerKey).eq("id",item.id);if(error)setMessage(error.message);else await load();}}>ELIMINA</button>
+          {item.source_key && /^(hr|crm|google):/.test(item.source_key) && (
+            <button type="button" title="Apri scheda originale nel Calendario" aria-label="Apri scheda originale nel Calendario"
+              onClick={() => window.dispatchEvent(new CustomEvent("ge:open-recruiting-calendar", { detail: { date: item.due_date, sourceKey: item.source_key } }))}
+              style={{ ...action, background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }}>
+              📅 CALENDARIO
+            </button>
+          )}
         </div>
       </div>)}
     </div>
