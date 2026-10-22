@@ -2708,6 +2708,11 @@ export default function UnifiedAgentManagement({
             </div>
           </div>
 
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginLeft:"auto"}}>
+            {hasUnsavedChanges&&<strong style={{color:"#b45309",fontSize:12}}>● MODIFICHE NON SALVATE</strong>}
+            <button type="button" disabled={busy||expandedId===null||!draft} onClick={()=>{const row=rows.find(item=>Number(item.agent.id)===expandedId);if(row)void saveRow(row);}} style={{...buttonStyle,background:expandedId===null?"#94a3b8":"#16a34a",color:"white",fontSize:16,fontWeight:950,padding:"13px 24px",boxShadow:"0 3px 10px #16a34a33"}}>{busy?"SALVATAGGIO...":"💾 SALVA MODIFICHE"}</button>
+          </div>
+
           <div style={{ flex: "1 1 100%" }}>
             <AgentManagementToolbar active="login" />
           </div>
