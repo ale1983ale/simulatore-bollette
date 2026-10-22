@@ -973,6 +973,18 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [detailModal, setDetailModal] = useState<RecessoRow | null>(null);
   const [detailNotesRow, setDetailNotesRow] = useState<RecessoRow | null>(null);
   const [detailNotesText, setDetailNotesText] = useState("");
+  const [detailSubsection, setDetailSubsection] = useState<"list" | "notes">("list");
+  const [detailNoteHistory, setDetailNoteHistory] = useState<Array<{id:number;recesso_id:number;note:string;created_at:string}>>([]);
+  const [detailNotesLoading, setDetailNotesLoading] = useState(false);
+  const loadDetailNoteHistory = async () => {
+    setDetailNotesLoading(true);
+    const {data,error}=await supabase.from("archive_recessi_note_history")
+      .select("id,recesso_id,note,created_at").order("created_at",{ascending:false}).limit(5000);
+    if(error)setDetailMessage("Errore caricamento storico note: "+error.message);
+    else setDetailNoteHistory(data||[]);
+    setDetailNotesLoading(false);
+  };
+  useEffect(()=>{if(archiveSection==="dettaglioRecessi")void loadDetailNoteHistory();},[archiveSection]);
   const [detailNotes, setDetailNotes] = useState<Record<string,string>>({});
   const [detailRecovered, setDetailRecovered] = useState<Record<string,boolean>>({});
   const [detailRecovering, setDetailRecovering] = useState<string | null>(null);
@@ -1008,12 +1020,19 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const saveDetailNote = async () => {
     if (!detailNotesRow) return;
     setDetailBusy(true);
+    const oldNote=detailNotes[detailNotesRow.id]||"";
+    if(detailNotesText.trim() && detailNotesText.trim()!==oldNote.trim()){
+      const {error:historyError}=await supabase.from("archive_recessi_note_history").insert({
+        recesso_id:Number(detailNotesRow.id),note:detailNotesText.trim()
+      });
+      if(historyError){setDetailBusy(false);setDetailMessage("Errore salvataggio storico note: "+historyError.message);return;}
+    }
     const {error}=await supabase.from("archive_recessi_notes").upsert({
       recesso_id:Number(detailNotesRow.id),note:detailNotesText,recuperato:Boolean(detailRecovered[detailNotesRow.id]),updated_at:new Date().toISOString()
     },{onConflict:"recesso_id"});
     setDetailBusy(false);
     if(error) setDetailMessage("Errore salvataggio note: "+error.message);
-    else {setDetailNotes(v=>({...v,[detailNotesRow.id]:detailNotesText}));setDetailNotesRow(null);setDetailMessage("Nota salvata.");}
+    else {setDetailNotes(v=>({...v,[detailNotesRow.id]:detailNotesText}));setDetailNotesRow(null);setDetailMessage("Nota salvata.");void loadDetailNoteHistory();}
   };
   const saveDetailCalendar = async () => {
     if(!detailCalendarRow || !detailCalendarDate || !detailCalendarTime)return;
@@ -2549,7 +2568,31 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         </>
       ) : archiveSection === "dettaglioRecessi" ? (
         <div style={cardStyle}>
-          <h3 style={{ marginTop: 0 }}>DETTAGLIO RECESSI · ELENCO NOMINATIVI</h3>
+          <h3 style={{ marginTop: 0 }}>DETTAGLIO RECESSI</h3>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+            <button type="button" onClick={()=>setDetailSubsection("list")} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="list"?"#0f172a":"white",color:detailSubsection==="list"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>ELENCO RECESSI</button>
+            <button type="button" onClick={()=>{setDetailSubsection("notes");void loadDetailNoteHistory();}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="notes"?"#0f172a":"white",color:detailSubsection==="notes"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>📝 NOTE RECESSI</button>
+          </div>
+          {detailSubsection==="notes" ? <div>
+            <h3 style={{marginTop:0}}>NOTE RECESSI · DALLA PIÙ RECENTE</h3>
+            <p style={{color:"#64748b",fontSize:13}}>Storico cronologico delle note aggiunte. Clicca SCHEDA per aprire il recesso e consultare la sequenza completa.</p>
+            {detailNotesLoading && <p>Caricamento note...</p>}
+            {!detailNotesLoading && !detailNoteHistory.length && <p>Nessuna nota nello storico. Le nuove note salvate compariranno qui.</p>}
+            <div style={{display:"grid",gap:10}}>
+              {detailNoteHistory.map(item=>{
+                const row=rows.find(r=>Number(r.id)===item.recesso_id);
+                return <div key={item.id} style={{border:"1px solid #e2e8f0",borderRadius:12,padding:14,background:"#f8fafc"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+                    <div><strong>{row?.denominazione||"Recesso #"+item.recesso_id}</strong>
+                      <div style={{fontSize:12,color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")} · {row?.agente||"—"} · {row?.podPdr||"—"}</div></div>
+                    <button type="button" disabled={!row} onClick={()=>{if(row){setDetailModal(row);}}}
+                      style={{border:0,borderRadius:9,padding:"9px 14px",background:"#2563eb",color:"white",fontWeight:850,cursor:"pointer"}}>SCHEDA</button>
+                  </div>
+                  <p style={{whiteSpace:"pre-wrap",marginBottom:0}}>{item.note}</p>
+                </div>;
+              })}
+            </div>
+          </div> : <>
           {detailSourceIds && <div style={{padding:10,background:"#eff6ff",borderRadius:10,marginBottom:12}}>
             Filtri importati dalla scheda RECESSI ({detailSourceIds.size} righe).
             <button type="button" onClick={()=>setDetailSourceIds(null)} style={{marginLeft:10,cursor:"pointer"}}>RIMUOVI FILTRO IMPORTATO</button>
@@ -2621,6 +2664,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             MOSTRA ALTRI 100 · {Math.min(detailLimit,detailRows.length)} di {detailRows.length}
           </button>}
           {!detailRows.length && <p>Nessun recesso corrisponde ai filtri selezionati.</p>}
+          </>}
         </div>
       ) : archiveSection === "attivo" ? (
         <ActiveProduction />
@@ -2645,6 +2689,15 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                 {Object.entries(detailModal.raw).map(([key,value])=><div key={key} style={{overflowWrap:"anywhere",padding:9,background:"#f8fafc",borderRadius:9}}>
                   <div style={{fontSize:11,fontWeight:800,color:"#64748b"}}>{key}</div><div>{String(value||"—")}</div>
                 </div>)}
+              </div>
+              <div style={{marginTop:16,padding:12,background:"#f0f9ff",borderRadius:10}}>
+                <strong>STORICO NOTE · DALLA PIÙ RECENTE</strong>
+                {detailNoteHistory.filter(x=>Number(detailModal.id)===x.recesso_id).map(x=>
+                  <div key={x.id} style={{padding:"9px 0",borderBottom:"1px solid #cbd5e1"}}>
+                    <div style={{fontSize:12,color:"#64748b"}}>{new Date(x.created_at).toLocaleString("it-IT")}</div>
+                    <div style={{whiteSpace:"pre-wrap"}}>{x.note}</div>
+                  </div>)}
+                {!detailNoteHistory.some(x=>Number(detailModal.id)===x.recesso_id) && <p style={{fontSize:13,color:"#64748b"}}>Nessuna nota nello storico.</p>}
               </div>
               <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
                 <button type="button" onClick={()=>{setDetailCalendarRow(detailModal);setDetailCalendarDate("");setDetailCalendarTime("");setDetailCalendarType("ALTRO");setDetailModal(null);}}
