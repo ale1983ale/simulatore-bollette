@@ -29,10 +29,18 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
  const [stickyPage,setStickyPage]=useState(0);
  const [stickyMode,setStickyMode]=useState<"keyboard"|"hand">("keyboard");
  const stickyCanvas=useRef<HTMLCanvasElement|null>(null);
+ const stickyHistory=useRef<Record<number,StickyPage[]>>({});
+ const [stickyPosition,setStickyPosition]=useState({x:16,y:110});
+ const stickyDrag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
+ const stickyBox=useRef<HTMLDivElement|null>(null);
+ const beginStickyDrag=(e:React.PointerEvent<HTMLDivElement>)=>{if((e.target as HTMLElement).closest("button"))return;stickyDrag.current={x:e.clientX,y:e.clientY,left:stickyPosition.x,top:stickyPosition.y};e.currentTarget.setPointerCapture(e.pointerId);};
+ const moveStickyDrag=(e:React.PointerEvent<HTMLDivElement>)=>{if(!stickyDrag.current)return;const d=stickyDrag.current;const w=stickyBox.current?.offsetWidth||350,h=stickyBox.current?.offsetHeight||400;setStickyPosition({x:Math.max(0,Math.min(Math.max(0,window.innerWidth-w),d.left+e.clientX-d.x)),y:Math.max(0,Math.min(Math.max(0,window.innerHeight-Math.min(h,100)),d.top+e.clientY-d.y))});};
+ const undoSticky=()=>{const previous=stickyHistory.current[stickyPage]?.pop();if(previous)saveSticky(sticky.pages.map((p,i)=>i===stickyPage?previous:p));};
+
  const drawing=useRef<number[][]|null>(null);
  const saveSticky=(pages:StickyPage[])=>{const next={pages,updated:Date.now()};setSticky(next);localStorage.setItem(STICKY_KEY,JSON.stringify(next));};
- const changeStickyPage=(patch:Partial<StickyPage>)=>saveSticky(sticky.pages.map((p,i)=>i===stickyPage?{...p,...patch}:p));
- const clearSticky=()=>{localStorage.removeItem(STICKY_KEY);setSticky({pages:[emptyPage()],updated:0});setStickyPage(0);};
+ const changeStickyPage=(patch:Partial<StickyPage>)=>{const previous=sticky.pages[stickyPage];if(previous){const history=stickyHistory.current[stickyPage]||[];history.push({text:previous.text,strokes:previous.strokes});if(history.length>300)history.shift();stickyHistory.current[stickyPage]=history;}saveSticky(sticky.pages.map((p,i)=>i===stickyPage?{...p,...patch}:p));};
+ const clearSticky=()=>{localStorage.removeItem(STICKY_KEY);setSticky({pages:[emptyPage()],updated:0});setStickyPage(0);stickyHistory.current={};};
  useEffect(()=>{const check=()=>{const next=readSticky();setSticky(current=>JSON.stringify(current)===JSON.stringify(next)?current:next);setStickyPage(p=>Math.min(p,next.pages.length-1));};const timer=window.setInterval(check,10000);window.addEventListener("storage",check);return()=>{window.clearInterval(timer);window.removeEventListener("storage",check);};},[]);
  useEffect(()=>{if(!stickyOpen||stickyMode!=="hand"||!stickyCanvas.current)return;const canvas=stickyCanvas.current;const ctx=canvas.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle="#111827";ctx.lineWidth=2.5;ctx.lineCap="round";ctx.lineJoin="round";for(const stroke of sticky.pages[stickyPage]?.strokes||[]){if(!stroke.length)continue;ctx.beginPath();ctx.moveTo(stroke[0][0]*canvas.width,stroke[0][1]*canvas.height);if(stroke.length===1){ctx.lineTo(stroke[0][0]*canvas.width+.1,stroke[0][1]*canvas.height+.1);}else for(const point of stroke.slice(1))ctx.lineTo(point[0]*canvas.width,point[1]*canvas.height);ctx.stroke();}},[stickyOpen,stickyMode,sticky,stickyPage]);
  const handPoint=(e:React.PointerEvent<HTMLCanvasElement>)=>{const b=e.currentTarget.getBoundingClientRect();return [Math.max(0,Math.min(1,(e.clientX-b.left)/b.width)),Math.max(0,Math.min(1,(e.clientY-b.top)/b.height))];};
@@ -157,19 +165,20 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
      </div>
     </div>}
    </div>
-  {stickyOpen&&<div style={{position:full?"absolute":"relative",top:full?88:undefined,right:full?12:undefined,zIndex:full?31000:10,width:full?"min(420px,calc(100% - 24px))":"100%",maxWidth:full?420:undefined,boxSizing:"border-box",background:"#fff4a8",backgroundImage:"repeating-linear-gradient(to bottom, transparent 0px, transparent 30px, #d9bc6940 31px, transparent 32px)",border:"1px solid #e4c45c",borderRadius:"4px 4px 19px 5px",boxShadow:"3px 7px 0 #e2bd53, 8px 14px 24px #0004",padding:15,color:"#27210f",display:"grid",gap:12}}>
-   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
-    <strong style={{fontSize:20,fontFamily:"cursive"}}>✎ I miei appunti <span style={{fontSize:13,color:"#85641c"}}>{stickyPage+1}/{sticky.pages.length}</span></strong>
+  {stickyOpen&&<div ref={stickyBox} style={{position:"fixed",top:stickyPosition.y,left:stickyPosition.x,zIndex:31000,width:"min(420px,calc(100vw - 24px))",maxWidth:420,maxHeight:"calc(100dvh - 24px)",overflowY:"auto",boxSizing:"border-box",background:"#fff4a8",backgroundImage:"repeating-linear-gradient(to bottom, transparent 0px, transparent 30px, #d9bc6940 31px, transparent 32px)",border:"1px solid #e4c45c",borderRadius:"4px 4px 19px 5px",boxShadow:"3px 7px 0 #e2bd53, 8px 14px 24px #0004",padding:15,color:"#27210f",display:"grid",gap:12}}>
+   <div onPointerDown={beginStickyDrag} onPointerMove={moveStickyDrag} onPointerUp={()=>{stickyDrag.current=null;}} onPointerCancel={()=>{stickyDrag.current=null;}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",cursor:"grab",touchAction:"none",userSelect:"none"}}>
+    <strong style={{fontSize:20,fontFamily:"cursive"}}>✎ Notes <span style={{fontSize:13,color:"#85641c"}}>{stickyPage+1}/{sticky.pages.length}</span></strong>
     <div style={{display:"flex",gap:6}}>
      <button type="button" onClick={()=>{if(window.confirm("Cancellare tutti gli appunti?"))clearSticky();}} style={{...toolButton,padding:"5px 8px",background:"#fef9c3"}} aria-label="Elimina appunti" title="Elimina appunti">🗑️</button>
-     <button type="button" onClick={()=>setStickyOpen(false)} aria-label="Chiudi appunti" style={{...toolButton,padding:"5px 10px"}}>✕</button>
+     <button type="button" onClick={()=>setStickyOpen(false)} aria-label="Chiudi Notes senza cancellare" title="Chiudi senza cancellare" style={{...toolButton,padding:"5px 10px"}}>✕</button>
     </div>
    </div>
    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
     <button type="button" onClick={()=>setStickyMode("keyboard")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="keyboard"?"#f59e0b":"white"}} aria-label="Tastiera" title="Tastiera">⌨️</button>
     <button type="button" onClick={()=>setStickyMode("hand")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="hand"?"#f59e0b":"white"}} aria-label="Mano libera" title="Mano libera">✍️</button>
+    <button type="button" onClick={undoSticky} disabled={!stickyHistory.current[stickyPage]?.length} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Annulla ultima modifica" title="Annulla ultima modifica">↶</button>
    </div>
-   {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:180,maxHeight:full?"35vh":280,resize:"vertical",background:"repeating-linear-gradient(to bottom,#fff9c8 0px,#fff9c8 30px,#d9bc6970 31px,#fff9c8 32px)",border:"1px solid #dfc875",borderRadius:7,padding:"7px 12px",color:"#1c1917",fontSize:18,lineHeight:"32px",fontFamily:"cursive"}}/>:<canvas ref={stickyCanvas} width={600} height={420} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",background:"#fff9c8",border:"1px solid #dfc875",borderRadius:7,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
+   {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:280,maxHeight:full?"48vh":420,resize:"vertical",background:"repeating-linear-gradient(to bottom,#fff9c8 0px,#fff9c8 30px,#d9bc6970 31px,#fff9c8 32px)",border:"1px solid #dfc875",borderRadius:7,padding:"7px 12px",color:"#1c1917",fontSize:18,lineHeight:"32px",fontFamily:"cursive"}}/>:<canvas ref={stickyCanvas} width={600} height={620} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",background:"#fff9c8",border:"1px solid #dfc875",borderRadius:7,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
    <div style={{display:"flex",gap:7,alignItems:"center",justifyContent:"space-between"}}>
     <button type="button" disabled={stickyPage===0} onClick={()=>setStickyPage(p=>p-1)} style={{...toolButton,padding:"7px 10px"}}>←</button>
     <button type="button" onClick={()=>{saveSticky([...sticky.pages,emptyPage()]);setStickyPage(sticky.pages.length);}} style={{...toolButton,padding:"7px 10px",background:"#fde047"}}>＋ Foglietto</button>
