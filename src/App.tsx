@@ -13642,10 +13642,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    const openTodoCalendar = (event: Event) => {
+    const [todoCalendarRequest, setTodoCalendarRequest] = useState<{ sourceKey: string; date: string | null; requestId: number } | null>(null);
+  const openTodoCalendar = (event: Event) => {
       const detail = (event as CustomEvent<{ date?: string | null; sourceKey?: string | null }>).detail;
-      if (detail?.date) window.sessionStorage.setItem("ge_calendar_open_date", detail.date);
-      if (detail?.sourceKey) window.sessionStorage.setItem("ge_calendar_open_source", detail.sourceKey);
+      if (detail?.sourceKey) {
+        setTodoCalendarRequest({ sourceKey: detail.sourceKey, date: detail.date || null, requestId: Date.now() });
+      }
       navigateTo("calendarAdmin");
     };
     window.addEventListener("ge:open-recruiting-calendar", openTodoCalendar);
@@ -15452,6 +15454,7 @@ const renderAdminContent = () => {
         <div style={{ width: "100%", minWidth: 0 }}>
           <Recruiting
             initialSection="calendar"
+            calendarOpenRequest={todoCalendarRequest}
             hideNavigation
             onOpenContact={openRecruitingContactFromCalendar}
             onOpenAppointment={openAppointmentFromCalendar}
