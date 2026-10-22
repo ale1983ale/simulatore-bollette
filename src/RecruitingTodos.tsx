@@ -97,7 +97,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     return true;
   }).sort((a,b) =>
     Number(!b.completed && b.priority) - Number(!a.completed && a.priority) ||
-    a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+    b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
   return <div style={{ background: "white", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, marginTop: 12 }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
       <h2 style={{ margin: 0 }}>☑ COSE DA FARE</h2>
@@ -161,6 +161,13 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           <strong style={{ textDecoration: item.completed?"line-through":"none" }}>{item.priority&&!item.completed?"★ ":""}{item.title}</strong>
           <span style={{ color: "#475569", fontSize: 12 }}>{item.due_date ? item.due_date.split("-").reverse().join("/") : "Senza data"} {item.due_time?.slice(0,5)||""}</span>
         </div>
+        {item.source_key && /^(hr|crm|google):/.test(item.source_key) && (
+          <button type="button" title="Apri Calendario" aria-label="Apri Calendario"
+            onClick={() => window.dispatchEvent(new CustomEvent("ge:open-recruiting-calendar", { detail: { date: item.due_date } }))}
+            style={{ ...action, marginTop: 7, background: "#eff6ff", color: "#1d4ed8", borderColor: "#bfdbfe" }}>
+            📅 CALENDARIO
+          </button>
+        )}
         {item.linked_name && <div style={{ fontSize: 13, marginTop: 5 }}>👤 {item.linked_name}</div>}
         {item.body && <div style={{ marginTop: 7, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.body}</div>}
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 10 }}>
