@@ -13506,7 +13506,8 @@ export default function App() {
       setAgentProductionAllowed(!error&&data===true);
     });
   },[agentSession?.token]);
-  const [provvigioniSubtab,setProvvigioniSubtab] = useState<"calcoli"|"presentazione">("calcoli");
+  const [provvigioniSubtab,setProvvigioniSubtabState] = useState<"calcoli"|"presentazione">(()=>{try{return localStorage.getItem("provvigioni-subtab")==="presentazione"?"presentazione":"calcoli";}catch{return "calcoli";}});
+  const setProvvigioniSubtab = (next:"calcoli"|"presentazione")=>{setProvvigioniSubtabState(next);try{localStorage.setItem("provvigioni-subtab",next);}catch{}};
   const [provvigioniPrefill, setProvvigioniPrefill] =
     useState<ProvvigioniPrefill | null>(null);
   const [appointmentOpenRequest, setAppointmentOpenRequest] =
