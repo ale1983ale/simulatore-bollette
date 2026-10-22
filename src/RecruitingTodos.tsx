@@ -30,6 +30,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [calendarTodo, setCalendarTodo] = useState<Todo | null>(null);
   const [calendarDate, setCalendarDate] = useState("");
   const [calendarTime, setCalendarTime] = useState("");
+  const [calendarType, setCalendarType] = useState("ALTRO");
   const [calendarSaving, setCalendarSaving] = useState(false);
 
   const [showCompleted, setShowCompleted] = useState(false);
@@ -85,6 +86,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     setCalendarTodo(item);
     setCalendarDate(item.due_date || "");
     setCalendarTime(item.due_time?.slice(0, 5) || "");
+    setCalendarType("COSE_DA_FARE_GENERICHE");
   };
   const confirmCalendarAppointment = async () => {
     if (!ctx || !calendarTodo) return;
@@ -101,8 +103,8 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       candidate_id: item.linked_kind === "candidate" ? item.linked_id : null,
       event_date: calendarDate,
       event_time: calendarTime,
-      event_type: "APPUNTAMENTO_ZONA",
-      custom_type: "",
+      event_type: calendarType === "COSE_DA_FARE_GENERICHE" ? "ALTRO" : calendarType,
+      custom_type: calendarType === "COSE_DA_FARE_GENERICHE" ? "COSE DA FARE GENERICHE" : "",
       notes: notesText
     }).select("id").single();
     if (error || !data?.id) {
@@ -175,16 +177,30 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <span style={{ color: "#475569", fontSize: 13 }}>{sorted.length} attività trovate</span>
       </div>
     </div>}
-    {calendarTodo && <div role="dialog" aria-label="Conferma appuntamento" style={{ background: "#eff6ff", border: "2px solid #93c5fd", padding: 16, borderRadius: 12, marginTop: 14, display: "grid", gap: 11 }}>
-      <strong>📅 AGGIUNGI AL CALENDARIO — {calendarTodo.title}</strong>
-      <span>Conferma oppure modifica il giorno e l'ora dell'appuntamento. Entrambi sono obbligatori.</span>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <label style={{ flex: "1 1 160px" }}>GIORNO *<input type="date" required style={field} value={calendarDate} onChange={e => setCalendarDate(e.target.value)} /></label>
-        <label style={{ flex: "1 1 140px" }}>ORA *<input type="time" required style={field} value={calendarTime} onChange={e => setCalendarTime(e.target.value)} /></label>
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button style={{ ...action, background: "#2563eb", color: "white" }} disabled={calendarSaving || !calendarDate || !calendarTime} onClick={() => void confirmCalendarAppointment()}>{calendarSaving ? "SALVATAGGIO..." : "CONFERMA E CREA APPUNTAMENTO"}</button>
-        <button style={action} disabled={calendarSaving} onClick={() => setCalendarTodo(null)}>ANNULLA</button>
+    {calendarTodo && <div role="presentation" onClick={() => !calendarSaving && setCalendarTodo(null)}
+      style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(15,23,42,.62)", display: "grid", placeItems: "center", padding: 14 }}>
+      <div role="dialog" aria-modal="true" aria-label="Aggiungi al calendario" onClick={event => event.stopPropagation()}
+        style={{ width: "min(480px, 100%)", maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 18, padding: 22, boxShadow: "0 20px 60px rgba(0,0,0,.3)", display: "grid", gap: 14 }}>
+        <strong style={{ fontSize: 19 }}>📅 AGGIUNGI AL CALENDARIO</strong>
+        <div style={{ fontWeight: 700, color: "#334155" }}>{calendarTodo.title}</div>
+        <label>TIPOLOGIA DI CALENDARIO
+          <select style={field} value={calendarType} onChange={e => setCalendarType(e.target.value)}>
+            <option value="COSE_DA_FARE_GENERICHE">COSE DA FARE GENERICHE</option>
+            <option value="CHIAMARE">CHIAMARE</option>
+            <option value="APPUNTAMENTO_ZONA">APPUNTAMENTO IN ZONA</option>
+            <option value="APPUNTAMENTO_SEDE">APPUNTAMENTO IN SEDE</option>
+            <option value="VIDEOCALL">VIDEOCALL</option>
+            <option value="ALTRO">ALTRO</option>
+          </select>
+        </label>
+        <label>GIORNO *<input type="date" required style={field} value={calendarDate} onChange={e => setCalendarDate(e.target.value)} /></label>
+        <label>ORARIO *<input type="time" required style={field} value={calendarTime} onChange={e => setCalendarTime(e.target.value)} /></label>
+        <div style={{ display: "flex", gap: 9, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button style={action} disabled={calendarSaving} onClick={() => setCalendarTodo(null)}>ANNULLA</button>
+          <button style={{ ...action, background: "#2563eb", color: "#fff" }} disabled={calendarSaving || !calendarDate || !calendarTime} onClick={() => void confirmCalendarAppointment()}>
+            {calendarSaving ? "SALVATAGGIO..." : "AGGIUNGI AL CALENDARIO"}
+          </button>
+        </div>
       </div>
     </div>}
     {formOpen && <div style={{ background: "#f8fafc", padding: 15, borderRadius: 12, marginTop: 14, display: "grid", gap: 10 }}>
