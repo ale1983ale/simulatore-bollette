@@ -34,9 +34,9 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
  const [stickySize,setStickySize]=useState({width:420,height:600});
  const [confirmClear,setConfirmClear]=useState(false);
  const resizeDrag=useRef<{x:number;y:number;width:number;height:number}|null>(null);
- const resizeNotes=(factor:number)=>setStickySize(v=>({width:Math.max(280,Math.min(window.innerWidth-24,Math.round(v.width*factor))),height:Math.max(330,Math.min(window.innerHeight-30,Math.round(v.height*factor)))}));
- const beginResize=(e:React.PointerEvent<HTMLDivElement>)=>{e.stopPropagation();resizeDrag.current={x:e.clientX,y:e.clientY,width:stickySize.width,height:stickySize.height};e.currentTarget.setPointerCapture(e.pointerId);};
- const moveResize=(e:React.PointerEvent<HTMLDivElement>)=>{if(!resizeDrag.current)return;const d=resizeDrag.current;setStickySize({width:Math.max(280,Math.min(window.innerWidth-stickyPosition.x,d.width+e.clientX-d.x)),height:Math.max(330,Math.min(window.innerHeight-stickyPosition.y,d.height+e.clientY-d.y))});};
+
+ const beginResize=(e:React.PointerEvent<HTMLDivElement>)=>{e.stopPropagation();e.preventDefault();resizeDrag.current={x:e.clientX,y:e.clientY,width:stickyBox.current?.offsetWidth||stickySize.width,height:stickyBox.current?.offsetHeight||stickySize.height};e.currentTarget.setPointerCapture(e.pointerId);};
+ const moveResize=(e:React.PointerEvent<HTMLDivElement>)=>{if(!resizeDrag.current)return;const d=resizeDrag.current;setStickySize({width:Math.max(280,Math.min(Math.max(280,window.innerWidth-stickyPosition.x-8),d.width+e.clientX-d.x)),height:Math.max(330,Math.min(Math.max(330,window.innerHeight-stickyPosition.y-8),d.height+e.clientY-d.y))});};
 
  const stickyDrag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const stickyBox=useRef<HTMLDivElement|null>(null);
@@ -183,8 +183,6 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
     <button type="button" onClick={()=>setStickyMode("keyboard")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="keyboard"?"#f59e0b":"white"}} aria-label="Tastiera" title="Tastiera">⌨️</button>
     <button type="button" onClick={()=>setStickyMode("hand")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="hand"?"#f59e0b":"white"}} aria-label="Mano libera" title="Mano libera">✍️</button>
-    <button type="button" onClick={()=>resizeNotes(0.85)} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Rimpicciolisci Notes" title="Rimpicciolisci">−</button>
-    <button type="button" onClick={()=>resizeNotes(1.15)} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Ingrandisci Notes" title="Ingrandisci">＋</button>
     <button type="button" onClick={undoSticky} disabled={!stickyHistory.current[stickyPage]?.length} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Annulla ultima modifica" title="Annulla ultima modifica">↶</button>
    </div>
    {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:100,flex:"1 1 auto",resize:"none",background:"repeating-linear-gradient(to bottom,#fff9c8 0px,#fff9c8 30px,#d9bc6970 31px,#fff9c8 32px)",border:"1px solid #dfc875",borderRadius:7,padding:"7px 12px",color:"#1c1917",fontSize:18,lineHeight:"32px",fontFamily:"cursive"}}/>:<canvas ref={stickyCanvas} width={600} height={620} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",maxHeight:"100%",flex:"1 1 auto",minHeight:100,background:"#fff9c8",border:"1px solid #dfc875",borderRadius:7,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
@@ -193,7 +191,7 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
     <button type="button" onClick={()=>{saveSticky([...sticky.pages,emptyPage()]);setStickyPage(sticky.pages.length);}} style={{...toolButton,padding:"7px 10px",background:"#fde047"}}>＋ Foglio</button>
     <button type="button" disabled={stickyPage>=sticky.pages.length-1} onClick={()=>setStickyPage(p=>p+1)} style={{...toolButton,padding:"7px 10px"}}>→</button>
    </div>
-   <div onPointerDown={beginResize} onPointerMove={moveResize} onPointerUp={()=>{resizeDrag.current=null;}} onPointerCancel={()=>{resizeDrag.current=null;}} title="Trascina per ridimensionare" style={{position:"absolute",right:2,bottom:2,width:28,height:28,cursor:"nwse-resize",touchAction:"none",display:"grid",placeItems:"center",color:"#a16207",fontSize:22,userSelect:"none"}}>◢</div>
+   <div onPointerDown={beginResize} onPointerMove={moveResize} onPointerUp={()=>{resizeDrag.current=null;}} onPointerCancel={()=>{resizeDrag.current=null;}} title="Trascina per ridimensionare" style={{position:"absolute",right:0,bottom:0,width:44,height:44,cursor:"nwse-resize",touchAction:"none",display:"grid",placeItems:"center",color:"#a16207",fontSize:27,userSelect:"none",background:"#facc1533",borderTopLeftRadius:18}}>◢</div>
   </div>}
   {confirmClear&&<div style={{position:"fixed",inset:0,zIndex:32000,background:"#0f172a88",display:"grid",placeItems:"center",padding:20}}>
    <div role="dialog" aria-modal="true" aria-label="Conferma cancellazione Notes" style={{width:"min(360px,100%)",background:"#fff8cc",border:"2px solid #eab308",borderRadius:18,padding:22,boxShadow:"0 18px 50px #0005",color:"#422006",display:"grid",gap:16,textAlign:"center"}}>
