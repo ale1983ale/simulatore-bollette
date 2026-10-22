@@ -139,7 +139,8 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       setCalendarSaving(false);
       return;
     }
-    const { error: updateError } = await ctx.client.from("recruiting_todos").update({
+    const diaryAppointment = diaryItems.some(entry=>entry.id===item.id);
+    const { error: updateError } = await ctx.client.from(diaryAppointment?"recruiting_diary":"recruiting_todos").update(diaryAppointment?{calendar_event_id:String(data.id)}:{
       due_date: calendarDate, due_time: calendarTime, source_key: "hr:" + String(data.id),
       updated_at: new Date().toISOString()
     }).eq("owner_key", ctx.ownerKey).eq("id", item.id);
@@ -147,7 +148,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     else setMessage("Appuntamento aggiunto al Calendario e collegato alla cosa da fare.");
     setCalendarTodo(null);
     setCalendarSaving(false);
-    await load();
+    if(diaryAppointment)await loadDiary();else await load();
   };
   const startEdit = (item: Todo) => {
     setEditing(item.id); setContactSearch(""); setPriority(item.priority);
@@ -195,7 +196,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none"}}>{item.body}</p>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <button style={action} onClick={()=>void diaryAction(item,"done")}>{item.completed?"↶ RIAPRI":"✓ FATTO"}</button>
-          <button style={action} onClick={()=>{setCalendarTodo({id:item.id,title:"DIARIO · "+(item.linked_name||"APPUNTO"),body:item.body,linked_name:item.linked_name,linked_kind:item.linked_kind,linked_id:item.linked_id,due_date:null,due_time:null,source_key:null} as Todo);setCalendarDate("");setCalendarTime("");setCalendarType("ALTRO");}}>📅 CALENDARIO</button>
+          <button style={action} disabled={Boolean(item.calendar_event_id)} onClick={()=>{setCalendarTodo({id:item.id,title:"DIARIO · "+(item.linked_name||"APPUNTO"),body:item.body,linked_name:item.linked_name,linked_kind:item.linked_kind,linked_id:item.linked_id,due_date:null,due_time:null,source_key:null} as Todo);setCalendarDate("");setCalendarTime("");setCalendarType("ALTRO");}}>{item.calendar_event_id?"✓ IN CALENDARIO":"📅 CALENDARIO"}</button>
           <button style={{...action,color:"#b91c1c"}} onClick={()=>void diaryAction(item,"delete")}>ELIMINA</button>
         </div>
       </article>)}{!diaryItems.length&&<p>Nessun appunto presente.</p>}</div>
