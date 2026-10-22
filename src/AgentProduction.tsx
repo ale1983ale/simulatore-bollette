@@ -16,6 +16,7 @@ const field = (row: Item, key: string) => row[key] == null || row[key] === "" ? 
 export default function AgentProduction({ token }: { token: string }) {
  const [data,setData]=useState<Data|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true);
  const [tab,setTab]=useState("RECESSI"),[selectedRecessMonth,setSelectedRecessMonth]=useState(""),[search,setSearch]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[commodity,setCommodity]=useState("TUTTE");
+ const [detailSort,setDetailSort]=useState("month"),[detailSortAsc,setDetailSortAsc]=useState(false);
  const [detail,setDetail]=useState<Item|null>(null),[detailMode,setDetailMode]=useState<"scheda"|"note">("scheda"),[note,setNote]=useState(""),[recovered,setRecovered]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState("");
  const refresh=async()=>{setLoading(true);setError("");const {data:result,error:failure}=await supabase.rpc("agent_production_data",{p_session_token:token});if(failure)setError(failure.message);else setData(result as Data);setLoading(false);};
  useEffect(()=>{void refresh();},[token]);
@@ -27,7 +28,11 @@ export default function AgentProduction({ token }: { token: string }) {
  };
  const recessi=useMemo(()=>(data?.recessi||[]).filter(r=>matches(r,false)),[data,from,to,commodity,search]);
  const produzione=useMemo(()=>(data?.produzione||[]).filter(r=>matches(r,true)),[data,from,to,commodity,search]);
- const detailRecessi=useMemo(()=>selectedRecessMonth?recessi.filter(r=>String(r.month_key||r.validita_date||"").slice(0,7)===selectedRecessMonth):recessi,[recessi,selectedRecessMonth]);
+ const detailRecessi=useMemo(()=>{
+ const filtered=selectedRecessMonth?recessi.filter(r=>String(r.month_key||r.validita_date||"").slice(0,7)===selectedRecessMonth):recessi;
+ const value=(r:Item):string|number=>({month:String(r.month_key||r.validita_date||""),client:String(r.denominazione||""),pod:String(r.pod_pdr||""),commodity:String(r.commodity||""),consumption:Number(r.consumo||0),notes:String(r.note||""),detail:r.recuperato?1:0} as Record<string,string|number>)[detailSort]??"";
+ return [...filtered].sort((a,b)=>{const x=value(a),y=value(b);const cmp=typeof x==="number"&&typeof y==="number"?x-y:String(x).localeCompare(String(y),"it",{numeric:true,sensitivity:"base"});return detailSortAsc?cmp:-cmp;});
+ },[recessi,selectedRecessMonth,detailSort,detailSortAsc]);
  const open=(r:Item,mode:"scheda"|"note"="scheda")=>{setDetailMode(mode);setDetail(r);setNote(String(r.note||""));setRecovered(Boolean(r.recuperato));setMessage("");};
  const save=async()=>{if(!detail)return;setSaving(true);setMessage("");const {error:e}=await supabase.rpc("agent_recesso_save_note",{p_session_token:token,p_recesso_id:Number(detail.id),p_note:note,p_recuperato:recovered});if(e)setMessage("Errore: "+e.message);else{setMessage("Note salvate");setDetail({...detail,note,recuperato:recovered});await refresh();}setSaving(false);};
  const setRecoveredDirect=async(r:Item)=>{
@@ -116,7 +121,10 @@ export default function AgentProduction({ token }: { token: string }) {
      <strong>📅 RECESSI DI {monthLabel(selectedRecessMonth).toUpperCase()} · {detailRecessi.length} risultati</strong>
      <button type="button" onClick={()=>setSelectedRecessMonth("")} style={{padding:"9px 13px",border:0,borderRadius:9,background:"#1d4ed8",color:"white",fontWeight:800,cursor:"pointer"}}>MOSTRA TUTTI I MESI</button>
     </div>}
-    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}><thead><tr>{["MESE","CLIENTE","POD/PDR","FORNITURA","CONSUMO","NOTE","DETTAGLIO"].map(h=><th key={h} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}>{h}</th>)}</tr></thead><tbody>{detailRecessi.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{monthLabel(r.month_key)||date(r.validita_date)}</td><td>{field(r,"denominazione")}</td><td>{field(r,"pod_pdr")}</td><td>{field(r,"commodity")}</td><td>{number(r.consumo)}</td><td>{r.note||"—"}</td><td><div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+     {(["LUCE","GAS"] as const).map(kind=>{const active=commodity==="TUTTE"||commodity===kind;return <button key={kind} type="button" aria-pressed={active} onClick={()=>setCommodity(current=>current==="TUTTE"?(kind==="LUCE"?"GAS":"LUCE"):current===kind?"TUTTE":"TUTTE")} style={{padding:"9px 15px",borderRadius:10,border:active?"2px solid "+(kind==="LUCE"?"#f59e0b":"#0284c7"):"1px solid #cbd5e1",background:active?(kind==="LUCE"?"#fef3c7":"#e0f2fe"):"white",color:kind==="GAS"?"#0284c7":"#92400e",fontSize:19,fontWeight:850,cursor:"pointer"}}>{kind==="LUCE"?"⚡":"♨"} {kind}</button>})}
+    </div>
+    <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:760}}><thead><tr>{([["MESE","month"],["CLIENTE","client"],["POD/PDR","pod"],["FORNITURA","commodity"],["CONSUMO","consumption"],["NOTE","notes"],["DETTAGLIO","detail"]] as const).map(([h,key])=><th key={key} style={{padding:10,textAlign:"left",background:"#e2e8f0"}}><button type="button" onClick={()=>{if(detailSort===key)setDetailSortAsc(v=>!v);else{setDetailSort(key);setDetailSortAsc(true);}}} style={{border:0,background:"transparent",cursor:"pointer",fontWeight:850,whiteSpace:"nowrap",color:"#0f172a"}}>{h} {detailSort===key?(detailSortAsc?"▲":"▼"):"↕"}</button></th>)}</tr></thead><tbody>{detailRecessi.map(r=><tr key={r.id} style={{borderBottom:"1px solid #e2e8f0"}}><td style={{padding:10}}>{monthLabel(r.month_key)||date(r.validita_date)}</td><td>{field(r,"denominazione")}</td><td>{field(r,"pod_pdr")}</td><td>{field(r,"commodity")}</td><td>{number(r.consumo)}</td><td>{r.note||"—"}</td><td><div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
  <button type="button" onClick={()=>open(r)} style={{...actionStyle,background:"#2563eb",color:"white"}}>📋 APRI</button>
  <button type="button" onClick={()=>open(r,"note")} style={{...actionStyle,background:"#ffedd5",color:"#9a3412"}}>📝 NOTE</button>
  <button type="button" disabled={saving} onClick={()=>void setRecoveredDirect(r)}
