@@ -371,8 +371,18 @@ export default function DriveArchive() {
           </div>
         )}
         {error && (
-          <div style={{ marginTop: 12, color: "#b91c1c", fontWeight: 750 }}>
-            {error}
+          <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+            <div style={{ color: "#b91c1c", fontWeight: 750 }}>
+              {/token has been expired or revoked|invalid_grant|token.*revoked/i.test(error)
+                ? "L'autorizzazione Google è scaduta o è stata revocata. Ricollega l'account per ripristinare l'accesso ai file."
+                : error}
+            </div>
+            {config.can_manage && /token has been expired or revoked|invalid_grant|token.*revoked/i.test(error) && (
+              <button type="button" disabled={busy} onClick={() => void connectGoogle()}
+                style={{ ...buttonStyle, background: "#2563eb", color: "white", borderColor: "#2563eb", justifySelf: "start" }}>
+                🔄 RICOLLEGA GOOGLE
+              </button>
+            )}
           </div>
         )}
       </div>
