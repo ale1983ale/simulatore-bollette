@@ -11,6 +11,10 @@ const toolButton:React.CSSProperties={border:"1px solid #cbd5e1",borderRadius:10
 export default function PdfEditor({base64,documentId,filename}:Props){
  const [pdf,setPdf]=useState<any>(null),[pages,setPages]=useState<number[]>([]),[zoom,setZoom]=useState(100),[tool,setTool]=useState<"move"|"magnify"|"pen"|"highlight"|"text">("move"),[marks,setMarks]=useState<Marks>({}),[dirty,setDirty]=useState(false),[status,setStatus]=useState(""),[busy,setBusy]=useState(false);
  const [full,setFull]=useState(false);
+ const [lensScale,setLensScale]=useState(2);
+ const [penColor,setPenColor]=useState("#111827");
+ const [highlightColor,setHighlightColor]=useState("#fde047");
+ const [menu,setMenu]=useState<"magnify"|"pen"|"highlight"|null>(null);
  const [lens,setLens]=useState<{page:number;x:number;y:number;screenX:number;screenY:number}|null>(null);
  const lensCanvas=useRef<HTMLCanvasElement|null>(null);
  const [draft,setDraft]=useState<{page:number;mark:Mark}|null>(null);
@@ -44,14 +48,14 @@ export default function PdfEditor({base64,documentId,filename}:Props){
  })();
  return()=>{cancelled=true;tasks.forEach(t=>{try{t.cancel();}catch{}});};
  },[pdf,pages,zoom]);
- useEffect(()=>{if(!lens||!lensCanvas.current)return;const source=canvasRefs.current[lens.page];const target=lensCanvas.current;if(!source)return;const ctx=target.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,280,280);const sx=lens.x*source.width,sy=lens.y*source.height;const sample=130;ctx.fillStyle="white";ctx.fillRect(0,0,280,280);ctx.drawImage(source,Math.max(0,sx-sample/2),Math.max(0,sy-sample/2),Math.min(sample,source.width-Math.max(0,sx-sample/2)),Math.min(sample,source.height-Math.max(0,sy-sample/2)),0,0,280,280);},[lens]);
+ useEffect(()=>{if(!lens||!lensCanvas.current)return;const source=canvasRefs.current[lens.page];const target=lensCanvas.current;if(!source)return;const ctx=target.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,280,280);const sx=lens.x*source.width,sy=lens.y*source.height;const sample=260/lensScale;ctx.fillStyle="white";ctx.fillRect(0,0,280,280);ctx.drawImage(source,Math.max(0,sx-sample/2),Math.max(0,sy-sample/2),Math.min(sample,source.width-Math.max(0,sx-sample/2)),Math.min(sample,source.height-Math.max(0,sy-sample/2)),0,0,280,280);},[lens]);
  const save=async()=>{setBusy(true);setStatus("");try{const token=await getAdminSessionToken();const {error}=await supabase.rpc("provvigioni_presentazioni_annotations_save",{p_session_token:token,p_id:documentId,p_annotazioni:marksRef.current});if(error)throw error;setDirty(false);setStatus("Annotazioni salvate.");}catch(e:any){setStatus("Errore salvataggio: "+e.message);}finally{setBusy(false);}};
  const start=(event:React.PointerEvent<SVGSVGElement>,page:number)=>{
   if(tool==="move"||tool==="magnify")return;
   const bounds=event.currentTarget.getBoundingClientRect();const x=(event.clientX-bounds.left)/bounds.width,y=(event.clientY-bounds.top)/bounds.height;
   if(tool==="text"){const value=window.prompt("Testo da inserire nel PDF:");if(value?.trim()){const item:Mark={kind:"text",x,y,text:value.trim(),color:"#b91c1c"};changeMarks({...marksRef.current,[page]:[...(marksRef.current[page]||[]),item]});}return;}
   event.currentTarget.setPointerCapture(event.pointerId);
-  const item:Mark=tool==="pen"?{kind:"pen",x,y,points:[[x,y]],color:"#dc2626"}:{kind:"highlight",x,y,w:0,h:0,color:"#fde047"};
+  const item:Mark=tool==="pen"?{kind:"pen",x,y,points:[[x,y]],color:penColor}:{kind:"highlight",x,y,w:0,h:0,color:highlightColor};
   setDraft({page,mark:item});
  };
  const move=(event:React.PointerEvent<SVGSVGElement>,page:number)=>{
@@ -71,32 +75,38 @@ export default function PdfEditor({base64,documentId,filename}:Props){
   return <text key={index} x={mark.x*1000} y={mark.y*1000} fill={mark.color} fontSize="25" fontWeight="bold">{mark.text}</text>;
  };
  return <div style={{display:"grid",gap:12,...(full?{position:"fixed" as const,inset:0,zIndex:30000,background:"#f8fafc",padding:10,overflow:"hidden",gridTemplateRows:"auto auto minmax(0,1fr) auto"}:{})}}>
-  {full?<div style={{display:"flex",alignItems:"center",gap:5,padding:"7px 5px",background:"#172235",borderRadius:12,overflow:"hidden",minWidth:0}}>
-    {([
-      {id:"magnify",symbol:"🔎",name:"Lente 2×",color:"#38bdf8"},
-      {id:"pen",symbol:"🖍️",name:"Penna",color:"#fb7185"},
-      {id:"highlight",symbol:"🖊️",name:"Evidenzia",color:"#fde047"},
-      {id:"undo",symbol:"↶",name:"Annulla",color:"#c4b5fd"},
-      {id:"text",symbol:"𝐓",name:"Scrivi",color:"#fbbf24"},
-      {id:"move",symbol:"✋",name:"Sposta",color:"#7dd3fc"},
-      {id:"save",symbol:"💾",name:"Salva",color:"#86efac"}
-    ] as const).map(item=><button key={item.id} type="button" title={item.name} aria-label={item.name}
-      disabled={(item.id==="save"&&(!dirty||busy))}
-      onClick={()=>{if(item.id==="save"){void save();return;}if(item.id==="undo"){const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});return;}setTool(item.id);setLens(null);}}
-      style={{flex:"1 1 0",minWidth:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,padding:"7px 1px",borderRadius:9,border:tool===item.id?"2px solid #f97316":"1px solid #475569",background:tool===item.id?"#334155":"#24344c",cursor:"pointer",opacity:item.id==="save"&&(!dirty||busy)?.5:1}}>
-      <span aria-hidden="true" style={{fontSize:"clamp(16px,4.4vw,23px)",lineHeight:1.15,color:item.color,fontWeight:900}}>{item.symbol}</span>
-      <span style={{fontSize:"clamp(8px,2vw,11px)",fontWeight:800,color:"#ffffff",whiteSpace:"nowrap"}}>{item.name}</span>
-    </button>)}
-    <button type="button" title="Chiudi schermo intero" aria-label="Chiudi schermo intero" onClick={()=>{setFull(false);setLens(null);}}
-      style={{border:0,borderRadius:9,background:"#7f1d1d",color:"white",fontSize:20,fontWeight:900,padding:"9px 7px",flex:"0 0 auto",cursor:"pointer"}}>×</button>
-   </div>:<div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:12,background:"#f1f5f9",borderRadius:12}}>
-    <strong style={{flex:"1 1 190px",overflowWrap:"anywhere"}}>📄 {filename} · {pages.length} pagine</strong>
-    <button style={{...toolButton,background:"#f97316",color:"white"}} onClick={()=>{setFull(true);setLens(null);}}>⛶ APRI A SCHERMO INTERO</button>
-    <button style={toolButton} onClick={()=>setZoom(v=>Math.max(50,v-25))}>−</button><strong>{zoom}%</strong><button style={toolButton} onClick={()=>setZoom(v=>Math.min(200,v+25))}>＋</button>
-    {([["move","✋ SPOSTA"],["magnify","🔎 LENTE 2×"],["pen","🖍️ DISEGNA"],["highlight","🟨 EVIDENZIA"],["text","🔤 SCRIVI"]] as const).map(([id,title])=><button key={id} onClick={()=>setTool(id)} style={{...toolButton,background:tool===id?"#0f172a":"white",color:tool===id?"white":"#0f172a"}}>{title}</button>)}
-    <button style={toolButton} onClick={()=>{const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});}}>↶ ANNULLA</button>
-    <button disabled={!dirty||busy} onClick={()=>void save()} style={{...toolButton,background:"#16a34a",color:"white",opacity:!dirty||busy?.55:1}}>💾 SALVA</button>
-   </div>}
+  <div style={{display:"flex",alignItems:"center",gap:6,padding:full?"6px 7px":"8px",background:full?"#172235":"#f1f5f9",borderRadius:12,minWidth:0,position:"relative",flexWrap:"nowrap"}}>
+    {!full&&<strong style={{flex:"1 1 auto",fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📄 {filename} · {pages.length} pagine</strong>}
+    {!full&&<button type="button" style={{...toolButton,background:"#f97316",color:"white",padding:"9px 11px",flex:"0 0 auto"}} onClick={()=>{setFull(true);setMenu(null);setLens(null);}}>⛶</button>}
+    <div style={{display:"flex",flex:"1 1 auto",minWidth:0,gap:4,justifyContent:full?"space-between":"flex-end",alignItems:"center"}}>
+      {([
+       {id:"magnify",symbol:"🔎",name:"Lente",color:"#38bdf8"},
+       {id:"pen",symbol:"🖊",name:"Pennarello",color:penColor},
+       {id:"highlight",symbol:"🖍",name:"Evidenziatore",color:highlightColor},
+       {id:"text",symbol:"T",name:"Scrivi",color:"#fbbf24"},
+       {id:"undo",symbol:"↶",name:"Annulla",color:"#c4b5fd"},
+       {id:"move",symbol:"✋",name:"Sposta",color:"#7dd3fc"},
+       {id:"save",symbol:"💾",name:"Salva",color:"#86efac"}
+      ] as const).map(item=><div key={item.id} style={{position:"relative",flex:full?"1 1 0":"0 1 auto",minWidth:0}}>
+       <button type="button" title={item.name} aria-label={item.name} disabled={item.id==="save"&&(!dirty||busy)}
+        onClick={()=>{setMenu(null);if(item.id==="save"){void save();return;}if(item.id==="undo"){const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});return;}setTool(item.id);setLens(null);}}
+        style={{width:"100%",minWidth:full?0:32,height:full?43:37,borderRadius:9,border:tool===item.id?"2px solid #f97316":full?"1px solid #475569":"1px solid #cbd5e1",background:tool===item.id?(full?"#334155":"#ffedd5"):(full?"#24344c":"white"),cursor:"pointer",opacity:item.id==="save"&&(!dirty||busy)?.45:1,padding:"3px 1px",position:"relative"}}>
+        <span aria-hidden="true" style={{fontSize:full?"clamp(18px,4.5vw,25px)":"20px",lineHeight:1,color:item.color,fontWeight:900,filter:item.id==="pen"&&penColor==="#111827"&&full?"drop-shadow(0 0 1px white)":"none"}}>{item.symbol}</span>
+       </button>
+       {(item.id==="magnify"||item.id==="pen"||item.id==="highlight")&&<button type="button" aria-label={"Opzioni "+item.name} title={"Opzioni "+item.name}
+         onClick={()=>setMenu(m=>m===item.id?null:item.id)} style={{position:"absolute",top:0,right:0,border:0,borderRadius:6,background:"#f97316",color:"white",fontSize:11,fontWeight:900,lineHeight:"15px",width:17,height:17,cursor:"pointer",padding:0}}>⌄</button>}
+      </div>)}
+    </div>
+    {full?<button type="button" aria-label="Chiudi schermo intero" onClick={()=>{setFull(false);setMenu(null);setLens(null);}} style={{flex:"0 0 auto",background:"#7f1d1d",color:"white",border:0,borderRadius:8,height:43,width:28,fontWeight:900,fontSize:22,cursor:"pointer"}}>×</button>:null}
+    {menu&&<div style={{position:"absolute",right:5,top:"calc(100% + 5px)",zIndex:32000,background:"white",border:"1px solid #cbd5e1",borderRadius:12,padding:10,boxShadow:"0 8px 25px #0003",minWidth:190}}>
+     <div style={{fontSize:12,fontWeight:900,marginBottom:7,color:"#0f172a"}}>{menu==="magnify"?"INGRANDIMENTO LENTE":menu==="pen"?"COLORE PENNARELLO":"COLORE EVIDENZIATORE"}</div>
+     <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+      {menu==="magnify"?([1.5,2,3,5] as const).map(v=><button key={v} type="button" onClick={()=>{setLensScale(v);setTool("magnify");setMenu(null);}} style={{...toolButton,padding:"8px",background:lensScale===v?"#ffedd5":"white",borderColor:lensScale===v?"#f97316":"#cbd5e1"}}>{v}×</button>):
+      (menu==="pen"?[{name:"Rosso",hex:"#dc2626"},{name:"Nero",hex:"#111827"},{name:"Blu",hex:"#2563eb"}]:[{name:"Giallo",hex:"#fde047"},{name:"Arancione",hex:"#fb923c"},{name:"Verde",hex:"#86efac"}]).map(opt=><button key={opt.hex} type="button" title={opt.name} aria-label={opt.name} onClick={()=>{if(menu==="pen"){setPenColor(opt.hex);setTool("pen");}else{setHighlightColor(opt.hex);setTool("highlight");}setMenu(null);}} style={{...toolButton,padding:6,background:opt.hex,width:38,height:36,border:(menu==="pen"?penColor:highlightColor)===opt.hex?"3px solid #f97316":"1px solid #94a3b8"}}/>)
+      }
+     </div>
+    </div>}
+   </div>
   {status&&<p role="status" style={{fontWeight:700,color:status.startsWith("Errore")?"#b91c1c":"#15803d"}}>{status}</p>}
   <div style={{height:full?"100%":"min(75vh,980px)",minHeight:full?0:450,overflow:"auto",background:"#cbd5e1",padding:12,borderRadius:12}}>
    {pages.map(page=><div key={page} style={{position:"relative",width:"fit-content",maxWidth:"none",margin:"0 auto 18px",background:"white",boxShadow:"0 3px 14px #0f172a30"}}>
