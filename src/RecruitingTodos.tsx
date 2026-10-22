@@ -27,6 +27,11 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [priority, setPriority] = useState(false);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [calendarTodo, setCalendarTodo] = useState<Todo | null>(null);
+  const [calendarDate, setCalendarDate] = useState("");
+  const [calendarTime, setCalendarTime] = useState("");
+  const [calendarSaving, setCalendarSaving] = useState(false);
+
   const [showCompleted, setShowCompleted] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -74,6 +79,46 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     if (!ctx) return;
     const { error } = await ctx.client.from("recruiting_todos").update({ ...values, updated_at: new Date().toISOString() }).eq("owner_key", ctx.ownerKey).eq("id", item.id);
     if (error) setMessage(error.message); else await load();
+  };
+  const startCalendarAppointment = (item: Todo) => {
+    setMessage("");
+    setCalendarTodo(item);
+    setCalendarDate(item.due_date || "");
+    setCalendarTime(item.due_time?.slice(0, 5) || "");
+  };
+  const confirmCalendarAppointment = async () => {
+    if (!ctx || !calendarTodo) return;
+    if (!calendarDate || !calendarTime) {
+      setMessage("Per aggiungere un appuntamento al Calendario devi indicare sia il giorno sia l'ora.");
+      return;
+    }
+    setCalendarSaving(true);
+    setMessage("");
+    const item = calendarTodo;
+    const notesText = [item.title, item.linked_name ? "Contatto: " + item.linked_name : "", item.body].filter(Boolean).join("\\n");
+    const { data, error } = await ctx.client.from("recruiting_events").insert({
+      owner_key: ctx.ownerKey,
+      candidate_id: item.linked_kind === "candidate" ? item.linked_id : null,
+      event_date: calendarDate,
+      event_time: calendarTime,
+      event_type: "APPUNTAMENTO_ZONA",
+      custom_type: "",
+      notes: notesText
+    }).select("id").single();
+    if (error || !data?.id) {
+      setMessage("Impossibile aggiungere l'appuntamento: " + (error?.message || "errore di salvataggio"));
+      setCalendarSaving(false);
+      return;
+    }
+    const { error: updateError } = await ctx.client.from("recruiting_todos").update({
+      due_date: calendarDate, due_time: calendarTime, source_key: "hr:" + String(data.id),
+      updated_at: new Date().toISOString()
+    }).eq("owner_key", ctx.ownerKey).eq("id", item.id);
+    if (updateError) setMessage("Appuntamento creato, ma non è stato possibile collegarlo alla cosa da fare: " + updateError.message);
+    else setMessage("Appuntamento aggiunto al Calendario e collegato alla cosa da fare.");
+    setCalendarTodo(null);
+    setCalendarSaving(false);
+    await load();
   };
   const startEdit = (item: Todo) => {
     setEditing(item.id); setContactSearch(""); setPriority(item.priority);
@@ -130,6 +175,18 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <span style={{ color: "#475569", fontSize: 13 }}>{sorted.length} attività trovate</span>
       </div>
     </div>}
+    {calendarTodo && <div role="dialog" aria-label="Conferma appuntamento" style={{ background: "#eff6ff", border: "2px solid #93c5fd", padding: 16, borderRadius: 12, marginTop: 14, display: "grid", gap: 11 }}>
+      <strong>📅 AGGIUNGI AL CALENDARIO — {calendarTodo.title}</strong>
+      <span>Conferma oppure modifica il giorno e l'ora dell'appuntamento. Entrambi sono obbligatori.</span>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <label style={{ flex: "1 1 160px" }}>GIORNO *<input type="date" required style={field} value={calendarDate} onChange={e => setCalendarDate(e.target.value)} /></label>
+        <label style={{ flex: "1 1 140px" }}>ORA *<input type="time" required style={field} value={calendarTime} onChange={e => setCalendarTime(e.target.value)} /></label>
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button style={{ ...action, background: "#2563eb", color: "white" }} disabled={calendarSaving || !calendarDate || !calendarTime} onClick={() => void confirmCalendarAppointment()}>{calendarSaving ? "SALVATAGGIO..." : "CONFERMA E CREA APPUNTAMENTO"}</button>
+        <button style={action} disabled={calendarSaving} onClick={() => setCalendarTodo(null)}>ANNULLA</button>
+      </div>
+    </div>}
     {formOpen && <div style={{ background: "#f8fafc", padding: 15, borderRadius: 12, marginTop: 14, display: "grid", gap: 10 }}>
       <label>OGGETTO *<input style={field} value={form.title} onChange={e => setForm(v => ({...v,title:e.target.value}))} required /></label>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -168,6 +225,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           <button style={action} onClick={()=>startEdit(item)}>MODIFICA</button>
           <button style={action} onClick={()=>void change(item,{priority:!item.priority})}>{item.priority?"TOGLI PRIORITÀ":"★ PRIORITÀ"}</button>
           <button style={{...action,color:"#b91c1c"}} onClick={async()=>{if(!ctx || !window.confirm("Eliminare questa cosa da fare?"))return;const {error}=await ctx.client.from("recruiting_todos").delete().eq("owner_key",ctx.ownerKey).eq("id",item.id);if(error)setMessage(error.message);else await load();}}>ELIMINA</button>
+          {!item.source_key && <button type="button" style={{ ...action, background: "#dcfce7", color: "#166534", borderColor: "#86efac" }} onClick={() => startCalendarAppointment(item)}>📅 AGGIUNGI AL CALENDARIO</button>}
           {item.source_key && /^(hr|crm|google):/.test(item.source_key) && (
             <button type="button" title="Apri scheda originale nel Calendario" aria-label="Apri scheda originale nel Calendario"
               onClick={() => window.dispatchEvent(new CustomEvent("ge:open-recruiting-calendar", { detail: { date: item.due_date, sourceKey: item.source_key } }))}
