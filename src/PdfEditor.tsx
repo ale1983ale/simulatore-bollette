@@ -18,6 +18,19 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
  const [lens,setLens]=useState<{page:number;x:number;y:number;screenX:number;screenY:number}|null>(null);
  const lensCanvas=useRef<HTMLCanvasElement|null>(null);
  const viewerRef=useRef<HTMLDivElement|null>(null);
+ const pinchRef=useRef<{distance:number;zoom:number}|null>(null);
+ const zoomRef=useRef(100);
+ const updateZoom=(next:number)=>{const value=Math.max(50,Math.min(400,Math.round(next)));zoomRef.current=value;setZoom(value);};
+ useEffect(()=>{zoomRef.current=zoom;},[zoom]);
+ useEffect(()=>{const el=viewerRef.current;if(!el)return;
+  const distance=(a:Touch,b:Touch)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+  const touchStart=(e:TouchEvent)=>{if(e.touches.length===2){pinchRef.current={distance:distance(e.touches[0],e.touches[1]),zoom:zoomRef.current};e.preventDefault();}};
+  const touchMove=(e:TouchEvent)=>{if(e.touches.length===2){e.preventDefault();if(!pinchRef.current)pinchRef.current={distance:distance(e.touches[0],e.touches[1]),zoom:zoomRef.current};else updateZoom(pinchRef.current.zoom*distance(e.touches[0],e.touches[1])/Math.max(1,pinchRef.current.distance));}};
+  const touchEnd=(e:TouchEvent)=>{if(e.touches.length<2)pinchRef.current=null;};
+  const wheel=(e:WheelEvent)=>{e.preventDefault();updateZoom(zoomRef.current*(e.deltaY<0?1.12:1/1.12));};
+  el.addEventListener("touchstart",touchStart,{passive:false});el.addEventListener("touchmove",touchMove,{passive:false});el.addEventListener("touchend",touchEnd);el.addEventListener("touchcancel",touchEnd);el.addEventListener("wheel",wheel,{passive:false});
+  return()=>{el.removeEventListener("touchstart",touchStart);el.removeEventListener("touchmove",touchMove);el.removeEventListener("touchend",touchEnd);el.removeEventListener("touchcancel",touchEnd);el.removeEventListener("wheel",wheel);};
+ },[full,pages.length]);
  const [viewerWidth,setViewerWidth]=useState(0);
  useEffect(()=>{const el=viewerRef.current;if(!el)return;const update=()=>setViewerWidth(Math.max(200,el.clientWidth-24));update();const observer=new ResizeObserver(update);observer.observe(el);window.addEventListener("resize",update);return()=>{observer.disconnect();window.removeEventListener("resize",update);};},[full,pages.length]);
  const [draft,setDraft]=useState<{page:number;mark:Mark}|null>(null);
@@ -43,7 +56,7 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
   const canvas=canvasRefs.current[pageNumber];if(!canvas)continue;
   const page=await pdf.getPage(pageNumber);if(cancelled)return;
   const base=page.getViewport({scale:1});
-  const viewport=page.getViewport({scale:Math.max(0.1,(viewerWidth||base.width)/base.width)});
+  const viewport=page.getViewport({scale:Math.max(0.1,(viewerWidth||base.width)/base.width)*zoom/100});
   canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
   const ctx=canvas.getContext("2d");if(!ctx)continue;
   const task=page.render({canvasContext:ctx,viewport});tasks.push(task);
@@ -51,7 +64,7 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
  }
  })();
  return()=>{cancelled=true;tasks.forEach(t=>{try{t.cancel();}catch{}});};
- },[pdf,pages,viewerWidth]);
+ },[pdf,pages,viewerWidth,zoom]);
  useEffect(()=>{if(!lens||!lensCanvas.current)return;const source=canvasRefs.current[lens.page];const target=lensCanvas.current;if(!source)return;const ctx=target.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,280,280);const sx=lens.x*source.width,sy=lens.y*source.height;const sample=260/lensScale;ctx.fillStyle="white";ctx.fillRect(0,0,280,280);ctx.drawImage(source,Math.max(0,sx-sample/2),Math.max(0,sy-sample/2),Math.min(sample,source.width-Math.max(0,sx-sample/2)),Math.min(sample,source.height-Math.max(0,sy-sample/2)),0,0,280,280);},[lens]);
  const save=async()=>{setBusy(true);setStatus("");try{const token=await getAdminSessionToken();const {error}=await supabase.rpc(driveFileId?"provvigioni_drive_annotations_save":"provvigioni_presentazioni_annotations_save",driveFileId?{p_session_token:token,p_file_id:driveFileId,p_annotazioni:marksRef.current}:{p_session_token:token,p_id:documentId,p_annotazioni:marksRef.current});if(error)throw error;setDirty(false);setStatus("Annotazioni salvate.");}catch(e:any){setStatus("Errore salvataggio: "+e.message);}finally{setBusy(false);}};
  const start=(event:React.PointerEvent<SVGSVGElement>,page:number)=>{
@@ -116,6 +129,12 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
     </div>}
    </div>
   {status&&<p role="status" style={{fontWeight:700,color:status.startsWith("Errore")?"#b91c1c":"#15803d"}}>{status}</p>}
+  <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
+    <button type="button" style={toolButton} onClick={()=>updateZoom(zoomRef.current/1.2)} aria-label="Riduci PDF">−</button>
+    <button type="button" style={toolButton} onClick={()=>updateZoom(100)} title="Adatta alla larghezza">{zoom}% · ADATTA</button>
+    <button type="button" style={toolButton} onClick={()=>updateZoom(zoomRef.current*1.2)} aria-label="Ingrandisci PDF">＋</button>
+    <span style={{fontSize:12,color:"#64748b"}}>Due dita o rotella mouse per zoom</span>
+   </div>
   <div ref={viewerRef} style={{height:full?"100%":"min(75vh,980px)",minHeight:full?0:450,overflow:"auto",background:"#cbd5e1",padding:12,borderRadius:12}}>
    {pages.map(page=><div key={page} style={{position:"relative",width:"fit-content",maxWidth:"none",margin:"0 auto 18px",background:"white",boxShadow:"0 3px 14px #0f172a30"}}>
     <canvas ref={node=>{canvasRefs.current[page]=node;}} style={{display:"block",maxWidth:"none"}}/>
