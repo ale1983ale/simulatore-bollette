@@ -39,6 +39,27 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [diaryText,setDiaryText]=useState("");
   const [diaryLinked,setDiaryLinked]=useState("");
   const [diarySaving,setDiarySaving]=useState(false);
+  const [diarySearch,setDiarySearch]=useState("");
+  const [diaryFiles,setDiaryFiles]=useState<Array<{name:string;type:string;data:string}>>([]);
+  const [diaryUploading,setDiaryUploading]=useState(false);
+  const diaryContacts=[...contacts].sort((a,b)=>a.name.localeCompare(b.name,"it",{sensitivity:"base"}));
+  const diaryGroups=Object.values(diaryItems.reduce((acc:Record<string,{key:string;name:string;items:any[]}>,item:any)=>{
+    const key=item.linked_kind&&item.linked_id?item.linked_kind+":"+item.linked_id:"generic";
+    if(!acc[key])acc[key]={key,name:item.linked_name||"APPUNTI GENERICI",items:[]};
+    acc[key].items.push(item);return acc;
+  },{})).sort((a,b)=>a.name.localeCompare(b.name,"it",{sensitivity:"base"}));
+  const addDiaryFiles=async(files:FileList|null)=>{
+    if(!files?.length)return;setDiaryUploading(true);
+    try{const added:Array<{name:string;type:string;data:string}>=[];
+      for(const file of Array.from(files)){if(file.size>2*1024*1024)throw Error("Il file "+file.name+" supera 2 MB.");
+        const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));reader.onerror=()=>reject(Error("Errore lettura file"));reader.readAsDataURL(file);});
+        added.push({name:file.name,type:file.type,data});
+      }
+      setDiaryFiles(v=>[...v,...added].slice(0,5));
+    }catch(e:any){setMessage(e.message||"Errore allegato");}
+    finally{setDiaryUploading(false);}
+  };
+
   const loadDiary=useCallback(async()=>{
     if(!ctx)return;
     const {data,error}=await ctx.client.from("recruiting_diary").select("*").eq("owner_key",ctx.ownerKey).order("created_at",{ascending:false});
@@ -46,11 +67,11 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   },[ctx]);
   useEffect(()=>{if(visible&&subtab==="diario")void loadDiary();},[visible,subtab,loadDiary]);
   const saveDiary=async()=>{
-    if(!ctx||!diaryText.trim())return;
+    if(!ctx||(!diaryText.trim()&&!diaryFiles.length))return;
     setDiarySaving(true);
     const linked=contacts.find(c=>c.kind+":"+c.id===diaryLinked);
-    const {error}=await ctx.client.from("recruiting_diary").insert({owner_key:ctx.ownerKey,body:diaryText.trim(),linked_kind:linked?.kind||null,linked_id:linked?.id||null,linked_name:linked?.name||"",completed:false});
-    if(error)setMessage(error.message);else{setDiaryText("");await loadDiary();}
+    const {error}=await ctx.client.from("recruiting_diary").insert({owner_key:ctx.ownerKey,body:diaryText.trim(),linked_kind:linked?.kind||null,linked_id:linked?.id||null,linked_name:linked?.name||"",completed:false,attachments:diaryFiles});
+    if(error)setMessage(error.message);else{setDiaryText("");setDiaryFiles([]);await loadDiary();}
     setDiarySaving(false);
   };
   const diaryAction=async(item:any,kind:"done"|"delete")=>{
@@ -188,18 +209,39 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     </div>
     {subtab==="diario"&&<div style={{marginTop:14}}>
       <h3>DIARIO · APPUNTI PER AGENTE / CONTATTO</h3>
-      <label>AGENTE O CONTATTO<select style={field} value={diaryLinked} onChange={e=>setDiaryLinked(e.target.value)}><option value="">Nessun collegamento</option>{contacts.map(c=><option key={c.kind+":"+c.id} value={c.kind+":"+c.id}>{c.name}</option>)}</select></label>
-      <label>NUOVO APPUNTO<textarea rows={4} style={field} value={diaryText} onChange={e=>setDiaryText(e.target.value)} placeholder="Scrivi un appunto..." /></label>
-      <button style={{...action,background:"#2563eb",color:"white",marginTop:8}} disabled={diarySaving||!diaryText.trim()} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"＋ SALVA APPUNTO"}</button>
-      <div style={{display:"grid",gap:10,marginTop:16}}>{diaryItems.map(item=><article key={item.id} style={{border:"1px solid #cbd5e1",borderRadius:12,padding:14,background:item.completed?"#f1f5f9":"white"}}>
-        <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}><strong>{item.linked_name||"APPUNTO GENERICO"}</strong><small>{new Date(item.created_at).toLocaleString("it-IT")}</small></div>
-        <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none"}}>{item.body}</p>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button style={action} onClick={()=>void diaryAction(item,"done")}>{item.completed?"↶ RIAPRI":"✓ FATTO"}</button>
-          <button style={action} disabled={Boolean(item.calendar_event_id)} onClick={()=>{setCalendarTodo({id:item.id,title:"DIARIO · "+(item.linked_name||"APPUNTO"),body:item.body,linked_name:item.linked_name,linked_kind:item.linked_kind,linked_id:item.linked_id,due_date:null,due_time:null,source_key:null} as Todo);setCalendarDate("");setCalendarTime("");setCalendarType("ALTRO");}}>{item.calendar_event_id?"✓ IN CALENDARIO":"📅 CALENDARIO"}</button>
-          <button style={{...action,color:"#b91c1c"}} onClick={()=>void diaryAction(item,"delete")}>ELIMINA</button>
-        </div>
-      </article>)}{!diaryItems.length&&<p>Nessun appunto presente.</p>}</div>
+      <label style={{display:"grid",gap:6}}>CERCA AGENTE O CONTATTO
+        <input style={field} placeholder="Digita nome o cognome..." value={diarySearch} onChange={e=>setDiarySearch(e.target.value)} />
+      </label>
+      <label style={{display:"grid",gap:6}}>AGENTE O CONTATTO
+        <select style={field} value={diaryLinked} onChange={e=>setDiaryLinked(e.target.value)}>
+          <option value="">Nessun collegamento</option>
+          {diaryContacts.filter(c=>c.name.toLocaleLowerCase("it").includes(diarySearch.toLocaleLowerCase("it"))||c.kind+":"+c.id===diaryLinked).map(c=><option key={c.kind+":"+c.id} value={c.kind+":"+c.id}>{c.name} · {c.kind==="agent"?"AGENTE":"CONTATTO"}</option>)}
+        </select>
+      </label>
+      <label style={{display:"grid",gap:6}}>NUOVO APPUNTO<textarea rows={4} style={field} value={diaryText} onChange={e=>setDiaryText(e.target.value)} placeholder="Scrivi un appunto..." /></label>
+      <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid #cbd5e1",background:"#f8fafc",cursor:"pointer",fontWeight:800,width:"fit-content"}}>
+        📎 ALLEGA FILE <input type="file" multiple style={{display:"none"}} onChange={e=>{void addDiaryFiles(e.target.files);e.target.value="";}} />
+      </label>
+      {diaryFiles.map((file,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}>📎 {file.name} <button type="button" style={action} onClick={()=>setDiaryFiles(v=>v.filter((_,j)=>i!==j))}>✕</button></div>)}
+      <small style={{color:"#64748b"}}>Fino a 5 allegati, massimo 2 MB per file.</small>
+      <button style={{...action,background:"#2563eb",color:"white",marginTop:8}} disabled={diarySaving||diaryUploading||(!diaryText.trim()&&!diaryFiles.length)} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"＋ SALVA APPUNTO"}</button>
+      {message&&<p role="alert" style={{color:"#b91c1c"}}>{message}</p>}
+      <div style={{display:"grid",gap:12,marginTop:16}}>
+        {diaryGroups.filter(g=>g.name.toLocaleLowerCase("it").includes(diarySearch.toLocaleLowerCase("it"))).map(group=><article key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
+          <h4 style={{margin:"0 0 12px",color:"#1d4ed8",fontSize:17}}>{group.name} <span style={{fontSize:12,color:"#64748b"}}>({group.items.length} note)</span></h4>
+          <div style={{display:"grid",gap:10}}>{group.items.map(item=><section key={item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
+            <small style={{color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")}</small>
+            <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none",margin:"8px 0"}}>{item.body}</p>
+            {Array.isArray(item.attachments)&&item.attachments.map((file:any,i:number)=><a key={i} href={file.data} download={file.name} style={{display:"inline-block",marginRight:10,marginBottom:8,color:"#1d4ed8",fontWeight:700,fontSize:13}}>📎 {file.name}</a>)}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button style={action} onClick={()=>void diaryAction(item,"done")}>{item.completed?"↶ RIAPRI":"✓ FATTO"}</button>
+              <button style={action} disabled={Boolean(item.calendar_event_id)} onClick={()=>{setCalendarTodo({id:item.id,title:"DIARIO · "+(item.linked_name||"APPUNTO"),body:item.body,linked_name:item.linked_name,linked_kind:item.linked_kind,linked_id:item.linked_id,due_date:null,due_time:null,source_key:null} as Todo);setCalendarDate("");setCalendarTime("");setCalendarType("ALTRO");}}>{item.calendar_event_id?"✓ IN CALENDARIO":"📅 CALENDARIO"}</button>
+              <button style={{...action,color:"#b91c1c"}} onClick={()=>void diaryAction(item,"delete")}>ELIMINA</button>
+            </div>
+          </section>)}</div>
+        </article>)}
+        {!diaryGroups.length&&<p>Nessun appunto presente.</p>}
+      </div>
     </div>}
     {subtab==="todo"&&<>
     {message && <p role="alert" style={{ color: "#b91c1c" }}>{message}</p>}
