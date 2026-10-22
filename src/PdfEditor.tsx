@@ -17,6 +17,9 @@ export default function PdfEditor({base64,documentId,filename}:Props){
  const [menu,setMenu]=useState<"magnify"|"pen"|"highlight"|null>(null);
  const [lens,setLens]=useState<{page:number;x:number;y:number;screenX:number;screenY:number}|null>(null);
  const lensCanvas=useRef<HTMLCanvasElement|null>(null);
+ const viewerRef=useRef<HTMLDivElement|null>(null);
+ const [viewerWidth,setViewerWidth]=useState(0);
+ useEffect(()=>{const el=viewerRef.current;if(!el)return;const update=()=>setViewerWidth(Math.max(200,el.clientWidth-24));update();const observer=new ResizeObserver(update);observer.observe(el);window.addEventListener("resize",update);return()=>{observer.disconnect();window.removeEventListener("resize",update);};},[full,pages.length]);
  const [draft,setDraft]=useState<{page:number;mark:Mark}|null>(null);
  const pdfRef=useRef<any>(null),marksRef=useRef<Marks>({}),canvasRefs=useRef<Record<number,HTMLCanvasElement|null>>({});
  const changeMarks=(value:Marks)=>{marksRef.current=value;setMarks(value);setDirty(true);};
@@ -39,7 +42,8 @@ export default function PdfEditor({base64,documentId,filename}:Props){
   if(cancelled)return;
   const canvas=canvasRefs.current[pageNumber];if(!canvas)continue;
   const page=await pdf.getPage(pageNumber);if(cancelled)return;
-  const viewport=page.getViewport({scale:1.25*zoom/100});
+  const base=page.getViewport({scale:1});
+  const viewport=page.getViewport({scale:Math.max(0.1,(viewerWidth||base.width)/base.width)});
   canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
   const ctx=canvas.getContext("2d");if(!ctx)continue;
   const task=page.render({canvasContext:ctx,viewport});tasks.push(task);
@@ -47,7 +51,7 @@ export default function PdfEditor({base64,documentId,filename}:Props){
  }
  })();
  return()=>{cancelled=true;tasks.forEach(t=>{try{t.cancel();}catch{}});};
- },[pdf,pages,zoom]);
+ },[pdf,pages,viewerWidth]);
  useEffect(()=>{if(!lens||!lensCanvas.current)return;const source=canvasRefs.current[lens.page];const target=lensCanvas.current;if(!source)return;const ctx=target.getContext("2d");if(!ctx)return;ctx.clearRect(0,0,280,280);const sx=lens.x*source.width,sy=lens.y*source.height;const sample=260/lensScale;ctx.fillStyle="white";ctx.fillRect(0,0,280,280);ctx.drawImage(source,Math.max(0,sx-sample/2),Math.max(0,sy-sample/2),Math.min(sample,source.width-Math.max(0,sx-sample/2)),Math.min(sample,source.height-Math.max(0,sy-sample/2)),0,0,280,280);},[lens]);
  const save=async()=>{setBusy(true);setStatus("");try{const token=await getAdminSessionToken();const {error}=await supabase.rpc("provvigioni_presentazioni_annotations_save",{p_session_token:token,p_id:documentId,p_annotazioni:marksRef.current});if(error)throw error;setDirty(false);setStatus("Annotazioni salvate.");}catch(e:any){setStatus("Errore salvataggio: "+e.message);}finally{setBusy(false);}};
  const start=(event:React.PointerEvent<SVGSVGElement>,page:number)=>{
@@ -112,7 +116,7 @@ export default function PdfEditor({base64,documentId,filename}:Props){
     </div>}
    </div>
   {status&&<p role="status" style={{fontWeight:700,color:status.startsWith("Errore")?"#b91c1c":"#15803d"}}>{status}</p>}
-  <div style={{height:full?"100%":"min(75vh,980px)",minHeight:full?0:450,overflow:"auto",background:"#cbd5e1",padding:12,borderRadius:12}}>
+  <div ref={viewerRef} style={{height:full?"100%":"min(75vh,980px)",minHeight:full?0:450,overflow:"auto",background:"#cbd5e1",padding:12,borderRadius:12}}>
    {pages.map(page=><div key={page} style={{position:"relative",width:"fit-content",maxWidth:"none",margin:"0 auto 18px",background:"white",boxShadow:"0 3px 14px #0f172a30"}}>
     <canvas ref={node=>{canvasRefs.current[page]=node;}} style={{display:"block",maxWidth:"none"}}/>
     <svg viewBox="0 0 1000 1000" preserveAspectRatio="none" onPointerDown={e=>start(e,page)} onPointerMove={e=>move(e,page)} onPointerUp={finish} onPointerCancel={()=>{setDraft(null);setLens(null);}} onPointerLeave={()=>setLens(null)}
