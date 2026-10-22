@@ -2710,7 +2710,7 @@ export default function UnifiedAgentManagement({
 
           <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginLeft:"auto"}}>
             {hasUnsavedChanges&&<strong style={{color:"#b45309",fontSize:12}}>● MODIFICHE NON SALVATE</strong>}
-            <button type="button" disabled={busy||expandedId===null||!draft} onClick={()=>{const row=rows.find(item=>Number(item.agent.id)===expandedId);if(row)void saveRow(row);}} style={{...buttonStyle,background:expandedId===null?"#94a3b8":"#16a34a",color:"white",fontSize:16,fontWeight:950,padding:"13px 24px",boxShadow:"0 3px 10px #16a34a33"}}>{busy?"SALVATAGGIO...":"💾 SALVA MODIFICHE"}</button>
+            <button type="button" disabled={busy||!hasUnsavedChanges} onClick={()=>{const row=rows.find(item=>Number(item.agent.id)===expandedId);if(row)void saveRow(row);}} style={{...buttonStyle,background:hasUnsavedChanges?"#16a34a":"#94a3b8",color:"white",fontSize:16,fontWeight:950,padding:"13px 24px",boxShadow:hasUnsavedChanges?"0 3px 12px #16a34a66":"none",cursor:hasUnsavedChanges?"pointer":"not-allowed",opacity:1}}>{busy?"SALVATAGGIO...":"💾 SALVA MODIFICHE"}</button>
           </div>
 
           <div style={{ flex: "1 1 100%" }}>
