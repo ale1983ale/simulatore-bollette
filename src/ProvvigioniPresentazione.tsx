@@ -2,11 +2,13 @@ import React,{useEffect,useRef,useState} from "react";
 import {supabase} from "./supabase";
 import {getAdminSessionToken} from "./adminSecurity";
 import PdfEditor from "./PdfEditor";
+import ProvvigioniDrive from "./ProvvigioniDrive";
 
 type Document={id:number;nome:string;dimensione_bytes:number;creato_il:string};
 const button:React.CSSProperties={padding:"10px 14px",borderRadius:10,border:"1px solid #cbd5e1",background:"white",color:"#0f172a",fontWeight:800,cursor:"pointer"};
 const toBase64=(file:File)=>new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("Lettura PDF non riuscita"));reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");reader.readAsDataURL(file);});
 export default function ProvvigioniPresentazione(){
+ const [source,setSource]=useState<"drive"|"manual">("drive");
  const [documents,setDocuments]=useState<Document[]>([]),[selected,setSelected]=useState<number|null>(null),[url,setUrl]=useState(""),[pdfBase64,setPdfBase64]=useState(""),[zoom,setZoom]=useState(100),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const objectUrl=useRef("");
  const clearUrl=()=>{if(objectUrl.current){URL.revokeObjectURL(objectUrl.current);objectUrl.current="";}setUrl("");setPdfBase64("");};
@@ -18,6 +20,11 @@ export default function ProvvigioniPresentazione(){
  const remove=async(doc:Document)=>{if(!window.confirm("Eliminare definitivamente "+doc.nome+"?"))return;setBusy(true);setError("");try{const token=await getAdminSessionToken();const {error:e}=await supabase.rpc("provvigioni_presentazioni_delete",{p_session_token:token,p_id:doc.id});if(e)throw e;if(selected===doc.id){setSelected(null);clearUrl();}await list();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const selectedName=documents.find(d=>d.id===selected)?.nome||"";
  return <div style={{display:"grid",gap:16}}>
+  <div style={{display:"flex",gap:9,flexWrap:"wrap"}}>
+   <button type="button" onClick={()=>setSource("drive")} style={{...button,background:source==="drive"?"#0f172a":"white",color:source==="drive"?"white":"#0f172a"}}>📁 GOOGLE DRIVE</button>
+   <button type="button" onClick={()=>setSource("manual")} style={{...button,background:source==="manual"?"#0f172a":"white",color:source==="manual"?"white":"#0f172a"}}>📄 PDF CARICATI MANUALMENTE</button>
+  </div>
+  {source==="drive"?<ProvvigioniDrive/>:<div style={{display:"grid",gap:16}}>
   <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:16,padding:20,boxShadow:"0 4px 18px #0f172a0b"}}>
    <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"center",flexWrap:"wrap"}}>
     <div><h2 style={{margin:"0 0 6px",color:"#0f172a"}}>📑 PRESENTAZIONE</h2><p style={{margin:0,color:"#64748b"}}>Archivio PDF riservato al super admin. Carica e consulta i documenti direttamente qui.</p></div>
@@ -45,5 +52,5 @@ export default function ProvvigioniPresentazione(){
     {pdfBase64&&selected!==null?<PdfEditor key={selected} base64={pdfBase64} documentId={selected} filename={selectedName}/>:<div style={{minHeight:360,display:"grid",placeItems:"center",background:"#f8fafc",borderRadius:12,color:"#64748b",textAlign:"center",padding:20}}>{busy?"Caricamento PDF…":"Seleziona un documento per visualizzarlo qui."}</div>}
    </div>
   </div>
- </div>;
+ </div></div>;
 }
