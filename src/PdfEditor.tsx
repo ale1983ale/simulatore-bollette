@@ -193,7 +193,6 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
     <button type="button" onClick={()=>{saveSticky([...sticky.pages,emptyPage()]);setStickyPage(sticky.pages.length);}} style={{...toolButton,padding:"7px 10px",background:"#fde047"}}>＋ Foglio</button>
     <button type="button" disabled={stickyPage>=sticky.pages.length-1} onClick={()=>setStickyPage(p=>p+1)} style={{...toolButton,padding:"7px 10px"}}>→</button>
    </div>
-   <span style={{fontSize:12,color:"#713f12"}}>Pagine condivise tra tutti i PDF su questo dispositivo. Cancellazione automatica dopo 30 minuti senza modifiche.</span>
    <div onPointerDown={beginResize} onPointerMove={moveResize} onPointerUp={()=>{resizeDrag.current=null;}} onPointerCancel={()=>{resizeDrag.current=null;}} title="Trascina per ridimensionare" style={{position:"absolute",right:2,bottom:2,width:28,height:28,cursor:"nwse-resize",touchAction:"none",display:"grid",placeItems:"center",color:"#a16207",fontSize:22,userSelect:"none"}}>◢</div>
   </div>}
   {confirmClear&&<div style={{position:"fixed",inset:0,zIndex:32000,background:"#0f172a88",display:"grid",placeItems:"center",padding:20}}>
