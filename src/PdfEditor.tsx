@@ -31,6 +31,13 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
  const stickyCanvas=useRef<HTMLCanvasElement|null>(null);
  const stickyHistory=useRef<Record<number,StickyPage[]>>({});
  const [stickyPosition,setStickyPosition]=useState({x:16,y:110});
+ const [stickySize,setStickySize]=useState({width:420,height:600});
+ const [confirmClear,setConfirmClear]=useState(false);
+ const resizeDrag=useRef<{x:number;y:number;width:number;height:number}|null>(null);
+ const resizeNotes=(factor:number)=>setStickySize(v=>({width:Math.max(280,Math.min(window.innerWidth-24,Math.round(v.width*factor))),height:Math.max(330,Math.min(window.innerHeight-30,Math.round(v.height*factor)))}));
+ const beginResize=(e:React.PointerEvent<HTMLDivElement>)=>{e.stopPropagation();resizeDrag.current={x:e.clientX,y:e.clientY,width:stickySize.width,height:stickySize.height};e.currentTarget.setPointerCapture(e.pointerId);};
+ const moveResize=(e:React.PointerEvent<HTMLDivElement>)=>{if(!resizeDrag.current)return;const d=resizeDrag.current;setStickySize({width:Math.max(280,Math.min(window.innerWidth-stickyPosition.x,d.width+e.clientX-d.x)),height:Math.max(330,Math.min(window.innerHeight-stickyPosition.y,d.height+e.clientY-d.y))});};
+
  const stickyDrag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const stickyBox=useRef<HTMLDivElement|null>(null);
  const beginStickyDrag=(e:React.PointerEvent<HTMLDivElement>)=>{if((e.target as HTMLElement).closest("button"))return;stickyDrag.current={x:e.clientX,y:e.clientY,left:stickyPosition.x,top:stickyPosition.y};e.currentTarget.setPointerCapture(e.pointerId);};
@@ -165,26 +172,39 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
      </div>
     </div>}
    </div>
-  {stickyOpen&&<div ref={stickyBox} style={{position:"fixed",top:stickyPosition.y,left:stickyPosition.x,zIndex:31000,width:"min(420px,calc(100vw - 24px))",maxWidth:420,maxHeight:"calc(100dvh - 24px)",overflowY:"auto",boxSizing:"border-box",background:"#fff4a8",backgroundImage:"repeating-linear-gradient(to bottom, transparent 0px, transparent 30px, #d9bc6940 31px, transparent 32px)",border:"1px solid #e4c45c",borderRadius:"4px 4px 19px 5px",boxShadow:"3px 7px 0 #e2bd53, 8px 14px 24px #0004",padding:15,color:"#27210f",display:"grid",gap:12}}>
+  {stickyOpen&&<div ref={stickyBox} style={{position:"fixed",top:stickyPosition.y,left:stickyPosition.x,zIndex:31000,width:`min(${stickySize.width}px,calc(100vw - 24px))`,height:`min(${stickySize.height}px,calc(100dvh - 24px))`,maxHeight:"calc(100dvh - 24px)",overflowY:"auto",boxSizing:"border-box",background:"#fff4a8",backgroundImage:"repeating-linear-gradient(to bottom, transparent 0px, transparent 30px, #d9bc6940 31px, transparent 32px)",border:"1px solid #e4c45c",borderRadius:"4px 4px 19px 5px",boxShadow:"3px 7px 0 #e2bd53, 8px 14px 24px #0004",padding:15,color:"#27210f",display:"flex",flexDirection:"column",gap:12}}>
    <div onPointerDown={beginStickyDrag} onPointerMove={moveStickyDrag} onPointerUp={()=>{stickyDrag.current=null;}} onPointerCancel={()=>{stickyDrag.current=null;}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap",cursor:"grab",touchAction:"none",userSelect:"none"}}>
     <strong style={{fontSize:20,fontFamily:"cursive"}}>✎ Notes <span style={{fontSize:13,color:"#85641c"}}>{stickyPage+1}/{sticky.pages.length}</span></strong>
     <div style={{display:"flex",gap:6}}>
-     <button type="button" onClick={()=>{if(window.confirm("Cancellare tutti gli appunti?"))clearSticky();}} style={{...toolButton,padding:"5px 8px",background:"#fef9c3"}} aria-label="Elimina appunti" title="Elimina appunti">🗑️</button>
+     <button type="button" onClick={()=>setConfirmClear(true)} style={{...toolButton,padding:"5px 8px",background:"#fef9c3"}} aria-label="Elimina appunti" title="Elimina appunti">🗑️</button>
      <button type="button" onClick={()=>setStickyOpen(false)} aria-label="Chiudi Notes senza cancellare" title="Chiudi senza cancellare" style={{...toolButton,padding:"5px 10px"}}>✕</button>
     </div>
    </div>
    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
     <button type="button" onClick={()=>setStickyMode("keyboard")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="keyboard"?"#f59e0b":"white"}} aria-label="Tastiera" title="Tastiera">⌨️</button>
     <button type="button" onClick={()=>setStickyMode("hand")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="hand"?"#f59e0b":"white"}} aria-label="Mano libera" title="Mano libera">✍️</button>
+    <button type="button" onClick={()=>resizeNotes(0.85)} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Rimpicciolisci Notes" title="Rimpicciolisci">−</button>
+    <button type="button" onClick={()=>resizeNotes(1.15)} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Ingrandisci Notes" title="Ingrandisci">＋</button>
     <button type="button" onClick={undoSticky} disabled={!stickyHistory.current[stickyPage]?.length} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Annulla ultima modifica" title="Annulla ultima modifica">↶</button>
    </div>
-   {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:280,maxHeight:full?"48vh":420,resize:"vertical",background:"repeating-linear-gradient(to bottom,#fff9c8 0px,#fff9c8 30px,#d9bc6970 31px,#fff9c8 32px)",border:"1px solid #dfc875",borderRadius:7,padding:"7px 12px",color:"#1c1917",fontSize:18,lineHeight:"32px",fontFamily:"cursive"}}/>:<canvas ref={stickyCanvas} width={600} height={620} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",background:"#fff9c8",border:"1px solid #dfc875",borderRadius:7,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
+   {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:100,flex:"1 1 auto",resize:"none",background:"repeating-linear-gradient(to bottom,#fff9c8 0px,#fff9c8 30px,#d9bc6970 31px,#fff9c8 32px)",border:"1px solid #dfc875",borderRadius:7,padding:"7px 12px",color:"#1c1917",fontSize:18,lineHeight:"32px",fontFamily:"cursive"}}/>:<canvas ref={stickyCanvas} width={600} height={620} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",maxHeight:"100%",flex:"1 1 auto",minHeight:100,background:"#fff9c8",border:"1px solid #dfc875",borderRadius:7,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
    <div style={{display:"flex",gap:7,alignItems:"center",justifyContent:"space-between"}}>
     <button type="button" disabled={stickyPage===0} onClick={()=>setStickyPage(p=>p-1)} style={{...toolButton,padding:"7px 10px"}}>←</button>
-    <button type="button" onClick={()=>{saveSticky([...sticky.pages,emptyPage()]);setStickyPage(sticky.pages.length);}} style={{...toolButton,padding:"7px 10px",background:"#fde047"}}>＋ Foglietto</button>
+    <button type="button" onClick={()=>{saveSticky([...sticky.pages,emptyPage()]);setStickyPage(sticky.pages.length);}} style={{...toolButton,padding:"7px 10px",background:"#fde047"}}>＋ Foglio</button>
     <button type="button" disabled={stickyPage>=sticky.pages.length-1} onClick={()=>setStickyPage(p=>p+1)} style={{...toolButton,padding:"7px 10px"}}>→</button>
    </div>
    <span style={{fontSize:12,color:"#713f12"}}>Pagine condivise tra tutti i PDF su questo dispositivo. Cancellazione automatica dopo 30 minuti senza modifiche.</span>
+   <div onPointerDown={beginResize} onPointerMove={moveResize} onPointerUp={()=>{resizeDrag.current=null;}} onPointerCancel={()=>{resizeDrag.current=null;}} title="Trascina per ridimensionare" style={{position:"absolute",right:2,bottom:2,width:28,height:28,cursor:"nwse-resize",touchAction:"none",display:"grid",placeItems:"center",color:"#a16207",fontSize:22,userSelect:"none"}}>◢</div>
+  </div>}
+  {confirmClear&&<div style={{position:"fixed",inset:0,zIndex:32000,background:"#0f172a88",display:"grid",placeItems:"center",padding:20}}>
+   <div role="dialog" aria-modal="true" aria-label="Conferma cancellazione Notes" style={{width:"min(360px,100%)",background:"#fff8cc",border:"2px solid #eab308",borderRadius:18,padding:22,boxShadow:"0 18px 50px #0005",color:"#422006",display:"grid",gap:16,textAlign:"center"}}>
+    <div style={{fontSize:38}}>🗑️</div><strong style={{fontSize:20}}>Cancellare le Notes?</strong>
+    <span style={{fontSize:14}}>Tutti i fogli e gli appunti verranno eliminati. Questa operazione non si può annullare.</span>
+    <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+     <button type="button" onClick={()=>setConfirmClear(false)} style={{...toolButton,padding:"11px 16px",borderRadius:12}}>Annulla</button>
+     <button type="button" onClick={()=>{clearSticky();setConfirmClear(false);}} style={{...toolButton,padding:"11px 16px",borderRadius:12,background:"#dc2626",color:"white",border:"none"}}>Elimina tutto</button>
+    </div>
+   </div>
   </div>}
   {status&&<p role="status" style={{fontWeight:700,color:status.startsWith("Errore")?"#b91c1c":"#15803d"}}>{status}</p>}
   <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
