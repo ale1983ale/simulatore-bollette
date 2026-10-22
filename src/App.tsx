@@ -13508,6 +13508,15 @@ export default function App() {
       return "report";
     }
 
+    // Un ricaricamento esplicito mantiene la scheda principale corrente.
+    // All'apertura normale dell'app resta invece la dashboard.
+    if (typeof window !== "undefined" && window.sessionStorage.getItem("ge_reload_preserve_tab") === "1") {
+      window.sessionStorage.removeItem("ge_reload_preserve_tab");
+      const savedTab = window.sessionStorage.getItem("ge_reload_tab") || "";
+      window.sessionStorage.removeItem("ge_reload_tab");
+      if (savedTab && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(savedTab)) return savedTab;
+    }
+
     return "dashboard";
   });
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -16287,7 +16296,11 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               className="ge-main-nav__reload"
               title="Ricarica pagina"
               aria-label="Ricarica pagina"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                window.sessionStorage.setItem("ge_reload_preserve_tab", "1");
+                window.sessionStorage.setItem("ge_reload_tab", tab);
+                window.location.reload();
+              }}
               style={{
                 ...baseBtn,
                 width: 42,
