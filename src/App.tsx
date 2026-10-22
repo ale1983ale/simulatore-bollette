@@ -16310,7 +16310,12 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </button>
           )}
 
-          {(!adminSession || canAdminAccessTab(adminProfile, "archive")) && (
+          {agentSession ? (agentProductionAllowed && (
+          <button onClick={() => navigateTo("agentProduction")} style={{...mainNavBtn,...(tab==="agentProduction"?activeBtn:{})}}>
+            <span className="ge-main-nav__label-desktop">PRODUZIONE</span>
+            <span className="ge-main-nav__label-mobile">PROD.</span>
+          </button>
+          )) : (!adminSession || canAdminAccessTab(adminProfile, "archive")) && (
           <button onClick={() => navigateTo("archive")} style={{...mainNavBtn,...(tab==="archive"?activeBtn:{})}}>
             <span className="ge-main-nav__label-desktop">PRODUZIONE</span>
             <span className="ge-main-nav__label-mobile">PROD.</span>
