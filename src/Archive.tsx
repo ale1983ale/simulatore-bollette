@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { adminGetSetting, adminUpsertSettings } from "./adminSecurity";
 import Production from "./Production";
 import ActiveProduction from "./ActiveProduction";
+import { getRecruitingContext } from "./recruitingClient";
 import { exportFilteredA4Pdf, pdfNumber, pdfSelection } from "./filteredReportsPdf";
 import { recessNoteText, recessReferenceMonth } from "./recessPeriod";
 
@@ -962,6 +963,50 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [detailSearch, setDetailSearch] = useState("");
   const [detailExpanded, setDetailExpanded] = useState<string | null>(null);
   const [detailLimit, setDetailLimit] = useState(100);
+  const [detailSourceIds, setDetailSourceIds] = useState<Set<string> | null>(null);
+  const [detailModal, setDetailModal] = useState<RecessoRow | null>(null);
+  const [detailNotesRow, setDetailNotesRow] = useState<RecessoRow | null>(null);
+  const [detailNotesText, setDetailNotesText] = useState("");
+  const [detailNotes, setDetailNotes] = useState<Record<string,string>>({});
+  const [detailCalendarRow, setDetailCalendarRow] = useState<RecessoRow | null>(null);
+  const [detailCalendarDate, setDetailCalendarDate] = useState("");
+  const [detailCalendarTime, setDetailCalendarTime] = useState("");
+  const [detailCalendarType, setDetailCalendarType] = useState("ALTRO");
+  const [detailBusy, setDetailBusy] = useState(false);
+  const [detailMessage, setDetailMessage] = useState("");
+  useEffect(() => {
+    void supabase.from("archive_recessi_notes").select("recesso_id,note").then(({data}) => {
+      if(data) setDetailNotes(Object.fromEntries(data.map(x=>[String(x.recesso_id),x.note])));
+    });
+  }, []);
+  const saveDetailNote = async () => {
+    if (!detailNotesRow) return;
+    setDetailBusy(true);
+    const {error}=await supabase.from("archive_recessi_notes").upsert({
+      recesso_id:Number(detailNotesRow.id),note:detailNotesText,updated_at:new Date().toISOString()
+    },{onConflict:"recesso_id"});
+    setDetailBusy(false);
+    if(error) setDetailMessage("Errore salvataggio note: "+error.message);
+    else {setDetailNotes(v=>({...v,[detailNotesRow.id]:detailNotesText}));setDetailNotesRow(null);setDetailMessage("Nota salvata.");}
+  };
+  const saveDetailCalendar = async () => {
+    if(!detailCalendarRow || !detailCalendarDate || !detailCalendarTime)return;
+    setDetailBusy(true);
+    try {
+      const ctx=await getRecruitingContext();
+      const {error}=await ctx.client.from("recruiting_events").insert({
+        owner_key:ctx.ownerKey,candidate_id:null,event_date:detailCalendarDate,
+        event_time:detailCalendarTime,event_type:detailCalendarType,
+        custom_type:detailCalendarType==="ALTRO"?"RECESSO":"",
+        notes:["RECESSO · "+detailCalendarRow.denominazione,
+          "POD/PDR: "+detailCalendarRow.podPdr,"Agente: "+detailCalendarRow.agente,
+          "Fornitura: "+detailCalendarRow.commodity,"Mese recesso: "+detailCalendarRow.monthKey].join("\\n")
+      });
+      if(error)throw error;
+      setDetailCalendarRow(null);setDetailMessage("Recesso inserito nel Calendario.");
+    } catch(error:any) {setDetailMessage("Errore Calendario: "+(error?.message||error));}
+    finally {setDetailBusy(false);}
+  };
   const [detailSort, setDetailSort] = useState<"month" | "agent" | "name" | "pod" | "commodity" | "consumption" | "province">("month");
   const [detailSortAsc, setDetailSortAsc] = useState(false);
   const [commodities, setCommodities] = useState<string[]>([]);
@@ -1214,6 +1259,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   }, [rows]);
 
   const detailRows = useMemo(() => rows.filter(row => {
+    if (detailSourceIds && !detailSourceIds.has(row.id)) return false;
     const geo = deriveLegalSeatGeo(row.raw);
     if (detailAgent && row.agente !== detailAgent) return false;
     if (detailRegion && geo.region !== detailRegion) return false;
@@ -1242,7 +1288,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     const comparison = value(a).localeCompare(value(b), "it", { numeric: true, sensitivity: "base" });
     return comparison * (detailSortAsc ? 1 : -1) || a.denominazione.localeCompare(b.denominazione, "it");
   }),
-  [rows, detailAgent, detailRegion, detailProvince, detailMonth, detailCommodity, detailSearch, detailSort, detailSortAsc]);
+  [rows, detailSourceIds, detailAgent, detailRegion, detailProvince, detailMonth, detailCommodity, detailSearch, detailSort, detailSortAsc]);
 
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
@@ -2241,12 +2287,15 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
 
           <div>
             <div style={labelStyle}>Periodo finale</div>
-            <input
-              type="month"
-              value={periodEnd}
-              onChange={(e) => setPeriodEnd(e.target.value)}
-              style={inputStyle}
-            />
+            <input type="month" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)} style={inputStyle}/>
+            <button type="button" onClick={()=>{
+              setDetailSourceIds(new Set(filteredRows.map(x=>x.id)));
+              setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");
+              setDetailCommodity("");setDetailSearch("");setDetailLimit(100);
+              setArchiveSection("dettaglioRecessi");
+            }} style={{ marginTop:8,padding:"10px 12px",border:0,borderRadius:10,background:"#2563eb",color:"white",fontWeight:850,cursor:"pointer",width:"100%" }}>
+              📋 DETTAGLIO RECESSI · FILTRI ATTUALI
+            </button>
           </div>
 
           <div style={{ gridColumn: "1 / -1" }}>
@@ -2473,6 +2522,11 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       ) : archiveSection === "dettaglioRecessi" ? (
         <div style={cardStyle}>
           <h3 style={{ marginTop: 0 }}>DETTAGLIO RECESSI · ELENCO NOMINATIVI</h3>
+          {detailSourceIds && <div style={{padding:10,background:"#eff6ff",borderRadius:10,marginBottom:12}}>
+            Filtri importati dalla scheda RECESSI ({detailSourceIds.size} righe).
+            <button type="button" onClick={()=>setDetailSourceIds(null)} style={{marginLeft:10,cursor:"pointer"}}>RIMUOVI FILTRO IMPORTATO</button>
+          </div>}
+          {detailMessage && <p role="status" style={{color:"#1d4ed8"}}>{detailMessage}</p>}
           <div style={{ color: "#64748b", marginBottom: 14, fontSize: 13 }}>
             Tutti i recessi salvati nell'archivio, con filtri indipendenti e dettaglio originale di ogni riga.
           </div>
@@ -2492,7 +2546,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
-            <button type="button" onClick={()=>{setDetailSearch("");setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity("");setDetailLimit(100);}}
+            <button type="button" onClick={()=>{setDetailSearch("");setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity("");setDetailSourceIds(null);setDetailLimit(100);}}
               style={{ padding: "9px 14px", borderRadius: 9, border: "1px solid #cbd5e1", background: "white", cursor: "pointer", fontWeight: 800 }}>AZZERA FILTRI</button>
             <strong>{detailRows.length.toLocaleString("it-IT")} recessi trovati</strong>
             <span style={{ color: "#64748b", fontSize: 13 }}>su {rows.length.toLocaleString("it-IT")} archiviati</span>
@@ -2520,19 +2574,11 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                     <td style={{ padding: 9 }}>{row.commodity}</td>
                     <td style={{ padding: 9 }}>{row.consumo === null ? "—" : row.consumo.toLocaleString("it-IT")}</td>
                     <td style={{ padding: 9 }}>{geo.provinceLabel || geo.provinceCode || "—"}</td>
-                    <td style={{ padding: 9 }}><button type="button" onClick={()=>setDetailExpanded(v=>v===row.id?null:row.id)}
-                      style={{ border: "1px solid #bfdbfe", borderRadius: 8, padding: "7px 11px", background: "#eff6ff", color: "#1d4ed8", fontWeight: 800, cursor: "pointer" }}>
-                      {detailExpanded===row.id?"CHIUDI":"SCHEDA"}</button></td>
+                    <td style={{ padding: 9, whiteSpace:"nowrap" }}>
+                      <button type="button" onClick={()=>setDetailModal(row)} style={{border:"1px solid #bfdbfe",borderRadius:8,padding:"7px 10px",background:"#eff6ff",color:"#1d4ed8",fontWeight:800,cursor:"pointer"}}>SCHEDA</button>
+                      <button type="button" onClick={()=>{setDetailNotesRow(row);setDetailNotesText(detailNotes[row.id]||"");}} style={{marginLeft:6,border:"1px solid #fed7aa",borderRadius:8,padding:"7px 10px",background:"#fff7ed",color:"#c2410c",fontWeight:800,cursor:"pointer"}}>📝 NOTE{detailNotes[row.id]?" ●":""}</button>
+                    </td>
                   </tr>
-                  {detailExpanded===row.id && <tr><td colSpan={8} style={{ padding: 14, background: "#f8fafc" }}>
-                    <strong>DATI ORIGINALI DEL RECESSO</strong>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 9, marginTop: 10 }}>
-                      {Object.entries(row.raw).map(([key,value])=><div key={key} style={{ overflowWrap: "anywhere" }}>
-                        <div style={{ color: "#64748b", fontSize: 11, fontWeight: 800 }}>{key}</div>
-                        <div>{String(value || "—")}</div>
-                      </div>)}
-                    </div>
-                  </td></tr>}
                 </React.Fragment>;
               })}</tbody>
             </table>
@@ -2549,6 +2595,50 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         <div style={{ width: "100%", minWidth: 0 }}>{reportAdminPanel}</div>
       ) : (
         <Production view={archiveSection === "zone" ? "zone" : "produzione"} />
+      )}
+      {(detailModal || detailNotesRow || detailCalendarRow) && (
+        <div role="presentation" onClick={()=>{if(!detailBusy){setDetailModal(null);setDetailNotesRow(null);setDetailCalendarRow(null);}}}
+          style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:14}}>
+          <div role="dialog" aria-modal="true" aria-label="Dettaglio recesso" onClick={e=>e.stopPropagation()}
+            style={{width:"min(760px,100%)",maxHeight:"90vh",overflowY:"auto",background:"white",borderRadius:18,padding:22,boxSizing:"border-box",boxShadow:"0 20px 70px #0004"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center"}}>
+              <h3 style={{margin:0}}>{detailCalendarRow?"📅 INSERISCI NEL CALENDARIO":detailNotesRow?"📝 NOTE RECESSO":"📋 SCHEDA RECESSO"}</h3>
+              <button type="button" disabled={detailBusy} onClick={()=>{setDetailModal(null);setDetailNotesRow(null);setDetailCalendarRow(null);}}
+                style={{border:0,borderRadius:9,padding:"9px 13px",background:"#e2e8f0",cursor:"pointer"}}>✕ CHIUDI</button>
+            </div>
+            <p style={{fontWeight:800,color:"#334155"}}>{(detailCalendarRow||detailNotesRow||detailModal)?.denominazione}</p>
+            {detailModal && !detailCalendarRow && !detailNotesRow && <>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:12}}>
+                {Object.entries(detailModal.raw).map(([key,value])=><div key={key} style={{overflowWrap:"anywhere",padding:9,background:"#f8fafc",borderRadius:9}}>
+                  <div style={{fontSize:11,fontWeight:800,color:"#64748b"}}>{key}</div><div>{String(value||"—")}</div>
+                </div>)}
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:18,flexWrap:"wrap"}}>
+                <button type="button" onClick={()=>{setDetailCalendarRow(detailModal);setDetailCalendarDate("");setDetailCalendarTime("");setDetailCalendarType("ALTRO");setDetailModal(null);}}
+                  style={{border:0,borderRadius:10,padding:"12px 16px",background:"#2563eb",color:"white",fontWeight:850,cursor:"pointer"}}>📅 AGGIUNGI AL CALENDARIO</button>
+                <button type="button" onClick={()=>{setDetailNotesRow(detailModal);setDetailNotesText(detailNotes[detailModal.id]||"");setDetailModal(null);}}
+                  style={{border:0,borderRadius:10,padding:"12px 16px",background:"#ffedd5",color:"#9a3412",fontWeight:850,cursor:"pointer"}}>📝 NOTE</button>
+              </div>
+            </>}
+            {detailNotesRow && <div style={{display:"grid",gap:12}}>
+              <textarea rows={6} value={detailNotesText} onChange={e=>setDetailNotesText(e.target.value)}
+                placeholder="Scrivi qui le note relative al recesso..." style={{width:"100%",padding:12,borderRadius:10,border:"1px solid #cbd5e1",boxSizing:"border-box",font:"inherit"}}/>
+              <button type="button" disabled={detailBusy} onClick={()=>void saveDetailNote()}
+                style={{border:0,borderRadius:10,padding:12,background:"#16a34a",color:"white",fontWeight:850,cursor:"pointer"}}>SALVA NOTE</button>
+            </div>}
+            {detailCalendarRow && <div style={{display:"grid",gap:12}}>
+              <label>TIPOLOGIA DI CALENDARIO<select value={detailCalendarType} onChange={e=>setDetailCalendarType(e.target.value)} style={inputStyle}>
+                <option value="ALTRO">COSE DA FARE GENERICHE / RECESSO</option>
+                <option value="CHIAMARE">CHIAMARE</option><option value="APPUNTAMENTO_ZONA">APPUNTAMENTO IN ZONA</option>
+                <option value="APPUNTAMENTO_SEDE">APPUNTAMENTO IN SEDE</option><option value="VIDEOCALL">VIDEOCALL</option>
+              </select></label>
+              <label>DATA<input type="date" value={detailCalendarDate} onChange={e=>setDetailCalendarDate(e.target.value)} style={inputStyle}/></label>
+              <label>ORARIO<input type="time" value={detailCalendarTime} onChange={e=>setDetailCalendarTime(e.target.value)} style={inputStyle}/></label>
+              <button type="button" disabled={detailBusy||!detailCalendarDate||!detailCalendarTime} onClick={()=>void saveDetailCalendar()}
+                style={{border:0,borderRadius:10,padding:12,background:"#2563eb",color:"white",fontWeight:850,cursor:"pointer"}}>CONFERMA E INSERISCI NEL CALENDARIO</button>
+            </div>}
+          </div>
+        </div>
       )}
     </div>
   );
