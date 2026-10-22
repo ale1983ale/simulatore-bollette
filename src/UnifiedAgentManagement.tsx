@@ -7,8 +7,8 @@ import {
   adminAgentUpdate,
   type SafeAgentRecord,
 } from "./agentSecurity";
-import { adminListUsers } from "./adminSecurity";
-import { supabaseAnonKey, supabaseUrl } from "./supabase";
+import { adminListUsers, getAdminSessionToken } from "./adminSecurity";
+import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
 import AgentManagementToolbar from "./AgentManagementToolbar";
 import {
@@ -224,6 +224,23 @@ export default function UnifiedAgentManagement({
   onOpenAdminManagement: () => void;
 }) {
   const [loginAgents, setLoginAgents] = useState<SafeAgentRecord[]>([]);
+  const [productionPermissions,setProductionPermissions]=useState<Record<string,boolean>>({});
+  const loadProductionPermissions=async()=>{
+    const token=await getAdminSessionToken();
+    const {data,error}=await supabase.rpc("admin_agent_production_permissions",{p_session_token:token});
+    if(!error)setProductionPermissions(data||{});
+  };
+  const toggleProduction=async(agentId:number,enabled:boolean)=>{
+    try{
+      setBusy(true);
+      const token=await getAdminSessionToken();
+      const {error}=await supabase.rpc("admin_agent_production_permission",{p_session_token:token,p_agent_id:agentId,p_enabled:enabled});
+      if(error)throw error;
+      setProductionPermissions(v=>({...v,[agentId]:enabled}));
+      setNotice("PRODUZ "+(enabled?"attivato":"disattivato")+" per l'agente selezionato.");
+    }catch(error:any){setNotice("Errore PRODUZ: "+(error?.message||error));}
+    finally{setBusy(false);}
+  };
   const [admins, setAdmins] = useState<any[]>([]);
   const [recipients, setRecipients] = useState<EmailRecipient[]>([]);
   const [recruitingAgents, setRecruitingAgents] = useState<RecruitingAgent[]>([]);
@@ -378,6 +395,7 @@ export default function UnifiedAgentManagement({
 
   useEffect(() => {
     void loadAll();
+    void loadProductionPermissions();
   }, [adminProfile?.id, adminProfile?.role]);
 
   useEffect(() => {
@@ -3233,6 +3251,7 @@ export default function UnifiedAgentManagement({
                   "ADMIN",
                   "EMAIL",
                   "REPORT",
+                  "PRODUZ",
                   "CELLULARE",
                   "ZONA",
                   "DM",
@@ -3365,6 +3384,9 @@ export default function UnifiedAgentManagement({
                       </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9", textAlign: "center" }}>
                         {row.email?.report_notify ? "✅" : "—"}
+                      </td>
+                      <td style={{padding:"10px 9px",textAlign:"center",borderBottom:"1px solid #f1f5f9"}}>
+                        <input type="checkbox" aria-label={"PRODUZ "+row.fullName} title="Abilita la scheda PRODUZIONE" checked={Boolean(productionPermissions[String(id)])} disabled={busy} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();void toggleProduction(id,e.target.checked);}} style={{width:18,height:18,cursor:"pointer"}} />
                       </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         {row.recruiting?.phone || "-"}
