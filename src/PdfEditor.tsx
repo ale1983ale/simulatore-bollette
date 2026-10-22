@@ -74,7 +74,7 @@ export default function PdfEditor({base64,documentId,filename}:Props){
   if(mark.kind==="highlight")return <rect key={index} x={Math.min(mark.x,mark.x+(mark.w||0))*1000} y={Math.min(mark.y,mark.y+(mark.h||0))*1000} width={Math.abs(mark.w||0)*1000} height={Math.abs(mark.h||0)*1000} fill={mark.color} opacity=".42"/>;
   return <text key={index} x={mark.x*1000} y={mark.y*1000} fill={mark.color} fontSize="25" fontWeight="bold">{mark.text}</text>;
  };
- return <div style={{display:"grid",gap:12,...(full?{position:"fixed" as const,inset:0,zIndex:30000,background:"#f8fafc",padding:10,overflow:"hidden",gridTemplateRows:"auto auto minmax(0,1fr) auto"}:{})}}>
+ return <div style={{display:"grid",gap:12,...(full?{position:"fixed" as const,inset:0,zIndex:30000,background:"#f8fafc",padding:"max(10px, env(safe-area-inset-top, 10px)) 10px max(12px, env(safe-area-inset-bottom, 12px))",overflow:"hidden",gridTemplateRows:"auto auto minmax(0,1fr) auto"}:{})}}>
   <div style={{display:"flex",alignItems:"center",gap:6,padding:full?"6px 7px":"10px",background:full?"#172235":"#f1f5f9",borderRadius:12,minWidth:0,position:"relative",flexDirection:"column"}}>
     {!full&&<div style={{display:"flex",width:"100%",alignItems:"center",gap:8,justifyContent:"space-between",minWidth:0}}>
       <strong style={{fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}}>📄 {filename} · {pages.length} pagine</strong>
@@ -101,8 +101,8 @@ export default function PdfEditor({base64,documentId,filename}:Props){
          onClick={()=>setMenu(m=>m===item.id?null:item.id)} style={{position:"absolute",top:0,right:0,border:0,borderRadius:6,background:"#f97316",color:"white",fontSize:11,fontWeight:900,lineHeight:"15px",width:17,height:17,cursor:"pointer",padding:0}}>⌄</button>}
       </div>)}
     </div>
-    {full?<button type="button" aria-label="Chiudi schermo intero" onClick={()=>{setFull(false);setMenu(null);setLens(null);}} style={{position:"absolute",right:4,top:4,background:"#7f1d1d",color:"white",border:0,borderRadius:8,height:23,width:23,fontWeight:900,fontSize:18,cursor:"pointer",zIndex:2}}>×</button>:null}
-    {menu&&<div style={{position:"absolute",right:5,top:"calc(100% + 5px)",zIndex:32000,background:"white",border:"1px solid #cbd5e1",borderRadius:12,padding:10,boxShadow:"0 8px 25px #0003",minWidth:190}}>
+    {full?<button type="button" aria-label="Chiudi schermo intero" onClick={()=>{setFull(false);setMenu(null);setLens(null);}} style={{position:"absolute",right:4,top:-4,background:"#7f1d1d",color:"white",border:0,borderRadius:8,height:26,width:26,fontWeight:900,fontSize:18,cursor:"pointer",zIndex:2}}>×</button>:null}
+    {menu&&<div style={{position:"relative",alignSelf:"stretch",width:"100%",zIndex:32000,background:"white",border:"1px solid #cbd5e1",borderRadius:12,padding:10,boxShadow:"0 8px 25px #0003",minWidth:190}}>
      <div style={{fontSize:12,fontWeight:900,marginBottom:7,color:"#0f172a"}}>{menu==="magnify"?"INGRANDIMENTO LENTE":menu==="pen"?"COLORE PENNARELLO":"COLORE EVIDENZIATORE"}</div>
      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
       {menu==="magnify"?([1.5,2,3,5] as const).map(v=><button key={v} type="button" onClick={()=>{setLensScale(v);setTool("magnify");setMenu(null);}} style={{...toolButton,padding:"8px",background:lensScale===v?"#ffedd5":"white",borderColor:lensScale===v?"#f97316":"#cbd5e1"}}>{v}×</button>):
