@@ -26,6 +26,7 @@ import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
 import UnifiedAgentManagement from "./UnifiedAgentManagement";
 import Provvigioni, { type ProvvigioniPrefill } from "./Provvigioni";
+import ProvvigioniPresentazione from "./ProvvigioniPresentazione";
 import Personale from "./Personale";
 import DriveArchive from "./DriveArchive";
 import ReportNotificationPanel from "./ReportNotificationPanel";
@@ -13505,6 +13506,7 @@ export default function App() {
       setAgentProductionAllowed(!error&&data===true);
     });
   },[agentSession?.token]);
+  const [provvigioniSubtab,setProvvigioniSubtab] = useState<"calcoli"|"presentazione">("calcoli");
   const [provvigioniPrefill, setProvvigioniPrefill] =
     useState<ProvvigioniPrefill | null>(null);
   const [appointmentOpenRequest, setAppointmentOpenRequest] =
@@ -16486,10 +16488,14 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               icon="💰"
               variant="energy"
             />
-            <Provvigioni
+            {isSuperAdmin && <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:16}}>
+              <button type="button" onClick={()=>setProvvigioniSubtab("calcoli")} style={{padding:"12px 20px",borderRadius:12,border:provvigioniSubtab==="calcoli"?"2px solid #f97316":"1px solid #cbd5e1",background:provvigioniSubtab==="calcoli"?"#0f172a":"white",color:provvigioniSubtab==="calcoli"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>💰 CALCOLO PROVVIGIONI</button>
+              <button type="button" onClick={()=>setProvvigioniSubtab("presentazione")} style={{padding:"12px 20px",borderRadius:12,border:provvigioniSubtab==="presentazione"?"2px solid #f97316":"1px solid #cbd5e1",background:provvigioniSubtab==="presentazione"?"#0f172a":"white",color:provvigioniSubtab==="presentazione"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>📑 PRESENTAZIONE</button>
+            </div>}
+            {isSuperAdmin && provvigioniSubtab==="presentazione" ? <ProvvigioniPresentazione/> : <Provvigioni
               prefill={provvigioniPrefill}
               onPrefillConsumed={() => setProvvigioniPrefill(null)}
-            />
+            />}
           </>
         ) : tab === "ateco" ? (
           <>
