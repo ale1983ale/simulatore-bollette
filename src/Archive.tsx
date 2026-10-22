@@ -2313,15 +2313,17 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
 
           <div>
             <div style={labelStyle}>Periodo finale</div>
-            <input type="month" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)} style={inputStyle}/>
-            <button type="button" onClick={()=>{
-              setDetailSourceIds(new Set(filteredRows.map(x=>x.id)));
-              setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");
-              setDetailCommodity("");setDetailSearch("");setDetailLimit(100);
-              setArchiveSection("dettaglioRecessi");
-            }} style={{ marginTop:8,padding:"10px 12px",border:0,borderRadius:10,background:"#2563eb",color:"white",fontWeight:850,cursor:"pointer",width:"100%" }}>
-              📋 DETTAGLIO RECESSI · FILTRI ATTUALI
-            </button>
+            <div style={{ display:"flex",alignItems:"center",gap:10,flexWrap:"nowrap" }}>
+              <input type="month" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)} style={{...inputStyle,minWidth:140,flex:"0 0 auto"}}/>
+              <button type="button" title="Apri Dettaglio Recessi applicando i filtri attuali" onClick={()=>{
+                setDetailSourceIds(new Set(filteredRows.map(x=>x.id)));
+                setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");
+                setDetailCommodity("");setDetailSearch("");setDetailLimit(100);
+                setArchiveSection("dettaglioRecessi");
+              }} style={{ padding:"10px 14px",border:"1px solid #2563eb",borderRadius:9,background:"#eff6ff",color:"#1d4ed8",fontWeight:850,cursor:"pointer",whiteSpace:"nowrap",fontSize:12,flexShrink:0 }}>
+                📋 DETTAGLIO RECESSI
+              </button>
+            </div>
           </div>
 
           <div style={{ gridColumn: "1 / -1" }}>
