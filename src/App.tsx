@@ -13632,6 +13632,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  useEffect(() => {
+    const openTodoCalendar = (event: Event) => {
+      const date = (event as CustomEvent<{ date?: string | null }>).detail?.date;
+      if (date) window.sessionStorage.setItem("ge_calendar_open_date", date);
+      navigateTo("calendarAdmin");
+    };
+    window.addEventListener("ge:open-recruiting-calendar", openTodoCalendar);
+    return () => window.removeEventListener("ge:open-recruiting-calendar", openTodoCalendar);
+  });
+
   const openProvvigioniFromSimulation = (
     prefill: ProvvigioniPrefill
   ) => {
