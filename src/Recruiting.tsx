@@ -1548,7 +1548,7 @@ export default function Recruiting({
     const requested = window.sessionStorage.getItem("ge_calendar_open_date");
     if (!requested) return;
     window.sessionStorage.removeItem("ge_calendar_open_date");
-    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(requested)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(requested)) {
       setCalendarMonth(requested.slice(0, 7));
       setCalendarDate(requested);
     }
@@ -2766,7 +2766,7 @@ export default function Recruiting({
   }, [notes]);
 
   const filteredCandidates = useMemo(() => {
-    const everywhereWords = normalizeFilterValue(everywhereFilter).split(/\\s+/).filter(Boolean);
+    const everywhereWords = normalizeFilterValue(everywhereFilter).split(/\s+/).filter(Boolean);
     const nameNeedle = normalizeFilterValue(nameFilter);
     const zoneNeedle = normalizeFilterValue(zoneFilter);
     const phoneNeedle = String(phoneFilter || "").replace(/\D/g, "");
@@ -3055,6 +3055,8 @@ export default function Recruiting({
     });
   }, [
     candidates,
+    everywhereFilter,
+    allNotesSearchByCandidateId,
     lastNoteSortKeyByCandidateId,
     candidateSortMode,
     statusDefinitions,
@@ -3082,6 +3084,7 @@ export default function Recruiting({
   }, [
     candidateSortMode,
     nameFilter,
+    everywhereFilter,
     zoneFilter,
     phoneFilter,
     regionFilters,
