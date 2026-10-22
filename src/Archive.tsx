@@ -968,6 +968,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [detailNotesRow, setDetailNotesRow] = useState<RecessoRow | null>(null);
   const [detailNotesText, setDetailNotesText] = useState("");
   const [detailNotes, setDetailNotes] = useState<Record<string,string>>({});
+  const [detailRecovered, setDetailRecovered] = useState<Record<string,boolean>>({});
+  const [detailRecovering, setDetailRecovering] = useState<string | null>(null);
   const [detailCalendarRow, setDetailCalendarRow] = useState<RecessoRow | null>(null);
   const [detailCalendarDate, setDetailCalendarDate] = useState("");
   const [detailCalendarTime, setDetailCalendarTime] = useState("");
@@ -975,15 +977,33 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailMessage, setDetailMessage] = useState("");
   useEffect(() => {
-    void supabase.from("archive_recessi_notes").select("recesso_id,note").then(({data}) => {
-      if(data) setDetailNotes(Object.fromEntries(data.map(x=>[String(x.recesso_id),x.note])));
+    void supabase.from("archive_recessi_notes").select("recesso_id,note,recuperato").then(({data,error}) => {
+      if(error) {setDetailMessage("Errore caricamento stato recuperi: "+error.message);return;}
+      if(data) {
+        setDetailNotes(Object.fromEntries(data.map(x=>[String(x.recesso_id),x.note])));
+        setDetailRecovered(Object.fromEntries(data.map(x=>[String(x.recesso_id),Boolean(x.recuperato)])));
+      }
     });
   }, []);
+  const toggleDetailRecovered = async (row: RecessoRow, recovered: boolean) => {
+    if(detailRecovering)return;
+    setDetailRecovering(row.id);
+    setDetailMessage("");
+    const {error}=await supabase.from("archive_recessi_notes").upsert({
+      recesso_id:Number(row.id),
+      note:detailNotes[row.id]||"",
+      recuperato:recovered,
+      updated_at:new Date().toISOString()
+    },{onConflict:"recesso_id"});
+    if(error)setDetailMessage("Impossibile salvare lo stato RECUPERATO: "+error.message);
+    else setDetailRecovered(v=>({...v,[row.id]:recovered}));
+    setDetailRecovering(null);
+  };
   const saveDetailNote = async () => {
     if (!detailNotesRow) return;
     setDetailBusy(true);
     const {error}=await supabase.from("archive_recessi_notes").upsert({
-      recesso_id:Number(detailNotesRow.id),note:detailNotesText,updated_at:new Date().toISOString()
+      recesso_id:Number(detailNotesRow.id),note:detailNotesText,recuperato:Boolean(detailRecovered[detailNotesRow.id]),updated_at:new Date().toISOString()
     },{onConflict:"recesso_id"});
     setDetailBusy(false);
     if(error) setDetailMessage("Errore salvataggio note: "+error.message);
@@ -2566,7 +2586,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
               <tbody>{detailRows.slice(0,detailLimit).map(row=>{
                 const geo=deriveLegalSeatGeo(row.raw);
                 return <React.Fragment key={row.id}>
-                  <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                  <tr style={{ borderBottom: "1px solid #e2e8f0", background: detailRecovered[row.id] ? "#bbf7d0" : "transparent", color: detailRecovered[row.id] ? "#14532d" : "inherit" }}>
                     <td style={{ padding: 9, whiteSpace: "nowrap" }}>{row.monthKey || "—"}</td>
                     <td style={{ padding: 9 }}>{row.agente || "—"}</td>
                     <td style={{ padding: 9, fontWeight: 750 }}>{row.denominazione || "—"}</td>
@@ -2577,6 +2597,11 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                     <td style={{ padding: 9, whiteSpace:"nowrap" }}>
                       <button type="button" onClick={()=>setDetailModal(row)} style={{border:"1px solid #bfdbfe",borderRadius:8,padding:"7px 10px",background:"#eff6ff",color:"#1d4ed8",fontWeight:800,cursor:"pointer"}}>SCHEDA</button>
                       <button type="button" onClick={()=>{setDetailNotesRow(row);setDetailNotesText(detailNotes[row.id]||"");}} style={{marginLeft:6,border:"1px solid #fed7aa",borderRadius:8,padding:"7px 10px",background:"#fff7ed",color:"#c2410c",fontWeight:800,cursor:"pointer"}}>📝 NOTE{detailNotes[row.id]?" ●":""}</button>
+                      <label style={{display:"inline-flex",alignItems:"center",gap:5,marginLeft:9,padding:"7px 9px",borderRadius:8,background:detailRecovered[row.id]?"#16a34a":"#f1f5f9",color:detailRecovered[row.id]?"white":"#334155",fontWeight:850,cursor:detailRecovering?"wait":"pointer"}}>
+                        <input type="checkbox" checked={Boolean(detailRecovered[row.id])} disabled={Boolean(detailRecovering)}
+                          onChange={e=>void toggleDetailRecovered(row,e.target.checked)} style={{width:17,height:17,accentColor:"#15803d"}}/>
+                        RECUPERATO
+                      </label>
                     </td>
                   </tr>
                 </React.Fragment>;
