@@ -1310,7 +1310,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     if (detailRegion && geo.region !== detailRegion) return false;
     if (detailProvince && geo.provinceCode !== detailProvince) return false;
     if (detailMonth && row.monthKey !== detailMonth) return false;
-    if (detailCommodity && row.commodity !== detailCommodity) return false;
+    if (detailCommodity && !detailCommodity.split(",").includes(row.commodity)) return false;
     if (detailSearch) {
       const needle = detailSearch.toLocaleLowerCase("it").trim();
       const haystack = [row.denominazione, row.podPdr, row.agente, row.tipoCliente,
@@ -2572,7 +2572,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
             <button type="button" onClick={()=>setDetailSubsection("list")} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="list"?"#0f172a":"white",color:detailSubsection==="list"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>ELENCO RECESSI</button>
             <button type="button" onClick={()=>{setDetailSubsection("notes");void loadDetailNoteHistory();}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="notes"?"#0f172a":"white",color:detailSubsection==="notes"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>📝 NOTE RECESSI</button>
-            {([["LUCE","⚡","Energia elettrica"],["GAS","🔥","Gas"]] as const).map(([value,symbol,label])=><button key={value} type="button" aria-pressed={detailCommodity===value} title={"Filtra "+label} onClick={()=>{setDetailCommodity(current=>current===value?"":value);setDetailLimit(100);}} style={{padding:"9px 15px",borderRadius:10,border:detailCommodity===value?"2px solid "+(value==="LUCE"?"#f59e0b":"#0284c7"):"1px solid #cbd5e1",background:detailCommodity===value?(value==="LUCE"?"#fef3c7":"#e0f2fe"):"white",color:"#0f172a",fontSize:20,fontWeight:850,cursor:"pointer",boxShadow:detailCommodity===value?"0 0 0 2px #0000000b":"none"}}>{symbol}</button>)}
+            {([["LUCE","⚡","Energia elettrica"],["GAS","🔥","Gas"]] as const).map(([value,symbol,label])=>{const active=detailCommodity.split(",").includes(value);return <button key={value} type="button" aria-pressed={active} title={"Filtra "+label} onClick={()=>{setDetailCommodity(current=>{const chosen=current.split(",").filter(x=>x==="LUCE"||x==="GAS");const next=chosen.includes(value)?chosen.filter(x=>x!==value):[...chosen,value];return ["LUCE","GAS"].filter(x=>next.includes(x)).join(",");});setDetailLimit(100);}} style={{padding:"9px 15px",borderRadius:10,border:active?"2px solid "+(value==="LUCE"?"#f59e0b":"#0284c7"):"1px solid #cbd5e1",background:active?(value==="LUCE"?"#fef3c7":"#e0f2fe"):"white",color:value==="GAS"?"#0284c7":"#0f172a",fontSize:20,fontWeight:850,cursor:"pointer",boxShadow:active?"0 0 0 2px #0000000b":"none"}}>{symbol}</button>})}
           </div>
           {detailSubsection==="notes" ? <div>
             <h3 style={{marginTop:0}}>NOTE RECESSI · DALLA PIÙ RECENTE</h3>
@@ -2580,7 +2580,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             {detailNotesLoading && <p>Caricamento note...</p>}
             {!detailNotesLoading && !detailNoteHistory.length && <p>Nessuna nota nello storico. Le nuove note salvate compariranno qui.</p>}
             <div style={{display:"grid",gap:10}}>
-              {detailNoteHistory.filter(item=>{if(!detailCommodity)return true;const row=rows.find(r=>Number(r.id)===item.recesso_id);return row?.commodity===detailCommodity;}).map(item=>{
+              {detailNoteHistory.filter(item=>{if(!detailCommodity)return true;const row=rows.find(r=>Number(r.id)===item.recesso_id);return detailCommodity.split(",").includes(String(row?.commodity));}).map(item=>{
                 const row=rows.find(r=>Number(r.id)===item.recesso_id);
                 return <div key={item.id} style={{border:"1px solid #e2e8f0",borderRadius:12,padding:14,background:"#f8fafc"}}>
                   <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}>
@@ -2609,7 +2609,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
               ["REGIONE", detailRegion, setDetailRegion, regions.map(x=>[x,x])],
               ["PROVINCIA / ZONA", detailProvince, setDetailProvince, provinces.map(x=>[x.code,x.label])],
               ["MESE RECESSO", detailMonth, setDetailMonth, months.map(x=>[x,x])],
-              ["FORNITURA", detailCommodity, setDetailCommodity, [["LUCE","LUCE"],["GAS","GAS"],["N/D","N/D"]]]
+              ["FORNITURA", detailCommodity, setDetailCommodity, [["LUCE","LUCE"],["GAS","GAS"],["LUCE,GAS","LUCE + GAS"],["N/D","N/D"]]]
             ] as Array<[string,string,(value:string)=>void,string[][]]>).map(([label,value,setValue,options])=>(
               <label key={label}>{label}<select value={value} onChange={e=>{setValue(e.target.value);setDetailLimit(100);}}
                 style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", boxSizing: "border-box" }}>
