@@ -1405,6 +1405,7 @@ export default function Recruiting({
   const [statusRows, setStatusRows] = useState<RecruitingStatusRow[]>([]);
 
   const [nameFilter, setNameFilter] = useState("");
+  const [everywhereFilter, setEverywhereFilter] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
   const [phoneFilter, setPhoneFilter] = useState("");
   const [regionFilters, setRegionFilters] = useState<string[]>([]);
@@ -1542,6 +1543,17 @@ export default function Recruiting({
   const [activityNotes, setActivityNotes] = useState("");
 
   const [calendarMonth, setCalendarMonth] = useState(localMonthKey());
+  useEffect(() => {
+    if (section !== "calendar") return;
+    const requested = window.sessionStorage.getItem("ge_calendar_open_date");
+    if (!requested) return;
+    window.sessionStorage.removeItem("ge_calendar_open_date");
+    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(requested)) {
+      setCalendarMonth(requested.slice(0, 7));
+      setCalendarDate(requested);
+    }
+  }, [section]);
+
   const calendarTodayFocusPendingRef = useRef(
     initialSection === "calendar"
   );
@@ -2743,7 +2755,18 @@ export default function Recruiting({
     return latest;
   }, [notes]);
 
+  const allNotesSearchByCandidateId = useMemo(() => {
+    const byCandidate = new Map<string, string[]>();
+    for (const note of notes) {
+      const existing = byCandidate.get(note.candidateId) || [];
+      existing.push(note.noteText || "");
+      byCandidate.set(note.candidateId, existing);
+    }
+    return byCandidate;
+  }, [notes]);
+
   const filteredCandidates = useMemo(() => {
+    const everywhereWords = normalizeFilterValue(everywhereFilter).split(/\\s+/).filter(Boolean);
     const nameNeedle = normalizeFilterValue(nameFilter);
     const zoneNeedle = normalizeFilterValue(zoneFilter);
     const phoneNeedle = String(phoneFilter || "").replace(/\D/g, "");
@@ -2857,6 +2880,17 @@ export default function Recruiting({
     };
 
     return candidates.filter((candidate) => {
+      if (everywhereWords.length) {
+        const searchable = normalizeFilterValue([
+          candidate.fullName, candidate.operationalZone, candidate.sectorOther,
+          candidate.phone, candidate.email, candidate.companyName, candidate.referrer,
+          candidate.status, getStatusDefinition(candidate.status).label,
+          candidate.forwardedTo, candidate.provinceCode, candidate.region,
+          candidate.createdAt, candidate.updatedAt, candidate.contactScope,
+          ...(allNotesSearchByCandidateId.get(candidate.id) || [])
+        ].join(" "));
+        if (!everywhereWords.every(word => searchable.includes(word))) return false;
+      }
       if (
         nameNeedle &&
         !normalizeFilterValue(candidate.fullName).includes(nameNeedle)
@@ -3071,6 +3105,7 @@ export default function Recruiting({
 
   const hasActiveContactFilters = Boolean(
     nameFilter.trim() ||
+      everywhereFilter.trim() ||
       zoneFilter.trim() ||
       phoneFilter.trim() ||
       regionFilters.length > 0 ||
@@ -3087,6 +3122,7 @@ export default function Recruiting({
 
   const resetContactFilters = () => {
     setNameFilter("");
+    setEverywhereFilter("");
     setZoneFilter("");
     setPhoneFilter("");
     setRegionFilters([]);
@@ -7785,6 +7821,13 @@ export default function Recruiting({
             )}
 
             <div className="recruiting-contact-filter-grid">
+              <div>
+                <label style={labelStyle}>CERCA OVUNQUE</label>
+                <input type="search" value={everywhereFilter}
+                  onChange={e => setEverywhereFilter(e.target.value)}
+                  placeholder="Cerca in tutti i campi e in tutte le note..."
+                  style={inputStyle} />
+              </div>
               <div>
                 <label style={labelStyle}>Nome</label>
                 <input
