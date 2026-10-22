@@ -30,7 +30,7 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
  const [stickyMode,setStickyMode]=useState<"keyboard"|"hand">("keyboard");
  const stickyCanvas=useRef<HTMLCanvasElement|null>(null);
  const stickyHistory=useRef<Record<number,StickyPage[]>>({});
- const [stickyPosition,setStickyPosition]=useState({x:16,y:110});
+ const [stickyPosition,setStickyPosition]=useState({x:Math.max(0,window.innerWidth-Math.min(420,window.innerWidth-24)-16),y:16});
  const [stickySize,setStickySize]=useState({width:420,height:600});
  const [confirmClear,setConfirmClear]=useState(false);
  const resizeDrag=useRef<{x:number;y:number;width:number;height:number}|null>(null);
@@ -154,7 +154,7 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
        {id:"save",symbol:"💾",name:"Salva",color:"#86efac"}
       ] as const).map(item=><div key={item.id} style={{position:"relative",minWidth:0}}>
        <button type="button" title={item.name} aria-label={item.name} disabled={item.id==="save"&&(!dirty||busy)}
-        onClick={()=>{setMenu(null);if(item.id==="sticky"){setStickyOpen(v=>!v);return;}if(item.id==="save"){void save();return;}if(item.id==="undo"){const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});return;}setTool(item.id);setLens(null);}}
+        onClick={()=>{setMenu(null);if(item.id==="sticky"){setStickyOpen(v=>{if(!v)setStickyPosition({x:Math.max(0,window.innerWidth-Math.min(stickySize.width,window.innerWidth-24)-16),y:16});return !v;});return;}if(item.id==="save"){void save();return;}if(item.id==="undo"){const last=[...pages].reverse().find(p=>(marksRef.current[p]||[]).length>0);if(last)changeMarks({...marksRef.current,[last]:marksRef.current[last].slice(0,-1)});return;}setTool(item.id);setLens(null);}}
         style={{width:"100%",minWidth:0,height:full?43:46,borderRadius:9,border:(item.id==="sticky"?stickyOpen:tool===item.id)?"2px solid #f97316":full?"1px solid #475569":"1px solid #cbd5e1",background:(item.id==="sticky"?stickyOpen:tool===item.id)?(full?"#334155":"#ffedd5"):(full?"#24344c":"white"),cursor:"pointer",opacity:item.id==="save"&&(!dirty||busy)?.45:1,padding:"3px 1px",position:"relative"}}>
         {item.id==="highlight"?<svg aria-hidden="true" viewBox="0 0 24 24" width={full?26:23} height={full?26:23} style={{transform:"rotate(-35deg)"}}><path d="M7 2h10v13H7z" fill={highlightColor} stroke="#475569" strokeWidth="1.3"/><path d="M7 15h10l-2 4H9z" fill="#64748b"/><path d="M9 19h6l-1 3h-4z" fill={highlightColor}/><path d="M9 5h6" stroke="#fff" strokeWidth="1.4"/></svg>:item.id==="pen"?<svg aria-hidden="true" viewBox="0 0 24 24" width={full?26:23} height={full?26:23} style={{transform:"rotate(35deg)"}}><path d="M8 2h8v16H8z" fill={penColor} stroke={penColor==="#111827"?"#f8fafc":"#334155"} strokeWidth="1.2"/><path d="M8 18h8l-4 5z" fill="#e2e8f0"/><path d="M10 5h4" stroke="#fff" strokeWidth="1.4"/></svg>:<span aria-hidden="true" style={{fontSize:full?"clamp(18px,4.5vw,25px)":"20px",lineHeight:1.1,color:item.color,fontWeight:900}}>{item.symbol}</span>}
        </button>
