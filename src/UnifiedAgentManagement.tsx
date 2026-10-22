@@ -256,6 +256,9 @@ export default function UnifiedAgentManagement({
     useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
+  const [savedDraftSnapshot,setSavedDraftSnapshot]=useState("");
+  const hasUnsavedChanges=Boolean(draft&&savedDraftSnapshot&&JSON.stringify(draft)!==savedDraftSnapshot);
+  useEffect(()=>{const handler=(event:BeforeUnloadEvent)=>{if(hasUnsavedChanges){event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",handler);return()=>window.removeEventListener("beforeunload",handler);},[hasUnsavedChanges]);
   const [createOpen, setCreateOpen] = useState(false);
   const [createSource, setCreateSource] =
     useState<CreateSource>("login");
@@ -1196,7 +1199,9 @@ export default function UnifiedAgentManagement({
     const id = Number(row.agent.id);
     if (!id) return;
 
+    if (hasUnsavedChanges && !window.confirm("Hai modifiche non salvate. Vuoi uscire senza salvarle?")) return;
     if (expandedId === id) {
+      setSavedDraftSnapshot("");
       setExpandedId(null);
       setDraft(null);
       return;
@@ -1204,7 +1209,7 @@ export default function UnifiedAgentManagement({
 
     setExpandedId(id);
     setEditDmCustomOpen(false);
-    setDraft({
+    const nextDraft:EditDraft = {
       username: row.agent.username || "",
       password: row.agent.password || "",
       ownerAdminId: row.agent.owner_admin_id || "",
@@ -1222,7 +1227,9 @@ export default function UnifiedAgentManagement({
         row.recruiting?.latitude !== undefined &&
         row.recruiting?.longitude !== null &&
         row.recruiting?.longitude !== undefined,
-    });
+    };
+    setDraft(nextDraft);
+    setSavedDraftSnapshot(JSON.stringify(nextDraft));
   };
 
   const toggleMapVisibility = async (
@@ -1463,6 +1470,7 @@ export default function UnifiedAgentManagement({
       );
       setExpandedId(null);
       setDraft(null);
+      setSavedDraftSnapshot("");
       await loadAll();
     } catch (error: any) {
       console.error(error);
@@ -2302,6 +2310,9 @@ export default function UnifiedAgentManagement({
               Login, abbinamenti, Macroaree e Mappa
             </div>
           </div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          {hasUnsavedChanges&&<strong style={{color:"#b45309",fontSize:12}}>● MODIFICHE NON SALVATE</strong>}
+          <button type="button" disabled={busy} onClick={()=>void saveRow(row)} style={{...buttonStyle,background:"#16a34a",color:"white",fontWeight:900}}>{busy?"SALVATAGGIO...":"💾 SALVA"}</button>
           <button
             type="button"
             onClick={() => openRow(row)}
@@ -2309,6 +2320,7 @@ export default function UnifiedAgentManagement({
           >
             CHIUDI
           </button>
+          </div>
         </div>
 
         <section
