@@ -7,6 +7,7 @@ import html2canvas from "html2canvas";
 import { supabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 import Ateco from "./Ateco";
 import Archive from "./Archive";
+import AgentProduction from "./AgentProduction";
 import { adminCreateUser, adminDeleteUser, adminListUsers, adminLogin, adminLogout, adminSetFullAccess, adminSetDashboardTabs, adminUpdateUser, adminUpsertSettings, ensureAdminSession, getAdminSessionToken } from "./adminSecurity";
 import {
   agentLogin,
@@ -13468,6 +13469,13 @@ export default function App() {
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [agentSession, setAgentSession] = useState<any>(null);
+  const [agentProductionAllowed,setAgentProductionAllowed]=useState(false);
+  useEffect(()=>{
+    if(!agentSession?.token){setAgentProductionAllowed(false);return;}
+    void supabase.rpc("agent_production_allowed",{p_session_token:agentSession.token}).then(({data,error})=>{
+      setAgentProductionAllowed(!error&&data===true);
+    });
+  },[agentSession?.token]);
   const [provvigioniPrefill, setProvvigioniPrefill] =
     useState<ProvvigioniPrefill | null>(null);
   const [appointmentOpenRequest, setAppointmentOpenRequest] =
@@ -16231,6 +16239,9 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </button>
           )}
 
+          {!adminSession && agentSession && agentProductionAllowed && (
+            <button onClick={()=>navigateTo("agentProduction")} style={{...mainNavBtn,...(tab==="agentProduction"?activeBtn:{})}}>📊 PRODUZIONE</button>
+          )}
           {(!adminSession || canAdminAccessTab(adminProfile, "report")) && (
           <button
             onClick={() => navigateTo("report")}
@@ -16429,6 +16440,8 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
     />
     <DriveArchive />
   </>
+) : tab === "agentProduction" && agentSession && agentProductionAllowed ? (
+  <AgentProduction token={agentSession.token} />
 ) : tab === "report" ? (
   <>
     <SectionHero
