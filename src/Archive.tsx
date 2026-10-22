@@ -2620,6 +2620,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             <button type="button" onClick={()=>{setDetailSearch("");setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity("");setDetailSourceIds(null);setDetailLimit(100);}}
               style={{ padding: "9px 14px", borderRadius: 9, border: "1px solid #cbd5e1", background: "white", cursor: "pointer", fontWeight: 800 }}>AZZERA FILTRI</button>
             <strong>{detailRows.length.toLocaleString("it-IT")} recessi trovati</strong>
+            <strong style={{color:"#b45309",background:"#fffbeb",padding:"7px 11px",borderRadius:9,border:"1px solid #fcd34d"}}>⚡ {detailRows.filter(r=>String(r.commodity).toUpperCase()==="LUCE").reduce((total,r)=>total+(Number(r.consumo)||0),0).toLocaleString("it-IT",{maximumFractionDigits:2})} kWh totali</strong>
+            <strong style={{color:"#0369a1",background:"#eff6ff",padding:"7px 11px",borderRadius:9,border:"1px solid #bae6fd"}}>🔥 {detailRows.filter(r=>String(r.commodity).toUpperCase()==="GAS").reduce((total,r)=>total+(Number(r.consumo)||0),0).toLocaleString("it-IT",{maximumFractionDigits:2})} Smc totali</strong>
             <span style={{ color: "#64748b", fontSize: 13 }}>su {rows.length.toLocaleString("it-IT")} archiviati</span>
           </div>
           <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>
