@@ -178,3 +178,21 @@ export async function downloadGoogleDriveFile(
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
 }
+
+export async function getPresentationDriveConfig():Promise<{folder_id:string|null;folder_name:string|null}>{
+ return await callGoogleDrive("drive_presentation_config");
+}
+export async function setPresentationDriveFolder(folderId:string):Promise<{folder_id:string;folder_name:string}>{
+ return await callGoogleDrive("drive_presentation_set_folder",{folder_id:folderId});
+}
+export async function listPresentationDrivePdfs():Promise<{folder_id:string;folder_name:string;items:GoogleDriveItem[]}>{
+ return await callGoogleDrive("drive_presentation_list");
+}
+export async function readPresentationDrivePdf(fileId:string):Promise<string>{
+ const viewer=await driveViewerPayload();
+ const response=await fetch(GOOGLE_WORKSPACE_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json",apikey:supabaseAnonKey},body:JSON.stringify({action:"drive_presentation_download",...viewer,file_id:fileId})});
+ if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data?.error||"Impossibile aprire PDF Drive.");}
+ const blob=await response.blob();
+ if(blob.size>16*1024*1024)throw new Error("PDF troppo grande per il visualizzatore (max 16 MB).");
+ return await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("Lettura PDF non riuscita"));reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");reader.readAsDataURL(blob);});
+}
