@@ -15992,6 +15992,32 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
               gap: 7,
             }}
           >
+            {(canAdminAccessTab(adminProfile, "todos") || canAdminAccessTab(adminProfile, "recruiting")) && (
+              <button
+                type="button"
+                title="Cose da fare"
+                aria-label="Apri Cose da fare"
+                onClick={() => navigateTo("todos")}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  border: tab === "todos" ? "2px solid #ffffff" : "1px solid rgba(255,255,255,.72)",
+                  background: tab === "todos" ? "rgba(255,255,255,.30)" : "rgba(255,255,255,.16)",
+                  color: "#ffffff",
+                  display: "grid",
+                  placeItems: "center",
+                  padding: 0,
+                  fontSize: 18,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  boxShadow: "0 3px 9px rgba(15,23,42,.16)",
+                }}
+              >
+                ☑️
+              </button>
+            )}
+
             {canAdminAccessTab(adminProfile, "calendarAdmin") && (
             <button
               type="button"
