@@ -13641,9 +13641,10 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const [todoCalendarRequest, setTodoCalendarRequest] = useState<{ sourceKey: string; date: string | null; requestId: number } | null>(null);
+
   useEffect(() => {
-    const [todoCalendarRequest, setTodoCalendarRequest] = useState<{ sourceKey: string; date: string | null; requestId: number } | null>(null);
-  const openTodoCalendar = (event: Event) => {
+    const openTodoCalendar = (event: Event) => {
       const detail = (event as CustomEvent<{ date?: string | null; sourceKey?: string | null }>).detail;
       if (detail?.sourceKey) {
         setTodoCalendarRequest({ sourceKey: detail.sourceKey, date: detail.date || null, requestId: Date.now() });
