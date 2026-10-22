@@ -12237,7 +12237,7 @@ const ADMIN_DASHBOARD_CHOICES: Array<{ key: string; label: string }> = [
   { key: "archive", label: "DATI PRODUZIONE" },
   { key: "email", label: "INVIO EMAIL" },
   { key: "driveArchive", label: "ARCHIVIO DRIVE" },
-  { key: "provvigioni", label: "PROVVIGIONI" },
+  { key: "provvigioni", label: "MANDATO AGENTI" },
   { key: "reportAdmin", label: "REPORT AGENTI" },
   { key: "recruitingWaiting", label: "SALA D'ATTESA HR" },
   { key: "personale", label: "PERSONALE" },
@@ -13385,7 +13385,7 @@ function AdminDashboard({
         {canShow("archive") && <DashboardCard title="DATI PRODUZIONE" description="Monitora i dati di produzione." icon="🧮" className="ge-card-production" compact onClick={() => navigate("archive")} />}
         {canShow("email") && <DashboardCard title="INVIO EMAIL" description="Invia comunicazioni e allegati." icon="✉" className="ge-card-email" compact onClick={openEmail} />}
         {canShow("driveArchive") && <DashboardCard title="ARCHIVIO DRIVE" description="Consulta documenti e file condivisi." icon="📁" className="ge-card-drive" compact onClick={() => navigate("driveArchive")} />}
-        {canShow("provvigioni") && <DashboardCard title="PROVVIGIONI" description="Consulta e calcola le provvigioni commerciali." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />}
+        {canShow("provvigioni") && <DashboardCard title="MANDATO AGENTI" description="Provvigioni, produzione e presentazione del mandato." icon="💰" className="ge-card-provvigioni" compact onClick={() => navigate("provvigioni")} />}
         {canShow("reportAdmin") && <DashboardCard title="REPORT AGENTI" description="Consulta i report degli agenti." icon="▤" className="ge-card-agent-report" compact onClick={() => navigate("reportAdmin")} />}
         {canShow("recruitingWaiting") && <DashboardCard title="SALA D'ATTESA HR" description="Gestisci nominativi in arrivo e sincronizzazioni HR." icon="⌛" className="ge-card-waiting" compact incomingCount={waitingIncomingCount} outgoingCount={waitingOutgoingCount} onClick={() => navigate("recruitingWaiting")} />}
         {canShow("personale") && <DashboardCard title="PERSONALE" description="Gestisci ferie, permessi ed ex festività." icon="👤" className="ge-card-personale" compact onClick={() => navigate("personale")} />}
@@ -13506,8 +13506,8 @@ export default function App() {
       setAgentProductionAllowed(!error&&data===true);
     });
   },[agentSession?.token]);
-  const [provvigioniSubtab,setProvvigioniSubtabState] = useState<"calcoli"|"presentazione">(()=>{try{return localStorage.getItem("provvigioni-subtab")==="presentazione"?"presentazione":"calcoli";}catch{return "calcoli";}});
-  const setProvvigioniSubtab = (next:"calcoli"|"presentazione")=>{setProvvigioniSubtabState(next);try{localStorage.setItem("provvigioni-subtab",next);}catch{}};
+  const [provvigioniSubtab,setProvvigioniSubtabState] = useState<"calcoli"|"presentazione"|"produzione">(()=>{try{return (["presentazione","produzione"].includes(localStorage.getItem("provvigioni-subtab")||"")?localStorage.getItem("provvigioni-subtab"):"calcoli") as "calcoli"|"presentazione"|"produzione";}catch{return "calcoli";}});
+  const setProvvigioniSubtab = (next:"calcoli"|"presentazione"|"produzione")=>{setProvvigioniSubtabState(next);try{localStorage.setItem("provvigioni-subtab",next);}catch{}};
   const [provvigioniPrefill, setProvvigioniPrefill] =
     useState<ProvvigioniPrefill | null>(null);
   const [appointmentOpenRequest, setAppointmentOpenRequest] =
@@ -16310,6 +16310,13 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </button>
           )}
 
+          {(!adminSession || canAdminAccessTab(adminProfile, "archive")) && (
+          <button onClick={() => navigateTo("archive")} style={{...mainNavBtn,...(tab==="archive"?activeBtn:{})}}>
+            <span className="ge-main-nav__label-desktop">PRODUZIONE</span>
+            <span className="ge-main-nav__label-mobile">PROD.</span>
+          </button>
+          )}
+
           {(!adminSession || canAdminAccessTab(adminProfile, "driveArchive")) && (
           <button
             onClick={() => navigateTo("driveArchive")}
@@ -16484,16 +16491,17 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         ) : tab === "provvigioni" && canUseProvvigioni ? (
           <>
             <SectionHero
-              title="PROVVIGIONI"
-              subtitle="Consulta e calcola le provvigioni commerciali."
+              title="MANDATO AGENTI"
+              subtitle="Provvigioni, produzione e presentazione."
               icon="💰"
               variant="energy"
             />
             {isSuperAdmin && <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:16}}>
               <button type="button" onClick={()=>setProvvigioniSubtab("calcoli")} style={{padding:"12px 20px",borderRadius:12,border:provvigioniSubtab==="calcoli"?"2px solid #f97316":"1px solid #cbd5e1",background:provvigioniSubtab==="calcoli"?"#0f172a":"white",color:provvigioniSubtab==="calcoli"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>💰 CALCOLO PROVVIGIONI</button>
+              {(!adminSession || canAdminAccessTab(adminProfile,"archive")) && <button type="button" onClick={()=>setProvvigioniSubtab("produzione")} style={{padding:"12px 20px",borderRadius:12,border:provvigioniSubtab==="produzione"?"2px solid #f97316":"1px solid #cbd5e1",background:provvigioniSubtab==="produzione"?"#0f172a":"white",color:provvigioniSubtab==="produzione"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>📊 PRODUZIONE</button>}
               <button type="button" onClick={()=>setProvvigioniSubtab("presentazione")} style={{padding:"12px 20px",borderRadius:12,border:provvigioniSubtab==="presentazione"?"2px solid #f97316":"1px solid #cbd5e1",background:provvigioniSubtab==="presentazione"?"#0f172a":"white",color:provvigioniSubtab==="presentazione"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>📑 PRESENTAZIONE</button>
             </div>}
-            {isSuperAdmin && provvigioniSubtab==="presentazione" ? <ProvvigioniPresentazione/> : <Provvigioni
+            {isSuperAdmin && provvigioniSubtab==="presentazione" ? <ProvvigioniPresentazione/> : isSuperAdmin && provvigioniSubtab==="produzione" ? <Archive reportAdminPanel={canAdminAccessTab(adminProfile,"reportAdmin")?<ReportAdmin adminProfile={adminProfile}/>:null}/> : <Provvigioni
               prefill={provvigioniPrefill}
               onPrefillConsumed={() => setProvvigioniPrefill(null)}
             />}
