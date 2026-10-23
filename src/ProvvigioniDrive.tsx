@@ -5,13 +5,13 @@ const btn:React.CSSProperties={border:"1px solid #cbd5e1",background:"white",bor
 export default function ProvvigioniDrive(){
  const [config,setConfig]=useState<{folder_id:string|null;folder_name:string|null}|null>(null);
  const [items,setItems]=useState<GoogleDriveItem[]>([]),[browse,setBrowse]=useState(false),[stack,setStack]=useState<{id:string;name:string}[]>([]),[folders,setFolders]=useState<GoogleDriveItem[]>([]);
- const [selected,setSelected]=useState<GoogleDriveItem|null>(null),[pdf,setPdf]=useState(""),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const [openFull,setOpenFull]=useState(false);const [selected,setSelected]=useState<GoogleDriveItem|null>(null),[pdf,setPdf]=useState(""),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState("");
  const load=async()=>{setError("");const cfg=await getPresentationDriveConfig();setConfig(cfg);if(cfg.folder_id){const result=await listPresentationDrivePdfs();setItems(result.items||[]);}else setItems([]);};
  useEffect(()=>{void load().catch(e=>setError(e.message)).finally(()=>setLoading(false));},[]);
  const browseFolder=async(id:string,name:string,nextStack?:{id:string;name:string}[])=>{setBusy(true);setError("");try{const result=await listGoogleDriveFolder(id);setFolders((result.items||[]).filter(x=>x.is_folder));setStack(nextStack||[...stack,{id,name:result.folder.name||name}]);}catch(e:any){setError(e.message);setBrowse(false);}finally{setBusy(false);}};
  const choose=async()=>{const folder=stack[stack.length-1];if(!folder)return;setBusy(true);setError("");try{await setPresentationDriveFolder(folder.id);setBrowse(false);setSelected(null);setPdf("");await load();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const reconnect=async()=>{setBusy(true);setError("");try{const url=await startGoogleDriveConnection();window.location.assign(url);}catch(e:any){setError(e.message);setBusy(false);}};
- const open=async(item:GoogleDriveItem)=>{setBusy(true);setError("");try{const value=await readPresentationDrivePdf(item.id);setSelected(item);setPdf(value);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
+ const open=async(item:GoogleDriveItem,fullscreen=false)=>{setBusy(true);setError("");try{const value=await readPresentationDrivePdf(item.id);setOpenFull(fullscreen);setSelected(item);setPdf(value);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  return <div style={{display:"grid",gap:13}}>
   <div style={{padding:15,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
    <div><strong>📁 CARTELLA GOOGLE DRIVE</strong><div style={{fontSize:13,color:"#475569",marginTop:5}}>{config?.folder_name||"Nessuna cartella selezionata"} · PDF sincronizzati quando apri la scheda o premi Aggiorna</div></div>
@@ -36,12 +36,10 @@ export default function ProvvigioniDrive(){
    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:14}}>
     <h3 style={{marginTop:0}}>PDF DA DRIVE ({items.length})</h3>
     {!items.length&&<p style={{color:"#64748b"}}>{config?.folder_id?"Nessun PDF nella cartella selezionata.":"Scegli una cartella per visualizzare i PDF."}</p>}
-    <div style={{display:"grid",gap:8}}>{items.map(item=><button key={item.id} type="button" disabled={busy} onClick={()=>void open(item)} style={{...btn,textAlign:"left",background:selected?.id===item.id?"#fff7ed":"#f8fafc",border:selected?.id===item.id?"2px solid #f97316":"1px solid #e2e8f0",overflowWrap:"anywhere"}}>
-      📄 {item.name}<div style={{fontSize:12,color:"#64748b",marginTop:5}}>{item.modified_time?new Date(item.modified_time).toLocaleDateString("it-IT"):""} · 👁 VISUALIZZA</div>
-    </button>)}</div>
+    <div style={{display:"grid",gap:8}}>{items.map(item=><div key={item.id} style={{display:"flex",gap:6,alignItems:"center",padding:7,borderRadius:10,background:selected?.id===item.id?"#fff7ed":"#f8fafc",border:selected?.id===item.id?"2px solid #f97316":"1px solid #e2e8f0"}}><button type="button" disabled={busy} onClick={()=>void open(item)} style={{...btn,flex:1,minWidth:0,textAlign:"left",overflowWrap:"anywhere",border:0,background:"transparent"}}>📄 {item.name}<div style={{fontSize:12,color:"#64748b",marginTop:5}}>{item.modified_time?new Date(item.modified_time).toLocaleDateString("it-IT"):""} · 👁 VISUALIZZA</div></button><button type="button" disabled={busy} title="Apri direttamente a schermo intero" aria-label={"Schermo intero "+item.name} onClick={()=>void open(item,true)} style={{...btn,background:"#0f172a",color:"white",padding:"10px 12px"}}>⛶</button></div>)}</div>
    </div>
    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:12,minWidth:0}}>
-    {selected&&pdf?<PdfEditor key={selected.id+"-"+selected.modified_time} base64={pdf} documentId={0} driveFileId={selected.id} filename={selected.name}/>:<div style={{minHeight:280,display:"grid",placeItems:"center",color:"#64748b",textAlign:"center"}}>{busy?"Caricamento PDF…":"Seleziona un PDF da Google Drive."}</div>}
+    {selected&&pdf?<PdfEditor key={selected.id+"-"+selected.modified_time} base64={pdf} documentId={0} driveFileId={selected.id} filename={selected.name} initialFull={openFull}/>:<div style={{minHeight:280,display:"grid",placeItems:"center",color:"#64748b",textAlign:"center"}}>{busy?"Caricamento PDF…":"Seleziona un PDF da Google Drive."}</div>}
    </div>
   </div>
  </div>;
