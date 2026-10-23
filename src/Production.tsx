@@ -511,7 +511,7 @@ function MultiSelectFilter({
   );
 }
 
-export default function Production({ view = "produzione" }: { view?: "produzione" | "zone" }) {
+export default function Production({ view = "produzione", onOpenDetail }: { view?: "produzione" | "dettaglio" | "zone"; onOpenDetail?:(period:string,commodity:string)=>void }) {
   const [rows, setRows] = useState<ProductionRow[]>([]);
   const [agentZones, setAgentZones] = useState<AgentZone[]>([]);
   const [pendingFiles, setPendingFiles] = useState<ParsedProductionFile[]>([]);
@@ -520,6 +520,8 @@ export default function Production({ view = "produzione" }: { view?: "produzione
   const [parsingProgress, setParsingProgress] = useState("");
   const [saving, setSaving] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [detailPeriod,setDetailPeriod]=useState(()=>sessionStorage.getItem("ge_production_detail_period")||"");
+  const [detailCommodity,setDetailCommodity]=useState(()=>sessionStorage.getItem("ge_production_detail_commodity")||"");
   const [message, setMessage] = useState("");
   const [zonesDirty, setZonesDirty] = useState(false);
   const [savingZones, setSavingZones] = useState(false);
@@ -985,6 +987,15 @@ export default function Production({ view = "produzione" }: { view?: "produzione
     setZonesSelected([]);
   };
 
+  const productionMonthly=useMemo(()=>{const map=new Map<string,{month:string;luce:{count:number;consumo:number};gas:{count:number;consumo:number}}>();for(const row of filteredRows){const month=row.periodEnd.slice(0,7);const g=map.get(month)||{month,luce:{count:0,consumo:0},gas:{count:0,consumo:0}};const target=row.commodity==="LUCE"?g.luce:g.gas;target.count+=row.inAttivazioneCount;target.consumo+=row.inAttivazioneConsumo;map.set(month,g);}return [...map.values()].sort((a,b)=>b.month.localeCompare(a.month));},[filteredRows]);
+  const monthText=(key:string)=>{const d=new Date(key+"-01T12:00:00");return Number.isNaN(d.getTime())?key:d.toLocaleDateString("it-IT",{month:"long",year:"numeric"}).toUpperCase();};
+  const exportMonthlyPdf=async()=>{
+    if(!productionMonthly.length||exportingPdf)return;setExportingPdf(true);
+    try{await exportFilteredA4Pdf({title:"PRODUZIONE MENSILE - LUCE E GAS",subtitle:"Riepilogo mensile di contratti e consumi in attivazione, Luce e Gas affiancati.",filename:"PRODUZIONE_MENSILE.pdf",filters:[pdfSelection("Fornitura",commoditiesSelected,"Luce e Gas"),pdfSelection("Agenti",agentsSelected,"Tutti"),pdfSelection("Zone",zonesSelected,"Tutte")],stats:[{label:"LUCE - CONTRATTI",value:pdfNumber(totals.luce.attivazioni,0)},{label:"LUCE - CONSUMO",value:pdfNumber(totals.luce.consumoAttivazione)+" kWh"},{label:"GAS - CONTRATTI",value:pdfNumber(totals.gas.attivazioni,0)},{label:"GAS - CONSUMO",value:pdfNumber(totals.gas.consumoAttivazione)+" Smc"}],columns:[{label:"MESE",width:30},{label:"LUCE - CONTRATTI",width:27,align:"right"},{label:"LUCE - CONSUMO kWh",width:42,align:"right"},{label:"GAS - CONTRATTI",width:27,align:"right"},{label:"GAS - CONSUMO Smc",width:42,align:"right"}],rows:productionMonthly.map(g=>[monthText(g.month),pdfNumber(g.luce.count,0),pdfNumber(g.luce.consumo),pdfNumber(g.gas.count,0),pdfNumber(g.gas.consumo)])});}
+    catch(e){alert("Errore PDF produzione mensile: "+(e instanceof Error?e.message:String(e)));}finally{setExportingPdf(false);}
+  };
+  const openMonthlyDetail=(month:string,commodity:string)=>{sessionStorage.setItem("ge_production_detail_period",month);sessionStorage.setItem("ge_production_detail_commodity",commodity);setDetailPeriod(month);setDetailCommodity(commodity);onOpenDetail?.(month,commodity);};
+  const detailedRows=filteredRows.filter(row=>(!detailPeriod||row.periodEnd.slice(0,7)===detailPeriod)&&(!detailCommodity||row.commodity===detailCommodity));
   const exportPdf = async () => {
     if (!filteredRows.length || exportingPdf) return;
     setExportingPdf(true);
@@ -1400,11 +1411,11 @@ export default function Production({ view = "produzione" }: { view?: "produzione
                   style={{ padding: "9px 13px", borderRadius: 8, border: 0, background: filteredRows.length ? "#0f172a" : "#cbd5e1", color: "white", fontWeight: 900 }}>
                   Esporta risultati Excel
                 </button>
-                <button type="button" onClick={() => void exportPdf()} disabled={!filteredRows.length || exportingPdf}
+                <button type="button" onClick={() => void (view==="dettaglio"?exportPdf():exportMonthlyPdf())} disabled={!filteredRows.length || exportingPdf}
                   style={{ padding: "9px 13px", borderRadius: 8, border: 0,
                     background: filteredRows.length && !exportingPdf ? "#b91c1c" : "#cbd5e1",
                     color: "white", fontWeight: 900, cursor: filteredRows.length && !exportingPdf ? "pointer" : "default" }}>
-                  {exportingPdf ? "Preparazione PDF..." : "📄 ESPORTA PDF A4"}
+                  {exportingPdf ? "Preparazione PDF..." : "{view==="dettaglio"?"📄 ESPORTA PDF DETTAGLIO":"📄 ESPORTA PDF MENSILE"}"}
                 </button>
               </div>
             </div>
@@ -1424,7 +1435,18 @@ export default function Production({ view = "produzione" }: { view?: "produzione
               </div>
             </div>
 
-            {!rows.length ? (
+            {view==="produzione"&&<div style={{display:"grid",gap:10,marginTop:18}}>
+              <h3 style={{margin:"0 0 4px",fontWeight:950}}>📅 PRODUZIONE MENSILE · LUCE E GAS</h3>
+              {productionMonthly.map((g,i)=><div key={g.month} style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,padding:"9px 12px",borderRadius:15,border:"1px solid #dbe4ee",background:i%2===0?"#f8fafc":"#eaf3ff"}}>
+                <strong style={{gridColumn:"1 / -1",padding:"2px 10px",fontSize:17,fontWeight:950}}>{monthText(g.month)}</strong>
+                {(["LUCE","GAS"] as const).map(kind=>{const gas=kind==="GAS";const item=gas?g.gas:g.luce;return <div key={kind} style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,padding:"10px 14px",borderRadius:12,background:gas?"#edf9ff":"#fff7ed",border:"1px solid "+(gas?"#bae6fd":"#fed7aa")}}>
+                  <div style={{display:"grid",gap:6}}><strong style={{color:gas?"#0369a1":"#c2410c"}}>{gas?"♨ GAS":"⚡ LUCE"}</strong><div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}><div style={{display:"grid",gap:2}}><span style={{fontSize:10,fontWeight:900,color:"#64748b"}}>N° CONTRATTI</span><strong style={{fontSize:24,fontWeight:850,fontFamily:"Arial,sans-serif"}}>{item.count.toLocaleString("it-IT")}</strong></div><div style={{width:1,height:34,background:gas?"#7dd3fc":"#fdba74"}}/><div style={{display:"grid",gap:2}}><span style={{fontSize:10,fontWeight:900,color:"#64748b"}}>CONSUMO IN ATTIVAZIONE</span><strong style={{fontSize:20,fontWeight:850,fontFamily:"Arial,sans-serif"}}>{item.consumo.toLocaleString("it-IT",{maximumFractionDigits:2})} <span style={{fontSize:12,color:"#64748b"}}>{gas?"Smc":"kWh"}</span></strong></div></div></div>
+                  <button type="button" disabled={!item.count} onClick={()=>openMonthlyDetail(g.month,kind)} style={{padding:"10px 12px",borderRadius:9,border:"1px solid "+(gas?"#7dd3fc":"#fdba74"),background:"white",color:gas?"#0369a1":"#9a3412",fontWeight:900,cursor:"pointer"}}>VEDI AGENTI ↗</button>
+                </div>;})}
+              </div>)}
+            </div>}
+            {view==="dettaglio"&&<div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginTop:16}}><strong>DETTAGLIO PRODUZIONE</strong><label>Mese <select value={detailPeriod} onChange={e=>setDetailPeriod(e.target.value)}><option value="">Tutti i mesi</option>{productionMonthly.map(g=><option key={g.month} value={g.month}>{monthText(g.month)}</option>)}</select></label><label>Fornitura <select value={detailCommodity} onChange={e=>setDetailCommodity(e.target.value)}><option value="">Luce e Gas</option><option value="LUCE">LUCE</option><option value="GAS">GAS</option></select></label></div>}
+            {view==="produzione"?null:!rows.length ? (
               <div style={{ marginTop: 16, color: "#64748b" }}>Nessun dato presente nell'archivio PRODUZIONE.</div>
             ) : (
               <div style={{ overflowX: "auto", marginTop: 14 }}>
@@ -1437,7 +1459,7 @@ export default function Production({ view = "produzione" }: { view?: "produzione
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRows.slice(0, 500).map((row) => (
+                    {detailedRows.slice(0, 500).map((row) => (
                       <tr key={row.id}>
                         <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap" }}>{row.periodLabel}</td>
                         <td style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9", fontWeight: 900 }}>{row.commodity}</td>
@@ -1456,7 +1478,7 @@ export default function Production({ view = "produzione" }: { view?: "produzione
                     ))}
                   </tbody>
                 </table>
-                {filteredRows.length > 500 && <div style={{ marginTop: 10, color: "#b45309", fontSize: 13, fontWeight: 800 }}>A video mostro le prime 500 righe. L'export Excel contiene tutti i risultati filtrati.</div>}
+                {detailedRows.length > 500 && <div style={{ marginTop: 10, color: "#b45309", fontSize: 13, fontWeight: 800 }}>A video mostro le prime 500 righe. L'export Excel contiene tutti i risultati filtrati.</div>}
               </div>
             )}
           </div>
