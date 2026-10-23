@@ -564,8 +564,27 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
       regione: String(item.regione || ""),
       includeInReport: item.include_in_report !== false,
     }));
+    // Proponi la regione da Gestione Agenti solo quando manca nella configurazione salvata.
+    // La proposta rimane locale finché non viene premuto Salva modifiche.
+    const {data:registered,error:registeredError}=await supabase.from("recruiting_active_agents").select("first_name,last_name,region");
+    if(!registeredError){
+      const byName=new Map<string,string>();
+      const normalize=(name:string)=>String(name||"").trim().toLocaleUpperCase("it-IT").replace(/\s+/g," ");
+      (registered||[]).forEach((item:any)=>{
+        const name=normalize([item.first_name,item.last_name].filter(Boolean).join(" "));
+        const region=String(item.region||"").trim();
+        if(name&&region)byName.set(name,region);
+      });
+      loaded.forEach((item:AgentZone)=>{
+        if(item.regione)return;
+        const region=byName.get(normalize(item.agente));
+        if(region&&ITALIAN_REGIONS.some(value=>normalize(value)===normalize(region))){
+          item.regione=ITALIAN_REGIONS.find(value=>normalize(value)===normalize(region))||region;
+        }
+      });
+    }
     setAgentZones(loaded);
-    setZonesDirty(false);
+    setZonesDirty(loaded.some((item:AgentZone)=>!((data||[]).find((saved:any)=>String(saved.agent_key)===item.agentKey)?.regione)&&Boolean(item.regione)));
     return loaded;
   };
 
