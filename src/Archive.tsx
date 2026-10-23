@@ -1931,6 +1931,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           gap: 10,
           flexWrap: "wrap",
         }}
+        className="ge-archive-main-tabs"
       >
         <button
           type="button"
@@ -2002,7 +2003,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
 
       </div>
 
-      {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+      {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div className="ge-archive-sub-tabs" style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{padding:"9px 15px",borderRadius:9,border:"1px solid #cbd5e1",background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>{label}</button>)}
       </div>}
       {archiveSection === "recessi" ? (
