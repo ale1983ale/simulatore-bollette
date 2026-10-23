@@ -6,7 +6,7 @@ import {getAdminSessionToken} from "./adminSecurity";
 pdfjs.GlobalWorkerOptions.workerSrc=pdfWorker;
 type Mark={kind:"pen"|"highlight"|"text";points?:number[][];x:number;y:number;w?:number;h?:number;text?:string;color:string};
 type Marks=Record<string,Mark[]>;
-type Props={base64:string;documentId:number;filename:string;driveFileId?:string};
+type Props={base64:string;documentId:number;filename:string;driveFileId?:string;initialFull?:boolean};
 const STICKY_KEY="provvigioni_pdf_postit_shared_v1";
 const STICKY_TTL=30*60*1000;
 type StickyPage={text:string;strokes:number[][][]};
@@ -21,13 +21,16 @@ function readSticky():StickyData{
  }catch{return {pages:[emptyPage()],updated:0};}
 }
 const toolButton:React.CSSProperties={border:"1px solid #cbd5e1",borderRadius:10,padding:"10px 12px",background:"white",fontWeight:800,color:"#0f172a",cursor:"pointer"};
-export default function PdfEditor({base64,documentId,filename,driveFileId}:Props){
+export default function PdfEditor({base64,documentId,filename,driveFileId,initialFull=false}:Props){
  const [pdf,setPdf]=useState<any>(null),[pages,setPages]=useState<number[]>([]),[zoom,setZoom]=useState(100),[tool,setTool]=useState<"move"|"magnify"|"pen"|"highlight"|"text">("move"),[marks,setMarks]=useState<Marks>({}),[dirty,setDirty]=useState(false),[status,setStatus]=useState(""),[busy,setBusy]=useState(false);
- const [full,setFull]=useState(false);
+ const [full,setFull]=useState(initialFull);
  const [stickyOpen,setStickyOpen]=useState(false);
  const [sticky,setSticky]=useState<StickyData>(()=>readSticky());
  const [stickyPage,setStickyPage]=useState(0);
- const [stickyMode,setStickyMode]=useState<"keyboard"|"hand">("keyboard");
+ const [stickyMode,setStickyMode]=useState<"keyboard"|"hand"|"calculator">("keyboard");
+ const [calcExpr,setCalcExpr]=useState("");
+ const [calcHistory,setCalcHistory]=useState<string[]>(()=>{try{const v=JSON.parse(localStorage.getItem("provvigioni_calc_history")||"[]");return Array.isArray(v)?v:[];}catch{return [];}});
+ const calcEvaluate=()=>{const expr=calcExpr.replace(/\s/g,"");if(!/^[0-9.+*/-]+$/.test(expr))return;const parts=expr.match(/\d+(?:\.\d+)?|[+*/-]/g);if(!parts||parts.join("")!==expr)return;const values=[...parts];for(const op of ["*","/","+","-"]){for(let i=1;i<values.length-1;){if(values[i]!==op){i+=2;continue;}const x=Number(values[i-1]),y=Number(values[i+1]);if(!Number.isFinite(x)||!Number.isFinite(y)||(op==="/"&&y===0))return;values.splice(i-1,3,String(op==="*"?x*y:op==="/"?x/y:op==="+"?x+y:x-y));}}if(values.length!==1)return;const result=Number(values[0]);if(!Number.isFinite(result))return;const entry=expr+" = "+result.toLocaleString("it-IT",{maximumFractionDigits:10});setCalcHistory(h=>{const next=[...h,entry];localStorage.setItem("provvigioni_calc_history",JSON.stringify(next));return next;});setCalcExpr(String(result));};
  const stickyCanvas=useRef<HTMLCanvasElement|null>(null);
  const stickyHistory=useRef<Record<number,StickyPage[]>>({});
  const [stickyPosition,setStickyPosition]=useState({x:Math.max(0,window.innerWidth-Math.min(420,window.innerWidth-24)-16),y:16});
@@ -183,9 +186,24 @@ export default function PdfEditor({base64,documentId,filename,driveFileId}:Props
    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
     <button type="button" onClick={()=>setStickyMode("keyboard")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="keyboard"?"#f59e0b":"white"}} aria-label="Tastiera" title="Tastiera">⌨️</button>
     <button type="button" onClick={()=>setStickyMode("hand")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="hand"?"#f59e0b":"white"}} aria-label="Mano libera" title="Mano libera">✍️</button>
+    <button type="button" onClick={()=>setStickyMode("calculator")} style={{...toolButton,padding:"7px 9px",background:stickyMode==="calculator"?"#f59e0b":"white"}} aria-label="Calcolatrice" title="Calcolatrice">🧮</button>
     <button type="button" onClick={undoSticky} disabled={!stickyHistory.current[stickyPage]?.length} style={{...toolButton,padding:"7px 10px",background:"#fff3b1"}} aria-label="Annulla ultima modifica" title="Annulla ultima modifica">↶</button>
    </div>
-   {stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" placeholder="Scrivi qui i tuoi appunti..." value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:100,flex:"1 1 auto",resize:"none",background:"repeating-linear-gradient(to bottom,#fff9c8 0px,#fff9c8 30px,#d9bc6970 31px,#fff9c8 32px)",border:"1px solid #dfc875",borderRadius:7,padding:"7px 12px",color:"#1c1917",fontSize:18,lineHeight:"32px",fontFamily:"cursive"}}/>:<canvas ref={stickyCanvas} width={600} height={620} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",maxHeight:"100%",flex:"1 1 auto",minHeight:100,background:"#fff9c8",border:"1px solid #dfc875",borderRadius:7,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
+   {stickyMode==="calculator"?<div style={{display:"flex",flexDirection:"column",gap:10,flex:"1 1 auto",minHeight:0}}>
+    <div style={{background:"#fffbea",border:"1px solid #dfc875",borderRadius:9,padding:10,overflowY:"auto",flex:"1 1 auto",minHeight:90}}>
+     <strong>STORICO CALCOLI</strong>
+     {calcHistory.map((entry,i)=><div key={i} style={{padding:"5px 0",borderBottom:"1px solid #e5d5a4",fontVariantNumeric:"tabular-nums",overflowWrap:"anywhere"}}>{entry}</div>)}
+    </div>
+    <input aria-label="Calcolo corrente" value={calcExpr} onChange={e=>setCalcExpr(e.target.value)} style={{width:"100%",boxSizing:"border-box",padding:12,fontSize:22,textAlign:"right",border:"1px solid #d4b75c",borderRadius:8}}/>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:6}}>
+     {["7","8","9","/","4","5","6","*","1","2","3","-","0",".","=","+"].map(key=><button key={key} type="button" onClick={()=>key==="="?calcEvaluate():setCalcExpr(v=>v+key)} style={{...toolButton,padding:"13px 4px",fontSize:19,background:key==="="?"#f59e0b":"white"}}>{key}</button>)}
+    </div>
+    <div style={{display:"flex",gap:8}}>
+     <button type="button" onClick={()=>setCalcExpr(v=>v.slice(0,-1))} style={{...toolButton,flex:1}}>⌫</button>
+     <button type="button" onClick={()=>setCalcExpr("")} style={{...toolButton,flex:1}}>C</button>
+     <button type="button" onClick={()=>{if(window.confirm("Cancellare tutto lo storico dei calcoli?")){setCalcHistory([]);localStorage.removeItem("provvigioni_calc_history");setCalcExpr("");}}} style={{...toolButton,flex:2,background:"#fee2e2"}}>🗑 CANCELLA STORICO</button>
+    </div>
+   </div>:stickyMode==="keyboard"?<textarea aria-label="Scrivi appunti condivisi tra i PDF" value={sticky.pages[stickyPage]?.text||""} onChange={e=>changeStickyPage({text:e.target.value})} style={{boxSizing:"border-box",width:"100%",minHeight:100,flex:"1 1 auto",resize:"none",background:"repeating-linear-gradient(to bottom,#fff9c8 0px,#fff9c8 30px,#d9bc6970 31px,#fff9c8 32px)",border:"1px solid #dfc875",borderRadius:7,padding:"7px 12px",color:"#1c1917",fontSize:18,lineHeight:"32px",fontFamily:"cursive"}}/>:<canvas ref={stickyCanvas} width={600} height={620} onPointerDown={handStart} onPointerMove={handMove} onPointerUp={handEnd} onPointerCancel={handEnd} style={{width:"100%",height:"auto",maxHeight:"100%",flex:"1 1 auto",minHeight:100,background:"#fff9c8",border:"1px solid #dfc875",borderRadius:7,touchAction:"none",cursor:"crosshair",boxSizing:"border-box"}}/>}
    <div style={{display:"flex",gap:7,alignItems:"center",justifyContent:"space-between"}}>
     <button type="button" disabled={stickyPage===0} onClick={()=>setStickyPage(p=>p-1)} style={{...toolButton,padding:"7px 10px"}}>←</button>
     <button type="button" onClick={()=>{saveSticky([...sticky.pages,emptyPage()]);setStickyPage(sticky.pages.length);}} style={{...toolButton,padding:"7px 10px",background:"#fde047"}}>＋ Foglio</button>
