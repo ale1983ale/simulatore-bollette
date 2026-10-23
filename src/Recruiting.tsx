@@ -10585,6 +10585,17 @@ export default function Recruiting({
       {section === "todos" && (
         <RecruitingTodos ctx={ctx} visible={section === "todos"} draft={todoDraft}
           onDraftConsumed={() => setTodoDraft(null)}
+          onOpenLinkedContact={(kind,id)=>{
+            if(kind!=="candidate")return;
+            const candidate=allCandidates.find(c=>String(c.id)===String(id));
+            if(!candidate)return;
+            const scope=candidate.contactScope==="external"?"external":"internal";
+            try{window.localStorage.setItem("recruiting_selected_candidate_"+scope,String(id));}catch{}
+            if(onOpenContact){onOpenContact(scope,String(id));return;}
+            setSelectedCandidateId(String(id));
+            setSection(scope==="external"?"external_contacts":"contacts");
+            window.setTimeout(()=>document.getElementById("recruiting-contact-detail")?.scrollIntoView({behavior:"smooth",block:"start"}),120);
+          }}
           contacts={[
             ...allCandidates.map(c => ({ id: c.id, name: c.fullName, kind: "candidate" as const })),
             ...activeAgents.map(a => ({ id: a.id, name: [a.firstName,a.lastName].filter(Boolean).join(" "), kind: "agent" as const }))
