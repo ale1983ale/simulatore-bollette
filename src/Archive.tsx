@@ -1634,6 +1634,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     setCommodities([]);
     setMonthsSelected([]);
     setAgentsSelected([]);
+    setAgentsSearch("");
     setProvincesSelected([]);
     setRegionsSelected([]);
     setCustomerName("");
@@ -2233,6 +2234,24 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           </div>;})}
         </div>
 
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
+          {(["LUCE","GAS"] as const).map(kind=><button key={kind} type="button" aria-pressed={commodities.includes(kind)} onClick={()=>setCommodities(current=>current.includes(kind)?current.filter(v=>v!==kind):[...current,kind])} style={{padding:"8px 15px",borderRadius:9,border:"1px solid "+(kind==="LUCE"?"#fdba74":"#7dd3fc"),background:commodities.includes(kind)?(kind==="LUCE"?"#ffedd5":"#dbeafe"):"white",color:kind==="LUCE"?"#c2410c":"#0369a1",fontWeight:900,cursor:"pointer"}}>{kind==="LUCE"?"⚡ LUCE":"♨ GAS"}</button>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(175px,1fr))",gap:10,marginTop:12}}>
+          <label style={{display:"grid",gap:5,fontSize:12,fontWeight:850,gridColumn:"1 / -1"}}>🔎 CERCA AGENTE<input list="recess-agent-suggestions" value={agentsSearch} placeholder="Digita il nome agente..." onChange={e=>{const value=e.target.value;setAgentsSearch(value);setAgentsSelected(agents.includes(value)?[value]:[]);}} style={{padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:9,width:"100%",boxSizing:"border-box"}}/><datalist id="recess-agent-suggestions">{agents.filter(a=>a.toLowerCase().includes(agentsSearch.toLowerCase())).map(a=><option key={a} value={a}/>)}</datalist></label>
+          <MultiSelectFilter label="Luce / Gas" allLabel="Tutte le forniture" selected={commodities} onChange={setCommodities} options={[{value:"LUCE",label:"Luce"},{value:"GAS",label:"Gas"}]}/>
+          <MultiSelectFilter label="Mese di riferimento" allLabel="Tutti i mesi" selected={monthsSelected} onChange={setMonthsSelected} options={months.map(m=>({value:m,label:monthLabel(m)}))}/>
+          <MultiSelectFilter label="Nome agente" allLabel="Tutti gli agenti" selected={agentsSelected} onChange={setAgentsSelected} wide options={agents.map(a=>({value:a,label:a}))}/>
+          <MultiSelectFilter label="Provincia" allLabel="Tutte le province" selected={provincesSelected} onChange={setProvincesSelected} options={provinces.map(p=>({value:p.code,label:p.label}))}/>
+          <MultiSelectFilter label="Regione" allLabel="Tutte le regioni" selected={regionsSelected} onChange={setRegionsSelected} options={regions.map(x=>({value:x,label:x}))}/>
+          <label style={{fontSize:12,fontWeight:850}}>Denominazione cliente<input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Nome cliente..." style={{display:"block",padding:10,width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:8,marginTop:5}}/></label>
+          <MultiSelectFilter label="Tipologia cliente" allLabel="Tutte le tipologie" selected={customerTypesSelected} onChange={setCustomerTypesSelected} options={customerTypes.map(x=>({value:x,label:x}))}/>
+          <label style={{fontSize:12,fontWeight:850}}>Consumo minimo<input type="number" value={consumptionMin} onChange={e=>setConsumptionMin(e.target.value)} placeholder="Da" style={{display:"block",padding:10,width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:8,marginTop:5}}/></label>
+          <label style={{fontSize:12,fontWeight:850}}>Consumo massimo<input type="number" value={consumptionMax} onChange={e=>setConsumptionMax(e.target.value)} placeholder="A" style={{display:"block",padding:10,width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:8,marginTop:5}}/></label>
+          <label style={{fontSize:12,fontWeight:850}}>Periodo iniziale<input type="month" value={periodStart} onChange={e=>setPeriodStart(e.target.value)} style={{display:"block",padding:10,width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:8,marginTop:5}}/></label>
+          <label style={{fontSize:12,fontWeight:850}}>Periodo finale<input type="month" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)} style={{display:"block",padding:10,width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:8,marginTop:5}}/></label>
+          <label style={{fontSize:12,fontWeight:850,gridColumn:"1 / -1"}}>Ricerca libera<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca cliente, POD/PDR, indirizzo, codice fiscale o altro testo..." style={{display:"block",padding:10,width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:8,marginTop:5}}/></label>
+        </div>
         {!rows.length ? (
           <div style={{ marginTop: 16, color: "#64748b" }}>
             Nessun dato presente nell'archivio RECESSI.
