@@ -1425,19 +1425,16 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 10, marginTop: 14 }}>
-              <div style={{ padding: 13, borderRadius: 10, background: "#eff6ff" }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: "#1e40af" }}>PRODUZIONE LUCE</div>
-                <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900 }}>{totals.luce.attivazioni.toLocaleString("it-IT")} POD in attivazione</div>
-                <div style={{ marginTop: 4, fontWeight: 800 }}>{totals.luce.consumoAttivazione.toLocaleString("it-IT", { maximumFractionDigits: 2 })} kWh in attivazione</div>
-                <div style={{ marginTop: 3, fontWeight: 800 }}>{totals.luce.consumoTotale.toLocaleString("it-IT", { maximumFractionDigits: 2 })} kWh consumo totale</div>
-              </div>
-              <div style={{ padding: 13, borderRadius: 10, background: "#f0fdf4" }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: "#166534" }}>PRODUZIONE GAS</div>
-                <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900 }}>{totals.gas.attivazioni.toLocaleString("it-IT")} PDR in attivazione</div>
-                <div style={{ marginTop: 4, fontWeight: 800 }}>{totals.gas.consumoAttivazione.toLocaleString("it-IT", { maximumFractionDigits: 2 })} Smc in attivazione</div>
-                <div style={{ marginTop: 3, fontWeight: 800 }}>{totals.gas.consumoTotale.toLocaleString("it-IT", { maximumFractionDigits: 2 })} Smc consumo totale</div>
-              </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginTop:14}}>
+              {(["LUCE","GAS"] as const).map(kind=>{const gas=kind==="GAS";const data=gas?totals.gas:totals.luce;return <div key={kind} style={{padding:"16px 20px",borderRadius:15,border:"1px solid "+(gas?"#bae6fd":"#fed7aa"),background:gas?"#edf9ff":"#fff7ed",boxShadow:"0 2px 8px #0f172a0b"}}>
+                <div style={{fontSize:18,fontWeight:950,color:gas?"#0369a1":"#c2410c",marginBottom:14}}>{gas?"♨ GAS":"⚡ LUCE"}</div>
+                <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) 1px minmax(0,1.5fr)",gap:18,alignItems:"center"}}>
+                  <div style={{display:"grid",gap:6}}><span style={{fontSize:12,fontWeight:900,color:"#64748b",letterSpacing:".04em"}}>N° CONTRATTI</span><strong style={{fontFamily:"Arial,sans-serif",fontSize:29,fontWeight:900,color:gas?"#0369a1":"#1d4ed8",letterSpacing:"-.035em"}}>{data.attivazioni.toLocaleString("it-IT")}</strong></div>
+                  <div style={{width:1,height:48,background:gas?"#38bdf8":"#fb923c"}}/>
+                  <div style={{display:"grid",gap:6,minWidth:0}}><span style={{fontSize:12,fontWeight:900,color:"#64748b",letterSpacing:".04em"}}>CONSUMO IN ATTIVAZIONE</span><strong style={{fontFamily:"Arial,sans-serif",fontSize:"clamp(18px,1.7vw,29px)",fontWeight:900,color:"#0f172a",letterSpacing:"-.035em",overflowWrap:"anywhere"}}>{data.consumoAttivazione.toLocaleString("it-IT",{maximumFractionDigits:2})} <span style={{fontSize:13,color:"#64748b",fontWeight:850}}>{gas?"Smc":"kWh"}</span></strong></div>
+                </div>
+                <div style={{marginTop:10,fontSize:12,fontWeight:800,color:"#64748b"}}>Consumo totale: {data.consumoTotale.toLocaleString("it-IT",{maximumFractionDigits:2})} {gas?"Smc":"kWh"}</div>
+              </div>;})}
             </div>
 
             {view==="produzione"&&<div style={{display:"grid",gap:10,marginTop:18}}>
