@@ -1650,16 +1650,22 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       await exportFilteredA4Pdf({title:"RECESSI MENSILI - LUCE E GAS",subtitle:"Riepilogo per mese, con Luce e Gas affiancati come nella schermata.",filename:"RECESSI_MENSILI.pdf",filters:[pdfSelection("Fornitura",commodities,"Luce e Gas"),pdfSelection("Mesi",monthsSelected.map(monthLabel),"Tutti i mesi"),pdfSelection("Agenti",agentsSelected,"Tutti"),"Totale recessi filtrati: "+filteredRows.length],stats:[{label:"RECESSI LUCE",value:pdfNumber(totals.luceCount,0)},{label:"CONSUMO LUCE",value:pdfNumber(totals.luce)+" kWh"},{label:"RECESSI GAS",value:pdfNumber(totals.gasCount,0)},{label:"CONSUMO GAS",value:pdfNumber(totals.gas)+" Smc"}],columns:[{label:"MESE",width:32},{label:"LUCE - N. RECESSI",width:25,align:"right"},{label:"LUCE - CONSUMO kWh",width:42,align:"right"},{label:"GAS - N. RECESSI",width:25,align:"right"},{label:"GAS - CONSUMO Smc",width:42,align:"right"}],rows:monthly.map(g=>[g.month==="SENZA MESE"?g.month:monthLabel(g.month),pdfNumber(g.luceCount,0),pdfNumber(g.luce),pdfNumber(g.gasCount,0),pdfNumber(g.gas)])});
     }catch(e){alert("Errore PDF riepilogo recessi: "+(e instanceof Error?e.message:String(e)));}finally{setExportingPdf(false);}
   };
+  const recessContactNumber=(raw:Record<string,unknown>):string=>{
+    const fields=Object.entries(raw||{});
+    const normalized=(v:string)=>v.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Z0-9]/g,"");
+    const find=(names:string[])=>{for(const name of names){const entry=fields.find(([key])=>normalized(key)===normalized(name));if(entry&&entry[1]!=null&&String(entry[1]).trim())return String(entry[1]).trim();}return "";};
+    return find(["CELLULARE","NUMERO CELLULARE","TELEFONO CELLULARE","MOBILE","NUMERO MOBILE","TEL CELL","CELL","RECAPITO CELLULARE"])||find(["TELEFONO","NUMERO TELEFONO","TELEFONO FISSO","NUMERO FISSO","TEL","RECAPITO TELEFONICO"])||"";
+  };
   const exportDetailPdf = async () => {
-    if (!filteredRows.length || exportingPdf) return;
+    if (!detailRows.length || exportingPdf) return;
     setExportingPdf(true);
     try {
-      const ordered = [...filteredRows].sort((a, b) =>
+      const ordered = [...detailRows].sort((a, b) =>
         b.monthKey.localeCompare(a.monthKey) ||
         a.agente.localeCompare(b.agente, "it") ||
         a.denominazione.localeCompare(b.denominazione, "it")
       );
-      const provinceLabels = provincesSelected.map((key) =>
+      const provinceLabels = (detailProvince?[detailProvince]:[]).map((key) =>
         provinces.find((p) => p.code === key)?.label || key
       );
       const from = ordered[ordered.length - 1].monthKey;
@@ -1670,30 +1676,31 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         subtitle: "Recessi associati al mese della data in NOTA_RECESSO. La data di validità resta informativa.",
         filename: "RECESSI_" + filePeriod + ".pdf",
         filters: [
-          pdfSelection("Periodo selezionato", monthsSelected.map(monthLabel), periodStart || periodEnd
+          pdfSelection("Periodo selezionato", detailMonth?[monthLabel(detailMonth)]:[], periodStart || periodEnd
             ? (periodStart || "Inizio") + " / " + (periodEnd || "Fine") : "Tutti i mesi"),
-          "Limiti periodo: " + (periodStart || "nessuno") + " - " + (periodEnd || "nessuno"),
-          pdfSelection("Fornitura", commodities, "Luce e Gas"),
-          pdfSelection("Agente", agentsSelected, "Tutti gli agenti"),
+          "Mese dettaglio: " + (detailMonth || "Tutti") + " · Filtro importato: " + (detailSourceIds?detailSourceIds.size+" righe":"nessuno"),
+          pdfSelection("Fornitura", detailCommodity?[detailCommodity]:[], "Luce e Gas"),
+          pdfSelection("Agente", detailAgent?[detailAgent]:[], "Tutti gli agenti"),
           pdfSelection("Provincia", provinceLabels, "Tutte"),
-          pdfSelection("Regione", regionsSelected, "Tutte"),
-          "Cliente: " + (customerName || "Tutti") +
-            "   /   Tipologia: " + (customerTypesSelected.join(", ") || "Tutte"),
-          "Consumo min/max: " + (consumptionMin || "-") + " / " + (consumptionMax || "-") +
-            "   /   Ricerca: " + (search || "Nessuna"),
+          pdfSelection("Regione", detailRegion?[detailRegion]:[], "Tutte"),
+          "Cliente: " + ("Tutti") +
+            "   /   Tipologia: " + ("" || "Tutte"),
+          "Consumo min/max: " + ("-") + " / " + ("-") +
+            "   /   Ricerca: " + (detailSearch || "Nessuna"),
           "Risultati esportati: " + pdfNumber(ordered.length, 0) + " su " + pdfNumber(rows.length, 0),
         ],
         stats: [
-          { label: "RECESSI LUCE", value: pdfNumber(totals.luceCount, 0), detail: "Contratti" },
-          { label: "CONSUMI LUCE", value: pdfNumber(totals.luce) + " kWh", detail: "Consumo annuo" },
-          { label: "RECESSI GAS", value: pdfNumber(totals.gasCount, 0), detail: "Contratti" },
-          { label: "CONSUMI GAS", value: pdfNumber(totals.gas) + " Smc", detail: "Consumo annuo" },
+          { label: "RECESSI LUCE", value: pdfNumber(detailRows.filter(r=>r.commodity==="LUCE").length, 0), detail: "Contratti" },
+          { label: "CONSUMI LUCE", value: pdfNumber(detailRows.filter(r=>r.commodity==="LUCE").reduce((n,r)=>n+(r.consumo||0),0)) + " kWh", detail: "Consumo annuo" },
+          { label: "RECESSI GAS", value: pdfNumber(detailRows.filter(r=>r.commodity==="GAS").length, 0), detail: "Contratti" },
+          { label: "CONSUMI GAS", value: pdfNumber(detailRows.filter(r=>r.commodity==="GAS").reduce((n,r)=>n+(r.consumo||0),0)) + " Smc", detail: "Consumo annuo" },
         ],
         columns: [
           { label: "MESE NOTA RECESSO", width: 25 },
           { label: "LUCE/GAS", width: 16 },
           { label: "DENOMINAZIONE CLIENTE", width: 48 },
           { label: "POD / PDR", width: 35 },
+          { label: "CELLULARE / TELEFONO", width: 34 },
           { label: "AGENTE", width: 36 },
           { label: "NOTA RECESSO", width: 45 },
           { label: "DATA VALIDITA", width: 23 },
@@ -1706,6 +1713,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           row.commodity,
           row.denominazione,
           row.podPdr,
+          recessContactNumber(row.raw),
           row.agente,
           recessNoteText(row.raw),
           row.validita,
@@ -2602,7 +2610,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       ) : archiveSection === "dettaglioRecessi" ? (
         <div style={cardStyle}>
           <h3 style={{ marginTop: 0 }}>DETTAGLIO RECESSI</h3>
-          <button type="button" onClick={()=>void exportDetailPdf()} disabled={exportingPdf||!filteredRows.length} style={{padding:"10px 15px",borderRadius:9,border:0,background:"#b91c1c",color:"white",fontWeight:900,marginBottom:12,cursor:"pointer"}}>📄 ESPORTA PDF NOMINATIVI</button>
+          <button type="button" onClick={()=>void exportDetailPdf()} disabled={exportingPdf||!detailRows.length} style={{padding:"10px 15px",borderRadius:9,border:0,background:"#b91c1c",color:"white",fontWeight:900,marginBottom:12,cursor:"pointer"}}>📄 ESPORTA PDF NOMINATIVI</button>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
             <button type="button" onClick={()=>setDetailSubsection("list")} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="list"?"#0f172a":"white",color:detailSubsection==="list"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>ELENCO RECESSI</button>
             <button type="button" onClick={()=>{setDetailSubsection("notes");void loadDetailNoteHistory();}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="notes"?"#0f172a":"white",color:detailSubsection==="notes"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>📝 NOTE RECESSI</button>
@@ -2663,7 +2671,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 850, fontSize: 13 }}>
               <thead style={{ background: "#f1f5f9" }}><tr>
-                {([["MESE RECESSO","month"],["AGENTE","agent"],["NOMINATIVO","name"],["POD / PDR","pod"],["LUCE / GAS","commodity"],["CONSUMO","consumption"],["PROVINCIA","province"],["DETTAGLI",""]] as const).map(([label,key])=>
+                {([["MESE RECESSO","month"],["AGENTE","agent"],["NOMINATIVO","name"],["POD / PDR","pod"],["CELLULARE / TELEFONO",""],["LUCE / GAS","commodity"],["CONSUMO","consumption"],["PROVINCIA","province"],["DETTAGLI",""]] as const).map(([label,key])=>
                   <th key={label} style={{ padding: 10, textAlign: "left", borderBottom: "1px solid #cbd5e1" }}>
                     {key ? <button type="button" title={"Ordina per " + label}
                       onClick={()=>{if(detailSort===key)setDetailSortAsc(v=>!v);else {setDetailSort(key);setDetailSortAsc(key==="name"||key==="agent"||key==="province"||key==="pod"||key==="commodity");}setDetailLimit(100);}}
@@ -2680,6 +2688,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                     <td style={{ padding: 9 }}>{row.agente || "—"}</td>
                     <td style={{ padding: 9, fontWeight: 750 }}>{row.denominazione || "—"}</td>
                     <td style={{ padding: 9 }}>{row.podPdr || "—"}</td>
+                    <td style={{ padding: 9,whiteSpace:"nowrap" }}>{recessContactNumber(row.raw)||"—"}</td>
                     <td style={{ padding: 9 }}>{row.commodity}</td>
                     <td style={{ padding: 9 }}>{row.consumo === null ? "—" : row.consumo.toLocaleString("it-IT")}</td>
                     <td style={{ padding: 9 }}>{geo.provinceLabel || geo.provinceCode || "—"}</td>
