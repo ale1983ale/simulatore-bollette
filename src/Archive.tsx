@@ -2210,6 +2210,9 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             marginTop: 14,
           }}
         >
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",gridColumn:"1 / -1"}}>
+            {(["LUCE","GAS"] as const).map(kind=>{const active=commodities.includes(kind);return <button key={kind} type="button" title={"Filtra "+kind} aria-pressed={active} onClick={()=>setCommodities(current=>current.includes(kind)?current.filter(x=>x!==kind):[...current,kind])} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 14px",borderRadius:10,border:active?"2px solid "+(kind==="LUCE"?"#f59e0b":"#0284c7"):"1px solid #cbd5e1",background:active?(kind==="LUCE"?"#fef3c7":"#e0f2fe"):"white",color:kind==="GAS"?"#0284c7":"#92400e",fontWeight:850,cursor:"pointer"}}>{kind==="LUCE"?"⚡":<svg width="20" height="22" viewBox="0 0 24 24" fill="#0284c7" aria-hidden="true"><path d="M12.1 22c4.9 0 8-3.3 8-7.6 0-3.4-2-5.9-4.2-8.1.3 2.4-1.2 3.7-1.2 3.7C14.8 6.3 12.5 3.5 9.4 1c.4 3.2-1.1 5.2-3.1 7.6C4.6 10.7 4 12.5 4 14.5 4 18.8 7.3 22 12.1 22Z"/></svg>}{kind}</button>})}
+          </div>
           <MultiSelectFilter
             label="Luce / Gas"
             allLabel="Tutti"
@@ -2458,6 +2461,15 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           </div>
         ) : (
           <>
+            <div style={{overflowX:"auto",marginTop:16}}>
+              <h3 style={{margin:"0 0 12px"}}>RECESSI PER MESE · LUCE E GAS</h3>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:650}}>
+                <thead><tr>{["MESE","FORNITURA","NUMERO RECESSI","CONSUMO TOTALE","DETTAGLIO CLIENTI"].map(h=><th key={h} style={{padding:12,textAlign:"left",background:"#e2e8f0",fontWeight:900}}>{h}</th>)}</tr></thead>
+                <tbody>{Array.from(filteredRows.reduce((map,row)=>{const key=row.monthKey+"|"+row.commodity;const existing=map.get(key)||{month:row.monthKey,commodity:row.commodity,count:0,consumo:0,ids:[] as number[]};existing.count++;existing.consumo+=Number(row.consumo||0);existing.ids.push(row.id);map.set(key,existing);return map;},new Map<string,{month:string;commodity:string;count:number;consumo:number;ids:number[]}>()).values()).sort((a,b)=>b.month.localeCompare(a.month)||a.commodity.localeCompare(b.commodity)).map((g,_,all)=>{const months=Array.from(new Set(all.map(x=>x.month)));const bg=months.indexOf(g.month)%2===0?"#ffffff":"#eaf2fb";return <tr key={g.month+"|"+g.commodity} style={{background:bg,borderBottom:"1px solid #cbd5e1"}}><td style={{padding:12,fontWeight:850}}>{monthLabel(g.month)}</td><td style={{color:g.commodity==="GAS"?"#0284c7":"#b45309",fontWeight:850}}>{g.commodity==="GAS"?"♨ GAS":g.commodity==="LUCE"?"⚡ LUCE":g.commodity}</td><td style={{fontWeight:850}}>{g.count.toLocaleString("it-IT")}</td><td>{g.consumo.toLocaleString("it-IT",{maximumFractionDigits:2})} {g.commodity==="GAS"?"Smc":"kWh"}</td><td><button type="button" onClick={()=>{setDetailSourceIds(new Set(g.ids));setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity(g.commodity==="LUCE"||g.commodity==="GAS"?g.commodity:"");setDetailSearch("");setDetailLimit(100);setArchiveSection("dettaglioRecessi");}} style={{padding:"9px 12px",borderRadius:9,border:"1px solid #bfdbfe",background:"#eff6ff",color:"#1d4ed8",fontWeight:850,cursor:"pointer"}}>📋 VEDI CLIENTI ↗</button></td></tr>;})}</tbody>
+              </table>
+              {!filteredRows.length&&<p>Nessun recesso per i filtri selezionati.</p>}
+            </div>
+            <details style={{marginTop:14}}><summary style={{cursor:"pointer",fontWeight:850,color:"#475569",padding:"12px 0"}}>MOSTRA ELENCO COMPLETO DEI SINGOLI CLIENTI</summary>
             <div style={{ overflowX: "auto", marginTop: 14 }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1210 }}>
                 <thead>
@@ -2562,6 +2574,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                 {filteredRows.length.toLocaleString("it-IT")} risultati filtrati.
               </div>
             )}
+            </details>
           </>
         )}
       </div>
