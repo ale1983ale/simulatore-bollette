@@ -110,6 +110,7 @@ export default function ActiveProduction() {
   const [periodSelected, setPeriodSelected] = useState<string>("");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+  const [agentQuery,setAgentQuery]=useState("");
   const [agentSelected, setAgentSelected] = useState<string>("");
 
   const reload = useCallback(async () => {
@@ -506,6 +507,10 @@ export default function ActiveProduction() {
                 {period.label}{period.valid ? "" : " · DATE DA CORREGGERE"}
               </option>)}
             </select>
+          </label>
+          <label style={{fontSize:12,fontWeight:850,gridColumn:"1 / -1"}}>🔎 CERCA AGENTE
+            <input list="active-production-agent-suggestions" placeholder="Digita lettere del nome agente..." value={agentQuery} onChange={e=>{const value=e.target.value;setAgentQuery(value);const match=agentOptions.find(a=>a.name===value);setAgentSelected(match?.key||"");}} style={{...field,marginTop:5}}/>
+            <datalist id="active-production-agent-suggestions">{agentOptions.filter(a=>a.name.toLocaleLowerCase("it").includes(agentQuery.toLocaleLowerCase("it"))).slice(0,70).map(a=><option key={a.key} value={a.name}/>)}</datalist>
           </label>
           <label style={{ fontSize: 12, fontWeight: 850 }}>
             SINGOLO AGENTE
