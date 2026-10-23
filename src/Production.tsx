@@ -997,10 +997,10 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
   const openMonthlyDetail=(month:string,commodity:string)=>{sessionStorage.setItem("ge_production_detail_period",month);sessionStorage.setItem("ge_production_detail_commodity",commodity);setDetailPeriod(month);setDetailCommodity(commodity);onOpenDetail?.(month,commodity);};
   const detailedRows=filteredRows.filter(row=>(!detailPeriod||row.periodEnd.slice(0,7)===detailPeriod)&&(!detailCommodity||row.commodity===detailCommodity));
   const exportPdf = async () => {
-    if (!filteredRows.length || exportingPdf) return;
+    if (!(view==="dettaglio"?detailedRows:filteredRows).length || exportingPdf) return;
     setExportingPdf(true);
     try {
-      const ordered = [...filteredRows].sort((a, b) =>
+      const ordered = [...(view==="dettaglio"?detailedRows:filteredRows)].sort((a, b) =>
         b.periodEnd.localeCompare(a.periodEnd) ||
         a.agente.localeCompare(b.agente, "it") ||
         a.commodity.localeCompare(b.commodity)
@@ -1415,7 +1415,7 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
                   style={{ padding: "9px 13px", borderRadius: 8, border: 0,
                     background: filteredRows.length && !exportingPdf ? "#b91c1c" : "#cbd5e1",
                     color: "white", fontWeight: 900, cursor: filteredRows.length && !exportingPdf ? "pointer" : "default" }}>
-                  {exportingPdf ? "Preparazione PDF..." : "{view==="dettaglio"?"📄 ESPORTA PDF DETTAGLIO":"📄 ESPORTA PDF MENSILE"}"}
+                  {exportingPdf ? "Preparazione PDF..." : (view==="dettaglio"?"📄 ESPORTA PDF DETTAGLIO":"📄 ESPORTA PDF MENSILE")}
                 </button>
               </div>
             </div>
