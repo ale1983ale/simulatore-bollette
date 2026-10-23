@@ -14720,6 +14720,7 @@ useEffect(() => {
 
   const databaseAdminTabs = [
     "agentManagement",
+    "productionZones",
     "agents",
     ...pricingCostTabs,
     "recruitingManagement",
@@ -15359,6 +15360,9 @@ const renderAdminContent = () => {
           >
             GESTIONE AGENTI
           </button>
+          <button onClick={() => setTab("productionZones")} style={{...baseBtn,padding:"9px 14px",...(tab==="productionZones"?activeBtn:{})}}>
+            AGENTI / ZONE
+          </button>
 
           <button
             onClick={() =>
@@ -15584,6 +15588,8 @@ const renderAdminContent = () => {
         </div>
       )}
 
+      {tab === "productionZones" && <div style={{width:"100%",minWidth:0}}><Production view="zone" /></div>}
+
       {tab === "agentManagement" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <UnifiedAgentManagement
@@ -15605,14 +15611,6 @@ const renderAdminContent = () => {
             }}
           />
 
-          <details style={{marginTop:14,background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:12,overflow:"hidden"}}>
-            <summary style={{cursor:"pointer",padding:"13px 16px",fontWeight:950,color:"#075985"}}>
-              AGENTI / ZONE · RECESSI/PRODUZ GENERALE
-            </summary>
-            <div style={{padding:12}}>
-              <Production view="zone" />
-            </div>
-          </details>
 
           {adminProfile?.role === "super_admin" && (
             <details
