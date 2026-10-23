@@ -951,10 +951,10 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [saving, setSaving] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
-  type ArchiveSection = "recessi" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone";
+  type ArchiveSection = "recessi" | "dettaglioProduzione" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone";
   const [archiveSection, setArchiveSection] = useState<ArchiveSection>(() => {
     const value = window.sessionStorage.getItem("ge_archive_section");
-    return value === "produzione" || value === "attivo" || value === "dettaglioRecessi" ||
+    return value === "produzione" || value === "dettaglioProduzione" || value === "attivo" || value === "dettaglioRecessi" ||
       value === "reportAdmin" || value === "zone" ? value : "recessi";
   });
   useEffect(() => {
@@ -1640,7 +1640,16 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     setSearch("");
   };
 
-  const exportPdf = async () => {
+  const exportMonthlyPdf = async () => {
+    if(!filteredRows.length||exportingPdf)return;
+    setExportingPdf(true);
+    try{
+      const grouped=filteredRows.reduce((map,row)=>{const month=row.monthKey||"SENZA MESE";const g=map.get(month)||{month,luceCount:0,luce:0,gasCount:0,gas:0};if(row.commodity==="LUCE"){g.luceCount++;g.luce+=Number(row.consumo||0);}else if(row.commodity==="GAS"){g.gasCount++;g.gas+=Number(row.consumo||0);}map.set(month,g);return map;},new Map<string,{month:string;luceCount:number;luce:number;gasCount:number;gas:number}>());
+      const monthly=[...grouped.values()].sort((a,b)=>b.month.localeCompare(a.month));
+      await exportFilteredA4Pdf({title:"RECESSI MENSILI - LUCE E GAS",subtitle:"Riepilogo per mese, con Luce e Gas affiancati come nella schermata.",filename:"RECESSI_MENSILI.pdf",filters:[pdfSelection("Fornitura",commodities,"Luce e Gas"),pdfSelection("Mesi",monthsSelected.map(monthLabel),"Tutti i mesi"),pdfSelection("Agenti",agentsSelected,"Tutti"),"Totale recessi filtrati: "+filteredRows.length],stats:[{label:"RECESSI LUCE",value:pdfNumber(totals.luceCount,0)},{label:"CONSUMO LUCE",value:pdfNumber(totals.luce)+" kWh"},{label:"RECESSI GAS",value:pdfNumber(totals.gasCount,0)},{label:"CONSUMO GAS",value:pdfNumber(totals.gas)+" Smc"}],columns:[{label:"MESE",width:32},{label:"LUCE - N. RECESSI",width:25,align:"right"},{label:"LUCE - CONSUMO kWh",width:42,align:"right"},{label:"GAS - N. RECESSI",width:25,align:"right"},{label:"GAS - CONSUMO Smc",width:42,align:"right"}],rows:monthly.map(g=>[g.month==="SENZA MESE"?g.month:monthLabel(g.month),pdfNumber(g.luceCount,0),pdfNumber(g.luce),pdfNumber(g.gasCount,0),pdfNumber(g.gas)])});
+    }catch(e){alert("Errore PDF riepilogo recessi: "+(e instanceof Error?e.message:String(e)));}finally{setExportingPdf(false);}
+  };
+  const exportDetailPdf = async () => {
     if (!filteredRows.length || exportingPdf) return;
     setExportingPdf(true);
     try {
@@ -1860,6 +1869,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                 ? "RECESSI · archivio cumulativo con eliminazione automatica dei duplicati."
                 : archiveSection === "produzione"
                 ? "PRODUZIONE · storico report e zone commerciali."
+                : archiveSection === "dettaglioProduzione"
+                ? "DETTAGLIO PRODUZIONE · elenco completo dei report per agente."
                 : archiveSection === "attivo"
                 ? "ATTIVO PRODUZIONE · confronto produzione / recessi per agente."
                 : archiveSection === "dettaglioRecessi"
@@ -1924,7 +1935,8 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           PRODUZIONE
         </button>
 
-        <button
+<button type="button" onClick={()=>setArchiveSection("dettaglioProduzione")} style={{padding:"10px 18px",borderRadius:9,border:archiveSection==="dettaglioProduzione"?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection==="dettaglioProduzione"?"#0f172a":"white",color:archiveSection==="dettaglioProduzione"?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>DETTAGLIO PRODUZIONE</button>
+                <button
           type="button"
           onClick={() => setArchiveSection("attivo")}
           style={{
@@ -2391,7 +2403,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             >
               Esporta risultati Excel
             </button>
-            <button type="button" onClick={() => void exportPdf()}
+            <button type="button" onClick={() => void exportMonthlyPdf()}
               disabled={!filteredRows.length || exportingPdf}
               style={{
                 padding: "9px 13px", borderRadius: 8, border: 0,
@@ -2590,6 +2602,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       ) : archiveSection === "dettaglioRecessi" ? (
         <div style={cardStyle}>
           <h3 style={{ marginTop: 0 }}>DETTAGLIO RECESSI</h3>
+          <button type="button" onClick={()=>void exportDetailPdf()} disabled={exportingPdf||!filteredRows.length} style={{padding:"10px 15px",borderRadius:9,border:0,background:"#b91c1c",color:"white",fontWeight:900,marginBottom:12,cursor:"pointer"}}>📄 ESPORTA PDF NOMINATIVI</button>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
             <button type="button" onClick={()=>setDetailSubsection("list")} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="list"?"#0f172a":"white",color:detailSubsection==="list"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>ELENCO RECESSI</button>
             <button type="button" onClick={()=>{setDetailSubsection("notes");void loadDetailNoteHistory();}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #cbd5e1",background:detailSubsection==="notes"?"#0f172a":"white",color:detailSubsection==="notes"?"white":"#0f172a",fontWeight:850,cursor:"pointer"}}>📝 NOTE RECESSI</button>
@@ -2695,7 +2708,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       ) : archiveSection === "reportAdmin" && reportAdminPanel ? (
         <div style={{ width: "100%", minWidth: 0 }}>{reportAdminPanel}</div>
       ) : (
-        <Production view={archiveSection === "zone" ? "zone" : "produzione"} />
+        <Production view={archiveSection === "zone" ? "zone" : archiveSection === "dettaglioProduzione" ? "dettaglio" : "produzione"} onOpenDetail={(period,commodity)=>{setArchiveSection("dettaglioProduzione");sessionStorage.setItem("ge_production_detail_period",period);sessionStorage.setItem("ge_production_detail_commodity",commodity);}} />
       )}
       {(detailModal || detailNotesRow || detailCalendarRow) && (
         <div role="presentation" onClick={()=>{if(!detailBusy){setDetailModal(null);setDetailNotesRow(null);setDetailCalendarRow(null);}}}
