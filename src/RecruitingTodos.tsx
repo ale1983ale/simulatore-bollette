@@ -72,6 +72,8 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [diaryText,setDiaryText]=useState("");
   const [diaryLinked,setDiaryLinked]=useState("");
   const [diarySaving,setDiarySaving]=useState(false);
+  const [diaryEditing,setDiaryEditing]=useState<string|null>(null);
+  const [diaryPendingFiles,setDiaryPendingFiles]=useState<File[]>([]);
   const [diarySearch,setDiarySearch]=useState("");
   const [diaryContactMenuOpen,setDiaryContactMenuOpen]=useState(false);
   const diaryContactMenuRef=useRef<HTMLDivElement|null>(null);
@@ -85,15 +87,25 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     acc[key].items.push(item);return acc;
   },{})).sort((a,b)=>a.name.localeCompare(b.name,"it",{sensitivity:"base"}));
   const addDiaryFiles=async(files:FileList|null)=>{
-    if(!files?.length)return;setDiaryUploading(true);
-    try{const added:Array<{name:string;type:string;data:string}>=[];
-      for(const file of Array.from(files)){if(file.size>10*1024*1024)throw Error("Il file "+file.name+" supera 10 MB.");
-        const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));reader.onerror=()=>reject(Error("Errore lettura file"));reader.readAsDataURL(file);});
-        added.push({name:file.name,type:file.type,data});
-      }
-      setDiaryFiles(v=>[...v,...added].slice(0,5));
-    }catch(e:any){setMessage(e.message||"Errore allegato");}
-    finally{setDiaryUploading(false);}
+    if(!files?.length)return;
+    const selected=Array.from(files);
+    if(diaryFiles.length+diaryPendingFiles.length+selected.length>5){setMessage("Massimo 5 allegati.");return;}
+    const oversized=selected.find(file=>file.size>10*1024*1024);
+    if(oversized){setMessage(oversized.name+" supera 10 MB.");return;}
+    setDiaryPendingFiles(current=>[...current,...selected]);
+    setMessage("Allegati pronti: premi SALVA per caricarli.");
+  };
+  const startDiaryEdit=(item:any)=>{
+    setDiaryEditing(item.id);
+    setDiaryText(item.body||"");
+    setDiaryLinked(item.linked_kind&&item.linked_id?item.linked_kind+":"+item.linked_id:"");
+    setDiaryFiles(Array.isArray(item.attachments)?item.attachments:[]);
+    setDiaryPendingFiles([]);
+    setMessage("");
+    setTimeout(()=>document.getElementById("diary-note-"+item.id)?.scrollIntoView({behavior:"smooth",block:"center"}),80);
+  };
+  const cancelDiaryEdit=()=>{
+    setDiaryEditing(null);setDiaryText("");setDiaryLinked("");setDiaryFiles([]);setDiaryPendingFiles([]);setMessage("");
   };
 
   const loadDiary=useCallback(async()=>{
@@ -103,12 +115,32 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   },[ctx]);
   useEffect(()=>{if(visible&&subtab==="diario")void loadDiary();},[visible,subtab,loadDiary]);
   const saveDiary=async()=>{
-    if(!ctx||(!diaryText.trim()&&!diaryFiles.length))return;
-    setDiarySaving(true);
-    const linked=contacts.find(c=>c.kind+":"+c.id===diaryLinked);
-    const {error}=await ctx.client.from("recruiting_diary").insert({owner_key:ctx.ownerKey,body:diaryText.trim(),linked_kind:linked?.kind||null,linked_id:linked?.id||null,linked_name:linked?.name||"",completed:false,attachments:diaryFiles});
-    if(error)setMessage(error.message);else{setDiaryText("");setDiaryFiles([]);await loadDiary();}
-    setDiarySaving(false);
+    if(!ctx||diarySaving||(!diaryText.trim()&&!diaryFiles.length&&!diaryPendingFiles.length))return;
+    setDiarySaving(true);setMessage("");
+    const uploaded:string[]=[];
+    try{
+      const linked=contacts.find(c=>c.kind+":"+c.id===diaryLinked);
+      const added:TodoAttachment[]=[];
+      for(let i=0;i<diaryPendingFiles.length;i++){
+        const file=diaryPendingFiles[i];
+        setMessage("Caricamento allegato "+(i+1)+" di "+diaryPendingFiles.length+": "+file.name);
+        const path=ctx.ownerKey+"/"+crypto.randomUUID()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+        const {error}=await ctx.client.storage.from("recruiting-todo-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});
+        if(error)throw Error(file.name+": "+error.message);
+        uploaded.push(path);added.push({name:file.name,type:file.type||"application/octet-stream",data:"",path});
+      }
+      const payload={body:diaryText.trim(),linked_kind:linked?.kind||null,linked_id:linked?.id||null,linked_name:linked?.name||"",attachments:[...diaryFiles,...added]};
+      const query=ctx.client.from("recruiting_diary");
+      const {error}=diaryEditing
+        ?await query.update(payload).eq("owner_key",ctx.ownerKey).eq("id",diaryEditing)
+        :await query.insert({...payload,owner_key:ctx.ownerKey,completed:false});
+      if(error)throw Error(error.message);
+      cancelDiaryEdit();await loadDiary();
+      setMessage("✓ Appunto e allegati salvati.");
+    }catch(e:any){
+      if(uploaded.length)await ctx.client.storage.from("recruiting-todo-files").remove(uploaded);
+      setMessage("Salvataggio non riuscito: "+(e?.message||"Errore"));
+    }finally{setDiarySaving(false);}
   };
   const diaryAction=async(item:any,kind:"done"|"delete")=>{
     if(!ctx)return;
