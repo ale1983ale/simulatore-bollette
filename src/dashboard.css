@@ -1405,3 +1405,16 @@ table {
     box-sizing: border-box;
   }
 }
+
+/* Mobile: uniforma le schede compatte all'altezza di Report Agenti e Sala d'attesa. */
+@media (max-width: 720px) {
+  .ge-dashboard-secondary--admin .ge-dashboard-card--compact {
+    min-height: 102px;
+    box-sizing: border-box;
+  }
+}
+@media (max-width: 460px) {
+  .ge-dashboard-secondary--admin .ge-dashboard-card--compact {
+    min-height: 94px;
+  }
+}
