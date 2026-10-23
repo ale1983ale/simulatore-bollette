@@ -15,11 +15,13 @@ type Todo = {
 type ContactOption = { id: string; name: string; kind: "candidate" | "agent" };
 const empty: TodoDraft = { title: "", dueDate: "", dueTime: "", body: "" };
 const field: React.CSSProperties = { width: "100%", padding: 11, border: "1px solid #cbd5e1", borderRadius: 9, boxSizing: "border-box", font: "inherit" };
+const linkStyle: React.CSSProperties = { display:"inline-flex", alignItems:"center", gap:6, padding:"7px 11px", borderRadius:999, border:"1px solid #bfdbfe", background:"linear-gradient(135deg,#eff6ff,#f0f9ff)", color:"#1d4ed8", fontWeight:850, fontSize:12, cursor:"pointer", boxShadow:"0 1px 3px rgba(37,99,235,.08)" };
 const action: React.CSSProperties = { padding: "9px 13px", borderRadius: 9, border: "1px solid #cbd5e1", cursor: "pointer", fontWeight: 800, background: "white" };
 
-export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed, visible }: {
+export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed, visible, onOpenLinkedContact }: {
   ctx: RecruitingContext | null; contacts: ContactOption[]; draft: TodoDraft | null;
   onDraftConsumed: () => void; visible: boolean;
+  onOpenLinkedContact?: (kind: "candidate" | "agent", id: string) => void;
 }) {
   const [items, setItems] = useState<Todo[]>([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -228,7 +230,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       {message&&<p role="alert" style={{color:"#b91c1c"}}>{message}</p>}
       <div style={{display:"grid",gap:12,marginTop:16}}>
         {diaryGroups.filter(g=>g.name.toLocaleLowerCase("it").includes(diarySearch.toLocaleLowerCase("it"))).map(group=><article key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
-          <h4 style={{margin:"0 0 12px",color:"#1d4ed8",fontSize:17}}>{group.name} <span style={{fontSize:12,color:"#64748b"}}>({group.items.length} note)</span></h4>
+          <h4 style={{margin:"0 0 12px",color:"#1d4ed8",fontSize:17}}>{group.name} <span style={{fontSize:12,color:"#64748b"}}>({group.items.length} note)</span></h4>{group.items[0]?.linked_kind==="candidate" && group.items[0]?.linked_id && onOpenLinkedContact && <button type="button" style={{...linkStyle,marginBottom:12}} onClick={()=>onOpenLinkedContact("candidate",String(group.items[0].linked_id))}>↗ APRI SCHEDA CONTATTO</button>}
           <div style={{display:"grid",gap:10}}>{group.items.map(item=><section key={item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
             <small style={{color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")}</small>
             <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none",margin:"8px 0"}}>{item.body}</p>
@@ -324,7 +326,10 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           <strong style={{ textDecoration: item.completed?"line-through":"none" }}>{item.priority&&!item.completed?"★ ":""}{item.title}</strong>
           <span style={{ color: "#475569", fontSize: 12 }}>{item.due_date ? item.due_date.split("-").reverse().join("/") : "Senza data"} {item.due_time?.slice(0,5)||""}</span>
         </div>
-        {item.linked_name && <div style={{ fontSize: 13, marginTop: 5 }}>👤 {item.linked_name}</div>}
+        {item.linked_name && <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:7}}>
+          <span style={{fontSize:13,color:"#475569"}}>👤 {item.linked_name}</span>
+          {item.linked_kind==="candidate" && item.linked_id && onOpenLinkedContact && <button type="button" style={linkStyle} title={"Apri la scheda contatto di "+item.linked_name} onClick={()=>onOpenLinkedContact("candidate",item.linked_id!)}>↗ APRI SCHEDA CONTATTO</button>}
+        </div>}
         {item.body && <div style={{ marginTop: 7, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.body}</div>}
         <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 10 }}>
           <button style={action} onClick={()=>void change(item,{completed:!item.completed})}>{item.completed?"↶ RIAPRI":"✓ FATTA"}</button>
