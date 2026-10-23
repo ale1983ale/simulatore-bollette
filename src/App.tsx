@@ -9356,7 +9356,7 @@ function AgentsAdmin({
   </>
 )}
   
-                    <td style={{padding:8,textAlign:"center"}}><input type="checkbox" aria-label={"PRODUZ "+a.nome+" "+a.cognome} checked={Boolean(productionPermissions[String(a.id)])} onChange={e=>{if(a.id)void toggleProductionPermission(a.id,e.target.checked);}} /></td>
+                    <td style={{padding:8,textAlign:"center"}}><input type="checkbox" aria-label={"SCHEDA PRODUZ. AGENTE "+a.nome+" "+a.cognome} checked={Boolean(productionPermissions[String(a.id)])} onChange={e=>{if(a.id)void toggleProductionPermission(a.id,e.target.checked);}} /></td>
                     <td style={{padding:8,textAlign:"center"}}><input type="checkbox" aria-label={"REPORT "+a.nome+" "+a.cognome} checked={Boolean(reportPermissions[String(a.id)])} onChange={e=>{if(a.id)void toggleReportPermission(a.id,e.target.checked);}} /></td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
                       <div style={{ display: "flex", gap: 8 }}>
