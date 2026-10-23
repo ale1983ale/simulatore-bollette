@@ -223,6 +223,16 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     Number(!b.completed && b.priority) - Number(!a.completed && a.priority) ||
     b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
   return <div style={{ background: "white", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, marginTop: 12 }}>
+    <style>{`@media(max-width:640px){
+      .ge-todo-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px!important}
+      .ge-todo-actions button{min-width:0;width:100%;min-height:46px;padding:10px 9px!important;border-radius:16px!important;font-size:12px!important;line-height:1.25;white-space:normal;box-shadow:0 2px 7px rgba(15,23,42,.08);transition:transform .15s ease}
+      .ge-todo-actions button:active{transform:scale(.97)}
+      .ge-todo-actions button:nth-child(1){background:#dcfce7!important;color:#166534!important;border-color:#86efac!important}
+      .ge-todo-actions button:nth-child(2){background:#eff6ff!important;color:#1d4ed8!important;border-color:#bfdbfe!important}
+      .ge-todo-actions button:nth-child(3){background:#fef3c7!important;color:#92400e!important;border-color:#fcd34d!important}
+      .ge-todo-actions button:nth-child(4){background:#fff1f2!important;color:#be123c!important;border-color:#fecdd3!important}
+      .ge-todo-actions button:nth-child(n+5){grid-column:span 2}
+    }`}</style>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
       <h2 style={{ margin: 0 }}>☑ COSE DA FARE</h2>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
