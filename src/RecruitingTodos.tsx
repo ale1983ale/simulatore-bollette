@@ -30,6 +30,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [form, setForm] = useState<TodoDraft>(empty);
   const [priority, setPriority] = useState(false);
   const [todoFiles,setTodoFiles]=useState<TodoAttachment[]>([]);
+  const todoFileInputRef=useRef<HTMLInputElement|null>(null);
   const [todoUploading,setTodoUploading]=useState(false);
   const addTodoFiles=async(files:FileList|null)=>{
     if(!files?.length)return;
@@ -354,10 +355,12 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         </div>}
       </div>
       <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
-      <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"11px 16px",borderRadius:14,border:"1px solid #bfdbfe",background:"#eff6ff",color:"#1d4ed8",fontWeight:800,cursor:"pointer",width:"fit-content"}}>
-        📎 AGGIUNGI ALLEGATI
-        <input type="file" multiple style={{display:"none"}} onChange={e=>{void addTodoFiles(e.target.files);e.target.value="";}} />
-      </label>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:7}}>
+        <input ref={todoFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" aria-label="Seleziona allegati" style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden",pointerEvents:"none"}} onChange={e=>{const selected=e.currentTarget.files;void addTodoFiles(selected);e.currentTarget.value="";}} />
+        <button type="button" onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
+        {todoUploading&&<span role="status" style={{fontSize:13,color:"#1d4ed8"}}>Caricamento allegati in corso...</span>}
+        {todoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length} allegat{todoFiles.length===1?"o":"i"} pront{todoFiles.length===1?"o":"i"} da salvare</span>}
+      </div>
       {todoFiles.map((file,index)=><div key={index} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:9,borderRadius:10,background:"white",border:"1px solid #e2e8f0"}}>
         <a href={file.data} download={file.name} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
         <button type="button" style={action} onClick={()=>setTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
