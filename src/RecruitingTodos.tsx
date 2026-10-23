@@ -32,24 +32,27 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [todoFiles,setTodoFiles]=useState<TodoAttachment[]>([]);
   const todoFileInputRef=useRef<HTMLInputElement|null>(null);
   const [todoUploading,setTodoUploading]=useState(false);
-  const addTodoFiles=async(files:FileList|null)=>{
-    if(!files?.length)return;
-    setTodoUploading(true);
+  const addTodoFiles=async(files:File[])=>{
+    if(!files.length){setMessage("Nessun file ricevuto dal selettore Android.");return;}
+    setTodoUploading(true);setMessage("");
     try{
-      if(todoFiles.length+files.length>5)throw Error("Massimo 5 allegati.");
+      if(todoFiles.length+files.length>5)throw Error("Massimo 5 allegati per attività.");
       const added:TodoAttachment[]=[];
-      for(const file of Array.from(files)){
-        if(file.size>2*1024*1024)throw Error(file.name+" supera 2 MB.");
+      for(const file of files){
+        if(file.size>2*1024*1024)throw Error(file.name+" supera 2 MB (dimensione: "+(file.size/1048576).toFixed(1)+" MB).");
         const data=await new Promise<string>((resolve,reject)=>{
           const reader=new FileReader();
           reader.onload=()=>resolve(String(reader.result||""));
-          reader.onerror=()=>reject(Error("Errore lettura file"));
+          reader.onerror=()=>reject(Error("Lettura non riuscita: "+file.name));
+          reader.onabort=()=>reject(Error("Lettura annullata: "+file.name));
           reader.readAsDataURL(file);
         });
-        added.push({name:file.name,type:file.type,data});
+        if(!data.startsWith("data:"))throw Error("Il file "+file.name+" non è leggibile.");
+        added.push({name:file.name||"allegato",type:file.type||"application/octet-stream",data});
       }
       setTodoFiles(v=>[...v,...added]);
-    }catch(e:any){setMessage(e?.message||"Errore allegato");}
+      setMessage("✓ "+added.length+" allegat"+(added.length===1?"o aggiunto":"i aggiunti")+". Premi SALVA per conservarli.");
+    }catch(e:any){setMessage("Allegati: "+(e?.message||"errore di lettura"));}
     finally{setTodoUploading(false);}
   };
   const [message, setMessage] = useState("");
@@ -356,7 +359,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       </div>
       <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:7}}>
-        <input ref={todoFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" aria-label="Seleziona allegati" style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden",pointerEvents:"none"}} onChange={e=>{const selected=e.currentTarget.files;void addTodoFiles(selected);e.currentTarget.value="";}} />
+        <input ref={todoFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" aria-label="Seleziona allegati" style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden",pointerEvents:"none"}} onChange={e=>{const input=e.currentTarget;const selected=Array.from(input.files||[]);void addTodoFiles(selected).finally(()=>{input.value="";});}} />
         <button type="button" onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
         {todoUploading&&<span role="status" style={{fontSize:13,color:"#1d4ed8"}}>Caricamento allegati in corso...</span>}
         {todoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length} allegat{todoFiles.length===1?"o":"i"} pront{todoFiles.length===1?"o":"i"} da salvare</span>}
