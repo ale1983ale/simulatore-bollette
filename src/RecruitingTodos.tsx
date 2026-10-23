@@ -6,17 +6,18 @@ export type TodoDraft = {
   title: string; dueDate?: string; dueTime?: string; body?: string;
   linkedKind?: "candidate" | "agent"; linkedId?: string; linkedName?: string; sourceKey?: string;
 };
+type TodoAttachment = {name:string;type:string;data:string};
 type Todo = {
   id: string; title: string; due_date: string | null; due_time: string | null;
   linked_kind: "candidate" | "agent" | null; linked_id: string | null;
   linked_name: string; body: string; priority: boolean; completed: boolean;
-  created_at: string; source_key: string | null;
+  created_at: string; source_key: string | null; attachments: TodoAttachment[];
 };
 type ContactOption = { id: string; name: string; kind: "candidate" | "agent" };
 const empty: TodoDraft = { title: "", dueDate: "", dueTime: "", body: "" };
 const field: React.CSSProperties = { width: "100%", padding: 11, border: "1px solid #cbd5e1", borderRadius: 9, boxSizing: "border-box", font: "inherit" };
 const linkStyle: React.CSSProperties = { display:"inline-flex", alignItems:"center", gap:6, padding:"7px 11px", borderRadius:999, border:"1px solid #bfdbfe", background:"linear-gradient(135deg,#eff6ff,#f0f9ff)", color:"#1d4ed8", fontWeight:850, fontSize:12, cursor:"pointer", boxShadow:"0 1px 3px rgba(37,99,235,.08)" };
-const action: React.CSSProperties = { padding: "9px 13px", borderRadius: 9, border: "1px solid #cbd5e1", cursor: "pointer", fontWeight: 800, background: "white" };
+const action: React.CSSProperties = { padding: "10px 14px", borderRadius: 14, border: "1px solid #cbd5e1", cursor: "pointer", fontWeight: 800, background: "white" };
 
 export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed, visible, onOpenLinkedContact }: {
   ctx: RecruitingContext | null; contacts: ContactOption[]; draft: TodoDraft | null;
@@ -28,6 +29,28 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<TodoDraft>(empty);
   const [priority, setPriority] = useState(false);
+  const [todoFiles,setTodoFiles]=useState<TodoAttachment[]>([]);
+  const [todoUploading,setTodoUploading]=useState(false);
+  const addTodoFiles=async(files:FileList|null)=>{
+    if(!files?.length)return;
+    setTodoUploading(true);
+    try{
+      if(todoFiles.length+files.length>5)throw Error("Massimo 5 allegati.");
+      const added:TodoAttachment[]=[];
+      for(const file of Array.from(files)){
+        if(file.size>2*1024*1024)throw Error(file.name+" supera 2 MB.");
+        const data=await new Promise<string>((resolve,reject)=>{
+          const reader=new FileReader();
+          reader.onload=()=>resolve(String(reader.result||""));
+          reader.onerror=()=>reject(Error("Errore lettura file"));
+          reader.readAsDataURL(file);
+        });
+        added.push({name:file.name,type:file.type,data});
+      }
+      setTodoFiles(v=>[...v,...added]);
+    }catch(e:any){setMessage(e?.message||"Errore allegato");}
+    finally{setTodoUploading(false);}
+  };
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [calendarTodo, setCalendarTodo] = useState<Todo | null>(null);
@@ -107,14 +130,15 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   useEffect(() => { if (visible) void load(); }, [visible, load]);
   useEffect(() => {
     if (!draft) return;
-    setForm(draft); setContactSearch(""); setPriority(false); setEditing(null); setFormOpen(true); onDraftConsumed();
+    setForm(draft); setContactSearch(""); setPriority(false); setTodoFiles([]); setEditing(null); setFormOpen(true); onDraftConsumed();
   }, [draft, onDraftConsumed]);
   const save = async () => {
+    if (todoUploading) return;
     if (!ctx || !form.title?.trim()) { setMessage("L'OGGETTO è obbligatorio."); return; }
     setSaving(true); setMessage("");
     const payload = {
       owner_key: ctx.ownerKey, title: form.title.trim(), due_date: form.dueDate || null,
-      due_time: form.dueTime || null, body: form.body || "", priority,
+      due_time: form.dueTime || null, body: form.body || "", priority, attachments: todoFiles,
       linked_kind: form.linkedKind || null, linked_id: form.linkedId || null,
       linked_name: form.linkedName || "", source_key: form.sourceKey || null,
       updated_at: new Date().toISOString()
@@ -125,7 +149,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     if (result.error) {
       if (result.error.code === "23505" && form.sourceKey) setMessage("Questo evento è già presente nelle cose da fare.");
       else setMessage(result.error.message);
-    } else { setFormOpen(false); setEditing(null); setForm(empty); await load(); }
+    } else { setFormOpen(false); setEditing(null); setForm(empty); setTodoFiles([]); await load(); }
     setSaving(false);
   };
   const change = async (item: Todo, values: Partial<Todo>) => {
@@ -176,7 +200,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     if(diaryAppointment)await loadDiary();else await load();
   };
   const startEdit = (item: Todo) => {
-    setEditing(item.id); setContactSearch(""); setPriority(item.priority);
+    setEditing(item.id); setContactSearch(""); setPriority(item.priority); setTodoFiles(Array.isArray(item.attachments)?item.attachments:[]);
     setForm({ title: item.title, dueDate: item.due_date || "", dueTime: item.due_time?.slice(0,5) || "",
       body: item.body, linkedKind: item.linked_kind || undefined, linkedId: item.linked_id || undefined,
       linkedName: item.linked_name, sourceKey: item.source_key || undefined });
@@ -320,9 +344,18 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         </div>}
       </div>
       <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
+      <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"11px 16px",borderRadius:14,border:"1px solid #bfdbfe",background:"#eff6ff",color:"#1d4ed8",fontWeight:800,cursor:"pointer",width:"fit-content"}}>
+        📎 AGGIUNGI ALLEGATI
+        <input type="file" multiple style={{display:"none"}} onChange={e=>{void addTodoFiles(e.target.files);e.target.value="";}} />
+      </label>
+      {todoFiles.map((file,index)=><div key={index} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:9,borderRadius:10,background:"white",border:"1px solid #e2e8f0"}}>
+        <a href={file.data} download={file.name} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
+        <button type="button" style={action} onClick={()=>setTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
+      </div>)}
+      <small style={{color:"#64748b"}}>Massimo 5 allegati, 2 MB ciascuno.</small>
       <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)} /> PRIORITÀ — mantieni in alto finché non è fatta</label>
       <div style={{ display: "flex", gap: 8 }}>
-        <button style={{ ...action, background: "#16a34a", color: "white" }} disabled={saving || !form.title.trim()} onClick={()=>void save()}>{saving?"SALVATAGGIO...":"SALVA"}</button>
+        <button style={{ ...action, background: "#16a34a", color: "white" }} disabled={saving || todoUploading || !form.title.trim()} onClick={()=>void save()}>{saving?"SALVATAGGIO...":"SALVA"}</button>
         <button style={action} onClick={()=>setFormOpen(false)}>ANNULLA</button>
       </div>
     </div>}
@@ -338,7 +371,10 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           {item.linked_kind==="candidate" && item.linked_id && onOpenLinkedContact && <button type="button" style={linkStyle} title={"Apri la scheda contatto di "+item.linked_name} onClick={()=>onOpenLinkedContact("candidate",item.linked_id!)}>↗ APRI SCHEDA CONTATTO</button>}
         </div>}
         {item.body && <div style={{ marginTop: 7, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.body}</div>}
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 10 }}>
+        {Array.isArray(item.attachments)&&item.attachments.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:10}}>
+          {item.attachments.map((file,index)=><a key={index} href={file.data} download={file.name} style={{...linkStyle,maxWidth:"100%",overflowWrap:"anywhere"}}>📎 {file.name}</a>)}
+        </div>}
+        <div className="ge-todo-actions" style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 10 }}>
           <button style={action} onClick={()=>void change(item,{completed:!item.completed})}>{item.completed?"↶ RIAPRI":"✓ FATTA"}</button>
           <button style={action} onClick={()=>startEdit(item)}>MODIFICA</button>
           <button style={action} onClick={()=>void change(item,{priority:!item.priority})}>{item.priority?"TOGLI PRIORITÀ":"★ PRIORITÀ"}</button>
