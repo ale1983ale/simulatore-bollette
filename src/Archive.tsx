@@ -962,9 +962,11 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   }, [archiveSection]);
 
   const [detailAgent, setDetailAgent] = useState("");
+  const [detailAgents,setDetailAgents]=useState<string[]>([]);
   const [detailRegion, setDetailRegion] = useState("");
   const [detailProvince, setDetailProvince] = useState("");
   const [detailMonth, setDetailMonth] = useState("");
+  const [detailMonths,setDetailMonths]=useState<string[]>([]);
   const [detailCommodity, setDetailCommodity] = useState("");
   const [detailSearch, setDetailSearch] = useState("");
   const [detailExpanded, setDetailExpanded] = useState<string | null>(null);
@@ -1307,9 +1309,11 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const detailRows = useMemo(() => rows.filter(row => {
     if (detailSourceIds && !detailSourceIds.has(row.id)) return false;
     const geo = deriveLegalSeatGeo(row.raw);
+    if (detailAgents.length&&!detailAgents.includes(row.agente)) return false;
     if (detailAgent && !row.agente.toLocaleLowerCase("it").includes(detailAgent.toLocaleLowerCase("it"))) return false;
     if (detailRegion && geo.region !== detailRegion) return false;
     if (detailProvince && geo.provinceCode !== detailProvince) return false;
+    if (detailMonths.length&&!detailMonths.includes(row.monthKey)) return false;
     if (detailMonth && row.monthKey !== detailMonth) return false;
     if (detailCommodity && !detailCommodity.split(",").includes(row.commodity)) return false;
     if (detailSearch) {
@@ -1334,7 +1338,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     const comparison = value(a).localeCompare(value(b), "it", { numeric: true, sensitivity: "base" });
     return comparison * (detailSortAsc ? 1 : -1) || a.denominazione.localeCompare(b.denominazione, "it");
   }),
-  [rows, detailSourceIds, detailAgent, detailRegion, detailProvince, detailMonth, detailCommodity, detailSearch, detailSort, detailSortAsc]);
+  [rows, detailSourceIds, detailAgent, detailAgents, detailRegion, detailProvince, detailMonth, detailMonths, detailCommodity, detailSearch, detailSort, detailSortAsc]);
 
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
@@ -1676,11 +1680,11 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         subtitle: "Recessi associati al mese della data in NOTA_RECESSO. La data di validità resta informativa.",
         filename: "RECESSI_" + filePeriod + ".pdf",
         filters: [
-          pdfSelection("Periodo selezionato", detailMonth?[monthLabel(detailMonth)]:[], periodStart || periodEnd
+          pdfSelection("Periodo selezionato", detailMonths.map(monthLabel), periodStart || periodEnd
             ? (periodStart || "Inizio") + " / " + (periodEnd || "Fine") : "Tutti i mesi"),
           "Mese dettaglio: " + (detailMonth || "Tutti") + " · Filtro importato: " + (detailSourceIds?detailSourceIds.size+" righe":"nessuno"),
           pdfSelection("Fornitura", detailCommodity?[detailCommodity]:[], "Luce e Gas"),
-          pdfSelection("Agente", detailAgent?[detailAgent]:[], "Tutti gli agenti"),
+          pdfSelection("Agente", detailAgents.length?detailAgents:(detailAgent?[detailAgent]:[]), "Tutti gli agenti"),
           pdfSelection("Provincia", provinceLabels, "Tutte"),
           pdfSelection("Regione", detailRegion?[detailRegion]:[], "Tutte"),
           "Cliente: " + ("Tutti") +
@@ -2491,7 +2495,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
                     <span style={{fontSize:13,fontWeight:900,color:gas?"#0369a1":"#c2410c"}}>{gas?"♨ GAS":"⚡ LUCE"}</span>
                     <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}><div style={{display:"grid",gap:2,minWidth:70}}><span style={{fontSize:10,fontWeight:900,letterSpacing:".07em",color:"#64748b"}}>N° RECESSI</span><strong style={{fontSize:24,fontWeight:850,fontFamily:"Arial, sans-serif",letterSpacing:"-.035em",color:"#0f172a",lineHeight:1.1}}>{data.count.toLocaleString("it-IT")}</strong></div><div style={{width:1,height:34,background:gas?"#7dd3fc":"#fdba74"}}/><div style={{display:"grid",gap:2}}><span style={{fontSize:10,fontWeight:900,letterSpacing:".07em",color:"#64748b"}}>CONSUMO TOTALE</span><strong style={{fontSize:20,fontWeight:850,fontFamily:"Arial, sans-serif",letterSpacing:"-.025em",color:"#0f172a"}}>{data.consumo.toLocaleString("it-IT",{maximumFractionDigits:2})} <span style={{fontSize:12,fontWeight:800,color:"#64748b"}}>{gas?"Smc":"kWh"}</span></strong></div></div>
                   </div>
-                  <button type="button" disabled={!data.count} onClick={()=>{setDetailSourceIds(new Set(data.ids));setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity(kind);setDetailSearch("");setDetailLimit(100);setArchiveSection("dettaglioRecessi");}} style={{padding:"10px 13px",borderRadius:10,border:"1px solid "+(gas?"#7dd3fc":"#fdba74"),background:data.count?"white":"#e2e8f0",color:gas?"#0369a1":"#9a3412",fontWeight:900,cursor:data.count?"pointer":"default",whiteSpace:"nowrap"}}>VEDI CLIENTI ↗</button>
+                  <button type="button" disabled={!data.count} onClick={()=>{setDetailSourceIds(new Set(data.ids));setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailMonths([]);setDetailAgents([]);setDetailAgent("");setDetailCommodity(kind);setDetailSearch("");setDetailLimit(100);setArchiveSection("dettaglioRecessi");}} style={{padding:"10px 13px",borderRadius:10,border:"1px solid "+(gas?"#7dd3fc":"#fdba74"),background:data.count?"white":"#e2e8f0",color:gas?"#0369a1":"#9a3412",fontWeight:900,cursor:data.count?"pointer":"default",whiteSpace:"nowrap"}}>VEDI CLIENTI ↗</button>
                 </div>;})}
               </div>)}
               </div>
@@ -2646,12 +2650,12 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 10, marginBottom: 14 }}>
             <label style={{display:"grid",gap:4}}>🔎 CERCA AGENTE<input list="archive-detail-agent-suggestions" value={detailAgent} placeholder="Digita nome agente..." onChange={e=>{setDetailAgent(e.target.value);setDetailLimit(100);}} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #cbd5e1",boxSizing:"border-box"}}/><datalist id="archive-detail-agent-suggestions">{agents.map(a=><option key={a} value={a}/>)}</datalist></label>
+            <MultiSelectFilter label="AGENTI" allLabel="Tutti gli agenti" options={agents.map(x=>({value:x,label:x}))} selected={detailAgents} onChange={v=>{setDetailAgents(v);setDetailLimit(100);}} />
+            <MultiSelectFilter label="MESI RECESSO" allLabel="Tutti i mesi" options={months.map(x=>({value:x,label:monthLabel(x)}))} selected={detailMonths} onChange={v=>{setDetailMonths(v);setDetailLimit(100);}} />
             <label>RICERCA GENERALE<input style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", boxSizing: "border-box" }} placeholder="Cliente, POD/PDR, note..." value={detailSearch} onChange={e => {setDetailSearch(e.target.value);setDetailLimit(100);}} /></label>
             {([
-              ["AGENTE", detailAgent, setDetailAgent, agents.map(x=>[x,x])],
               ["REGIONE", detailRegion, setDetailRegion, regions.map(x=>[x,x])],
               ["PROVINCIA / ZONA", detailProvince, setDetailProvince, provinces.map(x=>[x.code,x.label])],
-              ["MESE RECESSO", detailMonth, setDetailMonth, months.map(x=>[x,x])],
               ["FORNITURA", detailCommodity, setDetailCommodity, [["LUCE","LUCE"],["GAS","GAS"],["LUCE,GAS","LUCE + GAS"],["N/D","N/D"]]]
             ] as Array<[string,string,(value:string)=>void,string[][]]>).map(([label,value,setValue,options])=>(
               <label key={label}>{label}<select value={value} onChange={e=>{setValue(e.target.value);setDetailLimit(100);}}
