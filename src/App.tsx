@@ -9269,7 +9269,7 @@ function AgentsAdmin({
                     ...(adminProfile?.role === "super_admin"
                       ? ["Admin", "Provvigione"]
                       : []),
-                    "PRODUZ",
+                    "SCHEDA PRODUZ. AGENTE",
                     "REPORT",
                     "Azioni",
                   ].map((h) => (
