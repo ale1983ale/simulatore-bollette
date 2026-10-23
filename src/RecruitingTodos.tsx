@@ -73,8 +73,11 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [diaryLinked,setDiaryLinked]=useState("");
   const [diarySaving,setDiarySaving]=useState(false);
   const [diarySearch,setDiarySearch]=useState("");
+  const [diaryContactMenuOpen,setDiaryContactMenuOpen]=useState(false);
+  const diaryContactMenuRef=useRef<HTMLDivElement|null>(null);
   const [diaryFiles,setDiaryFiles]=useState<Array<{name:string;type:string;data:string}>>([]);
   const [diaryUploading,setDiaryUploading]=useState(false);
+  useEffect(()=>{if(!diaryContactMenuOpen)return;const close=(e:MouseEvent)=>{if(diaryContactMenuRef.current&&!diaryContactMenuRef.current.contains(e.target as Node))setDiaryContactMenuOpen(false);};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close);},[diaryContactMenuOpen]);
   const diaryContacts=[...contacts].sort((a,b)=>a.name.localeCompare(b.name,"it",{sensitivity:"base"}));
   const diaryGroups=Object.values(diaryItems.reduce((acc:Record<string,{key:string;name:string;items:any[]}>,item:any)=>{
     const key=item.linked_kind&&item.linked_id?item.linked_kind+":"+item.linked_id:"generic";
@@ -333,15 +336,20 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     </div>
     {subtab==="diario"&&<div style={{marginTop:14}}>
       <h3>DIARIO · APPUNTI PER AGENTE / CONTATTO</h3>
-      <label style={{display:"grid",gap:6}}>CERCA AGENTE O CONTATTO
-        <input style={field} placeholder="Digita nome o cognome..." value={diarySearch} onChange={e=>setDiarySearch(e.target.value)} />
-      </label>
-      <label style={{display:"grid",gap:6}}>AGENTE O CONTATTO
-        <select style={field} value={diaryLinked} onChange={e=>setDiaryLinked(e.target.value)}>
-          <option value="">Nessun collegamento</option>
-          {diaryContacts.filter(c=>c.name.toLocaleLowerCase("it").includes(diarySearch.toLocaleLowerCase("it"))||c.kind+":"+c.id===diaryLinked).map(c=><option key={c.kind+":"+c.id} value={c.kind+":"+c.id}>{c.name} · {c.kind==="agent"?"AGENTE":"CONTATTO"}</option>)}
-        </select>
-      </label>
+      <div ref={diaryContactMenuRef} style={{position:"relative",display:"grid",gap:6}}>
+        <label>AGENTE O CONTATTO</label>
+        <button type="button" style={{...field,textAlign:"left",background:"#fff",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}} onClick={()=>{setDiaryContactMenuOpen(v=>!v);setDiarySearch("");}}>
+          <span>{diaryLinked ? (diaryContacts.find(c=>c.kind+":"+c.id===diaryLinked)?.name||"Seleziona agente o contatto") : "Nessun collegamento"}</span><span>⌄</span>
+        </button>
+        {diaryContactMenuOpen&&<div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:40,background:"#fff",border:"1px solid #cbd5e1",borderRadius:12,boxShadow:"0 8px 25px rgba(15,23,42,.18)",padding:8,marginTop:4}}>
+          <input autoFocus style={field} placeholder="🔎 Cerca nome o cognome..." value={diarySearch} onChange={e=>setDiarySearch(e.target.value)} />
+          <div style={{maxHeight:250,overflowY:"auto",marginTop:6}}>
+            <button type="button" style={{...field,textAlign:"left",background:"white",border:"none",cursor:"pointer"}} onClick={()=>{setDiaryLinked("");setDiaryContactMenuOpen(false);setDiarySearch("");}}>Nessun collegamento</button>
+            {diaryContacts.filter(c=>c.name.toLocaleLowerCase("it").includes(diarySearch.toLocaleLowerCase("it"))).map(c=><button type="button" key={c.kind+":"+c.id} style={{...field,textAlign:"left",background:diaryLinked===c.kind+":"+c.id?"#eff6ff":"white",border:"none",cursor:"pointer"}} onClick={()=>{setDiaryLinked(c.kind+":"+c.id);setDiaryContactMenuOpen(false);setDiarySearch("");}}>{c.name} · {c.kind==="agent"?"AGENTE":"CONTATTO"}</button>)}
+            {!diaryContacts.some(c=>c.name.toLocaleLowerCase("it").includes(diarySearch.toLocaleLowerCase("it")))&&<p style={{padding:8,color:"#64748b"}}>Nessun risultato</p>}
+          </div>
+        </div>}
+      </div>
       <label style={{display:"grid",gap:6}}>NUOVO APPUNTO<textarea rows={4} style={field} value={diaryText} onChange={e=>setDiaryText(e.target.value)} placeholder="Scrivi un appunto..." /></label>
       <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid #cbd5e1",background:"#f8fafc",cursor:"pointer",fontWeight:800,width:"fit-content"}}>
         📎 ALLEGA FILE <input type="file" multiple style={{display:"none"}} onChange={e=>{void addDiaryFiles(e.target.files);e.target.value="";}} />
@@ -351,7 +359,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       <button style={{...action,background:"#2563eb",color:"white",marginTop:8}} disabled={diarySaving||diaryUploading||(!diaryText.trim()&&!diaryFiles.length)} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"＋ SALVA APPUNTO"}</button>
       {message&&<p role="alert" style={{color:"#b91c1c"}}>{message}</p>}
       <div style={{display:"grid",gap:12,marginTop:16}}>
-        {diaryGroups.filter(g=>g.name.toLocaleLowerCase("it").includes(diarySearch.toLocaleLowerCase("it"))).map(group=><article key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
+        {diaryGroups.map(group=><article key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
           <h4 style={{margin:"0 0 12px",color:"#1d4ed8",fontSize:17}}>{group.name} <span style={{fontSize:12,color:"#64748b"}}>({group.items.length} note)</span></h4>{group.items[0]?.linked_kind==="candidate" && group.items[0]?.linked_id && onOpenLinkedContact && <button type="button" style={{...linkStyle,marginBottom:12}} onClick={()=>onOpenLinkedContact("candidate",String(group.items[0].linked_id))}>↗ APRI SCHEDA CONTATTO</button>}
           <div style={{display:"grid",gap:10}}>{group.items.map(item=><section key={item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
             <small style={{color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")}</small>
