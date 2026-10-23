@@ -7285,6 +7285,31 @@ export default function Recruiting({
           }
         }
 
+        /* Restyling compatto coerente con le sottoschede di Produzione. */
+        @media (max-width: 620px) {
+          .recruiting-nav-bar {
+            display: grid !important;
+            grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+            gap: 9px !important;
+            align-items: stretch !important;
+          }
+          .recruiting-nav-group {display: contents !important;}
+          .recruiting-nav-button {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 58px !important;
+            padding: 10px 8px !important;
+            border-radius: 13px !important;
+            font-size: 12px !important;
+            font-weight: 850 !important;
+            line-height: 1.2 !important;
+            white-space: normal !important;
+            text-align: center !important;
+            box-shadow: 0 3px 10px rgba(15,23,42,.06);
+          }
+          .recruiting-nav-label-desktop {display: inline !important;}
+          .recruiting-nav-label-mobile {display: none !important;}
+        }
         .recruiting-nav-label-mobile {
           display: none;
         }
