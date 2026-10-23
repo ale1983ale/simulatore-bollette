@@ -52,10 +52,9 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     if(!files.length){setMessage("Nessun file ricevuto dal selettore Android.");return;}
     setTodoUploading(true);setMessage("");
     try{
-      if(todoFiles.length+files.length>5)throw Error("Massimo 5 allegati per attività.");
       const added:TodoAttachment[]=[];
       for(const file of files){
-        if(file.size>10*1024*1024)throw Error(file.name+" supera 10 MB (dimensione: "+(file.size/1048576).toFixed(1)+" MB).");
+        if(file.size>10*1024*1024)throw Error(file.name+" supera 10 MB.");
         const data=await new Promise<string>((resolve,reject)=>{
           const reader=new FileReader();
           reader.onload=()=>resolve(String(reader.result||""));
@@ -66,8 +65,14 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         if(!data.startsWith("data:"))throw Error("Il file "+file.name+" non è leggibile.");
         added.push({name:file.name||"allegato",type:file.type||"application/octet-stream",data});
       }
-      setTodoFiles(v=>[...v,...added]);
-      setMessage("✓ "+added.length+" allegat"+(added.length===1?"o aggiunto":"i aggiunti")+". Premi SALVA per conservarli.");
+      setTodoFiles(current=>{
+        if(current.length+added.length>5){
+          setMessage("Massimo 5 allegati. Rimuovi un file prima di aggiungerne altri.");
+          return current;
+        }
+        return [...current,...added];
+      });
+      setMessage("✓ Selezione completata. Puoi scegliere altri file con lo stesso pulsante, poi premi SALVA.");
     }catch(e:any){setMessage("Allegati: "+(e?.message||"errore di lettura"));}
     finally{setTodoUploading(false);}
   };
@@ -269,7 +274,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:7}}>
         <input ref={todoFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" aria-label="Seleziona allegati" style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden",pointerEvents:"none"}} onChange={e=>{const input=e.currentTarget;const selected=Array.from(input.files||[]);void addTodoFiles(selected).finally(()=>{input.value="";});}} />
-        <button type="button" onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
+        <button type="button" disabled={todoUploading || todoFiles.length>=5} onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
         {todoUploading&&<span role="status" style={{fontSize:13,color:"#1d4ed8"}}>Caricamento allegati in corso...</span>}
         {todoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length} allegat{todoFiles.length===1?"o":"i"} pront{todoFiles.length===1?"o":"i"} da salvare</span>}
       </div>
@@ -277,7 +282,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <a href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
         <button type="button" style={action} onClick={()=>setTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
       </div>)}
-      <small style={{color:"#64748b"}}>Massimo 5 allegati, 10 MB ciascuno.</small>
+      <small style={{color:"#64748b"}}>Massimo 5 allegati, 10 MB ciascuno. Su Android puoi aggiungerli uno alla volta: premi nuovamente SCEGLI ALLEGATI per ogni file.</small>
       <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)} /> PRIORITÀ — mantieni in alto finché non è fatta</label>
       <div style={{ display: "flex", gap: 8 }}>
         <button style={{ ...action, background: "#16a34a", color: "white" }} disabled={saving || todoUploading || !form.title.trim()} onClick={()=>void save()}>{saving?"SALVATAGGIO...":"SALVA"}</button>
