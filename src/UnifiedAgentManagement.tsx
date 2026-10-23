@@ -3294,7 +3294,7 @@ export default function UnifiedAgentManagement({
                   "ADMIN",
                   "EMAIL",
                   "REPORT",
-                  "PRODUZ",
+                  "SCHEDA PRODUZ. AGENTE",
                   "CELLULARE",
                   "ZONA",
                   "DM",
