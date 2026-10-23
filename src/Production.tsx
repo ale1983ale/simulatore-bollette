@@ -1433,6 +1433,7 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
                   <div style={{width:1,height:48,background:gas?"#38bdf8":"#fb923c"}}/>
                   <div style={{display:"grid",gap:6,minWidth:0}}><span style={{fontSize:12,fontWeight:900,color:"#64748b",letterSpacing:".04em"}}>CONSUMO IN ATTIVAZIONE</span><strong style={{fontFamily:"Arial,sans-serif",fontSize:"clamp(18px,1.7vw,29px)",fontWeight:900,color:"#0f172a",letterSpacing:"-.035em",overflowWrap:"anywhere"}}>{data.consumoAttivazione.toLocaleString("it-IT",{maximumFractionDigits:2})} <span style={{fontSize:13,color:"#64748b",fontWeight:850}}>{gas?"Smc":"kWh"}</span></strong></div>
                 </div>
+                <div style={{marginTop:10,fontSize:14,fontWeight:850}}>CONSUMO TOTALE: {data.consumoTotale.toLocaleString("it-IT",{maximumFractionDigits:2})} {gas?"Smc":"kWh"}</div>
               </div>;})}
             </div>
 
