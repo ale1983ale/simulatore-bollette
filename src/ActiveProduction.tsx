@@ -112,6 +112,8 @@ export default function ActiveProduction() {
   const [customEnd, setCustomEnd] = useState("");
   const [agentQuery,setAgentQuery]=useState("");
   const [agentSelected, setAgentSelected] = useState<string>("");
+  const [agentsSelected,setAgentsSelected]=useState<string[]>([]);
+  const [periodsSelected,setPeriodsSelected]=useState<string[]>([]);
 
   const reload = useCallback(async () => {
     setLoading(true); setError("");
@@ -170,14 +172,14 @@ export default function ActiveProduction() {
   // si includono soltanto i report la cui data FINE cade nell'intervallo.
   // Non si ripartiscono artificialmente contratti o consumi per giorno.
   const intervals = useMemo(
-    () => activePeriod === "ALL"
+    () => periodsSelected.length ? validPeriods.filter(p=>periodsSelected.includes(p.key)) : activePeriod === "ALL"
       ? validPeriods
       : activePeriod === "CUSTOM"
         ? (customValid ? validPeriods.filter(
             (period) => period.end >= customStart && period.end <= customEnd
           ) : [])
         : currentPeriod ? [currentPeriod] : [],
-    [activePeriod, currentPeriod, validPeriods, customValid, customStart, customEnd]
+    [activePeriod, currentPeriod, validPeriods, customValid, customStart, customEnd, periodsSelected]
   );
   const intervalSet = useMemo(() => new Set(intervals.map((p) => p.key)), [intervals]);
   // Ogni report 11 mese precedente - 10 mese corrente confronta
@@ -235,7 +237,7 @@ export default function ActiveProduction() {
 
   const selectedAgentExists = !!agentSelected && agentSummaries.some((a) => a.key === agentSelected);
   const selectedAgent = selectedAgentExists ? agentSelected : "";
-  const displayed = selectedAgent
+  const displayed = agentsSelected.length?agentSummaries.filter(a=>agentsSelected.includes(a.key)):selectedAgent
     ? agentSummaries.filter((a) => a.key === selectedAgent)
     : agentSummaries;
   const aggregate = useMemo(() => {
@@ -508,6 +510,8 @@ export default function ActiveProduction() {
               </option>)}
             </select>
           </label>
+          <details style={{position:"relative",gridColumn:"1 / -1",border:"1px solid #cbd5e1",borderRadius:9,padding:10,background:"white"}}><summary style={{cursor:"pointer",fontWeight:850,fontSize:12}}>PERIODI DI PRODUZIONE · {periodsSelected.length?periodsSelected.length+" selezionati":"Tutti / periodo corrente"} ▾</summary><div style={{maxHeight:230,overflowY:"auto",display:"grid",gap:8,paddingTop:10}}><button type="button" onClick={()=>setPeriodsSelected([])} style={{padding:6}}>AZZERA SELEZIONE</button>{validPeriods.map(p=><label key={p.key} style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={periodsSelected.includes(p.key)} onChange={e=>setPeriodsSelected(current=>e.target.checked?[...current,p.key]:current.filter(x=>x!==p.key))}/>{p.label}</label>)}</div></details>
+          <details style={{position:"relative",gridColumn:"1 / -1",border:"1px solid #cbd5e1",borderRadius:9,padding:10,background:"white"}}><summary style={{cursor:"pointer",fontWeight:850,fontSize:12}}>AGENTI · {agentsSelected.length?agentsSelected.length+" selezionati":"Tutti gli agenti"} ▾</summary><div style={{maxHeight:230,overflowY:"auto",display:"grid",gap:8,paddingTop:10}}><button type="button" onClick={()=>{setAgentsSelected([]);setAgentSelected("");}} style={{padding:6}}>TUTTI GLI AGENTI</button>{agentOptions.map(a=><label key={a.key} style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={agentsSelected.includes(a.key)} onChange={e=>{setAgentSelected("");setAgentsSelected(current=>e.target.checked?[...current,a.key]:current.filter(x=>x!==a.key));}}/>{a.name}</label>)}</div></details>
           <label style={{fontSize:12,fontWeight:850,gridColumn:"1 / -1"}}>🔎 CERCA AGENTE
             <input list="active-production-agent-suggestions" placeholder="Digita lettere del nome agente..." value={agentQuery} onChange={e=>{const value=e.target.value;setAgentQuery(value);const match=agentOptions.find(a=>a.name===value);setAgentSelected(match?.key||"");}} style={{...field,marginTop:5}}/>
             <datalist id="active-production-agent-suggestions">{agentOptions.filter(a=>a.name.toLocaleLowerCase("it").includes(agentQuery.toLocaleLowerCase("it"))).slice(0,70).map(a=><option key={a.key} value={a.name}/>)}</datalist>
