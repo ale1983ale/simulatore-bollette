@@ -6,7 +6,7 @@ export type TodoDraft = {
   title: string; dueDate?: string; dueTime?: string; body?: string;
   linkedKind?: "candidate" | "agent"; linkedId?: string; linkedName?: string; sourceKey?: string;
 };
-type TodoAttachment = {name:string;type:string;data:string};
+type TodoAttachment = {name:string;type:string;data:string;path?:string};
 type Todo = {
   id: string; title: string; due_date: string | null; due_time: string | null;
   linked_kind: "candidate" | "agent" | null; linked_id: string | null;
@@ -30,12 +30,14 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [form, setForm] = useState<TodoDraft>(empty);
   const [priority, setPriority] = useState(false);
   const [todoFiles,setTodoFiles]=useState<TodoAttachment[]>([]);
+  const [pendingTodoFiles,setPendingTodoFiles]=useState<File[]>([]);
   const [previewFile,setPreviewFile]=useState<TodoAttachment|null>(null);
   const [previewUrl,setPreviewUrl]=useState<string|null>(null);
   const openAttachment=async(file:TodoAttachment)=>{
     try{
-      const response=await fetch(file.data);
-      const blob=await response.blob();
+      const response=file.path&&ctx ? null : await fetch(file.data);
+      const blob=file.path&&ctx ? (await ctx.client.storage.from("recruiting-todo-files").download(file.path)).data : await response!.blob();
+      if(!blob)throw Error("File non disponibile");
       const url=URL.createObjectURL(blob);
       setPreviewUrl(current=>{if(current)URL.revokeObjectURL(current);return url;});
       setPreviewFile(file);
@@ -49,32 +51,13 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const todoFileInputRef=useRef<HTMLInputElement|null>(null);
   const [todoUploading,setTodoUploading]=useState(false);
   const addTodoFiles=async(files:File[])=>{
-    if(!files.length){setMessage("Nessun file ricevuto dal selettore Android.");return;}
-    setTodoUploading(true);setMessage("");
-    try{
-      const added:TodoAttachment[]=[];
-      for(const file of files){
-        if(file.size>10*1024*1024)throw Error(file.name+" supera 10 MB.");
-        const data=await new Promise<string>((resolve,reject)=>{
-          const reader=new FileReader();
-          reader.onload=()=>resolve(String(reader.result||""));
-          reader.onerror=()=>reject(Error("Lettura non riuscita: "+file.name));
-          reader.onabort=()=>reject(Error("Lettura annullata: "+file.name));
-          reader.readAsDataURL(file);
-        });
-        if(!data.startsWith("data:"))throw Error("Il file "+file.name+" non è leggibile.");
-        added.push({name:file.name||"allegato",type:file.type||"application/octet-stream",data});
-      }
-      setTodoFiles(current=>{
-        if(current.length+added.length>5){
-          setMessage("Massimo 5 allegati. Rimuovi un file prima di aggiungerne altri.");
-          return current;
-        }
-        return [...current,...added];
-      });
-      setMessage("✓ Selezione completata. Puoi scegliere altri file con lo stesso pulsante, poi premi SALVA.");
-    }catch(e:any){setMessage("Allegati: "+(e?.message||"errore di lettura"));}
-    finally{setTodoUploading(false);}
+    if(!files.length){setMessage("Nessun file ricevuto da Android.");return;}
+    const count=todoFiles.length+pendingTodoFiles.length+files.length;
+    if(count>5){setMessage("Massimo 5 allegati.");return;}
+    const tooLarge=files.find(file=>file.size>10*1024*1024);
+    if(tooLarge){setMessage(tooLarge.name+" supera 10 MB.");return;}
+    setPendingTodoFiles(current=>[...current,...files]);
+    setMessage("✓ Allegati pronti. Premi SALVA per caricarli.");
   };
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -155,27 +138,44 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   useEffect(() => { if (visible) void load(); }, [visible, load]);
   useEffect(() => {
     if (!draft) return;
-    setForm(draft); setContactSearch(""); setPriority(false); setTodoFiles([]); setEditing(null); setFormOpen(true); onDraftConsumed();
+    setForm(draft); setContactSearch(""); setPriority(false); setTodoFiles([]); setPendingTodoFiles([]); setEditing(null); setFormOpen(true); onDraftConsumed();
   }, [draft, onDraftConsumed]);
   const save = async () => {
-    if (todoUploading) return;
+    if (todoUploading || saving) return;
     if (!ctx || !form.title?.trim()) { setMessage("L'OGGETTO è obbligatorio."); return; }
     setSaving(true); setMessage("");
-    const payload = {
-      owner_key: ctx.ownerKey, title: form.title.trim(), due_date: form.dueDate || null,
-      due_time: form.dueTime || null, body: form.body || "", priority, attachments: todoFiles,
-      linked_kind: form.linkedKind || null, linked_id: form.linkedId || null,
-      linked_name: form.linkedName || "", source_key: form.sourceKey || null,
-      updated_at: new Date().toISOString()
-    };
-    const result = editing
-      ? await ctx.client.from("recruiting_todos").update(payload).eq("owner_key", ctx.ownerKey).eq("id", editing)
-      : await ctx.client.from("recruiting_todos").insert(payload);
-    if (result.error) {
-      if (result.error.code === "23505" && form.sourceKey) setMessage("Questo evento è già presente nelle cose da fare.");
-      else setMessage(result.error.message);
-    } else { setFormOpen(false); setEditing(null); setForm(empty); setTodoFiles([]); await load(); }
-    setSaving(false);
+    const uploadedPaths:string[]=[];
+    try{
+      const newAttachments:TodoAttachment[]=[];
+      for(let i=0;i<pendingTodoFiles.length;i++){
+        const file=pendingTodoFiles[i];
+        setMessage("Caricamento allegato "+(i+1)+" di "+pendingTodoFiles.length+": "+file.name);
+        const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+        const path=ctx.ownerKey+"/"+crypto.randomUUID()+"-"+safeName;
+        const {error}=await ctx.client.storage.from("recruiting-todo-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});
+        if(error)throw Error("Caricamento "+file.name+": "+error.message);
+        uploadedPaths.push(path);
+        newAttachments.push({name:file.name,type:file.type||"application/octet-stream",data:"",path});
+      }
+      const payload = {
+        owner_key: ctx.ownerKey, title: form.title.trim(), due_date: form.dueDate || null,
+        due_time: form.dueTime || null, body: form.body || "", priority, attachments: [...todoFiles,...newAttachments],
+        linked_kind: form.linkedKind || null, linked_id: form.linkedId || null,
+        linked_name: form.linkedName || "", source_key: form.sourceKey || null,
+        updated_at: new Date().toISOString()
+      };
+      setMessage("Salvataggio attività...");
+      const result = editing
+        ? await ctx.client.from("recruiting_todos").update(payload).eq("owner_key", ctx.ownerKey).eq("id", editing)
+        : await ctx.client.from("recruiting_todos").insert(payload);
+      if(result.error)throw Error(result.error.code==="23505"?"Questo evento è già presente.":result.error.message);
+      setFormOpen(false);setEditing(null);setForm(empty);setTodoFiles([]);setPendingTodoFiles([]);
+      setMessage("✓ Attività e allegati salvati.");
+      await load();
+    }catch(error:any){
+      if(uploadedPaths.length)await ctx.client.storage.from("recruiting-todo-files").remove(uploadedPaths);
+      setMessage("Salvataggio non riuscito: "+(error?.message||"errore sconosciuto"));
+    }finally{setSaving(false);}
   };
   const change = async (item: Todo, values: Partial<Todo>) => {
     if (!ctx) return;
@@ -225,7 +225,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     if(diaryAppointment)await loadDiary();else await load();
   };
   const startEdit = (item: Todo) => {
-    setEditing(item.id); setContactSearch(""); setPriority(item.priority); setTodoFiles(Array.isArray(item.attachments)?item.attachments:[]);
+    setEditing(item.id); setContactSearch(""); setPriority(item.priority); setTodoFiles(Array.isArray(item.attachments)?item.attachments:[]); setPendingTodoFiles([]);
     setForm({ title: item.title, dueDate: item.due_date || "", dueTime: item.due_time?.slice(0,5) || "",
       body: item.body, linkedKind: item.linked_kind || undefined, linkedId: item.linked_id || undefined,
       linkedName: item.linked_name, sourceKey: item.source_key || undefined });
@@ -274,13 +274,17 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:7}}>
         <input ref={todoFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" aria-label="Seleziona allegati" style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden",pointerEvents:"none"}} onChange={e=>{const input=e.currentTarget;const selected=Array.from(input.files||[]);void addTodoFiles(selected).finally(()=>{input.value="";});}} />
-        <button type="button" disabled={todoUploading || todoFiles.length>=5} onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
+        <button type="button" disabled={todoUploading || todoFiles.length+pendingTodoFiles.length>=5} onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
         {todoUploading&&<span role="status" style={{fontSize:13,color:"#1d4ed8"}}>Caricamento allegati in corso...</span>}
-        {todoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length} allegat{todoFiles.length===1?"o":"i"} pront{todoFiles.length===1?"o":"i"} da salvare</span>}
+        {todoFiles.length+pendingTodoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length+pendingTodoFiles.length} allegat{todoFiles.length+pendingTodoFiles.length===1?"o":"i"} pront{todoFiles.length+pendingTodoFiles.length===1?"o":"i"} da salvare</span>}
       </div>
       {todoFiles.map((file,index)=><div key={index} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:9,borderRadius:10,background:"white",border:"1px solid #e2e8f0"}}>
         <a href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
         <button type="button" style={action} onClick={()=>setTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
+      </div>)}
+      {pendingTodoFiles.map((file,index)=><div key={"pending-"+index} style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",padding:9,background:"#f0fdf4",borderRadius:10}}>
+        <span style={{flex:1,overflowWrap:"anywhere"}}>📎 {file.name} ({(file.size/1048576).toFixed(1)} MB)</span>
+        <button type="button" style={action} onClick={()=>setPendingTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
       </div>)}
       <small style={{color:"#64748b"}}>Massimo 5 allegati, 10 MB ciascuno. Su Android puoi aggiungerli uno alla volta: premi nuovamente SCEGLI ALLEGATI per ogni file.</small>
       <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)} /> PRIORITÀ — mantieni in alto finché non è fatta</label>
