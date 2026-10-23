@@ -3429,7 +3429,7 @@ export default function UnifiedAgentManagement({
                         {row.email?.report_notify ? "✅" : "—"}
                       </td>
                       <td style={{padding:"10px 9px",textAlign:"center",borderBottom:"1px solid #f1f5f9"}}>
-                        <input type="checkbox" aria-label={"PRODUZ "+row.fullName} title="Abilita la scheda PRODUZIONE" checked={pendingProduction[String(id)]??Boolean(productionPermissions[String(id)])} disabled={busy} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();const enabled=e.target.checked;setPendingProduction(v=>{const next={...v};if(enabled===Boolean(productionPermissions[String(id)]))delete next[String(id)];else next[String(id)]=enabled;return next;});}} style={{width:18,height:18,cursor:"pointer"}} />
+                        <input type="checkbox" aria-label={"SCHEDA PRODUZ. AGENTE "+row.fullName} title="Abilita la scheda PRODUZIONE" checked={pendingProduction[String(id)]??Boolean(productionPermissions[String(id)])} disabled={busy} onClick={e=>e.stopPropagation()} onChange={e=>{e.stopPropagation();const enabled=e.target.checked;setPendingProduction(v=>{const next={...v};if(enabled===Boolean(productionPermissions[String(id)]))delete next[String(id)];else next[String(id)]=enabled;return next;});}} style={{width:18,height:18,cursor:"pointer"}} />
                       </td>
                       <td style={{ padding: "10px 9px", borderBottom: "1px solid #f1f5f9" }}>
                         {row.recruiting?.phone || "-"}
