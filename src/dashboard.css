@@ -1481,3 +1481,28 @@ table {
     box-shadow: 0 3px 12px rgba(15,23,42,.045);
   }
 }
+
+/* Correzione leggibilità riepiloghi: niente sovrapposizioni su schermi stretti. */
+@media (max-width: 720px) {
+  .ge-totals-grid { grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap:8px !important; }
+  .ge-total-card { padding: 12px 10px !important; min-width:0 !important; overflow:hidden; }
+  .ge-total-card__metrics { display:flex !important; flex-direction:column !important; gap:9px !important; align-items:stretch !important; }
+  .ge-total-card__metrics > div { min-width:0 !important; width:100%; overflow-wrap:anywhere; }
+  .ge-total-card__metrics > div:nth-child(2) { height:1px !important; width:100% !important; }
+  .ge-total-card__metrics strong { font-size:clamp(17px,4.5vw,25px) !important; line-height:1.15 !important; display:block; overflow-wrap:anywhere; word-break:break-word; }
+  .ge-total-card__metrics span { font-size:11px !important; line-height:1.3 !important; }
+  .ge-total-card > div:last-child { overflow-wrap:anywhere; font-size:12px !important; }
+}
+/* Stile comune dei menu interni su mobile, senza modificare la logica dei filtri. */
+@media (max-width: 620px) {
+  .ge-database-nav, .ge-archive-main-tabs, .ge-archive-sub-tabs {gap:8px !important;}
+  .ge-database-nav > button {
+    flex: 1 1 calc(50% - 8px) !important;
+    min-height: 54px !important;
+    padding: 10px 7px !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    white-space: normal !important;
+    text-align: center !important;
+  }
+}
