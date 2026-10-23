@@ -943,6 +943,18 @@ function MultiSelectFilter({
 export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?: React.ReactNode }) {
   const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [rows, setRows] = useState<RecessoRow[]>([]);
+  const [excludedGeneralAgents,setExcludedGeneralAgents]=useState<Set<string>>(()=>new Set());
+  const normalizeGeneralAgent=(value:string)=>String(value||"").trim().toLocaleUpperCase("it-IT").replace(/\\s+/g," ");
+  useEffect(()=>{
+    let active=true;
+    const load=async()=>{const {data,error}=await supabase.from("production_agent_zones").select("agent_key,include_in_report");if(!error&&active)setExcludedGeneralAgents(new Set((data||[]).filter(x=>x.include_in_report===false).map(x=>normalizeGeneralAgent(x.agent_key))));};
+    void load();
+    const onFocus=()=>void load();
+    window.addEventListener("focus",onFocus);
+    return()=>{active=false;window.removeEventListener("focus",onFocus);};
+  },[]);
+  const isGeneralAgentIncluded=(name:string)=>!excludedGeneralAgents.has(normalizeGeneralAgent(name));
+
   const [legacyArchive, setLegacyArchive] = useState<LegacyArchive>({ version: 1, files: [] });
   const [pendingFiles, setPendingFiles] = useState<ParsedFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1239,10 +1251,10 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
 
   const agents = useMemo(
     () =>
-      Array.from(new Set(rows.map((row) => row.agente.trim()).filter(Boolean))).sort((a, b) =>
+      Array.from(new Set(rows.filter(row=>isGeneralAgentIncluded(row.agente)).map((row) => row.agente.trim()).filter(Boolean))).sort((a, b) =>
         a.localeCompare(b, "it")
       ),
-    [rows]
+    [rows,excludedGeneralAgents]
   );
 
   const provinces = useMemo(() => {
@@ -1307,6 +1319,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   }, [rows]);
 
   const detailRows = useMemo(() => rows.filter(row => {
+    if (!isGeneralAgentIncluded(row.agente)) return false;
     if (detailSourceIds && !detailSourceIds.has(row.id)) return false;
     const geo = deriveLegalSeatGeo(row.raw);
     if (detailAgents.length&&!detailAgents.includes(row.agente)) return false;
@@ -1338,7 +1351,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     const comparison = value(a).localeCompare(value(b), "it", { numeric: true, sensitivity: "base" });
     return comparison * (detailSortAsc ? 1 : -1) || a.denominazione.localeCompare(b.denominazione, "it");
   }),
-  [rows, detailSourceIds, detailAgent, detailAgents, detailRegion, detailProvince, detailMonth, detailMonths, detailCommodity, detailSearch, detailSort, detailSortAsc]);
+  [rows, excludedGeneralAgents, detailSourceIds, detailAgent, detailAgents, detailRegion, detailProvince, detailMonth, detailMonths, detailCommodity, detailSearch, detailSort, detailSortAsc]);
 
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
@@ -1347,6 +1360,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     const needle = search.trim().toLocaleLowerCase("it");
 
     return rows.filter((row) => {
+      if (!isGeneralAgentIncluded(row.agente)) return false;
       if (commodities.length && !commodities.includes(row.commodity)) return false;
       if (monthsSelected.length && !monthsSelected.includes(row.monthKey)) return false;
       if (agentsSelected.length && !agentsSelected.includes(row.agente)) return false;
