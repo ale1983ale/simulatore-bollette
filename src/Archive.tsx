@@ -1057,6 +1057,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [commodities, setCommodities] = useState<string[]>([]);
   const [monthsSelected, setMonthsSelected] = useState<string[]>([]);
   const [agentsSelected, setAgentsSelected] = useState<string[]>([]);
+  const [agentsSearch,setAgentsSearch]=useState("");
   const [provincesSelected, setProvincesSelected] = useState<string[]>([]);
   const [regionsSelected, setRegionsSelected] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -1306,7 +1307,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const detailRows = useMemo(() => rows.filter(row => {
     if (detailSourceIds && !detailSourceIds.has(row.id)) return false;
     const geo = deriveLegalSeatGeo(row.raw);
-    if (detailAgent && row.agente !== detailAgent) return false;
+    if (detailAgent && !row.agente.toLocaleLowerCase("it").includes(detailAgent.toLocaleLowerCase("it"))) return false;
     if (detailRegion && geo.region !== detailRegion) return false;
     if (detailProvince && geo.provinceCode !== detailProvince) return false;
     if (detailMonth && row.monthKey !== detailMonth) return false;
@@ -1935,8 +1936,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           PRODUZIONE
         </button>
 
-<button type="button" onClick={()=>setArchiveSection("dettaglioProduzione")} style={{padding:"10px 18px",borderRadius:9,border:archiveSection==="dettaglioProduzione"?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection==="dettaglioProduzione"?"#0f172a":"white",color:archiveSection==="dettaglioProduzione"?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>DETTAGLIO PRODUZIONE</button>
-                <button
+<button
           type="button"
           onClick={() => setArchiveSection("attivo")}
           style={{
@@ -1951,13 +1951,6 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
         >
           ATTIVO PRODUZIONE
         </button>
-
-        <button type="button" onClick={() => setArchiveSection("dettaglioRecessi")}
-          style={{ padding: "10px 18px", borderRadius: 9,
-            border: archiveSection === "dettaglioRecessi" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            background: archiveSection === "dettaglioRecessi" ? "#0f172a" : "white",
-            color: archiveSection === "dettaglioRecessi" ? "white" : "#0f172a",
-            fontWeight: 900, cursor: "pointer" }}>DETTAGLIO RECESSI</button>
 
         {reportAdminPanel && (
           <button
@@ -1996,6 +1989,9 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
 
       </div>
 
+      {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+        {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{padding:"9px 15px",borderRadius:9,border:"1px solid #cbd5e1",background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>{label}</button>)}
+      </div>}
       {archiveSection === "recessi" ? (
         <>
       <div style={cardStyle}>
@@ -2225,6 +2221,10 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",gridColumn:"1 / -1"}}>
             {(["LUCE","GAS"] as const).map(kind=>{const active=commodities.includes(kind);return <button key={kind} type="button" title={"Filtra "+kind} aria-pressed={active} onClick={()=>setCommodities(current=>current.includes(kind)?current.filter(x=>x!==kind):[...current,kind])} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"9px 14px",borderRadius:10,border:active?"2px solid "+(kind==="LUCE"?"#f59e0b":"#0284c7"):"1px solid #cbd5e1",background:active?(kind==="LUCE"?"#fef3c7":"#e0f2fe"):"white",color:kind==="GAS"?"#0284c7":"#92400e",fontWeight:850,cursor:"pointer"}}>{kind==="LUCE"?"⚡":<svg width="20" height="22" viewBox="0 0 24 24" fill="#0284c7" aria-hidden="true"><path d="M12.1 22c4.9 0 8-3.3 8-7.6 0-3.4-2-5.9-4.2-8.1.3 2.4-1.2 3.7-1.2 3.7C14.8 6.3 12.5 3.5 9.4 1c.4 3.2-1.1 5.2-3.1 7.6C4.6 10.7 4 12.5 4 14.5 4 18.8 7.3 22 12.1 22Z"/></svg>}{kind}</button>})}
           </div>
+          <label style={{display:"grid",gap:5,fontSize:12,fontWeight:850,color:"#334155",gridColumn:"span 2"}}>🔎 CERCA AGENTE
+            <input list="archive-agent-suggestions" placeholder="Scrivi le prime lettere del nome agente..." value={agentsSelected.length===1?agentsSelected[0]:agentsSearch} onChange={e=>{const value=e.target.value;setAgentsSearch(value);setAgentsSelected(agents.includes(value)?[value]:[]);}} style={{padding:"11px 12px",border:"1px solid #cbd5e1",borderRadius:9,width:"100%",boxSizing:"border-box"}}/>
+            <datalist id="archive-agent-suggestions">{agents.filter(a=>a.toLocaleLowerCase("it").includes(agentsSearch.toLocaleLowerCase("it"))).slice(0,60).map(a=><option key={a} value={a}/>)}</datalist>
+          </label>
           <MultiSelectFilter
             label="Luce / Gas"
             allLabel="Tutti"
@@ -2637,6 +2637,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
             Tutti i recessi salvati nell'archivio, con filtri indipendenti e dettaglio originale di ogni riga.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 10, marginBottom: 14 }}>
+            <label style={{display:"grid",gap:4}}>🔎 CERCA AGENTE<input list="archive-detail-agent-suggestions" value={detailAgent} placeholder="Digita nome agente..." onChange={e=>{setDetailAgent(e.target.value);setDetailLimit(100);}} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #cbd5e1",boxSizing:"border-box"}}/><datalist id="archive-detail-agent-suggestions">{agents.map(a=><option key={a} value={a}/>)}</datalist></label>
             <label>RICERCA GENERALE<input style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", boxSizing: "border-box" }} placeholder="Cliente, POD/PDR, note..." value={detailSearch} onChange={e => {setDetailSearch(e.target.value);setDetailLimit(100);}} /></label>
             {([
               ["AGENTE", detailAgent, setDetailAgent, agents.map(x=>[x,x])],
