@@ -1,3 +1,4 @@
+import Production from "./Production";
 import { confirmAction } from "./confirmAction";
 import MunicipalOffers from "./MunicipalOffers";
 import PunPsvMonitoringPanel from "./PunPsvMonitoringPanel";
@@ -15603,6 +15604,15 @@ const renderAdminContent = () => {
               });
             }}
           />
+
+          <details style={{marginTop:14,background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:12,overflow:"hidden"}}>
+            <summary style={{cursor:"pointer",padding:"13px 16px",fontWeight:950,color:"#075985"}}>
+              AGENTI / ZONE · RECESSI/PRODUZ GENERALE
+            </summary>
+            <div style={{padding:12}}>
+              <Production view="zone" />
+            </div>
+          </details>
 
           {adminProfile?.role === "super_admin" && (
             <details
