@@ -1397,3 +1397,11 @@ table {
 .punpsv-admin-table tbody tr:nth-child(3) td:last-child {
   border-bottom-right-radius: 8px;
 }
+
+/* Android / PWA: spazio di scorrimento sotto l'ultima scheda, oltre alla barra di navigazione di sistema. */
+@media (max-width: 720px) {
+  #root {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+}
