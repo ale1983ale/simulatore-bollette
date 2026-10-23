@@ -1138,7 +1138,7 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
           </div>
 
           <div style={{ color: "#64748b", fontSize: 13, marginBottom: 10 }}>
-            Gli agenti vengono aggiunti automaticamente quando importi i report. Assegna la regione e usa la spunta Report generale per decidere quali agenti devono concorrere ai risultati PRODUZIONE e comparire nel filtro Agente.
+            Gli agenti vengono aggiunti automaticamente quando importi i report. Assegna la regione e usa la spunta Recessi/Produz generale per decidere quali agenti devono concorrere ai risultati PRODUZIONE e comparire nel filtro Agente.
           </div>
 
           {zonesDirty && (
@@ -1246,7 +1246,7 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
                       }
                       style={{ width: 18, height: 18 }}
                     />
-                    Report generale
+                    Recessi/Produz generale
                   </label>
                 </div>
               ))
