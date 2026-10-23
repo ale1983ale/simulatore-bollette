@@ -10,12 +10,13 @@ const toBase64=(file:File)=>new Promise<string>((resolve,reject)=>{const reader=
 export default function ProvvigioniPresentazione(){
  const [source,setSource]=useState<"drive"|"manual">("drive");
  const [documents,setDocuments]=useState<Document[]>([]),[selected,setSelected]=useState<number|null>(null),[url,setUrl]=useState(""),[pdfBase64,setPdfBase64]=useState(""),[zoom,setZoom]=useState(100),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [openFull,setOpenFull]=useState(false);
  const objectUrl=useRef("");
  const clearUrl=()=>{if(objectUrl.current){URL.revokeObjectURL(objectUrl.current);objectUrl.current="";}setUrl("");setPdfBase64("");};
  useEffect(()=>()=>{if(objectUrl.current)URL.revokeObjectURL(objectUrl.current);},[]);
  const list=async()=>{const token=await getAdminSessionToken();const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_list",{p_session_token:token});if(e)throw e;setDocuments(Array.isArray(data)?data:[]);};
  useEffect(()=>{void list().catch(e=>setError(e.message));},[]);
- const open=async(id:number)=>{setBusy(true);setError("");clearUrl();try{const token=await getAdminSessionToken();const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_get",{p_session_token:token,p_id:id});if(e)throw e;const bytes=Uint8Array.from(atob(String(data)),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:"application/pdf"});objectUrl.current=URL.createObjectURL(blob);setUrl(objectUrl.current);setPdfBase64(String(data));setSelected(id);setZoom(100);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
+ const open=async(id:number,fullscreen=false)=>{setBusy(true);setError("");clearUrl();try{const token=await getAdminSessionToken();const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_get",{p_session_token:token,p_id:id});if(e)throw e;const bytes=Uint8Array.from(atob(String(data)),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:"application/pdf"});objectUrl.current=URL.createObjectURL(blob);setUrl(objectUrl.current);setPdfBase64(String(data));setSelected(id);setOpenFull(fullscreen);setZoom(100);}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const upload=async(event:React.ChangeEvent<HTMLInputElement>)=>{const file=event.target.files?.[0];event.target.value="";if(!file)return;if(file.size>8388608){setError("Dimensione massima: 8 MB per PDF.");return;}setBusy(true);setError("");setNotice("");try{const head=new Uint8Array(await file.slice(0,5).arrayBuffer());if(String.fromCharCode(...head)!=="%PDF-")throw new Error("Seleziona un file PDF valido.");const token=await getAdminSessionToken();const b64=await toBase64(file);const {data,error:e}=await supabase.rpc("provvigioni_presentazioni_add",{p_session_token:token,p_nome:file.name,p_pdf_base64:b64});if(e)throw e;await list();setNotice("PDF caricato correttamente.");if(data)await open(Number(data));}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const remove=async(doc:Document)=>{if(!window.confirm("Eliminare definitivamente "+doc.nome+"?"))return;setBusy(true);setError("");try{const token=await getAdminSessionToken();const {error:e}=await supabase.rpc("provvigioni_presentazioni_delete",{p_session_token:token,p_id:doc.id});if(e)throw e;if(selected===doc.id){setSelected(null);clearUrl();}await list();}catch(e:any){setError(e.message);}finally{setBusy(false);}};
  const selectedName=documents.find(d=>d.id===selected)?.nome||"";
@@ -41,7 +42,7 @@ export default function ProvvigioniPresentazione(){
     <div style={{display:"grid",gap:8}}>{documents.map(d=><div key={d.id} style={{padding:12,borderRadius:11,border:selected===d.id?"2px solid #f97316":"1px solid #e2e8f0",background:selected===d.id?"#fff7ed":"#f8fafc"}}>
      <div style={{fontWeight:850,overflowWrap:"anywhere"}}>📄 {d.nome}</div>
      <div style={{color:"#64748b",fontSize:12,margin:"5px 0 10px"}}>{(d.dimensione_bytes/1048576).toFixed(2)} MB · {new Date(d.creato_il).toLocaleDateString("it-IT")}</div>
-     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button style={{...button,background:"#0f172a",color:"white"}} disabled={busy} onClick={()=>void open(d.id)}>👁 VISUALIZZA</button><button style={{...button,color:"#b91c1c"}} disabled={busy} onClick={()=>void remove(d)}>ELIMINA</button></div>
+     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button style={{...button,background:"#0f172a",color:"white"}} disabled={busy} onClick={()=>void open(d.id)}>👁 VISUALIZZA</button><button style={{...button,background:"#0f172a",color:"white"}} title="Schermo intero" aria-label={"Schermo intero "+d.nome} disabled={busy} onClick={()=>void open(d.id,true)}>⛶</button><button style={{...button,color:"#b91c1c"}} disabled={busy} onClick={()=>void remove(d)}>ELIMINA</button></div>
     </div>)}</div>
    </div>
    <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:14,minWidth:0}}>
@@ -49,7 +50,7 @@ export default function ProvvigioniPresentazione(){
      <strong style={{overflowWrap:"anywhere"}}>{selectedName||"ANTEPRIMA PDF"}</strong>
      {url&&<a href={url} target="_blank" rel="noopener noreferrer" style={{...button,textDecoration:"none"}}>↗ APRI ORIGINALE</a>}
     </div>
-    {pdfBase64&&selected!==null?<PdfEditor key={selected} base64={pdfBase64} documentId={selected} filename={selectedName}/>:<div style={{minHeight:360,display:"grid",placeItems:"center",background:"#f8fafc",borderRadius:12,color:"#64748b",textAlign:"center",padding:20}}>{busy?"Caricamento PDF…":"Seleziona un documento per visualizzarlo qui."}</div>}
+    {pdfBase64&&selected!==null?<PdfEditor key={selected} base64={pdfBase64} documentId={selected} filename={selectedName} initialFull={openFull}/>:<div style={{minHeight:360,display:"grid",placeItems:"center",background:"#f8fafc",borderRadius:12,color:"#64748b",textAlign:"center",padding:20}}>{busy?"Caricamento PDF…":"Seleziona un documento per visualizzarlo qui."}</div>}
    </div>
   </div>
  </div>}</div>;
