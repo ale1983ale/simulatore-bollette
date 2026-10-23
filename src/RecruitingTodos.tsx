@@ -1,5 +1,5 @@
 import { confirmAction } from "./confirmAction";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { RecruitingContext } from "./recruitingClient";
 
 export type TodoDraft = {
@@ -85,6 +85,8 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   };
   const [showCompleted, setShowCompleted] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
+  const [contactMenuOpen,setContactMenuOpen]=useState(false);
+  const contactMenuRef=useRef<HTMLDivElement|null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState({
     title: "", dateFrom: "", dateTo: "", timeFrom: "", timeTo: "",
@@ -301,17 +303,22 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <label style={{ flex: "1 1 170px" }}>DATA (opzionale)<input type="date" style={field} value={form.dueDate || ""} onChange={e => setForm(v => ({...v,dueDate:e.target.value}))} /></label>
         <label style={{ flex: "1 1 130px" }}>ORA (opzionale)<input type="time" style={field} value={form.dueTime || ""} onChange={e => setForm(v => ({...v,dueTime:e.target.value}))} /></label>
       </div>
-      <label>CONTATTO COLLEGATO (opzionale)
-        <input style={{ ...field, marginTop: 5, marginBottom: 7 }} placeholder="⌕ Cerca per nome o cognome..." value={contactSearch} onChange={e=>setContactSearch(e.target.value)} />
-        <select style={field} value={form.linkedKind && form.linkedId ? form.linkedKind+":"+form.linkedId : ""} onChange={e => {
-          const found=contacts.find(x=>x.kind+":"+x.id===e.target.value);
-          setForm(v=>({...v,linkedKind:found?.kind,linkedId:found?.id,linkedName:found?.name || ""}));
-        }}>
-          <option value="">Nessun collegamento</option>
-          {form.linkedId && !contacts.some(x=>x.id===form.linkedId && x.kind===form.linkedKind) && <option value={form.linkedKind+":"+form.linkedId}>{form.linkedName}</option>}
-          {filteredContacts.map(x=><option key={x.kind+":"+x.id} value={x.kind+":"+x.id}>{x.name}</option>)}
-        </select>
-      </label>
+      <div ref={contactMenuRef} style={{position:"relative"}}>
+        <div style={{fontSize:13,marginBottom:5}}>CONTATTO COLLEGATO (opzionale)</div>
+        <button type="button" onClick={()=>{setContactMenuOpen(v=>!v);setContactSearch("");}} style={{...field,textAlign:"left",background:"#fff",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span>{form.linkedName || "Nessun collegamento"}</span><span style={{color:"#64748b"}}>⌄</span>
+        </button>
+        {contactMenuOpen && <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:30,background:"white",border:"1px solid #cbd5e1",borderRadius:10,boxShadow:"0 8px 22px rgba(15,23,42,.14)",padding:8,marginTop:4}}>
+          <input autoFocus style={{...field,marginBottom:6}} placeholder="⌕ Cerca nome o cognome nel menu..." value={contactSearch} onChange={e=>setContactSearch(e.target.value)} />
+          <div style={{maxHeight:220,overflowY:"auto"}}>
+            {[{id:"",name:"Nessun collegamento",kind:"candidate" as const},...filteredContacts].map(x=><button key={x.kind+":"+x.id} type="button" onClick={()=>{
+              setForm(v=>({...v,linkedKind:x.id?x.kind:undefined,linkedId:x.id||undefined,linkedName:x.id?x.name:""}));
+              setContactMenuOpen(false);setContactSearch("");
+            }} style={{display:"block",width:"100%",padding:"10px 9px",textAlign:"left",border:0,borderRadius:7,background:form.linkedId===x.id&&x.id?"#eff6ff":"white",cursor:"pointer",fontWeight:form.linkedId===x.id?800:500}}>{x.name}</button>)}
+            {filteredContacts.length===0&&<div style={{padding:10,color:"#64748b"}}>Nessun contatto trovato</div>}
+          </div>
+        </div>}
+      </div>
       <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
       <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)} /> PRIORITÀ — mantieni in alto finché non è fatta</label>
       <div style={{ display: "flex", gap: 8 }}>
