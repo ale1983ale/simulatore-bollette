@@ -330,7 +330,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       </div>
     </div>
   );
-  return <div style={{ background: "white", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, marginTop: 12 }}>
+  return <div className="ge-workspace" style={{ background: "white", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, marginTop: 12 }}>
     {previewFile&&previewUrl&&<div role="dialog" aria-modal="true" aria-label={"Anteprima "+previewFile.name} style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.86)",display:"flex",flexDirection:"column",padding:"max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom))",boxSizing:"border-box"}}>
       <div style={{display:"flex",gap:9,alignItems:"center",justifyContent:"space-between",color:"#fff",paddingBottom:12}}>
         <strong style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>📎 {previewFile.name}</strong>
@@ -345,17 +345,56 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <a href={previewUrl} download={previewFile.name} style={{...linkStyle,background:"#fff",padding:"12px 20px"}}>⬇ SCARICA / APRI CON ALTRA APP</a>
       </div>
     </div>}
-    <style>{`@media(max-width:640px){
-      .ge-todo-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px!important}
-      .ge-todo-actions button{min-width:0;width:100%;min-height:46px;padding:10px 9px!important;border-radius:16px!important;font-size:12px!important;line-height:1.25;white-space:normal;box-shadow:0 2px 7px rgba(15,23,42,.08);transition:transform .15s ease}
-      .ge-todo-actions button:active{transform:scale(.97)}
-      .ge-todo-actions button:nth-child(1){background:#dcfce7!important;color:#166534!important;border-color:#86efac!important}
-      .ge-todo-actions button:nth-child(2){background:#eff6ff!important;color:#1d4ed8!important;border-color:#bfdbfe!important}
-      .ge-todo-actions button:nth-child(3){background:#fef3c7!important;color:#92400e!important;border-color:#fcd34d!important}
-      .ge-todo-actions button:nth-child(4){background:#fff1f2!important;color:#be123c!important;border-color:#fecdd3!important}
-      .ge-todo-actions button:nth-child(n+5){grid-column:span 2}
-    }`}</style>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+    <style>{`
+    .ge-workspace{font-family:inherit;color:#14233d;box-shadow:0 12px 32px rgba(20,44,82,.05);min-width:0;overflow-wrap:anywhere}
+    .ge-workspace *{box-sizing:border-box}
+    .ge-workspace-header{padding:18px 20px!important;background:linear-gradient(110deg,#fff6e9,#fffaf4);border:1px solid #ffe1b4;border-radius:17px;gap:14px!important}
+    .ge-workspace-header h2{font-size:clamp(19px,2.2vw,26px);font-weight:850;letter-spacing:-.4px;color:#17243d}
+    .ge-workspace button{transition:background .15s,transform .12s,box-shadow .15s}
+    .ge-workspace button:active{transform:scale(.985)}
+    .ge-workspace-header button,.ge-workspace-tabs button{min-height:44px;border-radius:12px!important;font-size:13px!important;padding:10px 14px!important;box-shadow:0 2px 4px rgba(15,23,42,.04)}
+    .ge-workspace-tabs{background:#f4f8ff;padding:8px;border-radius:15px;gap:8px!important}
+    .ge-workspace-tabs button{flex:1 1 150px}
+    .ge-diary,.ge-todo-panel{min-width:0}
+    .ge-diary>h3,.ge-diary-list>h3,.ge-todo-list>h3{font-size:clamp(16px,2vw,20px);font-weight:850;color:#142743;margin:18px 0 12px;line-height:1.35}
+    .ge-diary-form{background:linear-gradient(135deg,#f2f7ff,#f9fbff);border:1px solid #d6e5ff;border-radius:16px;padding:clamp(12px,2.2vw,20px);margin:10px 0 18px}
+    .ge-diary-form label{font-size:13px;font-weight:750;color:#243a5c}
+    .ge-diary-form textarea,.ge-diary-form input,.ge-diary-form select{font-size:15px!important;border-radius:12px!important;background:white;max-width:100%}
+    .ge-diary-form textarea{min-height:110px}
+    .ge-diary-form button{min-height:43px;border-radius:12px!important}
+    .ge-diary-form button:disabled{opacity:.6}
+    .ge-diary-list,.ge-todo-list{background:#f7faff;border:1px solid #e0e9f6;border-radius:16px;padding:clamp(9px,1.5vw,16px)}
+    .ge-diary-list>h3,.ge-todo-list>h3{margin:2px 4px 6px}
+    .ge-diary-group{border:0!important;padding:0!important;background:transparent!important}
+    .ge-diary-group h4{background:#eaf3ff;border-radius:11px;padding:11px 14px;margin:4px 0 10px!important;font-size:15px!important}
+    .ge-diary-note,.ge-todo-card{background:#fff!important;border:1px solid #dce7f4!important;border-left:5px solid #367ff4!important;border-radius:14px!important;padding:clamp(12px,2vw,17px)!important;box-shadow:0 3px 12px rgba(23,48,83,.04);min-width:0}
+    .ge-diary-note:has(button:disabled),.ge-todo-card:has(button:disabled){opacity:1}
+    .ge-diary-note small,.ge-todo-card small{color:#687b96!important}
+    .ge-diary-note a,.ge-todo-card a{overflow-wrap:anywhere}
+    .ge-diary-actions,.ge-todo-actions{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px!important;margin-top:14px}
+    .ge-diary-actions button,.ge-todo-actions button{min-width:0!important;min-height:42px;border-radius:11px!important;padding:9px 7px!important;font-size:12px!important;font-weight:800!important;white-space:normal;line-height:1.25}
+    .ge-diary-actions button:nth-child(1){background:#eff6ff!important;color:#1d4ed8!important;border-color:#dbeafe!important}
+    .ge-diary-actions button:nth-child(2){background:#ecfdf5!important;color:#047857!important;border-color:#c6f6df!important}
+    .ge-diary-actions button:nth-child(3){background:#fff!important;color:#243a5c!important;border-color:#d5e0ed!important}
+    .ge-diary-actions button:nth-child(4){background:#fff1f2!important;color:#be123c!important;border-color:#ffe0e6!important}
+    .ge-todo-actions button:nth-child(1){background:#ecfdf5!important;color:#047857!important;border-color:#c6f6df!important}
+    .ge-todo-actions button:nth-child(2){background:#eff6ff!important;color:#1d4ed8!important;border-color:#dbeafe!important}
+    .ge-todo-actions button:nth-child(3){background:#fff7e6!important;color:#995d0a!important;border-color:#fde7b3!important}
+    .ge-todo-actions button:nth-child(4){background:#fff1f2!important;color:#be123c!important;border-color:#ffe0e6!important}
+    @media(max-width:640px){
+      .ge-workspace{padding:10px!important}
+      .ge-workspace-header{padding:13px!important}
+      .ge-workspace-header>div{width:100%;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px!important}
+      .ge-workspace-header>div button:last-child{grid-column:span 2}
+      .ge-workspace-header button{font-size:11px!important;padding:10px 7px!important}
+      .ge-workspace-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px!important}
+      .ge-workspace-tabs button{min-width:0!important;font-size:12px!important;padding:10px 5px!important}
+      .ge-diary-actions,.ge-todo-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      .ge-diary-actions button,.ge-todo-actions button{min-height:45px;font-size:12px!important}
+      .ge-diary-group h4{font-size:14px!important}
+    }
+`}</style>
+    <div className="ge-workspace-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
       <h2 style={{ margin: 0 }}>☑ COSE DA FARE</h2>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button style={action} onClick={() => setFiltersOpen(v => !v)}>{filtersOpen ? "NASCONDI FILTRI" : "⌕ FILTRI E RICERCA"}</button>
@@ -363,12 +402,13 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <button style={{ ...action, background: "#2563eb", color: "white" }} onClick={() => { setForm(empty); setContactSearch(""); setPriority(false); setEditing(null); setFormOpen(true); }}>＋ NUOVA COSA DA FARE</button>
       </div>
     </div>
-    <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
+    <div className="ge-workspace-tabs" style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
       <button style={{...action,background:subtab==="todo"?"#1d4ed8":"white",color:subtab==="todo"?"white":"#0f172a"}} onClick={()=>setSubtab("todo")}>☑ COSE DA FARE</button>
       <button style={{...action,background:subtab==="diario"?"#1d4ed8":"white",color:subtab==="diario"?"white":"#0f172a"}} onClick={()=>setSubtab("diario")}>📔 DIARIO</button>
     </div>
-    {subtab==="diario"&&<div style={{marginTop:14}}>
-      <h3>DIARIO · APPUNTI PER AGENTE / CONTATTO</h3>
+    {subtab==="diario"&&<div className="ge-diary" style={{marginTop:14}}>
+      <h3>📒 DIARIO · APPUNTI PER AGENTE / CONTATTO</h3>
+      <div className="ge-diary-form" style={{display:"grid",gap:12}}>
       <div ref={diaryContactMenuRef} style={{position:"relative",display:"grid",gap:6}}>
         <label>AGENTE O CONTATTO</label>
         <button type="button" style={{...field,textAlign:"left",background:"#fff",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}} onClick={()=>{setDiaryContactMenuOpen(v=>!v);setDiarySearch("");}}>
@@ -391,11 +431,13 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         <small>Fino a 5 allegati da 10 MB ciascuno.</small>
         <button style={{...action,background:"#2563eb",color:"white",width:"fit-content"}} disabled={diarySaving||(!diaryText.trim()&&!diaryFiles.length&&!diaryPendingFiles.length)} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"＋ SALVA APPUNTO"}</button>
       </div>}
-      {message&&<p role="alert" style={{color:"#b91c1c"}}>{message}</p>}
-      <div style={{display:"grid",gap:12,marginTop:16}}>
-        {diaryGroups.map(group=><article key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
+      </div>
+      {message&&<p role="status" style={{color:message.startsWith("✓")?"#15803d":"#b91c1c"}}>{message}</p>}
+      <div className="ge-diary-list" style={{display:"grid",gap:12,marginTop:16}}>
+        <h3>☷ APPUNTI INSERITI</h3>
+        {diaryGroups.map(group=><article className="ge-diary-group" key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
           <h4 style={{margin:"0 0 12px",color:"#1d4ed8",fontSize:17}}>{group.name} <span style={{fontSize:12,color:"#64748b"}}>({group.items.length} note)</span></h4>{group.items[0]?.linked_kind==="candidate" && group.items[0]?.linked_id && onOpenLinkedContact && <button type="button" style={{...linkStyle,marginBottom:12}} onClick={()=>onOpenLinkedContact("candidate",String(group.items[0].linked_id))}>↗ APRI SCHEDA CONTATTO</button>}
-          <div style={{display:"grid",gap:10}}>{group.items.map(item=><section key={item.id} id={"diary-note-"+item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
+          <div style={{display:"grid",gap:10}}>{group.items.map(item=><section className="ge-diary-note" key={item.id} id={"diary-note-"+item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
             <small style={{color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")}</small>
             {diaryEditing===item.id ? <div style={{display:"grid",gap:9,margin:"10px 0",padding:12,border:"2px solid #2563eb",borderRadius:12,background:"#fff"}}>
               <strong>✎ MODIFICA APPUNTO</strong>
@@ -415,7 +457,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
               {message&&<span role="status">{message}</span>}
             </div> : <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none",margin:"8px 0"}}>{item.body}</p>}
             {Array.isArray(item.attachments)&&item.attachments.map((file:any,i:number)=><a key={i} href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{display:"inline-block",marginRight:10,marginBottom:8,color:"#1d4ed8",fontWeight:700,fontSize:13}}>📎 {file.name}</a>)}
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <div className="ge-diary-actions" style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button type="button" style={{...action,background:"#eff6ff",color:"#1d4ed8"}} onClick={()=>startDiaryEdit(item)}>✎ MODIFICA</button>
               <button style={action} onClick={()=>void diaryAction(item,"done")}>{item.completed?"↶ RIAPRI":"✓ FATTO"}</button>
               <button style={action} disabled={Boolean(item.calendar_event_id)} onClick={()=>{setCalendarTodo({id:item.id,title:"DIARIO · "+(item.linked_name||"APPUNTO"),body:item.body,linked_name:item.linked_name,linked_kind:item.linked_kind,linked_id:item.linked_id,due_date:null,due_time:null,source_key:null} as Todo);setCalendarDate("");setCalendarTime("");setCalendarType("ALTRO");}}>{item.calendar_event_id?"✓ IN CALENDARIO":"📅 CALENDARIO"}</button>
@@ -426,7 +468,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         {!diaryGroups.length&&<p>Nessun appunto presente.</p>}
       </div>
     </div>}
-    {subtab==="todo"&&<>
+    {subtab==="todo"&&<div className="ge-todo-panel">
     {message && <p role="alert" style={{ color: "#b91c1c" }}>{message}</p>}
     {filtersOpen && <div style={{ background: "#f1f5f9", padding: 14, borderRadius: 12, marginTop: 14 }}>
       <strong>FILTRA COSE DA FARE</strong>
@@ -477,9 +519,10 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       </div>
     </div>}
     {formOpen && !editing && todoEditor}
-    <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+    <div className="ge-todo-list" style={{ display: "grid", gap: 10, marginTop: 16 }}>
+      <h3>☷ ATTIVITÀ INSERITE</h3>
       {sorted.length===0 && <p style={{ color: "#64748b" }}>Nessuna cosa da fare nell'elenco.</p>}
-      {sorted.map(item=><div key={item.id} id={"ge-todo-edit-"+item.id} style={{ padding: 13, borderRadius: 11, border: "1px solid "+(item.priority&&!item.completed?"#f59e0b":"#cbd5e1"), borderLeft: "6px solid "+(item.completed?"#94a3b8":item.priority?"#f59e0b":"#2563eb"), background: item.completed?"#f1f5f9":item.priority?"#fffbeb":"#fff" }}>
+      {sorted.map(item=><div key={item.id} id={"ge-todo-edit-"+item.id} className="ge-todo-card" style={{ padding: 13, borderRadius: 11, border: "1px solid "+(item.priority&&!item.completed?"#f59e0b":"#cbd5e1"), borderLeft: "6px solid "+(item.completed?"#94a3b8":item.priority?"#f59e0b":"#2563eb"), background: item.completed?"#f1f5f9":item.priority?"#fffbeb":"#fff" }}>
         {formOpen && editing===item.id && <div style={{marginBottom:12,border:"2px solid #2563eb",borderRadius:14,padding:4}}>{todoEditor}</div>}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
           <strong style={{ textDecoration: item.completed?"line-through":"none" }}>{item.priority&&!item.completed?"★ ":""}{item.title}</strong>
@@ -509,6 +552,6 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         </div>
       </div>)}
     </div>
-    </>}
+    </div>}
   </div>;
 }
