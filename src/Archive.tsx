@@ -944,7 +944,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [rows, setRows] = useState<RecessoRow[]>([]);
   const [excludedGeneralAgents,setExcludedGeneralAgents]=useState<Set<string>>(()=>new Set());
-  const normalizeGeneralAgent=(value:string)=>String(value||"").trim().toLocaleUpperCase("it-IT").replace(/\\s+/g," ");
+  const normalizeGeneralAgent=(value:string)=>String(value||"").trim().toLocaleUpperCase("it-IT").replace(/\s+/g," ");
   useEffect(()=>{
     let active=true;
     const load=async()=>{const {data,error}=await supabase.from("production_agent_zones").select("agent_key,include_in_report");if(!error&&active)setExcludedGeneralAgents(new Set((data||[]).filter(x=>x.include_in_report===false).map(x=>normalizeGeneralAgent(x.agent_key))));};
@@ -1406,6 +1406,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
     });
   }, [
     rows,
+    excludedGeneralAgents,
     commodities,
     monthsSelected,
     agentsSelected,
