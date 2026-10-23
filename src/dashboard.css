@@ -1480,7 +1480,4 @@ table {
     text-align: center !important;
     box-shadow: 0 3px 12px rgba(15,23,42,.045);
   }
-  .ge-archive-main-tabs > button:nth-child(3) {background: #f3e8ff !important; color:#6b21a8 !important; border-color:#e9d5ff !important;}
-  .ge-archive-main-tabs > button:nth-child(4) {background: #fff7ed !important; color:#9a3412 !important; border-color:#fed7aa !important;}
-  .ge-archive-sub-tabs > button:nth-child(2) {background: #e0f2fe !important; color:#075985 !important; border-color:#bae6fd !important;}
 }
