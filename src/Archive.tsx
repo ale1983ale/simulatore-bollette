@@ -2461,12 +2461,21 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           </div>
         ) : (
           <>
-            <div style={{overflowX:"auto",marginTop:16}}>
-              <h3 style={{margin:"0 0 12px"}}>RECESSI PER MESE · LUCE E GAS</h3>
-              <table style={{width:"100%",borderCollapse:"collapse",minWidth:650}}>
-                <thead><tr>{["MESE","FORNITURA","NUMERO RECESSI","CONSUMO TOTALE","DETTAGLIO CLIENTI"].map(h=><th key={h} style={{padding:12,textAlign:"left",background:"#e2e8f0",fontWeight:900}}>{h}</th>)}</tr></thead>
-                <tbody>{Array.from(filteredRows.reduce((map,row)=>{const key=row.monthKey+"|"+row.commodity;const existing=map.get(key)||{month:row.monthKey,commodity:row.commodity,count:0,consumo:0,ids:[] as number[]};existing.count++;existing.consumo+=Number(row.consumo||0);existing.ids.push(row.id);map.set(key,existing);return map;},new Map<string,{month:string;commodity:string;count:number;consumo:number;ids:number[]}>()).values()).sort((a,b)=>b.month.localeCompare(a.month)||a.commodity.localeCompare(b.commodity)).map((g,_,all)=>{const months=Array.from(new Set(all.map(x=>x.month)));const bg=months.indexOf(g.month)%2===0?"#ffffff":"#eaf2fb";return <tr key={g.month+"|"+g.commodity} style={{background:bg,borderBottom:"1px solid #cbd5e1"}}><td style={{padding:12,fontWeight:850}}>{monthLabel(g.month)}</td><td style={{color:g.commodity==="GAS"?"#0284c7":"#b45309",fontWeight:850}}>{g.commodity==="GAS"?"♨ GAS":g.commodity==="LUCE"?"⚡ LUCE":g.commodity}</td><td style={{fontWeight:850}}>{g.count.toLocaleString("it-IT")}</td><td>{g.consumo.toLocaleString("it-IT",{maximumFractionDigits:2})} {g.commodity==="GAS"?"Smc":"kWh"}</td><td><button type="button" onClick={()=>{setDetailSourceIds(new Set(g.ids));setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity(g.commodity==="LUCE"||g.commodity==="GAS"?g.commodity:"");setDetailSearch("");setDetailLimit(100);setArchiveSection("dettaglioRecessi");}} style={{padding:"9px 12px",borderRadius:9,border:"1px solid #bfdbfe",background:"#eff6ff",color:"#1d4ed8",fontWeight:850,cursor:"pointer"}}>📋 VEDI CLIENTI ↗</button></td></tr>;})}</tbody>
-              </table>
+            <div style={{marginTop:20}}>
+              <h3 style={{margin:"0 0 14px",fontSize:18,fontWeight:950,letterSpacing:"-.02em"}}>📅 RECESSI MENSILI · LUCE E GAS</h3>
+              <div style={{display:"grid",gap:10}}>
+              {Array.from(filteredRows.reduce((map,row)=>{const month=row.monthKey||"SENZA MESE";const entry=map.get(month)||{month,luce:{count:0,consumo:0,ids:[] as number[]},gas:{count:0,consumo:0,ids:[] as number[]}};const target=row.commodity==="LUCE"?entry.luce:row.commodity==="GAS"?entry.gas:null;if(target){target.count++;target.consumo+=Number(row.consumo||0);target.ids.push(row.id);}map.set(month,entry);return map;},new Map<string,{month:string;luce:{count:number;consumo:number;ids:number[]};gas:{count:number;consumo:number;ids:number[]}}>()).values()).sort((a,b)=>b.month.localeCompare(a.month)).map((g,i)=><div key={g.month} style={{display:"grid",gridTemplateColumns:"minmax(140px,.65fr) repeat(2,minmax(0,1fr))",gap:10,alignItems:"stretch",padding:"12px",minHeight:112,borderRadius:15,border:"1px solid "+(i%2===0?"#dbe4ee":"#c9def5"),background:i%2===0?"#f8fafc":"#eaf3ff",boxShadow:"0 2px 8px #0f172a0b"}}>
+                <div style={{display:"flex",alignItems:"center",padding:"12px",fontSize:17,fontWeight:950,color:"#0f172a",letterSpacing:"-.02em"}}>{g.month==="SENZA MESE"?"SENZA MESE":monthLabel(g.month)}</div>
+                {(["LUCE","GAS"] as const).map(kind=>{const data=kind==="LUCE"?g.luce:g.gas;const gas=kind==="GAS";return <div key={kind} style={{display:"flex",flexWrap:"wrap",justifyContent:"space-between",alignItems:"center",gap:10,padding:"13px 16px",borderRadius:12,background:gas?"#edf9ff":"#fff7ed",border:"1px solid "+(gas?"#bae6fd":"#fed7aa")}}>
+                  <div style={{display:"grid",gap:5}}>
+                    <span style={{fontSize:13,fontWeight:900,color:gas?"#0369a1":"#c2410c"}}>{gas?"♨ GAS":"⚡ LUCE"}</span>
+                    <strong style={{fontSize:23,fontWeight:950,color:"#0f172a",lineHeight:1.1}}>{data.count.toLocaleString("it-IT")} <span style={{fontSize:12,fontWeight:700,color:"#64748b"}}>recessi</span></strong>
+                    <span style={{fontSize:14,fontWeight:850,color:"#334155"}}>{data.consumo.toLocaleString("it-IT",{maximumFractionDigits:2})} {gas?"Smc":"kWh"}</span>
+                  </div>
+                  <button type="button" disabled={!data.count} onClick={()=>{setDetailSourceIds(new Set(data.ids));setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity(kind);setDetailSearch("");setDetailLimit(100);setArchiveSection("dettaglioRecessi");}} style={{padding:"10px 13px",borderRadius:10,border:"1px solid "+(gas?"#7dd3fc":"#fdba74"),background:data.count?"white":"#e2e8f0",color:gas?"#0369a1":"#9a3412",fontWeight:900,cursor:data.count?"pointer":"default",whiteSpace:"nowrap"}}>VEDI CLIENTI ↗</button>
+                </div>;})}
+              </div>)}
+              </div>
               {!filteredRows.length&&<p>Nessun recesso per i filtri selezionati.</p>}
             </div>
             <details style={{marginTop:14}}><summary style={{cursor:"pointer",fontWeight:850,color:"#475569",padding:"12px 0"}}>MOSTRA ELENCO COMPLETO DEI SINGOLI CLIENTI</summary>
