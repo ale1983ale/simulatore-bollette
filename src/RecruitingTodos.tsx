@@ -30,6 +30,22 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [form, setForm] = useState<TodoDraft>(empty);
   const [priority, setPriority] = useState(false);
   const [todoFiles,setTodoFiles]=useState<TodoAttachment[]>([]);
+  const [previewFile,setPreviewFile]=useState<TodoAttachment|null>(null);
+  const [previewUrl,setPreviewUrl]=useState<string|null>(null);
+  const openAttachment=async(file:TodoAttachment)=>{
+    try{
+      const response=await fetch(file.data);
+      const blob=await response.blob();
+      const url=URL.createObjectURL(blob);
+      setPreviewUrl(current=>{if(current)URL.revokeObjectURL(current);return url;});
+      setPreviewFile(file);
+    }catch(error:any){setMessage("Impossibile aprire l'allegato: "+(error?.message||"file non leggibile"));}
+  };
+  const closeAttachment=()=>{
+    setPreviewFile(null);
+    setPreviewUrl(current=>{if(current)URL.revokeObjectURL(current);return null;});
+  };
+
   const todoFileInputRef=useRef<HTMLInputElement|null>(null);
   const [todoUploading,setTodoUploading]=useState(false);
   const addTodoFiles=async(files:File[])=>{
@@ -39,7 +55,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       if(todoFiles.length+files.length>5)throw Error("Massimo 5 allegati per attività.");
       const added:TodoAttachment[]=[];
       for(const file of files){
-        if(file.size>2*1024*1024)throw Error(file.name+" supera 2 MB (dimensione: "+(file.size/1048576).toFixed(1)+" MB).");
+        if(file.size>10*1024*1024)throw Error(file.name+" supera 10 MB (dimensione: "+(file.size/1048576).toFixed(1)+" MB).");
         const data=await new Promise<string>((resolve,reject)=>{
           const reader=new FileReader();
           reader.onload=()=>resolve(String(reader.result||""));
@@ -80,7 +96,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const addDiaryFiles=async(files:FileList|null)=>{
     if(!files?.length)return;setDiaryUploading(true);
     try{const added:Array<{name:string;type:string;data:string}>=[];
-      for(const file of Array.from(files)){if(file.size>2*1024*1024)throw Error("Il file "+file.name+" supera 2 MB.");
+      for(const file of Array.from(files)){if(file.size>10*1024*1024)throw Error("Il file "+file.name+" supera 10 MB.");
         const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));reader.onerror=()=>reject(Error("Errore lettura file"));reader.readAsDataURL(file);});
         added.push({name:file.name,type:file.type,data});
       }
@@ -227,6 +243,20 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
     Number(!b.completed && b.priority) - Number(!a.completed && a.priority) ||
     b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
   return <div style={{ background: "white", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, marginTop: 12 }}>
+    {previewFile&&previewUrl&&<div role="dialog" aria-modal="true" aria-label={"Anteprima "+previewFile.name} style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.86)",display:"flex",flexDirection:"column",padding:"max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom))",boxSizing:"border-box"}}>
+      <div style={{display:"flex",gap:9,alignItems:"center",justifyContent:"space-between",color:"#fff",paddingBottom:12}}>
+        <strong style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>📎 {previewFile.name}</strong>
+        <button type="button" onClick={closeAttachment} style={{...action,background:"#fff",color:"#0f172a",minHeight:44}}>✕ CHIUDI</button>
+      </div>
+      {previewFile.type.startsWith("image/")||/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(previewFile.name)
+        ?<img src={previewUrl} alt={previewFile.name} style={{flex:1,width:"100%",minHeight:0,objectFit:"contain"}} />
+        :previewFile.type==="application/pdf"||/\.pdf$/i.test(previewFile.name)
+          ?<iframe title={previewFile.name} src={previewUrl} style={{flex:1,width:"100%",minHeight:0,border:0,borderRadius:12,background:"#fff"}} />
+          :<div style={{flex:1,display:"grid",placeItems:"center",color:"#fff",textAlign:"center",padding:20}}>Questo formato non dispone di anteprima integrata. Puoi aprirlo con un'app compatibile scaricandolo.</div>}
+      <div style={{display:"flex",justifyContent:"center",paddingTop:10}}>
+        <a href={previewUrl} download={previewFile.name} style={{...linkStyle,background:"#fff",padding:"12px 20px"}}>⬇ SCARICA / APRI CON ALTRA APP</a>
+      </div>
+    </div>}
     <style>{`@media(max-width:640px){
       .ge-todo-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px!important}
       .ge-todo-actions button{min-width:0;width:100%;min-height:46px;padding:10px 9px!important;border-radius:16px!important;font-size:12px!important;line-height:1.25;white-space:normal;box-shadow:0 2px 7px rgba(15,23,42,.08);transition:transform .15s ease}
@@ -265,7 +295,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         📎 ALLEGA FILE <input type="file" multiple style={{display:"none"}} onChange={e=>{void addDiaryFiles(e.target.files);e.target.value="";}} />
       </label>
       {diaryFiles.map((file,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}>📎 {file.name} <button type="button" style={action} onClick={()=>setDiaryFiles(v=>v.filter((_,j)=>i!==j))}>✕</button></div>)}
-      <small style={{color:"#64748b"}}>Fino a 5 allegati, massimo 2 MB per file.</small>
+      <small style={{color:"#64748b"}}>Fino a 5 allegati, massimo 10 MB per file.</small>
       <button style={{...action,background:"#2563eb",color:"white",marginTop:8}} disabled={diarySaving||diaryUploading||(!diaryText.trim()&&!diaryFiles.length)} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"＋ SALVA APPUNTO"}</button>
       {message&&<p role="alert" style={{color:"#b91c1c"}}>{message}</p>}
       <div style={{display:"grid",gap:12,marginTop:16}}>
@@ -274,7 +304,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           <div style={{display:"grid",gap:10}}>{group.items.map(item=><section key={item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
             <small style={{color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")}</small>
             <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none",margin:"8px 0"}}>{item.body}</p>
-            {Array.isArray(item.attachments)&&item.attachments.map((file:any,i:number)=><a key={i} href={file.data} download={file.name} style={{display:"inline-block",marginRight:10,marginBottom:8,color:"#1d4ed8",fontWeight:700,fontSize:13}}>📎 {file.name}</a>)}
+            {Array.isArray(item.attachments)&&item.attachments.map((file:any,i:number)=><a key={i} href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{display:"inline-block",marginRight:10,marginBottom:8,color:"#1d4ed8",fontWeight:700,fontSize:13}}>📎 {file.name}</a>)}
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <button style={action} onClick={()=>void diaryAction(item,"done")}>{item.completed?"↶ RIAPRI":"✓ FATTO"}</button>
               <button style={action} disabled={Boolean(item.calendar_event_id)} onClick={()=>{setCalendarTodo({id:item.id,title:"DIARIO · "+(item.linked_name||"APPUNTO"),body:item.body,linked_name:item.linked_name,linked_kind:item.linked_kind,linked_id:item.linked_id,due_date:null,due_time:null,source_key:null} as Todo);setCalendarDate("");setCalendarTime("");setCalendarType("ALTRO");}}>{item.calendar_event_id?"✓ IN CALENDARIO":"📅 CALENDARIO"}</button>
@@ -365,10 +395,10 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         {todoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length} allegat{todoFiles.length===1?"o":"i"} pront{todoFiles.length===1?"o":"i"} da salvare</span>}
       </div>
       {todoFiles.map((file,index)=><div key={index} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:9,borderRadius:10,background:"white",border:"1px solid #e2e8f0"}}>
-        <a href={file.data} download={file.name} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
+        <a href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
         <button type="button" style={action} onClick={()=>setTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
       </div>)}
-      <small style={{color:"#64748b"}}>Massimo 5 allegati, 2 MB ciascuno.</small>
+      <small style={{color:"#64748b"}}>Massimo 5 allegati, 10 MB ciascuno.</small>
       <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)} /> PRIORITÀ — mantieni in alto finché non è fatta</label>
       <div style={{ display: "flex", gap: 8 }}>
         <button style={{ ...action, background: "#16a34a", color: "white" }} disabled={saving || todoUploading || !form.title.trim()} onClick={()=>void save()}>{saving?"SALVATAGGIO...":"SALVA"}</button>
@@ -388,7 +418,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         </div>}
         {item.body && <div style={{ marginTop: 7, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.body}</div>}
         {Array.isArray(item.attachments)&&item.attachments.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:10}}>
-          {item.attachments.map((file,index)=><a key={index} href={file.data} download={file.name} style={{...linkStyle,maxWidth:"100%",overflowWrap:"anywhere"}}>📎 {file.name}</a>)}
+          {item.attachments.map((file,index)=><a key={index} href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{...linkStyle,maxWidth:"100%",overflowWrap:"anywhere"}}>📎 {file.name}</a>)}
         </div>}
         <div className="ge-todo-actions" style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 10 }}>
           <button style={action} onClick={()=>void change(item,{completed:!item.completed})}>{item.completed?"↶ RIAPRI":"✓ FATTA"}</button>
