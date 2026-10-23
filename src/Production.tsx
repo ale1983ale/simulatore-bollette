@@ -1226,7 +1226,7 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
                   key={agent.agentKey}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "minmax(280px,1fr) minmax(220px,320px) minmax(160px,190px)",
+                    gridTemplateColumns: "minmax(240px,1fr) minmax(205px,260px) minmax(220px,320px)",
                     gap: 12,
                     alignItems: "center",
                     padding: "9px 10px",
@@ -1235,17 +1235,6 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
                   }}
                 >
                   <strong>{agent.agente}</strong>
-
-                  <select
-                    value={agent.regione}
-                    onChange={(e) => updateAgentRegion(agent, e.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="">Zona non assegnata</option>
-                    {ITALIAN_REGIONS.map((region) => (
-                      <option key={region} value={region}>{region}</option>
-                    ))}
-                  </select>
 
                   <label
                     style={{
@@ -1267,6 +1256,17 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
                     />
                     Recessi/Produz generale
                   </label>
+
+                  <select
+                    value={agent.regione}
+                    onChange={(e) => updateAgentRegion(agent, e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">Zona non assegnata</option>
+                    {ITALIAN_REGIONS.map((region) => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
+                  </select>
                 </div>
               ))
             )}
