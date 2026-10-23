@@ -74,6 +74,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [diarySaving,setDiarySaving]=useState(false);
   const [diaryEditing,setDiaryEditing]=useState<string|null>(null);
   const [diaryPendingFiles,setDiaryPendingFiles]=useState<File[]>([]);
+  const diaryFileInputRef=useRef<HTMLInputElement|null>(null);
   const [diarySearch,setDiarySearch]=useState("");
   const [diaryContactMenuOpen,setDiaryContactMenuOpen]=useState(false);
   const diaryContactMenuRef=useRef<HTMLDivElement|null>(null);
@@ -382,22 +383,40 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           </div>
         </div>}
       </div>
-      <label style={{display:"grid",gap:6}}>NUOVO APPUNTO<textarea rows={4} style={field} value={diaryText} onChange={e=>setDiaryText(e.target.value)} placeholder="Scrivi un appunto..." /></label>
-      <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:10,border:"1px solid #cbd5e1",background:"#f8fafc",cursor:"pointer",fontWeight:800,width:"fit-content"}}>
-        📎 ALLEGA FILE <input type="file" multiple style={{display:"none"}} onChange={e=>{void addDiaryFiles(e.target.files);e.target.value="";}} />
-      </label>
-      {diaryFiles.map((file,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}>📎 {file.name} <button type="button" style={action} onClick={()=>setDiaryFiles(v=>v.filter((_,j)=>i!==j))}>✕</button></div>)}
-      <small style={{color:"#64748b"}}>Fino a 5 allegati, massimo 10 MB per file.</small>
-      <button style={{...action,background:"#2563eb",color:"white",marginTop:8}} disabled={diarySaving||diaryUploading||(!diaryText.trim()&&!diaryFiles.length)} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"＋ SALVA APPUNTO"}</button>
+      {!diaryEditing&&<label style={{display:"grid",gap:6}}>NUOVO APPUNTO<textarea rows={4} style={field} value={diaryText} onChange={e=>setDiaryText(e.target.value)} placeholder="Scrivi un appunto..." /></label>}
+      {!diaryEditing&&<div style={{display:"grid",gap:8}}>
+        <input ref={diaryFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" style={{position:"absolute",width:1,height:1,opacity:0,pointerEvents:"none"}} onChange={e=>{void addDiaryFiles(e.currentTarget.files);e.currentTarget.value="";}} />
+        <button type="button" style={{...action,width:"fit-content",background:"#eff6ff",color:"#1d4ed8"}} onClick={()=>diaryFileInputRef.current?.click()}>📎 AGGIUNGI ALLEGATI</button>
+        {diaryPendingFiles.map((file,i)=><div key={i}>📎 {file.name} ({(file.size/1048576).toFixed(1)} MB) <button type="button" style={action} onClick={()=>setDiaryPendingFiles(v=>v.filter((_,j)=>i!==j))}>✕</button></div>)}
+        <small>Fino a 5 allegati da 10 MB ciascuno.</small>
+        <button style={{...action,background:"#2563eb",color:"white",width:"fit-content"}} disabled={diarySaving||(!diaryText.trim()&&!diaryFiles.length&&!diaryPendingFiles.length)} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"＋ SALVA APPUNTO"}</button>
+      </div>}
       {message&&<p role="alert" style={{color:"#b91c1c"}}>{message}</p>}
       <div style={{display:"grid",gap:12,marginTop:16}}>
         {diaryGroups.map(group=><article key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
           <h4 style={{margin:"0 0 12px",color:"#1d4ed8",fontSize:17}}>{group.name} <span style={{fontSize:12,color:"#64748b"}}>({group.items.length} note)</span></h4>{group.items[0]?.linked_kind==="candidate" && group.items[0]?.linked_id && onOpenLinkedContact && <button type="button" style={{...linkStyle,marginBottom:12}} onClick={()=>onOpenLinkedContact("candidate",String(group.items[0].linked_id))}>↗ APRI SCHEDA CONTATTO</button>}
-          <div style={{display:"grid",gap:10}}>{group.items.map(item=><section key={item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
+          <div style={{display:"grid",gap:10}}>{group.items.map(item=><section key={item.id} id={"diary-note-"+item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
             <small style={{color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")}</small>
-            <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none",margin:"8px 0"}}>{item.body}</p>
+            {diaryEditing===item.id ? <div style={{display:"grid",gap:9,margin:"10px 0",padding:12,border:"2px solid #2563eb",borderRadius:12,background:"#fff"}}>
+              <strong>✎ MODIFICA APPUNTO</strong>
+              <textarea rows={5} style={field} value={diaryText} onChange={e=>setDiaryText(e.target.value)} />
+              <select style={field} value={diaryLinked} onChange={e=>setDiaryLinked(e.target.value)}>
+                <option value="">Nessun collegamento</option>
+                {diaryContacts.map(c=><option key={c.kind+":"+c.id} value={c.kind+":"+c.id}>{c.name} · {c.kind==="agent"?"AGENTE":"CONTATTO"}</option>)}
+              </select>
+              {diaryFiles.map((file,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>📎 {file.name}<button type="button" style={action} onClick={()=>setDiaryFiles(v=>v.filter((_,j)=>i!==j))}>✕ RIMUOVI</button></div>)}
+              <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" onChange={e=>{void addDiaryFiles(e.currentTarget.files);e.currentTarget.value="";}} />
+              {diaryPendingFiles.map((file,i)=><div key={i}>📎 {file.name} <button type="button" style={action} onClick={()=>setDiaryPendingFiles(v=>v.filter((_,j)=>i!==j))}>✕</button></div>)}
+              <small>Massimo 5 allegati da 10 MB ciascuno.</small>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button type="button" style={{...action,background:"#16a34a",color:"#fff"}} disabled={diarySaving} onClick={()=>void saveDiary()}>{diarySaving?"SALVATAGGIO...":"✓ SALVA MODIFICHE"}</button>
+                <button type="button" style={action} onClick={cancelDiaryEdit}>ANNULLA</button>
+              </div>
+              {message&&<span role="status">{message}</span>}
+            </div> : <p style={{whiteSpace:"pre-wrap",textDecoration:item.completed?"line-through":"none",margin:"8px 0"}}>{item.body}</p>}
             {Array.isArray(item.attachments)&&item.attachments.map((file:any,i:number)=><a key={i} href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{display:"inline-block",marginRight:10,marginBottom:8,color:"#1d4ed8",fontWeight:700,fontSize:13}}>📎 {file.name}</a>)}
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <button type="button" style={{...action,background:"#eff6ff",color:"#1d4ed8"}} onClick={()=>startDiaryEdit(item)}>✎ MODIFICA</button>
               <button style={action} onClick={()=>void diaryAction(item,"done")}>{item.completed?"↶ RIAPRI":"✓ FATTO"}</button>
               <button style={action} disabled={Boolean(item.calendar_event_id)} onClick={()=>{setCalendarTodo({id:item.id,title:"DIARIO · "+(item.linked_name||"APPUNTO"),body:item.body,linked_name:item.linked_name,linked_kind:item.linked_kind,linked_id:item.linked_id,due_date:null,due_time:null,source_key:null} as Todo);setCalendarDate("");setCalendarTime("");setCalendarType("ALTRO");}}>{item.calendar_event_id?"✓ IN CALENDARIO":"📅 CALENDARIO"}</button>
               <button style={{...action,color:"#b91c1c"}} onClick={()=>void diaryAction(item,"delete")}>ELIMINA</button>
