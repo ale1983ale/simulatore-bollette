@@ -531,6 +531,7 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
   const [periodsSelected, setPeriodsSelected] = useState<string[]>([]);
   const [commoditiesSelected, setCommoditiesSelected] = useState<string[]>([]);
   const [agentsSelected, setAgentsSelected] = useState<string[]>([]);
+  const [agentQuery,setAgentQuery]=useState("");
   const [zonesSelected, setZonesSelected] = useState<string[]>([]);
 
   const fetchRows = async () => {
@@ -1387,6 +1388,10 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, marginTop: 14 }}>
+              <label style={{display:"grid",gap:5,fontSize:12,fontWeight:850,gridColumn:"1 / -1"}}>🔎 CERCA AGENTE
+                <input list="production-agent-suggestions" value={agentQuery} placeholder="Digita le lettere del nome agente..." onChange={e=>{const value=e.target.value;setAgentQuery(value);setAgentsSelected(agents.includes(value)?[value]:[]);}} style={{padding:"11px 12px",border:"1px solid #cbd5e1",borderRadius:9,width:"100%",boxSizing:"border-box"}}/>
+                <datalist id="production-agent-suggestions">{agents.filter(a=>a.toLocaleLowerCase("it").includes(agentQuery.toLocaleLowerCase("it"))).slice(0,70).map(a=><option key={a} value={a}/>)}</datalist>
+              </label>
               <MultiSelectFilter label="Periodo report" allLabel="Tutti i periodi" selected={periodsSelected} onChange={setPeriodsSelected} options={periods} />
               <MultiSelectFilter
                 label="Luce / Gas"
