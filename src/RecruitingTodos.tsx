@@ -225,6 +225,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       body: item.body, linkedKind: item.linked_kind || undefined, linkedId: item.linked_id || undefined,
       linkedName: item.linked_name, sourceKey: item.source_key || undefined });
     setFormOpen(true);
+    setTimeout(()=>document.getElementById("ge-todo-edit-"+item.id)?.scrollIntoView({behavior:"smooth",block:"center"}),80);
   };
   const sorted = [...items].filter(x => {
     if (filters.status === "pending" && x.completed) return false;
@@ -242,6 +243,48 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   }).sort((a,b) =>
     Number(!b.completed && b.priority) - Number(!a.completed && a.priority) ||
     b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
+  const todoEditor = (
+<div style={{ background: "#f8fafc", padding: 15, borderRadius: 12, marginTop: 14, display: "grid", gap: 10 }}>
+      <label>OGGETTO *<input style={field} value={form.title} onChange={e => setForm(v => ({...v,title:e.target.value}))} required /></label>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <label style={{ flex: "1 1 170px" }}>DATA (opzionale)<input type="date" style={field} value={form.dueDate || ""} onChange={e => setForm(v => ({...v,dueDate:e.target.value}))} /></label>
+        <label style={{ flex: "1 1 130px" }}>ORA (opzionale)<input type="time" style={field} value={form.dueTime || ""} onChange={e => setForm(v => ({...v,dueTime:e.target.value}))} /></label>
+      </div>
+      <div ref={contactMenuRef} style={{position:"relative"}}>
+        <div style={{fontSize:13,marginBottom:5}}>CONTATTO COLLEGATO (opzionale)</div>
+        <button type="button" onClick={()=>{setContactMenuOpen(v=>!v);setContactSearch("");}} style={{...field,textAlign:"left",background:"#fff",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span>{form.linkedName || "Nessun collegamento"}</span><span style={{color:"#64748b"}}>⌄</span>
+        </button>
+        {contactMenuOpen && <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:30,background:"white",border:"1px solid #cbd5e1",borderRadius:10,boxShadow:"0 8px 22px rgba(15,23,42,.14)",padding:8,marginTop:4}}>
+          <input autoFocus style={{...field,marginBottom:6}} placeholder="⌕ Cerca nome o cognome nel menu..." value={contactSearch} onChange={e=>setContactSearch(e.target.value)} />
+          <div style={{maxHeight:220,overflowY:"auto"}}>
+            {[{id:"",name:"Nessun collegamento",kind:"candidate" as const},...filteredContacts].map(x=><button key={x.kind+":"+x.id} type="button" onClick={()=>{
+              setForm(v=>({...v,linkedKind:x.id?x.kind:undefined,linkedId:x.id||undefined,linkedName:x.id?x.name:""}));
+              setContactMenuOpen(false);setContactSearch("");
+            }} style={{display:"block",width:"100%",padding:"10px 9px",textAlign:"left",border:0,borderRadius:7,background:form.linkedId===x.id&&x.id?"#eff6ff":"white",cursor:"pointer",fontWeight:form.linkedId===x.id?800:500}}>{x.name}</button>)}
+            {filteredContacts.length===0&&<div style={{padding:10,color:"#64748b"}}>Nessun contatto trovato</div>}
+          </div>
+        </div>}
+      </div>
+      <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:7}}>
+        <input ref={todoFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" aria-label="Seleziona allegati" style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden",pointerEvents:"none"}} onChange={e=>{const input=e.currentTarget;const selected=Array.from(input.files||[]);void addTodoFiles(selected).finally(()=>{input.value="";});}} />
+        <button type="button" onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
+        {todoUploading&&<span role="status" style={{fontSize:13,color:"#1d4ed8"}}>Caricamento allegati in corso...</span>}
+        {todoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length} allegat{todoFiles.length===1?"o":"i"} pront{todoFiles.length===1?"o":"i"} da salvare</span>}
+      </div>
+      {todoFiles.map((file,index)=><div key={index} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:9,borderRadius:10,background:"white",border:"1px solid #e2e8f0"}}>
+        <a href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
+        <button type="button" style={action} onClick={()=>setTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
+      </div>)}
+      <small style={{color:"#64748b"}}>Massimo 5 allegati, 10 MB ciascuno.</small>
+      <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)} /> PRIORITÀ — mantieni in alto finché non è fatta</label>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button style={{ ...action, background: "#16a34a", color: "white" }} disabled={saving || todoUploading || !form.title.trim()} onClick={()=>void save()}>{saving?"SALVATAGGIO...":"SALVA"}</button>
+        <button style={action} onClick={()=>{setFormOpen(false);setEditing(null);}}>ANNULLA</button>
+      </div>
+    </div>
+  );
   return <div style={{ background: "white", border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, marginTop: 12 }}>
     {previewFile&&previewUrl&&<div role="dialog" aria-modal="true" aria-label={"Anteprima "+previewFile.name} style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.86)",display:"flex",flexDirection:"column",padding:"max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom))",boxSizing:"border-box"}}>
       <div style={{display:"flex",gap:9,alignItems:"center",justifyContent:"space-between",color:"#fff",paddingBottom:12}}>
@@ -365,49 +408,11 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
         </div>
       </div>
     </div>}
-    {formOpen && <div style={{ background: "#f8fafc", padding: 15, borderRadius: 12, marginTop: 14, display: "grid", gap: 10 }}>
-      <label>OGGETTO *<input style={field} value={form.title} onChange={e => setForm(v => ({...v,title:e.target.value}))} required /></label>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <label style={{ flex: "1 1 170px" }}>DATA (opzionale)<input type="date" style={field} value={form.dueDate || ""} onChange={e => setForm(v => ({...v,dueDate:e.target.value}))} /></label>
-        <label style={{ flex: "1 1 130px" }}>ORA (opzionale)<input type="time" style={field} value={form.dueTime || ""} onChange={e => setForm(v => ({...v,dueTime:e.target.value}))} /></label>
-      </div>
-      <div ref={contactMenuRef} style={{position:"relative"}}>
-        <div style={{fontSize:13,marginBottom:5}}>CONTATTO COLLEGATO (opzionale)</div>
-        <button type="button" onClick={()=>{setContactMenuOpen(v=>!v);setContactSearch("");}} style={{...field,textAlign:"left",background:"#fff",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span>{form.linkedName || "Nessun collegamento"}</span><span style={{color:"#64748b"}}>⌄</span>
-        </button>
-        {contactMenuOpen && <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:30,background:"white",border:"1px solid #cbd5e1",borderRadius:10,boxShadow:"0 8px 22px rgba(15,23,42,.14)",padding:8,marginTop:4}}>
-          <input autoFocus style={{...field,marginBottom:6}} placeholder="⌕ Cerca nome o cognome nel menu..." value={contactSearch} onChange={e=>setContactSearch(e.target.value)} />
-          <div style={{maxHeight:220,overflowY:"auto"}}>
-            {[{id:"",name:"Nessun collegamento",kind:"candidate" as const},...filteredContacts].map(x=><button key={x.kind+":"+x.id} type="button" onClick={()=>{
-              setForm(v=>({...v,linkedKind:x.id?x.kind:undefined,linkedId:x.id||undefined,linkedName:x.id?x.name:""}));
-              setContactMenuOpen(false);setContactSearch("");
-            }} style={{display:"block",width:"100%",padding:"10px 9px",textAlign:"left",border:0,borderRadius:7,background:form.linkedId===x.id&&x.id?"#eff6ff":"white",cursor:"pointer",fontWeight:form.linkedId===x.id?800:500}}>{x.name}</button>)}
-            {filteredContacts.length===0&&<div style={{padding:10,color:"#64748b"}}>Nessun contatto trovato</div>}
-          </div>
-        </div>}
-      </div>
-      <label>CORPO DELLA COSA DA FARE<textarea rows={4} style={field} value={form.body || ""} onChange={e=>setForm(v=>({...v,body:e.target.value}))} /></label>
-      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:7}}>
-        <input ref={todoFileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" aria-label="Seleziona allegati" style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden",pointerEvents:"none"}} onChange={e=>{const input=e.currentTarget;const selected=Array.from(input.files||[]);void addTodoFiles(selected).finally(()=>{input.value="";});}} />
-        <button type="button" onClick={()=>todoFileInputRef.current?.click()} style={{...action,padding:"12px 17px",background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",borderRadius:15}}>📎 SCEGLI ALLEGATI</button>
-        {todoUploading&&<span role="status" style={{fontSize:13,color:"#1d4ed8"}}>Caricamento allegati in corso...</span>}
-        {todoFiles.length>0&&<span role="status" style={{fontSize:13,fontWeight:800,color:"#166534"}}>✓ {todoFiles.length} allegat{todoFiles.length===1?"o":"i"} pront{todoFiles.length===1?"o":"i"} da salvare</span>}
-      </div>
-      {todoFiles.map((file,index)=><div key={index} style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",padding:9,borderRadius:10,background:"white",border:"1px solid #e2e8f0"}}>
-        <a href="#" onClick={e=>{e.preventDefault();void openAttachment(file);}} style={{flex:"1 1 170px",overflowWrap:"anywhere"}}>📎 {file.name}</a>
-        <button type="button" style={action} onClick={()=>setTodoFiles(v=>v.filter((_,i)=>i!==index))}>✕ RIMUOVI</button>
-      </div>)}
-      <small style={{color:"#64748b"}}>Massimo 5 allegati, 10 MB ciascuno.</small>
-      <label style={{ display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={priority} onChange={e=>setPriority(e.target.checked)} /> PRIORITÀ — mantieni in alto finché non è fatta</label>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button style={{ ...action, background: "#16a34a", color: "white" }} disabled={saving || todoUploading || !form.title.trim()} onClick={()=>void save()}>{saving?"SALVATAGGIO...":"SALVA"}</button>
-        <button style={action} onClick={()=>setFormOpen(false)}>ANNULLA</button>
-      </div>
-    </div>}
+    {formOpen && !editing && todoEditor}
     <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
       {sorted.length===0 && <p style={{ color: "#64748b" }}>Nessuna cosa da fare nell'elenco.</p>}
-      {sorted.map(item=><div key={item.id} style={{ padding: 13, borderRadius: 11, border: "1px solid "+(item.priority&&!item.completed?"#f59e0b":"#cbd5e1"), borderLeft: "6px solid "+(item.completed?"#94a3b8":item.priority?"#f59e0b":"#2563eb"), background: item.completed?"#f1f5f9":item.priority?"#fffbeb":"#fff" }}>
+      {sorted.map(item=><div key={item.id} id={"ge-todo-edit-"+item.id} style={{ padding: 13, borderRadius: 11, border: "1px solid "+(item.priority&&!item.completed?"#f59e0b":"#cbd5e1"), borderLeft: "6px solid "+(item.completed?"#94a3b8":item.priority?"#f59e0b":"#2563eb"), background: item.completed?"#f1f5f9":item.priority?"#fffbeb":"#fff" }}>
+        {formOpen && editing===item.id && <div style={{marginBottom:12,border:"2px solid #2563eb",borderRadius:14,padding:4}}>{todoEditor}</div>}
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
           <strong style={{ textDecoration: item.completed?"line-through":"none" }}>{item.priority&&!item.completed?"★ ":""}{item.title}</strong>
           <span style={{ color: "#475569", fontSize: 12 }}>{item.due_date ? item.due_date.split("-").reverse().join("/") : "Senza data"} {item.due_time?.slice(0,5)||""}</span>
