@@ -967,7 +967,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [archiveSection, setArchiveSection] = useState<ArchiveSection>(() => {
     const value = window.sessionStorage.getItem("ge_archive_section");
     return value === "produzione" || value === "dettaglioProduzione" || value === "attivo" || value === "dettaglioRecessi" ||
-      value === "reportAdmin" || value === "zone" ? value : "recessi";
+      value === "reportAdmin" ? value : "recessi";
   });
   useEffect(() => {
     window.sessionStorage.setItem("ge_archive_section", archiveSection);
@@ -1998,22 +1998,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={() => setArchiveSection("zone")}
-          style={{
-            marginLeft: "auto",
-            padding: "10px 18px",
-            borderRadius: 9,
-            border: archiveSection === "zone" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            background: archiveSection === "zone" ? "#0f172a" : "white",
-            color: archiveSection === "zone" ? "white" : "#0f172a",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          AGENTI / ZONE
-        </button>
+
 
       </div>
 
