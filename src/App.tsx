@@ -1557,6 +1557,9 @@ function SavedSimulationsModal({
   const [deletingAll, setDeletingAll] = useState(false);
   const [customerFilter, setCustomerFilter] = useState("");
   const [agentFilter, setAgentFilter] = useState("");
+  const [agentSearch, setAgentSearch] = useState("");
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
+  const agentMenuRef = useRef<HTMLDivElement | null>(null);
   const [archiveView, setArchiveView] = useState<"personal" | "agents">("personal");
 
   const agentFilterOptions = useMemo(
@@ -1565,6 +1568,21 @@ function SavedSimulationsModal({
         items.map((item) => String(item.agent_name || ""))
       ),
     [items]
+  );
+
+  useEffect(() => {
+    if (!agentMenuOpen) return;
+    const close = (event: MouseEvent) => {
+      if (agentMenuRef.current && !agentMenuRef.current.contains(event.target as Node)) {
+        setAgentMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [agentMenuOpen]);
+
+  const filteredAgentOptions = agentFilterOptions.filter(agent =>
+    agent.toLocaleLowerCase("it-IT").includes(agentSearch.trim().toLocaleLowerCase("it-IT"))
   );
 
   const filteredItems = useMemo(() => {
@@ -1618,6 +1636,8 @@ function SavedSimulationsModal({
     setArchiveView("personal");
     setCustomerFilter("");
     setAgentFilter("");
+    setAgentSearch("");
+    setAgentMenuOpen(false);
     void reloadSavedSimulations("personal");
   }, [open, type]);
 
@@ -1626,6 +1646,8 @@ function SavedSimulationsModal({
     setArchiveView(view);
     setCustomerFilter("");
     setAgentFilter("");
+    setAgentSearch("");
+    setAgentMenuOpen(false);
     setItems([]);
     void reloadSavedSimulations(view);
   };
@@ -1884,31 +1906,31 @@ function SavedSimulationsModal({
               }}
             >
               {archiveView === "agents" ? "Agente che ha salvato" : "Agente associato"}
-              <select
-                value={agentFilter}
-                onChange={(event) =>
-                  setAgentFilter(event.target.value)
-                }
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: 9,
-                  padding: "8px 10px",
-                  background: "white",
-                  fontSize: 14,
-                }}
-              >
-                <option value="">TUTTI GLI AGENTI</option>
-                {archiveView === "personal" && (
-                  <option value="__NO_AGENT__">SENZA AGENTE</option>
-                )}
-                {agentFilterOptions.map((agent) => (
-                  <option key={agent} value={agent}>
-                    {agent}
-                  </option>
-                ))}
-              </select>
+              <div ref={agentMenuRef} style={{position:"relative",minWidth:0}}>
+                <button type="button" aria-expanded={agentMenuOpen} aria-label="Seleziona o cerca agente"
+                  onClick={()=>{setAgentMenuOpen(v=>!v);setAgentSearch("");}}
+                  style={{width:"100%",minHeight:39,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,textAlign:"left",border:"1px solid #cbd5e1",borderRadius:9,padding:"8px 10px",background:"white",fontSize:14,fontWeight:750,cursor:"pointer"}}>
+                  <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{agentFilter==="__NO_AGENT__"?"SENZA AGENTE":agentFilter||"TUTTI GLI AGENTI"}</span>
+                  <span aria-hidden="true">⌄</span>
+                </button>
+                {agentMenuOpen&&<div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:1000,padding:8,background:"#fff",border:"1px solid #cbd5e1",borderRadius:12,boxShadow:"0 12px 28px rgba(15,23,42,.2)"}}>
+                  <input autoFocus aria-label="Cerca agente per nome" value={agentSearch} onChange={e=>setAgentSearch(e.target.value)} placeholder="🔎 Cerca agente..."
+                    style={{width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:8,padding:"10px",fontSize:14}} />
+                  <div style={{maxHeight:220,overflowY:"auto",marginTop:5}}>
+                    {[
+                      {value:"",label:"TUTTI GLI AGENTI"},
+                      ...(archiveView==="personal"?[{value:"__NO_AGENT__",label:"SENZA AGENTE"}]:[]),
+                      ...filteredAgentOptions.map(agent=>({value:agent,label:agent}))
+                    ].filter(option=>!agentSearch.trim()||option.value===""||option.value==="__NO_AGENT__"||option.label.toLocaleLowerCase("it-IT").includes(agentSearch.trim().toLocaleLowerCase("it-IT"))).map(option=>
+                      <button type="button" key={option.value||"all"} onClick={()=>{setAgentFilter(option.value);setAgentMenuOpen(false);setAgentSearch("");}}
+                        style={{display:"block",width:"100%",padding:"10px",border:0,borderRadius:8,background:agentFilter===option.value?"#eff6ff":"white",color:"#172554",fontWeight:agentFilter===option.value?800:600,textAlign:"left",cursor:"pointer"}}>
+                        {option.label}
+                      </button>
+                    )}
+                    {filteredAgentOptions.length===0&&agentSearch.trim()&&<div style={{padding:10,color:"#64748b"}}>Nessun agente trovato</div>}
+                  </div>
+                </div>}
+              </div>
             </label>
 
             <button
@@ -1917,6 +1939,8 @@ function SavedSimulationsModal({
               onClick={() => {
                 setCustomerFilter("");
                 setAgentFilter("");
+                setAgentSearch("");
+                setAgentMenuOpen(false);
               }}
               style={{
                 border: "1px solid #dc2626",
