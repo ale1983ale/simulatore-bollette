@@ -1246,6 +1246,8 @@ function SaveSimulationModal({
   const [agentChoice, setAgentChoice] = useState("");
   const [customAgent, setCustomAgent] = useState("");
   const [agentOptions, setAgentOptions] = useState<string[]>([]);
+  const [agentSearch,setAgentSearch]=useState("");
+  const [agentMenuOpen,setAgentMenuOpen]=useState(false);
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1255,6 +1257,8 @@ function SaveSimulationModal({
 
     setCustomerName(initialName || "");
     setAgentChoice("");
+    setAgentSearch("");
+    setAgentMenuOpen(false);
     setCustomAgent("");
     setError("");
 
@@ -1419,37 +1423,22 @@ function SaveSimulationModal({
             }}
           >
             Agente associato
-            <select
-              value={agentChoice}
-              disabled={loadingAgents}
-              onChange={(event) => {
-                setAgentChoice(event.target.value);
-                if (event.target.value !== "__ALTRO__") {
-                  setCustomAgent("");
-                }
-              }}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                border: "1px solid #cbd5e1",
-                borderRadius: 10,
-                padding: "8px 10px",
-                fontSize: 15,
-                background: "white",
-              }}
-            >
-              <option value="">
-                {loadingAgents
-                  ? "Carico nominativi..."
-                  : "Nessun agente associato"}
-              </option>
-              {agentOptions.map((agent) => (
-                <option key={agent} value={agent}>
-                  {agent}
-                </option>
-              ))}
-              <option value="__ALTRO__">ALTRO</option>
-            </select>
+            <div style={{position:"relative",width:"100%"}}>
+              <button type="button" disabled={loadingAgents} onClick={()=>setAgentMenuOpen(v=>!v)}
+                style={{width:"100%",boxSizing:"border-box",border:"1px solid #cbd5e1",borderRadius:10,padding:"10px 12px",fontSize:15,background:"white",textAlign:"left",cursor:"pointer",display:"flex",justifyContent:"space-between",gap:8}}>
+                <span>{loadingAgents?"Carico nominativi...":agentChoice==="__ALTRO__"?"ALTRO":agentChoice||"Nessun agente associato"}</span><span>▾</span>
+              </button>
+              {agentMenuOpen&&!loadingAgents&&<div style={{position:"absolute",zIndex:100105,top:"100%",left:0,right:0,marginTop:4,background:"white",border:"1px solid #cbd5e1",borderRadius:10,boxShadow:"0 12px 30px rgba(15,23,42,.18)",maxHeight:280,overflowY:"auto"}}>
+                <input autoFocus value={agentSearch} onChange={e=>setAgentSearch(e.target.value)}
+                  placeholder="⌕ Cerca agente per nome..." aria-label="Ricerca libera agenti"
+                  style={{position:"sticky",top:0,zIndex:1,width:"100%",boxSizing:"border-box",padding:"12px",fontSize:15,border:0,borderBottom:"1px solid #cbd5e1",background:"#f8fafc"}}/>
+                {[{value:"",label:"Nessun agente associato"},...agentOptions.filter(name=>name.toLocaleLowerCase("it").includes(agentSearch.toLocaleLowerCase("it").trim())).map(name=>({value:name,label:name})),{value:"__ALTRO__",label:"ALTRO"}].map(option=>
+                  <button type="button" key={option.value} onClick={()=>{setAgentChoice(option.value);setAgentMenuOpen(false);setAgentSearch("");if(option.value!=="__ALTRO__")setCustomAgent("");}}
+                    style={{display:"block",width:"100%",textAlign:"left",padding:"10px 12px",background:agentChoice===option.value?"#eff6ff":"white",border:0,borderBottom:"1px solid #f1f5f9",cursor:"pointer",fontSize:14}}>
+                    {option.label}
+                  </button>)}
+              </div>}
+            </div>
           </label>
         )}
 
