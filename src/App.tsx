@@ -2538,7 +2538,27 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
         close.textContent = "✕ Chiudi";
         close.style.cssText = "border:0;border-radius:9px;background:#e2e8f0;color:#0f172a;padding:10px 15px;font-weight:800;cursor:pointer;";
         close.onclick = () => overlay.remove();
-        header.append(heading, close);
+        const zoomControls = document.createElement("div");
+        zoomControls.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;";
+        let zoom = 100;
+        const zoomLabel = document.createElement("span");
+        zoomLabel.style.cssText = "min-width:48px;text-align:center;font-size:13px;";
+        const pageImages: HTMLImageElement[] = [];
+        const updateZoom = () => {
+          zoomLabel.textContent = zoom + "%";
+          pageImages.forEach(img => { img.style.width = (700 * zoom / 100) + "px"; img.style.maxWidth = "none"; });
+        };
+        const zoomButton = (label: string, action: () => void) => {
+          const button = document.createElement("button");
+          button.type = "button"; button.textContent = label;
+          button.style.cssText = "border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;padding:7px 10px;cursor:pointer;font-weight:800;";
+          button.onclick = action; zoomControls.appendChild(button);
+        };
+        zoomButton("−", () => { zoom = Math.max(40, zoom - 25); updateZoom(); });
+        zoomControls.appendChild(zoomLabel);
+        zoomButton("+", () => { zoom = Math.min(300, zoom + 25); updateZoom(); });
+        zoomButton("100%", () => { zoom = 100; updateZoom(); });
+        header.append(heading, zoomControls, close);
         const scroll = document.createElement("div");
         scroll.style.cssText = "flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px;";
         // L'anteprima usa le stesse pagine renderizzate del file generato.
@@ -2547,8 +2567,10 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
           img.src = canvas.toDataURL("image/jpeg", quality);
           img.alt = "Pagina del preventivo";
           img.style.cssText = "display:block;width:100%;max-width:700px;height:auto;background:white;box-shadow:0 6px 25px #0005;";
+          pageImages.push(img);
           scroll.appendChild(img);
         });
+        updateZoom();
         overlay.append(header, scroll);
         document.body.appendChild(overlay);
         renderFrame?.remove();
@@ -4723,7 +4745,10 @@ return (
               marginBottom: 12,
             }}
           >
-            <div style={{ minWidth: 0 }} />
+            <div style={{...boxStyle,background:"#fff7ed",border:"2px solid #f97316"}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#9a3412"}}>ENERGIA (€)</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#9a3412"}}>{money(r.H22)}</div>
+            </div>
 
             <div style={boxStyle}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
@@ -6662,7 +6687,10 @@ function Gas({
                 marginBottom: 12,
               }}
             >
-              <div style={{ minWidth: 0 }} />
+              <div style={{...boxStyle,background:"#eff6ff",border:"2px solid #0284c7"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#075985"}}>GAS (€)</div>
+                <div style={{fontSize:16,fontWeight:800,color:"#075985"}}>{money(r.H22)}</div>
+              </div>
   
               <div style={boxStyle}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#475569" }}>Prezzo medio</div>
