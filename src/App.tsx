@@ -4379,7 +4379,7 @@ function Energia({
       <div class="page" style="min-height:920px;padding:18px 8px;color:#0f172a">
         <div style="border-radius:18px;padding:28px;background:linear-gradient(125deg,#f9731620,#fff 75%);border-top:8px solid #f97316">
           <div style="font-size:34px;font-weight:900;color:#f97316">Preventivo Luce</div>
-          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore alla tua ${isDomesticEnergyType(s.tipo) ? "casa" : "attività"}</div>
+          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore ${isDomesticEnergyType(s.tipo) ? "alla tua casa" : "al tuo business"}</div>
           <p style="font-size:15px">Una proposta chiara, semplice e trasparente.</p>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px">
@@ -6310,7 +6310,7 @@ function Gas({
       <div class="page" style="min-height:920px;padding:18px 8px;color:#0f172a">
         <div style="border-radius:18px;padding:28px;background:linear-gradient(125deg,#2563eb20,#fff 75%);border-top:8px solid #2563eb">
           <div style="font-size:34px;font-weight:900;color:#2563eb">Preventivo Gas</div>
-          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore alla tua ${String(s.uso || "").toUpperCase().includes("DOMEST") ? "casa" : "attività"}</div>
+          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore ${String(s.uso || "").toUpperCase().includes("DOMEST") ? "alla tua casa" : "al tuo business"}</div>
           <p style="font-size:15px">Una proposta chiara, semplice e trasparente.</p>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px">
