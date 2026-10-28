@@ -3220,7 +3220,7 @@ function calcEnergia(
   const H37 = H35 + H36;
   const H41 = H22 + H25 + H24 + H28 + H29 + H30 + H37 + H38 - H39 + H40;
 
-  const risparmioFattura = isSi(d.confrontoFlag) ? H41 - n(d.confrontoValore) : 0;
+  const risparmioFattura = isSi(d.confrontoFlag) ? n(d.confrontoValore) - H41 : 0;
   const risparmioAnnuo = isSi(d.confrontoFlag) ? (risparmioFattura * 12) / mesi : 0;
 
   return {
@@ -3396,7 +3396,7 @@ function calcGas(
       : 0;
   const H37 = H24 + H29 + H34 + H35 - H36;
   const risparmioFattura = isSi(d.confrontoFlag)
-    ? H37 - n(d.confrontoValore)
+    ? n(d.confrontoValore) - H37
     : 0;
   const risparmioAnnuo = isSi(d.confrontoFlag)
     ? (risparmioFattura / mesi) * 12
