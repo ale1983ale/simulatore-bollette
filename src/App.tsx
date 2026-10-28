@@ -5528,24 +5528,28 @@ Base suggerito
               </>
             )}
 
-          <button
-            onClick={() => printEnergyPdf(false)}
-            style={{
-              marginTop: 14,
-              padding: "10px 14px",
-              borderRadius: 8,
-              background: "#0f172a",
-              color: "white",
-              border: "none",
-              cursor: "pointer",
-              width: "100%",
-            }}
-          >
-            Crea PDF semplificato
-          </button>
-          <button type="button" onClick={() => printEnergyPdf(false, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#f8fafc", border: "1px solid #94a3b8", color: "#0f172a", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF semplificato</button>
-          <button type="button" onClick={() => printEnergyPdf(true)} style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "#f97316", color: "white", border: "none", cursor: "pointer", width: "100%", fontWeight: 800 }}>Crea PDF dettagliato</button>
-          <button type="button" onClick={() => printEnergyPdf(true, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#eff6ff", border: "1px solid #f97316", color: "#f97316", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF dettagliato</button>
+          <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "stretch" }}>
+            <button type="button" onClick={() => printEnergyPdf(false)}
+              style={{ flex: 1, minWidth: 0, padding: "11px 12px", borderRadius: 8, background: "#0f172a", color: "white", border: "none", cursor: "pointer", fontWeight: 800 }}>
+              Crea PDF semplificato
+            </button>
+            <button type="button" onClick={() => printEnergyPdf(false, true)}
+              title="Anteprima PDF semplificato" aria-label="Anteprima PDF semplificato"
+              style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#f8fafc", color: "#0f172a", border: "1px solid #94a3b8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "stretch" }}>
+            <button type="button" onClick={() => printEnergyPdf(true)}
+              style={{ flex: 1, minWidth: 0, padding: "11px 12px", borderRadius: 8, background: "#f97316", color: "white", border: "none", cursor: "pointer", fontWeight: 800 }}>
+              Crea PDF dettagliato
+            </button>
+            <button type="button" onClick={() => printEnergyPdf(true, true)}
+              title="Anteprima PDF dettagliato" aria-label="Anteprima PDF dettagliato"
+              style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#fff", color: "#f97316", border: "1px solid #f97316", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
 
           {canUseProvvigioni && (
             <button
@@ -7163,24 +7167,28 @@ border: "1px solid #bfd8f6",
                 </>
               )}
   
-            <button
-              onClick={() => printGasPdf(false)}
-              style={{
-                marginTop: 14,
-                padding: "10px 14px",
-                borderRadius: 8,
-                background: "#0f172a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-                width: "100%",
-              }}
-            >
+            <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "stretch" }}>
+            <button type="button" onClick={() => printGasPdf(false)}
+              style={{ flex: 1, minWidth: 0, padding: "11px 12px", borderRadius: 8, background: "#0f172a", color: "white", border: "none", cursor: "pointer", fontWeight: 800 }}>
               Crea PDF semplificato
             </button>
-          <button type="button" onClick={() => printGasPdf(false, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#f8fafc", border: "1px solid #94a3b8", color: "#0f172a", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF semplificato</button>
-          <button type="button" onClick={() => printGasPdf(true)} style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "#2563eb", color: "white", border: "none", cursor: "pointer", width: "100%", fontWeight: 800 }}>Crea PDF dettagliato</button>
-          <button type="button" onClick={() => printGasPdf(true, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#eff6ff", border: "1px solid #2563eb", color: "#2563eb", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF dettagliato</button>
+            <button type="button" onClick={() => printGasPdf(false, true)}
+              title="Anteprima PDF semplificato" aria-label="Anteprima PDF semplificato"
+              style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#f8fafc", color: "#0f172a", border: "1px solid #94a3b8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "stretch" }}>
+            <button type="button" onClick={() => printGasPdf(true)}
+              style={{ flex: 1, minWidth: 0, padding: "11px 12px", borderRadius: 8, background: "#2563eb", color: "white", border: "none", cursor: "pointer", fontWeight: 800 }}>
+              Crea PDF dettagliato
+            </button>
+            <button type="button" onClick={() => printGasPdf(true, true)}
+              title="Anteprima PDF dettagliato" aria-label="Anteprima PDF dettagliato"
+              style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#fff", color: "#2563eb", border: "1px solid #2563eb", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
 
             {canUseProvvigioni && (
               <button
