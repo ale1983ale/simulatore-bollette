@@ -2327,6 +2327,23 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
           .savings-row strong {
             font-size: 11px;
           }
+          ${detailed ? `
+          body { padding: 0; }
+          .page { width: 650px; max-width:650px; margin:0 auto; padding:22px 24px; }
+          .page + .page { margin-top: 0; }
+          .page.detail-sheet { background:#fff; border-top:10px solid var(--accent); }
+          .detail-sheet .topbar { border-bottom:0; margin-bottom:15px; }
+          .detail-sheet .title { font-size:23px; color:var(--accent); font-weight:900; }
+          .detail-sheet .box { border:1px solid #dbe3ed !important; border-left:5px solid var(--accent) !important; border-radius:12px; padding:12px; margin-bottom:12px; box-shadow:0 3px 12px #0f172a0b; }
+          .detail-sheet .bar { background:var(--accent) !important; height:4px; border-radius:8px; }
+          .detail-sheet .section-title { font-size:12px; color:#1e293b; }
+          .detail-sheet th { color:var(--accent); }
+          .detail-sheet .total { background:var(--accent) !important; border-radius:12px; padding:16px; }
+          .detail-sheet .savings { border:2px solid var(--accent); }
+          .detail-sheet .label { font-size:10px; }
+          .detail-sheet .value { font-size:11px; }
+          .detail-sheet td { font-size:10px; }
+          ` : "" }
           @page {
             size: A4 portrait;
             margin: 8mm;
@@ -2441,15 +2458,25 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
         let firstPage = true;
         canvases.forEach((canvas, canvasIndex) => {
           const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
-          const imgWidth = usableWidth;
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          let renderedHeight = 0;
-          while (renderedHeight < imgHeight) {
+          // Nel dettagliato ciascun foglio HTML corrisponde ESATTAMENTE a una pagina A4.
+          if (detailed) {
             if (!firstPage) pdf.addPage();
             firstPage = false;
-            pdf.addImage(imgData, "JPEG", margin, marginTop - renderedHeight,
-              imgWidth, imgHeight, `preventivo-page-${canvasIndex}`, "FAST");
-            renderedHeight += usableHeight;
+            const fittedWidth = Math.min(usableWidth, usableHeight * canvas.width / canvas.height);
+            const fittedHeight = fittedWidth * canvas.height / canvas.width;
+            pdf.addImage(imgData, "JPEG", margin + (usableWidth - fittedWidth) / 2,
+              marginTop, fittedWidth, fittedHeight, `preventivo-page-${canvasIndex}`, "FAST");
+          } else {
+            const imgWidth = usableWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let renderedHeight = 0;
+            while (renderedHeight < imgHeight) {
+              if (!firstPage) pdf.addPage();
+              firstPage = false;
+              pdf.addImage(imgData, "JPEG", margin, marginTop - renderedHeight,
+                imgWidth, imgHeight, `preventivo-page-${canvasIndex}`, "FAST");
+              renderedHeight += usableHeight;
+            }
           }
         });
         return pdf;
@@ -4376,34 +4403,49 @@ function Energia({
       .filter(Boolean)
       .join(" ");
     const detailedSummary = `
-      <div class="page" style="min-height:920px;padding:18px 8px;color:#0f172a">
-        <div style="border-radius:18px;padding:28px;background:linear-gradient(125deg,#f9731620,#fff 75%);border-top:8px solid #f97316">
-          <div style="font-size:34px;font-weight:900;color:#f97316">Preventivo Luce</div>
-          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore ${isDomesticEnergyType(s.tipo) ? "alla tua casa" : "al tuo business"}</div>
-          <p style="font-size:15px">Una proposta chiara, semplice e trasparente.</p>
+      <div class="page" style="height:865px;padding:24px 22px;color:#0f172a;overflow:hidden">
+        <div style="border-radius:20px;padding:25px 22px;background:linear-gradient(135deg,#fff7ed,#fff);border-top:8px solid #f97316;position:relative">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="max-width:340px">
+              <div style="font-size:12px;letter-spacing:2px;font-weight:800;color:#9a3412">LA TUA PROPOSTA ENERGETICA</div>
+              <div style="font-size:36px;line-height:1.15;font-weight:900;color:#f97316;margin-top:10px">Preventivo Luce</div>
+              <div style="font-size:22px;font-weight:800;margin-top:13px">Più valore ${isDomesticEnergyType(s.tipo) ? "alla tua casa" : "al tuo business"}</div>
+            </div>
+            <div><svg width="230" height="175" viewBox="0 0 230 175" xmlns="http://www.w3.org/2000/svg"><circle cx="177" cy="41" r="32" fill="#fdba74" opacity=".7"/><path d="M15 142 L48 85 L82 142 Z" fill="#fed7aa"/><rect x="25" y="109" width="48" height="39" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/><path d="M17 110 L49 81 L82 110" fill="none" stroke="#ea580c" stroke-width="5" stroke-linejoin="round"/><rect x="39" y="123" width="17" height="25" fill="#fdba74"/><rect x="94" y="96" width="109" height="54" rx="5" fill="#ffedd5" stroke="#ea580c" stroke-width="3"/><path d="M100 96 L113 67 L207 67 L194 96 Z" fill="#fb923c"/><path d="M116 70 L104 94 M140 70 L132 94 M165 70 L161 94 M190 70 L189 94 M110 82 L200 82" stroke="#fff7ed" stroke-width="2"/><path d="M16 151 H215" stroke="#ea580c" stroke-width="4"/><path d="M152 16 L135 45 H153 L143 69 L182 35 H161 L174 16 Z" fill="#ea580c"/></svg></div>
+          </div>
+          <div style="font-size:13px;margin-top:8px;color:#475569">Una proposta chiara, semplice e trasparente.</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px">
-          <div class="box"><div class="label">CLIENTE</div><strong>${s.nome || "-"}</strong></div>
-          <div class="box"><div class="label">PERIODO</div><strong>${periodo}</strong></div>
-          <div class="box"><div class="label">OFFERTA</div><strong>${s.offerta || "-"}</strong></div>
-          <div class="box"><div class="label">FATTURAZIONE</div><strong>${s.fatturazione || "-"}</strong></div>
-          <div class="box"><div class="label">CONSUMO DEL PERIODO</div><strong style="font-size:24px">${r.consumiTot.toLocaleString("it-IT")} kWh</strong></div>
-          <div class="box" style="background:#f97316;color:white"><div style="font-size:13px">TOTALE PREVENTIVO</div><strong style="font-size:28px">${money(r.H41)}</strong></div>
+        <div style="margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">CLIENTE</div><strong style="font-size:14px">${s.nome || "-"}</strong></div>
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">PERIODO</div><strong style="font-size:14px">${periodo}</strong></div>
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">OFFERTA</div><strong style="font-size:14px">${s.offerta || "-"}</strong></div>
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">FATTURAZIONE</div><strong style="font-size:14px">${s.fatturazione || "-"}</strong></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:20px">
+          <div style="flex:1;padding:19px;border-radius:15px;background:#fff7ed;border:1px solid #f9731644">
+            <div style="font-size:11px;font-weight:700;color:#9a3412">CONSUMO DEL PERIODO</div>
+            <div style="font-size:26px;font-weight:900;color:#9a3412;margin-top:6px">${r.consumiTot.toLocaleString("it-IT")} kWh</div>
+          </div>
+          <div style="flex:1;padding:19px;border-radius:15px;background:#f97316;color:#fff">
+            <div style="font-size:11px;font-weight:800">TOTALE PREVENTIVO</div>
+            <div style="font-size:26px;font-weight:900;margin-top:6px">${money(r.H41)}</div>
+          </div>
         </div>
         ${isSi(s.confrontoFlag) ? `
-          <div style="margin-top:25px;padding:25px;border-radius:16px;background:#ecfdf5;border:1px solid #86efac">
-            <div style="font-size:19px;font-weight:800;color:#166534">IL TUO RISPARMIO ANNUO</div>
-            <div style="font-size:40px;font-weight:900;color:#15803d">${money(r.risparmioAnnuo)}</div>
-            <div style="font-size:13px;color:#166534">Risparmio stimato rispetto alla spesa attuale</div>
-          </div>` : ""}
-        <div style="margin-top:35px;padding:18px;border-radius:12px;background:#f8fafc;border-left:6px solid #f97316">
-          <strong>Il dettaglio completo nella pagina successiva</strong>
-          <p>Quote consumi, quote fisse, eventuale potenza, imponibile, accise e IVA: tutte le voci calcolate dal simulatore.</p>
-        </div>
+          <div style="margin-top:20px;border-radius:17px;padding:20px 23px;background:#fff7ed;border:2px solid #f97316">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div><div style="font-size:16px;font-weight:900;color:#9a3412">IL TUO RISPARMIO</div><div style="font-size:12px;color:#475569;margin-top:5px">Risparmio annuo stimato</div></div>
+              <div style="font-size:34px;font-weight:900;color:#f97316">${money(r.risparmioAnnuo)}</div>
+            </div>
+            <div style="margin-top:9px;height:9px;background:#fff;border-radius:10px;overflow:hidden"><div style="height:9px;width:72%;background:#f97316;border-radius:10px"></div></div>
+          </div>` : `<div style="margin-top:22px;border-radius:14px;padding:20px;background:#fff7ed;color:#9a3412;font-weight:700">Trasparenza nei costi, chiarezza nella scelta.</div>`}
+        <div style="margin-top:20px;padding:13px 16px;border-radius:12px;background:#f8fafc;border-left:5px solid #f97316;font-size:12px;color:#334155">Nella pagina successiva trovi il dettaglio completo di tutte le voci del preventivo.</div>
+        <div style="margin-top:15px;text-align:right;color:#94a3b8;font-size:10px">RIEPILOGO · 01 / 02</div>
       </div>`;
+    const detailedHtml = html.replace('class="page"', 'class="page detail-sheet" style="--accent:#f97316"');
     printHtmlDocument(
       "Preventivo Energia",
-      detailed ? detailedSummary + html : html,
+      detailed ? detailedSummary + detailedHtml : html,
       `${energyFileName} - Energia${detailed ? " - Dettagliato" : ""}`,
       detailed
     );
@@ -6307,34 +6349,49 @@ function Gas({
       .filter(Boolean)
       .join(" ");
     const detailedSummary = `
-      <div class="page" style="min-height:920px;padding:18px 8px;color:#0f172a">
-        <div style="border-radius:18px;padding:28px;background:linear-gradient(125deg,#2563eb20,#fff 75%);border-top:8px solid #2563eb">
-          <div style="font-size:34px;font-weight:900;color:#2563eb">Preventivo Gas</div>
-          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore ${String(s.uso || "").toUpperCase().includes("DOMEST") ? "alla tua casa" : "al tuo business"}</div>
-          <p style="font-size:15px">Una proposta chiara, semplice e trasparente.</p>
+      <div class="page" style="height:865px;padding:24px 22px;color:#0f172a;overflow:hidden">
+        <div style="border-radius:20px;padding:25px 22px;background:linear-gradient(135deg,#eff6ff,#fff);border-top:8px solid #2563eb;position:relative">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="max-width:340px">
+              <div style="font-size:12px;letter-spacing:2px;font-weight:800;color:#164e8d">LA TUA PROPOSTA ENERGETICA</div>
+              <div style="font-size:36px;line-height:1.15;font-weight:900;color:#2563eb;margin-top:10px">Preventivo Gas</div>
+              <div style="font-size:22px;font-weight:800;margin-top:13px">Più valore ${String(s.uso || "").toUpperCase().includes("DOMEST") ? "alla tua casa" : "al tuo business"}</div>
+            </div>
+            <div><svg width="230" height="175" viewBox="0 0 230 175" xmlns="http://www.w3.org/2000/svg"><circle cx="174" cy="42" r="32" fill="#bfdbfe"/><path d="M26 94 L104 34 L183 94" stroke="#1d4ed8" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="45" y="91" width="120" height="66" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="4"/><rect x="58" y="106" width="30" height="29" rx="3" fill="#93c5fd"/><rect x="103" y="107" width="35" height="50" rx="4" fill="#60a5fa"/><path d="M190 151 C153 118 211 96 193 57 C231 90 231 118 210 145 C219 117 195 109 196 91 C181 113 178 130 190 151Z" fill="#2563eb"/><path d="M197 149 C185 134 205 120 201 108 C220 129 214 141 207 151Z" fill="#93c5fd"/><path d="M19 160 H223" stroke="#1d4ed8" stroke-width="4"/></svg></div>
+          </div>
+          <div style="font-size:13px;margin-top:8px;color:#475569">Una proposta chiara, semplice e trasparente.</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px">
-          <div class="box"><div class="label">CLIENTE</div><strong>${s.nome || "-"}</strong></div>
-          <div class="box"><div class="label">PERIODO</div><strong>${periodo}</strong></div>
-          <div class="box"><div class="label">OFFERTA</div><strong>${s.offerta || "-"}</strong></div>
-          <div class="box"><div class="label">FATTURAZIONE</div><strong>${s.fatturazione || "-"}</strong></div>
-          <div class="box"><div class="label">CONSUMO DEL PERIODO</div><strong style="font-size:24px">${r.consumoTotale.toLocaleString("it-IT")} Smc</strong></div>
-          <div class="box" style="background:#2563eb;color:white"><div style="font-size:13px">TOTALE PREVENTIVO</div><strong style="font-size:28px">${money(r.H37)}</strong></div>
+        <div style="margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">CLIENTE</div><strong style="font-size:14px">${s.nome || "-"}</strong></div>
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">PERIODO</div><strong style="font-size:14px">${periodo}</strong></div>
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">OFFERTA</div><strong style="font-size:14px">${s.offerta || "-"}</strong></div>
+          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">FATTURAZIONE</div><strong style="font-size:14px">${s.fatturazione || "-"}</strong></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:20px">
+          <div style="flex:1;padding:19px;border-radius:15px;background:#eff6ff;border:1px solid #2563eb44">
+            <div style="font-size:11px;font-weight:700;color:#164e8d">CONSUMO DEL PERIODO</div>
+            <div style="font-size:26px;font-weight:900;color:#164e8d;margin-top:6px">${r.consumoTotale.toLocaleString("it-IT")} Smc</div>
+          </div>
+          <div style="flex:1;padding:19px;border-radius:15px;background:#2563eb;color:#fff">
+            <div style="font-size:11px;font-weight:800">TOTALE PREVENTIVO</div>
+            <div style="font-size:26px;font-weight:900;margin-top:6px">${money(r.H37)}</div>
+          </div>
         </div>
         ${isSi(s.confrontoFlag) ? `
-          <div style="margin-top:25px;padding:25px;border-radius:16px;background:#ecfdf5;border:1px solid #86efac">
-            <div style="font-size:19px;font-weight:800;color:#166534">IL TUO RISPARMIO ANNUO</div>
-            <div style="font-size:40px;font-weight:900;color:#15803d">${money(r.risparmioAnnuo)}</div>
-            <div style="font-size:13px;color:#166534">Risparmio stimato rispetto alla spesa attuale</div>
-          </div>` : ""}
-        <div style="margin-top:35px;padding:18px;border-radius:12px;background:#f8fafc;border-left:6px solid #2563eb">
-          <strong>Il dettaglio completo nella pagina successiva</strong>
-          <p>Quote consumi, quote fisse, eventuale potenza, imponibile, accise e IVA: tutte le voci calcolate dal simulatore.</p>
-        </div>
+          <div style="margin-top:20px;border-radius:17px;padding:20px 23px;background:#eff6ff;border:2px solid #2563eb">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div><div style="font-size:16px;font-weight:900;color:#164e8d">IL TUO RISPARMIO</div><div style="font-size:12px;color:#475569;margin-top:5px">Risparmio annuo stimato</div></div>
+              <div style="font-size:34px;font-weight:900;color:#2563eb">${money(r.risparmioAnnuo)}</div>
+            </div>
+            <div style="margin-top:9px;height:9px;background:#fff;border-radius:10px;overflow:hidden"><div style="height:9px;width:72%;background:#2563eb;border-radius:10px"></div></div>
+          </div>` : `<div style="margin-top:22px;border-radius:14px;padding:20px;background:#eff6ff;color:#164e8d;font-weight:700">Trasparenza nei costi, chiarezza nella scelta.</div>`}
+        <div style="margin-top:20px;padding:13px 16px;border-radius:12px;background:#f8fafc;border-left:5px solid #2563eb;font-size:12px;color:#334155">Nella pagina successiva trovi il dettaglio completo di tutte le voci del preventivo.</div>
+        <div style="margin-top:15px;text-align:right;color:#94a3b8;font-size:10px">RIEPILOGO · 01 / 02</div>
       </div>`;
+    const detailedHtml = html.replace('class="page"', 'class="page detail-sheet" style="--accent:#2563eb"');
     printHtmlDocument(
       "Preventivo Gas",
-      detailed ? detailedSummary + html : html,
+      detailed ? detailedSummary + detailedHtml : html,
       `${gasFileName} - Gas${detailed ? " - Dettagliato" : ""}`,
       detailed
     );
