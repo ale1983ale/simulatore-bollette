@@ -8923,12 +8923,25 @@ function Listini({
                     <textarea rows={2} maxLength={100} value={group.text} onChange={e=>{section.setGroups(prev=>prev.map(g=>g.id===group.id?{...g,text:e.target.value.slice(0,100)}:g));markDirty();}} style={{...inputStyle,display:"block",marginTop:5}}/>
                     <small>{group.text.length} / 100</small>
                   </label>
-                  <label style={{fontSize:12,fontWeight:700}}>CTE associate (selezione multipla)
-                    <select multiple size={Math.min(5,Math.max(2,section.offers.length))} value={group.offers} onChange={e=>{const selected=Array.from(e.target.selectedOptions).map(o=>o.value);section.setGroups(prev=>prev.map(g=>g.id===group.id?{...g,offers:selected}:g));markDirty();}} style={{...inputStyle,display:"block",marginTop:5}}>
-                      {section.offers.filter(o=>group.offers.includes(o.nome)||!section.groups.some(g=>g.id!==group.id&&g.offers.includes(o.nome))).map(o=><option key={o.nome} value={o.nome}>{o.nome}</option>)}
-                    </select>
-                    <small>Ctrl/Cmd per selezionare più CTE</small>
-                  </label>
+                  <div style={{fontSize:12,fontWeight:700}}>CTE associate
+                    <details style={{position:"relative",marginTop:5}}>
+                      <summary style={{cursor:"pointer",listStyle:"none",padding:"10px 12px",border:"1px solid #cbd5e1",borderRadius:8,background:"#fff",minHeight:20}}>
+                        {group.offers.length ? group.offers.length+" CTE selezionate" : "Seleziona CTE"} <span style={{float:"right"}}>▾</span>
+                      </summary>
+                      <div style={{maxHeight:245,overflowY:"auto",padding:8,background:"#fff",border:"1px solid #cbd5e1",borderRadius:8,boxShadow:"0 6px 18px #0001",marginTop:4}}>
+                        {section.offers.filter(o=>group.offers.includes(o.nome)||!section.groups.some(g=>g.id!==group.id&&g.offers.includes(o.nome))).map(o=>(
+                          <label key={o.nome} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 6px",cursor:"pointer",fontSize:13,borderBottom:"1px solid #f1f5f9"}}>
+                            <input type="checkbox" checked={group.offers.includes(o.nome)} onChange={e=>{
+                              const selected=e.target.checked?[...group.offers,o.nome]:group.offers.filter(name=>name!==o.nome);
+                              section.setGroups(prev=>prev.map(g=>g.id===group.id?{...g,offers:selected}:g));markDirty();
+                            }} style={{width:19,height:19,accentColor:section.title==="LUCE"?"#f97316":"#0284c7",flexShrink:0}}/>
+                            <span>{o.nome}</span>
+                          </label>
+                        ))}
+                        {!section.offers.some(o=>group.offers.includes(o.nome)||!section.groups.some(g=>g.id!==group.id&&g.offers.includes(o.nome)))&&<div style={{padding:8,color:"#64748b"}}>Nessuna CTE disponibile</div>}
+                      </div>
+                    </details>
+                  </div>
                 </div>
                 <button type="button" onClick={()=>{section.setGroups(prev=>prev.filter(g=>g.id!==group.id));markDirty();}} style={{marginTop:8,color:"#b91c1c"}}>Elimina didascalia</button>
               </div>
