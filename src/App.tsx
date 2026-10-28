@@ -2565,6 +2565,8 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
         scroll.style.cssText = "flex:1;min-height:0;overflow:auto;padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px;touch-action:pan-x pan-y;";
         // L'anteprima usa le stesse pagine renderizzate del file generato.
         scroll.addEventListener("wheel", (event) => {
+          // La rotella normale scorre il PDF; Ctrl/Cmd + rotella modifica lo zoom.
+          if (!event.ctrlKey && !event.metaKey) return;
           event.preventDefault();
           setZoom(zoom + (event.deltaY < 0 ? 10 : -10));
         }, { passive: false });
