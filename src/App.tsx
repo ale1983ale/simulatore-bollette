@@ -4889,11 +4889,7 @@ return (
 )}
 </div>
 
-<div style={{border:"1px solid #cbd5e1",borderRadius:8,padding:10,background:"#fff",minWidth:isMobile?"100%":220,boxSizing:"border-box"}}>
-  <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Confronto fornitore precedente (€)</div>
-  <input type="number" step="any" value={s.confrontoValore} onChange={e=>{set("confrontoValore",e.target.value);set("confrontoFlag",Number(e.target.value)!==0?"SI":"NO");}} placeholder="0 = disattivo" style={{width:"100%",boxSizing:"border-box",padding:"9px 10px",border:"1px solid #cbd5e1",borderRadius:7,fontSize:16}}/>
-  <small style={{color:"#64748b"}}>{Number(String(s.confrontoValore||"0").replace(",","."))!==0?"Confronto attivo":"Confronto disattivo"}</small>
-</div>
+
               <div style={{ minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined }}>
   <div
     style={{
@@ -4957,6 +4953,11 @@ Base suggerito
 </button>
 </div>
   </div>
+</div>
+              <div style={{border:"2px solid #f97316",borderRadius:8,padding:8,background:"#fff7ed",width:isMobile?"100%":220,minWidth:0,boxSizing:"border-box"}}>
+  <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:"#9a3412"}}>Confronto fornitore precedente (€)</div>
+  <input type="number" step="any" value={s.confrontoValore} onChange={e=>{set("confrontoValore",e.target.value);set("confrontoFlag",Number(e.target.value)!==0?"SI":"NO");}} placeholder="0 = disattivo" style={{width:"100%",boxSizing:"border-box",padding:"9px 10px",border:"1px solid #cbd5e1",borderRadius:7,fontSize:16}}/>
+  <small style={{color:"#64748b"}}>{Number(String(s.confrontoValore||"0").replace(",","."))!==0?"Confronto attivo":"Confronto disattivo"}</small>
 </div>
             </div>
           </div>
@@ -6775,8 +6776,8 @@ border: "1px solid #bfd8f6",
           </>
         )}
   
-        <div style={{marginBottom:12,maxWidth:340}}><div style={{border:"1px solid #cbd5e1",borderRadius:8,padding:10,background:"#fff",minWidth:isMobile?"100%":220,boxSizing:"border-box"}}>
-  <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Confronto fornitore precedente (€)</div>
+        <div style={{marginBottom:12}}><div style={{border:"2px solid #0284c7",borderRadius:8,padding:8,background:"#eff6ff",width:isMobile?"100%":220,minWidth:0,boxSizing:"border-box"}}>
+  <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:"#075985"}}>Confronto fornitore precedente (€)</div>
   <input type="number" step="any" value={s.confrontoValore} onChange={e=>{set("confrontoValore",e.target.value);set("confrontoFlag",Number(e.target.value)!==0?"SI":"NO");}} placeholder="0 = disattivo" style={{width:"100%",boxSizing:"border-box",padding:"9px 10px",border:"1px solid #cbd5e1",borderRadius:7,fontSize:16}}/>
   <small style={{color:"#64748b"}}>{Number(String(s.confrontoValore||"0").replace(",","."))!==0?"Confronto attivo":"Confronto disattivo"}</small>
 </div></div>
