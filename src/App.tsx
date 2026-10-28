@@ -4472,7 +4472,7 @@ function Energia({
         </div>
         ${brochureHasComparison && brochureSaving > 0 ? `
           <div style="margin-top:8px;border-radius:12px;background:linear-gradient(90deg,#dcfce7,#f0fdf4);padding:9px 14px;display:flex;align-items:center;gap:16px">
-            <span style="font-size:43px" aria-hidden="true">🐷</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:#bbf7d0;color:#166534" aria-hidden="true"><svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7c1.2 1 2 2.5 2 4.5 0 2.1-.8 3.6-2.5 4.7L18 20h-3l-.5-2H9l-.5 2h-3L5 16.7C3.8 15.7 3 14.1 3 12c0-1.1.3-2.1.8-3L2 7l3.6.6A8.6 8.6 0 0 1 12 5c1.4 0 2.7.3 3.8.9L19 5v2Z"/><path d="M9 8h5"/><circle cx="17" cy="11" r=".7" fill="currentColor" stroke="none"/><path d="M3 12H1"/></svg></span>
             <div style="flex:1"><div style="font-size:15px;font-weight:900;color:#166534">IL TUO RISPARMIO ANNUO</div><div style="font-size:33px;font-weight:900;color:#14532d">${money(brochureSaving)}</div></div>
             ${brochureSavingPercent >= 10 ? `<div style="font-size:23px;font-weight:900;background:#16a34a;color:#fff;border-radius:40px;padding:9px 13px">${brochureSavingPercent}%</div>` : ``}
           </div>` : ``}
