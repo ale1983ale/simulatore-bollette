@@ -2150,15 +2150,15 @@ function sanitizeFileName(name: string) {
   return cleaned || "Cliente";
 }
 
-function printHtmlDocument(title: string, html: string, fileName?: string, detailed = false) {
+function printHtmlDocument(title: string, html: string, fileName?: string, detailed = false, preview = false) {
   const androidFiles = (window as any).AndroidFiles;
   const useNativePdf =
-    Boolean(androidFiles && typeof androidFiles.savePdf === "function");
+    !preview && Boolean(androidFiles && typeof androidFiles.savePdf === "function");
 
   let renderFrame: HTMLIFrameElement | null = null;
   let win: Window | null = null;
 
-  if (useNativePdf) {
+  if (useNativePdf || preview) {
     renderFrame = document.createElement("iframe");
     renderFrame.setAttribute("aria-hidden", "true");
     renderFrame.style.position = "fixed";
@@ -2367,7 +2367,7 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
   `);
 
   win.document.close();
-  if (!useNativePdf) {
+  if (!useNativePdf && !preview) {
     win.focus();
   }
 
@@ -2513,6 +2513,42 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
         quality = Math.max(0.42, Math.min(quality, 0.56) - 0.015);
         pdf = buildPdf(workingCanvases, quality);
         blob = pdf.output("blob");
+      }
+
+      if (preview) {
+        // Mostra l'anteprima delle pagine effettivamente impaginate, senza download.
+        // Le immagini funzionano anche nelle WebView Android prive di visualizzatore PDF.
+        document.getElementById("simulation-pdf-preview")?.remove();
+        const overlay = document.createElement("div");
+        overlay.id = "simulation-pdf-preview";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-label", "Anteprima " + title);
+        overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#0f172ae8;display:flex;flex-direction:column;";
+        const header = document.createElement("div");
+        header.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:#fff;color:#0f172a;font-weight:800;";
+        const heading = document.createElement("span");
+        heading.textContent = "Anteprima PDF " + (detailed ? "dettagliato" : "semplificato") + " — " + title;
+        const close = document.createElement("button");
+        close.type = "button";
+        close.textContent = "✕ Chiudi";
+        close.style.cssText = "border:0;border-radius:9px;background:#e2e8f0;color:#0f172a;padding:10px 15px;font-weight:800;cursor:pointer;";
+        close.onclick = () => overlay.remove();
+        header.append(heading, close);
+        const scroll = document.createElement("div");
+        scroll.style.cssText = "flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px;";
+        // L'anteprima usa le stesse pagine renderizzate del file generato.
+        workingCanvases.forEach((canvas) => {
+          const img = document.createElement("img");
+          img.src = canvas.toDataURL("image/jpeg", quality);
+          img.alt = "Pagina del preventivo";
+          img.style.cssText = "display:block;width:100%;max-width:700px;height:auto;background:white;box-shadow:0 6px 25px #0005;";
+          scroll.appendChild(img);
+        });
+        overlay.append(header, scroll);
+        document.body.appendChild(overlay);
+        renderFrame?.remove();
+        return;
       }
 
       if (useNativePdf) {
@@ -4124,7 +4160,7 @@ function Energia({
     textAlign: "right",
   };
 
-  const printEnergyPdf = (detailed = false) => {
+  const printEnergyPdf = (detailed = false, preview = false) => {
     if (r.isBalanced && !r.balancedFixedReady) {
       alert("Completa prima il PREZZO FISSO bilanciato delle fasce con consumo. Il PDF non può essere generato con importi incompleti.");
       return;
@@ -4451,7 +4487,8 @@ function Energia({
       "Preventivo Energia",
       detailed ? detailedSummary + detailedHtml : html,
       `${energyFileName} - Energia${detailed ? " - Dettagliato" : ""}`,
-      detailed
+      detailed,
+      preview
     );
 };
 
@@ -5506,7 +5543,9 @@ Base suggerito
           >
             Crea PDF semplificato
           </button>
+          <button type="button" onClick={() => printEnergyPdf(false, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#f8fafc", border: "1px solid #94a3b8", color: "#0f172a", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF semplificato</button>
           <button type="button" onClick={() => printEnergyPdf(true)} style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "#f97316", color: "white", border: "none", cursor: "pointer", width: "100%", fontWeight: 800 }}>Crea PDF dettagliato</button>
+          <button type="button" onClick={() => printEnergyPdf(true, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#eff6ff", border: "1px solid #f97316", color: "#f97316", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF dettagliato</button>
 
           {canUseProvvigioni && (
             <button
@@ -6164,7 +6203,7 @@ function Gas({
     textAlign: "right",
   };
 
-  const printGasPdf = (detailed = false) => {
+  const printGasPdf = (detailed = false, preview = false) => {
     const periodo = [s.periodo1, s.periodo2, s.periodo3, s.periodo4].filter(Boolean).join(" / ") || "-";
     const blue = "#2563eb";
     const green = "#16a34a";
@@ -6401,7 +6440,8 @@ function Gas({
       "Preventivo Gas",
       detailed ? detailedSummary + detailedHtml : html,
       `${gasFileName} - Gas${detailed ? " - Dettagliato" : ""}`,
-      detailed
+      detailed,
+      preview
     );
   };
 
@@ -7138,7 +7178,9 @@ border: "1px solid #bfd8f6",
             >
               Crea PDF semplificato
             </button>
+          <button type="button" onClick={() => printGasPdf(false, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#f8fafc", border: "1px solid #94a3b8", color: "#0f172a", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF semplificato</button>
           <button type="button" onClick={() => printGasPdf(true)} style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "#2563eb", color: "white", border: "none", cursor: "pointer", width: "100%", fontWeight: 800 }}>Crea PDF dettagliato</button>
+          <button type="button" onClick={() => printGasPdf(true, true)} style={{ marginTop: 8, padding: "10px 14px", borderRadius: 8, background: "#eff6ff", border: "1px solid #2563eb", color: "#2563eb", cursor: "pointer", width: "100%", fontWeight: 800 }}>Anteprima PDF dettagliato</button>
 
             {canUseProvvigioni && (
               <button
