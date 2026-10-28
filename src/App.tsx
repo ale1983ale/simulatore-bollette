@@ -4442,9 +4442,9 @@ function Energia({
     const brochureHasComparison = isSi(s.confrontoFlag);
     const brochureSaving = Number(r.risparmioAnnuo) || 0;
     const brochureTotal = Number(r.H41) || 0;
-    const brochureSavingPercent = brochureHasComparison && brochureTotal + brochureSaving > 0
-      ? Math.round(brochureSaving / (brochureTotal + brochureSaving) * 100) : 0;
-    const brochureCurrent = brochureTotal + brochureSaving;
+    const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
+    const brochureSavingPercent = brochureHasComparison && brochureCurrent > 0
+      ? Math.round((Number(r.risparmioFattura) || 0) / brochureCurrent * 100) : 0;
     const brochureOfferDescription = ""; // Testo gestito nei Listini: non inventare una descrizione.
     const detailedSummary = `
       <div class="page" style="height:870px;padding:12px 12px;color:#10213d;overflow:hidden;font-family:Arial,sans-serif">
@@ -6403,9 +6403,9 @@ function Gas({
     const brochureHasComparison = isSi(s.confrontoFlag);
     const brochureSaving = Number(r.risparmioAnnuo) || 0;
     const brochureTotal = Number(r.H37) || 0;
-    const brochureSavingPercent = brochureHasComparison && brochureTotal + brochureSaving > 0
-      ? Math.round(brochureSaving / (brochureTotal + brochureSaving) * 100) : 0;
-    const brochureCurrent = brochureTotal + brochureSaving;
+    const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
+    const brochureSavingPercent = brochureHasComparison && brochureCurrent > 0
+      ? Math.round((Number(r.risparmioFattura) || 0) / brochureCurrent * 100) : 0;
     const brochureOfferDescription = ""; // Testo gestito nei Listini: non inventare una descrizione.
     const detailedSummary = `
       <div class="page" style="height:870px;padding:12px 12px;color:#10213d;overflow:hidden;font-family:Arial,sans-serif">
