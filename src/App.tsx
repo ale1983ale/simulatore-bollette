@@ -4402,45 +4402,49 @@ function Energia({
     const energyFileName = [cleanName, cleanOffer]
       .filter(Boolean)
       .join(" ");
+    const brochureIsDomestic = isDomesticEnergyType(s.tipo);
+    const brochureHasComparison = isSi(s.confrontoFlag);
+    const brochureSaving = Number(r.risparmioAnnuo) || 0;
+    const brochureTotal = Number(r.H41) || 0;
+    const brochureSavingPercent = brochureHasComparison && brochureTotal + brochureSaving > 0
+      ? Math.round(brochureSaving / (brochureTotal + brochureSaving) * 100) : 0;
+    const brochureCurrent = brochureTotal + brochureSaving;
+    const brochureOfferDescription = ""; // Testo gestito nei Listini: non inventare una descrizione.
     const detailedSummary = `
-      <div class="page" style="height:865px;padding:24px 22px;color:#0f172a;overflow:hidden">
-        <div style="border-radius:20px;padding:25px 22px;background:linear-gradient(135deg,#fff7ed,#fff);border-top:8px solid #f97316;position:relative">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div style="max-width:340px">
-              <div style="font-size:12px;letter-spacing:2px;font-weight:800;color:#9a3412">LA TUA PROPOSTA ENERGETICA</div>
-              <div style="font-size:36px;line-height:1.15;font-weight:900;color:#f97316;margin-top:10px">Preventivo Luce</div>
-              <div style="font-size:22px;font-weight:800;margin-top:13px">Più valore ${isDomesticEnergyType(s.tipo) ? "alla tua casa" : "al tuo business"}</div>
-            </div>
-            <div><svg width="230" height="175" viewBox="0 0 230 175" xmlns="http://www.w3.org/2000/svg"><circle cx="177" cy="41" r="32" fill="#fdba74" opacity=".7"/><path d="M15 142 L48 85 L82 142 Z" fill="#fed7aa"/><rect x="25" y="109" width="48" height="39" rx="4" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/><path d="M17 110 L49 81 L82 110" fill="none" stroke="#ea580c" stroke-width="5" stroke-linejoin="round"/><rect x="39" y="123" width="17" height="25" fill="#fdba74"/><rect x="94" y="96" width="109" height="54" rx="5" fill="#ffedd5" stroke="#ea580c" stroke-width="3"/><path d="M100 96 L113 67 L207 67 L194 96 Z" fill="#fb923c"/><path d="M116 70 L104 94 M140 70 L132 94 M165 70 L161 94 M190 70 L189 94 M110 82 L200 82" stroke="#fff7ed" stroke-width="2"/><path d="M16 151 H215" stroke="#ea580c" stroke-width="4"/><path d="M152 16 L135 45 H153 L143 69 L182 35 H161 L174 16 Z" fill="#ea580c"/></svg></div>
+      <div class="page" style="height:870px;padding:12px 12px;color:#10213d;overflow:hidden;font-family:Arial,sans-serif">
+        <div style="height:235px;position:relative;overflow:hidden;background:linear-gradient(110deg,#fff 0%,#fff0e1 85%);border-radius:12px">
+          <div style="position:absolute;right:0;top:0;width:325px;height:230px;overflow:hidden;border-radius:0 12px 12px 55px"><svg xmlns="http://www.w3.org/2000/svg" width="325" height="230" viewBox="0 0 325 230"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#ffd2a0"/><stop offset="1" stop-color="#ff8d3b"/></linearGradient><linearGradient id="glass" x2="0" y2="1"><stop stop-color="#253d56"/><stop offset="1" stop-color="#ffcc8b"/></linearGradient></defs><rect width="325" height="230" fill="url(#sky)"/><circle cx="70" cy="55" r="38" fill="#fff0c9" opacity=".8"/><path d="M0 157 L85 111 L169 147 L246 100 L325 143 V230 H0" fill="#475569" opacity=".4"/><rect y="185" width="325" height="45" fill="#485d51"/><path d="M62 93 L289 68 L315 89 L315 202 L62 202 Z" fill="#24344a"/><path d="M62 93 L289 68 L315 89 L91 116 Z" fill="#111e32"/><rect x="85" y="116" width="207" height="80" fill="url(#glass)"/><path d="M126 114 V198 M169 109 V198 M212 105 V198 M255 101 V198 M83 156 H295" stroke="#19283b" stroke-width="7"/><path d="M0 215 Q160 187 325 218" stroke="#f8fafc" stroke-width="5" opacity=".6"/><circle cx="29" cy="147" r="27" fill="#356b43"/><rect x="25" y="150" width="7" height="53" fill="#584b39"/><circle cx="304" cy="166" r="23" fill="#356b43"/></svg></div>
+          <div style="position:relative;z-index:1;width:330px;padding:15px;background:linear-gradient(90deg,#fff 65%,#ffffffdd 88%,transparent)">
+            <div style="display:flex;align-items:center;gap:10px"><span style="display:inline-flex;align-items:center;justify-content:center;background:#ff6a00;color:white;width:52px;height:52px;border-radius:50%;font-size:31px">ϟ</span><span style="font-size:31px;font-weight:900;line-height:1">Preventivo <span style="color:#ff6a00">Luce</span></span></div>
+            <div style="font-size:27px;font-weight:900;line-height:1.1;margin-top:13px">Più valore<br/> ${brochureIsDomestic ? "alla tua casa" : "al tuo business"}</div>
+            <p style="font-size:13px;line-height:1.35;margin-top:9px">Una fornitura semplice, trasparente e conveniente.</p>
           </div>
-          <div style="font-size:13px;margin-top:8px;color:#475569">Una proposta chiara, semplice e trasparente.</div>
+          <div style="position:absolute;bottom:0;right:0;width:290px;height:16px;background:#ff6a00;border-radius:100% 0 0 0"></div>
         </div>
-        <div style="margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">CLIENTE</div><strong style="font-size:14px">${s.nome || "-"}</strong></div>
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">PERIODO</div><strong style="font-size:14px">${periodo}</strong></div>
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">OFFERTA</div><strong style="font-size:14px">${s.offerta || "-"}</strong></div>
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">FATTURAZIONE</div><strong style="font-size:14px">${s.fatturazione || "-"}</strong></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+          <div style="background:#f2f6fa;padding:13px;border-radius:12px;font-size:12px"><div style="font-size:10px;color:#64748b">CLIENTE</div><b>${s.nome || "-"}</b><div style="font-size:10px;color:#64748b;margin-top:10px">USO</div><b>${brochureIsDomestic ? "DOMESTICO" : "BUSINESS"}</b></div>
+          <div style="background:#f2f6fa;padding:13px;border-radius:12px;font-size:12px"><div style="font-size:10px;color:#64748b">PERIODO</div><b>${periodo}</b><div style="font-size:10px;color:#64748b;margin-top:7px">OFFERTA</div><b>${s.offerta || "-"}</b><div style="font-size:10px;color:#64748b;margin-top:7px">FATTURAZIONE</div><b>${s.fatturazione || "-"}</b></div>
         </div>
-        <div style="display:flex;gap:12px;margin-top:20px">
-          <div style="flex:1;padding:19px;border-radius:15px;background:#fff7ed;border:1px solid #f9731644">
-            <div style="font-size:11px;font-weight:700;color:#9a3412">CONSUMO DEL PERIODO</div>
-            <div style="font-size:26px;font-weight:900;color:#9a3412;margin-top:6px">${r.consumiTot.toLocaleString("it-IT")} kWh</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
+          <div style="border-radius:12px;padding:12px 10px;background:#f3f7fc;border:1px solid #e5edf5"><div style="font-size:10px">⚡ CONSUMO</div><b style="font-size:20px">${r.consumiTot.toLocaleString("it-IT")} kWh</b></div>
+          <div style="border-radius:12px;padding:12px 10px;background:#f3f7fc;border:1px solid #e5edf5"><div style="font-size:10px">SPESA ATTUALE${brochureHasComparison ? "" : " NON DISP."}</div><b style="font-size:20px">${brochureHasComparison ? money(brochureCurrent) : "—"}</b></div>
+          <div style="border-radius:12px;padding:12px 10px;background:#ff6a00;color:white"><div style="font-size:10px">SPESA PREVISTA</div><b style="font-size:20px">${money(brochureTotal)}</b></div>
+        </div>
+        <div style="margin-top:11px;background:#fff0e1;border-radius:12px;padding:12px 15px;display:flex;gap:14px;min-height:75px">
+          <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#ff6a00">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
+          <div style="width:160px;border-left:1px solid #cbd5e1;padding-left:14px;font-size:11px;line-height:1.9">✓ Prezzi trasparenti<br/>✓ Gestione semplice<br/>✓ Condizioni chiare</div>
+        </div>
+        ${brochureHasComparison ? `
+          <div style="margin-top:11px;border-radius:12px;background:linear-gradient(90deg,#e4f9e9,#f4fff6);padding:15px 18px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:45px;color:#148c35">●</span>
+            <div><div style="font-size:15px;font-weight:900;color:#147b2e">IL TUO RISPARMIO ANNUO</div><div style="font-size:35px;font-weight:900;color:#086823">${money(brochureSaving)}</div></div>
+            <div style="font-size:24px;font-weight:900;background:#169b39;color:white;border-radius:40px;padding:9px 13px">${brochureSavingPercent}%</div>
           </div>
-          <div style="flex:1;padding:19px;border-radius:15px;background:#f97316;color:#fff">
-            <div style="font-size:11px;font-weight:800">TOTALE PREVENTIVO</div>
-            <div style="font-size:26px;font-weight:900;margin-top:6px">${money(r.H41)}</div>
-          </div>
-        </div>
-        ${isSi(s.confrontoFlag) ? `
-          <div style="margin-top:20px;border-radius:17px;padding:20px 23px;background:#fff7ed;border:2px solid #f97316">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div><div style="font-size:16px;font-weight:900;color:#9a3412">IL TUO RISPARMIO</div><div style="font-size:12px;color:#475569;margin-top:5px">Risparmio annuo stimato</div></div>
-              <div style="font-size:34px;font-weight:900;color:#f97316">${money(r.risparmioAnnuo)}</div>
-            </div>
-            <div style="margin-top:9px;height:9px;background:#fff;border-radius:10px;overflow:hidden"><div style="height:9px;width:72%;background:#f97316;border-radius:10px"></div></div>
-          </div>` : `<div style="margin-top:22px;border-radius:14px;padding:20px;background:#fff7ed;color:#9a3412;font-weight:700">Trasparenza nei costi, chiarezza nella scelta.</div>`}
-        <div style="margin-top:20px;padding:13px 16px;border-radius:12px;background:#f8fafc;border-left:5px solid #f97316;font-size:12px;color:#334155">Nella pagina successiva trovi il dettaglio completo di tutte le voci del preventivo.</div>
-        <div style="margin-top:15px;text-align:right;color:#94a3b8;font-size:10px">RIEPILOGO · 01 / 02</div>
+          <div style="margin-top:12px;display:flex;gap:15px">
+            <div style="width:54%;background:#fff;border-radius:12px;padding:10px"><b style="font-size:13px">Confronto spesa</b><div style="height:100px;display:flex;align-items:end;justify-content:space-evenly;border-bottom:1px solid #cbd5e1;margin-top:5px"><div style="width:68px;height:85px;background:#94a3b8;border-radius:5px 5px 0 0"></div><div style="width:68px;height:${Math.max(8,Math.min(85,85*(brochureTotal / (brochureCurrent || 1))))}px;background:#ff6a00;border-radius:5px 5px 0 0"></div></div><div style="display:flex;justify-content:space-around;font-size:10px;margin-top:4px"><span>Attuale</span><span>Previsione</span></div></div>
+            <div style="flex:1;background:#f1f7fc;border-radius:12px;padding:12px;font-size:11px"><b style="font-size:13px">I tuoi vantaggi</b><div style="margin-top:8px">✓ Maggiore chiarezza</div><div style="margin-top:8px">✓ Una scelta consapevole</div><div style="margin-top:8px">✓ Gestione semplice</div></div>
+          </div>` : `<div style="margin-top:14px;background:#fff0e1;border-radius:12px;padding:20px;font-size:14px;font-weight:700">Una scelta trasparente, con tutti i dettagli economici nella seconda pagina.</div>`}
+        <div style="margin-top:12px;background:linear-gradient(90deg,#fff0e1,#fff);border-radius:12px;border-left:5px solid #ff6a00;padding:13px;font-size:13px;font-weight:800">Più valore ${brochureIsDomestic ? "alla tua casa" : "al tuo business"}, oggi e domani.</div>
       </div>`;
     const detailedHtml = html.replace('class="page"', 'class="page detail-sheet" style="--accent:#f97316"');
     printHtmlDocument(
@@ -6348,45 +6352,49 @@ function Gas({
     const gasFileName = [cleanName, cleanOffer]
       .filter(Boolean)
       .join(" ");
+    const brochureIsDomestic = String(s.uso || "").toUpperCase().includes("DOMEST");
+    const brochureHasComparison = isSi(s.confrontoFlag);
+    const brochureSaving = Number(r.risparmioAnnuo) || 0;
+    const brochureTotal = Number(r.H37) || 0;
+    const brochureSavingPercent = brochureHasComparison && brochureTotal + brochureSaving > 0
+      ? Math.round(brochureSaving / (brochureTotal + brochureSaving) * 100) : 0;
+    const brochureCurrent = brochureTotal + brochureSaving;
+    const brochureOfferDescription = ""; // Testo gestito nei Listini: non inventare una descrizione.
     const detailedSummary = `
-      <div class="page" style="height:865px;padding:24px 22px;color:#0f172a;overflow:hidden">
-        <div style="border-radius:20px;padding:25px 22px;background:linear-gradient(135deg,#eff6ff,#fff);border-top:8px solid #2563eb;position:relative">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div style="max-width:340px">
-              <div style="font-size:12px;letter-spacing:2px;font-weight:800;color:#164e8d">LA TUA PROPOSTA ENERGETICA</div>
-              <div style="font-size:36px;line-height:1.15;font-weight:900;color:#2563eb;margin-top:10px">Preventivo Gas</div>
-              <div style="font-size:22px;font-weight:800;margin-top:13px">Più valore ${String(s.uso || "").toUpperCase().includes("DOMEST") ? "alla tua casa" : "al tuo business"}</div>
-            </div>
-            <div><svg width="230" height="175" viewBox="0 0 230 175" xmlns="http://www.w3.org/2000/svg"><circle cx="174" cy="42" r="32" fill="#bfdbfe"/><path d="M26 94 L104 34 L183 94" stroke="#1d4ed8" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="45" y="91" width="120" height="66" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="4"/><rect x="58" y="106" width="30" height="29" rx="3" fill="#93c5fd"/><rect x="103" y="107" width="35" height="50" rx="4" fill="#60a5fa"/><path d="M190 151 C153 118 211 96 193 57 C231 90 231 118 210 145 C219 117 195 109 196 91 C181 113 178 130 190 151Z" fill="#2563eb"/><path d="M197 149 C185 134 205 120 201 108 C220 129 214 141 207 151Z" fill="#93c5fd"/><path d="M19 160 H223" stroke="#1d4ed8" stroke-width="4"/></svg></div>
+      <div class="page" style="height:870px;padding:12px 12px;color:#10213d;overflow:hidden;font-family:Arial,sans-serif">
+        <div style="height:235px;position:relative;overflow:hidden;background:linear-gradient(110deg,#fff 0%,#eaf5ff 85%);border-radius:12px">
+          <div style="position:absolute;right:0;top:0;width:325px;height:230px;overflow:hidden;border-radius:0 12px 12px 55px"><svg xmlns="http://www.w3.org/2000/svg" width="325" height="230" viewBox="0 0 325 230"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#b8e4ff"/><stop offset="1" stop-color="#58a5d8"/></linearGradient><linearGradient id="glass" x2="0" y2="1"><stop stop-color="#253d56"/><stop offset="1" stop-color="#ffcc8b"/></linearGradient></defs><rect width="325" height="230" fill="url(#sky)"/><circle cx="70" cy="55" r="38" fill="#fff0c9" opacity=".8"/><path d="M0 157 L85 111 L169 147 L246 100 L325 143 V230 H0" fill="#475569" opacity=".4"/><rect y="185" width="325" height="45" fill="#485d51"/><path d="M62 93 L289 68 L315 89 L315 202 L62 202 Z" fill="#24344a"/><path d="M62 93 L289 68 L315 89 L91 116 Z" fill="#111e32"/><rect x="85" y="116" width="207" height="80" fill="url(#glass)"/><path d="M126 114 V198 M169 109 V198 M212 105 V198 M255 101 V198 M83 156 H295" stroke="#19283b" stroke-width="7"/><path d="M0 215 Q160 187 325 218" stroke="#f8fafc" stroke-width="5" opacity=".6"/><circle cx="29" cy="147" r="27" fill="#356b43"/><rect x="25" y="150" width="7" height="53" fill="#584b39"/><circle cx="304" cy="166" r="23" fill="#356b43"/></svg></div>
+          <div style="position:relative;z-index:1;width:330px;padding:15px;background:linear-gradient(90deg,#fff 65%,#ffffffdd 88%,transparent)">
+            <div style="display:flex;align-items:center;gap:10px"><span style="display:inline-flex;align-items:center;justify-content:center;background:#1479bb;color:white;width:52px;height:52px;border-radius:50%;font-size:31px">ϟ</span><span style="font-size:31px;font-weight:900;line-height:1">Preventivo <span style="color:#1479bb">Gas</span></span></div>
+            <div style="font-size:27px;font-weight:900;line-height:1.1;margin-top:13px">Più valore<br/> ${brochureIsDomestic ? "alla tua casa" : "al tuo business"}</div>
+            <p style="font-size:13px;line-height:1.35;margin-top:9px">Una fornitura semplice, trasparente e conveniente.</p>
           </div>
-          <div style="font-size:13px;margin-top:8px;color:#475569">Una proposta chiara, semplice e trasparente.</div>
+          <div style="position:absolute;bottom:0;right:0;width:290px;height:16px;background:#1479bb;border-radius:100% 0 0 0"></div>
         </div>
-        <div style="margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">CLIENTE</div><strong style="font-size:14px">${s.nome || "-"}</strong></div>
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">PERIODO</div><strong style="font-size:14px">${periodo}</strong></div>
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">OFFERTA</div><strong style="font-size:14px">${s.offerta || "-"}</strong></div>
-          <div style="border:1px solid #e2e8f0;border-radius:13px;padding:14px"><div class="label">FATTURAZIONE</div><strong style="font-size:14px">${s.fatturazione || "-"}</strong></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+          <div style="background:#f2f6fa;padding:13px;border-radius:12px;font-size:12px"><div style="font-size:10px;color:#64748b">CLIENTE</div><b>${s.nome || "-"}</b><div style="font-size:10px;color:#64748b;margin-top:10px">USO</div><b>${brochureIsDomestic ? "DOMESTICO" : "BUSINESS"}</b></div>
+          <div style="background:#f2f6fa;padding:13px;border-radius:12px;font-size:12px"><div style="font-size:10px;color:#64748b">PERIODO</div><b>${periodo}</b><div style="font-size:10px;color:#64748b;margin-top:7px">OFFERTA</div><b>${s.offerta || "-"}</b><div style="font-size:10px;color:#64748b;margin-top:7px">FATTURAZIONE</div><b>${s.fatturazione || "-"}</b></div>
         </div>
-        <div style="display:flex;gap:12px;margin-top:20px">
-          <div style="flex:1;padding:19px;border-radius:15px;background:#eff6ff;border:1px solid #2563eb44">
-            <div style="font-size:11px;font-weight:700;color:#164e8d">CONSUMO DEL PERIODO</div>
-            <div style="font-size:26px;font-weight:900;color:#164e8d;margin-top:6px">${r.consumoTotale.toLocaleString("it-IT")} Smc</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
+          <div style="border-radius:12px;padding:12px 10px;background:#f3f7fc;border:1px solid #e5edf5"><div style="font-size:10px">⚡ CONSUMO</div><b style="font-size:20px">${r.consumoTotale.toLocaleString("it-IT")} Smc</b></div>
+          <div style="border-radius:12px;padding:12px 10px;background:#f3f7fc;border:1px solid #e5edf5"><div style="font-size:10px">SPESA ATTUALE${brochureHasComparison ? "" : " NON DISP."}</div><b style="font-size:20px">${brochureHasComparison ? money(brochureCurrent) : "—"}</b></div>
+          <div style="border-radius:12px;padding:12px 10px;background:#1479bb;color:white"><div style="font-size:10px">SPESA PREVISTA</div><b style="font-size:20px">${money(brochureTotal)}</b></div>
+        </div>
+        <div style="margin-top:11px;background:#eaf5ff;border-radius:12px;padding:12px 15px;display:flex;gap:14px;min-height:75px">
+          <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#1479bb">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
+          <div style="width:160px;border-left:1px solid #cbd5e1;padding-left:14px;font-size:11px;line-height:1.9">✓ Prezzi trasparenti<br/>✓ Gestione semplice<br/>✓ Condizioni chiare</div>
+        </div>
+        ${brochureHasComparison ? `
+          <div style="margin-top:11px;border-radius:12px;background:linear-gradient(90deg,#e4f9e9,#f4fff6);padding:15px 18px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:45px;color:#148c35">●</span>
+            <div><div style="font-size:15px;font-weight:900;color:#147b2e">IL TUO RISPARMIO ANNUO</div><div style="font-size:35px;font-weight:900;color:#086823">${money(brochureSaving)}</div></div>
+            <div style="font-size:24px;font-weight:900;background:#169b39;color:white;border-radius:40px;padding:9px 13px">${brochureSavingPercent}%</div>
           </div>
-          <div style="flex:1;padding:19px;border-radius:15px;background:#2563eb;color:#fff">
-            <div style="font-size:11px;font-weight:800">TOTALE PREVENTIVO</div>
-            <div style="font-size:26px;font-weight:900;margin-top:6px">${money(r.H37)}</div>
-          </div>
-        </div>
-        ${isSi(s.confrontoFlag) ? `
-          <div style="margin-top:20px;border-radius:17px;padding:20px 23px;background:#eff6ff;border:2px solid #2563eb">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <div><div style="font-size:16px;font-weight:900;color:#164e8d">IL TUO RISPARMIO</div><div style="font-size:12px;color:#475569;margin-top:5px">Risparmio annuo stimato</div></div>
-              <div style="font-size:34px;font-weight:900;color:#2563eb">${money(r.risparmioAnnuo)}</div>
-            </div>
-            <div style="margin-top:9px;height:9px;background:#fff;border-radius:10px;overflow:hidden"><div style="height:9px;width:72%;background:#2563eb;border-radius:10px"></div></div>
-          </div>` : `<div style="margin-top:22px;border-radius:14px;padding:20px;background:#eff6ff;color:#164e8d;font-weight:700">Trasparenza nei costi, chiarezza nella scelta.</div>`}
-        <div style="margin-top:20px;padding:13px 16px;border-radius:12px;background:#f8fafc;border-left:5px solid #2563eb;font-size:12px;color:#334155">Nella pagina successiva trovi il dettaglio completo di tutte le voci del preventivo.</div>
-        <div style="margin-top:15px;text-align:right;color:#94a3b8;font-size:10px">RIEPILOGO · 01 / 02</div>
+          <div style="margin-top:12px;display:flex;gap:15px">
+            <div style="width:54%;background:#fff;border-radius:12px;padding:10px"><b style="font-size:13px">Confronto spesa</b><div style="height:100px;display:flex;align-items:end;justify-content:space-evenly;border-bottom:1px solid #cbd5e1;margin-top:5px"><div style="width:68px;height:85px;background:#94a3b8;border-radius:5px 5px 0 0"></div><div style="width:68px;height:${Math.max(8,Math.min(85,85*(brochureTotal / (brochureCurrent || 1))))}px;background:#1479bb;border-radius:5px 5px 0 0"></div></div><div style="display:flex;justify-content:space-around;font-size:10px;margin-top:4px"><span>Attuale</span><span>Previsione</span></div></div>
+            <div style="flex:1;background:#f1f7fc;border-radius:12px;padding:12px;font-size:11px"><b style="font-size:13px">I tuoi vantaggi</b><div style="margin-top:8px">✓ Maggiore chiarezza</div><div style="margin-top:8px">✓ Una scelta consapevole</div><div style="margin-top:8px">✓ Gestione semplice</div></div>
+          </div>` : `<div style="margin-top:14px;background:#eaf5ff;border-radius:12px;padding:20px;font-size:14px;font-weight:700">Una scelta trasparente, con tutti i dettagli economici nella seconda pagina.</div>`}
+        <div style="margin-top:12px;background:linear-gradient(90deg,#eaf5ff,#fff);border-radius:12px;border-left:5px solid #1479bb;padding:13px;font-size:13px;font-weight:800">Più valore ${brochureIsDomestic ? "alla tua casa" : "al tuo business"}, oggi e domani.</div>
       </div>`;
     const detailedHtml = html.replace('class="page"', 'class="page detail-sheet" style="--accent:#2563eb"');
     printHtmlDocument(
