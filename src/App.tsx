@@ -2150,7 +2150,7 @@ function sanitizeFileName(name: string) {
   return cleaned || "Cliente";
 }
 
-function printHtmlDocument(title: string, html: string, fileName?: string) {
+function printHtmlDocument(title: string, html: string, fileName?: string, detailed = false) {
   const androidFiles = (window as any).AndroidFiles;
   const useNativePdf =
     Boolean(androidFiles && typeof androidFiles.savePdf === "function");
@@ -2372,7 +2372,8 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
         await doc.fonts.ready;
       }
 
-      const sourceCanvas = await html2canvas(page, {
+      const pages = detailed ? Array.from(doc.querySelectorAll(".page")) as HTMLElement[] : [page];
+      const sourceCanvases = await Promise.all(pages.map((currentPage) => html2canvas(currentPage, {
         // 2.2x aumenta nettamente la definizione del testo rispetto al vecchio 1.2x.
         // La dimensione finale viene poi tenuta sotto 2 MB con compressione adattiva.
         scale: 2.2,
@@ -2380,8 +2381,8 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
         backgroundColor: "#ffffff",
         logging: false,
         imageTimeout: 8000,
-        windowWidth: Math.max(page.scrollWidth, 650),
-      });
+        windowWidth: Math.max(currentPage.scrollWidth, 650),
+      })));
 
       const pdfWidth = 210;
       const pdfHeight = 297;
@@ -2424,11 +2425,9 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       };
 
       const buildPdf = (
-        canvas: HTMLCanvasElement,
+        canvases: HTMLCanvasElement[],
         jpegQuality: number
       ) => {
-        const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
-
         const pdf = new jsPDF({
           orientation: "p",
           unit: "mm",
@@ -2439,38 +2438,26 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
 
         // Usa tutta la larghezza utile A4: il testo risulta anche fisicamente
         // più grande rispetto al precedente 90% della pagina.
-        const imgWidth = usableWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        let renderedHeight = 0;
-        let pageIndex = 0;
-
-        while (renderedHeight < imgHeight) {
-          if (pageIndex > 0) {
-            pdf.addPage();
+        let firstPage = true;
+        canvases.forEach((canvas, canvasIndex) => {
+          const imgData = canvas.toDataURL("image/jpeg", jpegQuality);
+          const imgWidth = usableWidth;
+          const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          let renderedHeight = 0;
+          while (renderedHeight < imgHeight) {
+            if (!firstPage) pdf.addPage();
+            firstPage = false;
+            pdf.addImage(imgData, "JPEG", margin, marginTop - renderedHeight,
+              imgWidth, imgHeight, `preventivo-page-${canvasIndex}`, "FAST");
+            renderedHeight += usableHeight;
           }
-
-          pdf.addImage(
-            imgData,
-            "JPEG",
-            margin,
-            marginTop - renderedHeight,
-            imgWidth,
-            imgHeight,
-            "preventivo-page",
-            "FAST"
-          );
-
-          renderedHeight += usableHeight;
-          pageIndex += 1;
-        }
-
+        });
         return pdf;
       };
 
-      let workingCanvas = sourceCanvas;
+      let workingCanvases = sourceCanvases;
       let quality = 0.9;
-      let pdf = buildPdf(workingCanvas, quality);
+      let pdf = buildPdf(workingCanvases, quality);
       let blob = pdf.output("blob");
 
       // Mantiene il file entro il limite richiesto senza sacrificare
@@ -2482,10 +2469,10 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
         if (quality > 0.58) {
           quality = Math.max(0.58, quality - 0.06);
         } else {
-          workingCanvas = resizeCanvas(workingCanvas, 0.88);
+          workingCanvases = workingCanvases.map(canvas => resizeCanvas(canvas, 0.88));
         }
 
-        pdf = buildPdf(workingCanvas, quality);
+        pdf = buildPdf(workingCanvases, quality);
         blob = pdf.output("blob");
       }
 
@@ -2495,9 +2482,9 @@ function printHtmlDocument(title: string, html: string, fileName?: string) {
       let safetyAttempts = 0;
       while (blob.size > maxPdfBytes && safetyAttempts < 12) {
         safetyAttempts += 1;
-        workingCanvas = resizeCanvas(workingCanvas, 0.84);
+        workingCanvases = workingCanvases.map(canvas => resizeCanvas(canvas, 0.84));
         quality = Math.max(0.42, Math.min(quality, 0.56) - 0.015);
-        pdf = buildPdf(workingCanvas, quality);
+        pdf = buildPdf(workingCanvases, quality);
         blob = pdf.output("blob");
       }
 
@@ -4110,7 +4097,7 @@ function Energia({
     textAlign: "right",
   };
 
-  const printEnergyPdf = () => {
+  const printEnergyPdf = (detailed = false) => {
     if (r.isBalanced && !r.balancedFixedReady) {
       alert("Completa prima il PREZZO FISSO bilanciato delle fasce con consumo. Il PDF non può essere generato con importi incompleti.");
       return;
@@ -4388,10 +4375,37 @@ function Energia({
     const energyFileName = [cleanName, cleanOffer]
       .filter(Boolean)
       .join(" ");
+    const detailedSummary = `
+      <div class="page" style="min-height:920px;padding:18px 8px;color:#0f172a">
+        <div style="border-radius:18px;padding:28px;background:linear-gradient(125deg,#f9731620,#fff 75%);border-top:8px solid #f97316">
+          <div style="font-size:34px;font-weight:900;color:#f97316">Preventivo Luce</div>
+          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore alla tua ${isDomesticEnergyType(s.tipo) ? "casa" : "attività"}</div>
+          <p style="font-size:15px">Una proposta chiara, semplice e trasparente.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px">
+          <div class="box"><div class="label">CLIENTE</div><strong>${s.nome || "-"}</strong></div>
+          <div class="box"><div class="label">PERIODO</div><strong>${periodo}</strong></div>
+          <div class="box"><div class="label">OFFERTA</div><strong>${s.offerta || "-"}</strong></div>
+          <div class="box"><div class="label">FATTURAZIONE</div><strong>${s.fatturazione || "-"}</strong></div>
+          <div class="box"><div class="label">CONSUMO DEL PERIODO</div><strong style="font-size:24px">${r.consumiTot.toLocaleString("it-IT")} kWh</strong></div>
+          <div class="box" style="background:#f97316;color:white"><div style="font-size:13px">TOTALE PREVENTIVO</div><strong style="font-size:28px">${money(r.H41)}</strong></div>
+        </div>
+        ${isSi(s.confrontoFlag) ? `
+          <div style="margin-top:25px;padding:25px;border-radius:16px;background:#ecfdf5;border:1px solid #86efac">
+            <div style="font-size:19px;font-weight:800;color:#166534">IL TUO RISPARMIO ANNUO</div>
+            <div style="font-size:40px;font-weight:900;color:#15803d">${money(r.risparmioAnnuo)}</div>
+            <div style="font-size:13px;color:#166534">Risparmio stimato rispetto alla spesa attuale</div>
+          </div>` : ""}
+        <div style="margin-top:35px;padding:18px;border-radius:12px;background:#f8fafc;border-left:6px solid #f97316">
+          <strong>Il dettaglio completo nella pagina successiva</strong>
+          <p>Quote consumi, quote fisse, eventuale potenza, imponibile, accise e IVA: tutte le voci calcolate dal simulatore.</p>
+        </div>
+      </div>`;
     printHtmlDocument(
       "Preventivo Energia",
-      html,
-      `${energyFileName} - Energia`
+      detailed ? detailedSummary + html : html,
+      `${energyFileName} - Energia${detailed ? " - Dettagliato" : ""}`,
+      detailed
     );
 };
 
@@ -5432,7 +5446,7 @@ Base suggerito
             )}
 
           <button
-            onClick={printEnergyPdf}
+            onClick={() => printEnergyPdf(false)}
             style={{
               marginTop: 14,
               padding: "10px 14px",
@@ -5444,8 +5458,9 @@ Base suggerito
               width: "100%",
             }}
           >
-            Crea PDF Energia
+            Crea PDF semplificato
           </button>
+          <button type="button" onClick={() => printEnergyPdf(true)} style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "#f97316", color: "white", border: "none", cursor: "pointer", width: "100%", fontWeight: 800 }}>Crea PDF dettagliato</button>
 
           {canUseProvvigioni && (
             <button
@@ -6103,7 +6118,7 @@ function Gas({
     textAlign: "right",
   };
 
-  const printGasPdf = () => {
+  const printGasPdf = (detailed = false) => {
     const periodo = [s.periodo1, s.periodo2, s.periodo3, s.periodo4].filter(Boolean).join(" / ") || "-";
     const blue = "#2563eb";
     const green = "#16a34a";
@@ -6291,10 +6306,37 @@ function Gas({
     const gasFileName = [cleanName, cleanOffer]
       .filter(Boolean)
       .join(" ");
+    const detailedSummary = `
+      <div class="page" style="min-height:920px;padding:18px 8px;color:#0f172a">
+        <div style="border-radius:18px;padding:28px;background:linear-gradient(125deg,#2563eb20,#fff 75%);border-top:8px solid #2563eb">
+          <div style="font-size:34px;font-weight:900;color:#2563eb">Preventivo Gas</div>
+          <div style="font-size:25px;font-weight:800;margin-top:10px">Più valore alla tua ${String(s.uso || "").toUpperCase().includes("DOMEST") ? "casa" : "attività"}</div>
+          <p style="font-size:15px">Una proposta chiara, semplice e trasparente.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px">
+          <div class="box"><div class="label">CLIENTE</div><strong>${s.nome || "-"}</strong></div>
+          <div class="box"><div class="label">PERIODO</div><strong>${periodo}</strong></div>
+          <div class="box"><div class="label">OFFERTA</div><strong>${s.offerta || "-"}</strong></div>
+          <div class="box"><div class="label">FATTURAZIONE</div><strong>${s.fatturazione || "-"}</strong></div>
+          <div class="box"><div class="label">CONSUMO DEL PERIODO</div><strong style="font-size:24px">${r.consumoTotale.toLocaleString("it-IT")} Smc</strong></div>
+          <div class="box" style="background:#2563eb;color:white"><div style="font-size:13px">TOTALE PREVENTIVO</div><strong style="font-size:28px">${money(r.H37)}</strong></div>
+        </div>
+        ${isSi(s.confrontoFlag) ? `
+          <div style="margin-top:25px;padding:25px;border-radius:16px;background:#ecfdf5;border:1px solid #86efac">
+            <div style="font-size:19px;font-weight:800;color:#166534">IL TUO RISPARMIO ANNUO</div>
+            <div style="font-size:40px;font-weight:900;color:#15803d">${money(r.risparmioAnnuo)}</div>
+            <div style="font-size:13px;color:#166534">Risparmio stimato rispetto alla spesa attuale</div>
+          </div>` : ""}
+        <div style="margin-top:35px;padding:18px;border-radius:12px;background:#f8fafc;border-left:6px solid #2563eb">
+          <strong>Il dettaglio completo nella pagina successiva</strong>
+          <p>Quote consumi, quote fisse, eventuale potenza, imponibile, accise e IVA: tutte le voci calcolate dal simulatore.</p>
+        </div>
+      </div>`;
     printHtmlDocument(
       "Preventivo Gas",
-      html,
-      `${gasFileName} - Gas`
+      detailed ? detailedSummary + html : html,
+      `${gasFileName} - Gas${detailed ? " - Dettagliato" : ""}`,
+      detailed
     );
   };
 
@@ -7017,7 +7059,7 @@ border: "1px solid #bfd8f6",
               )}
   
             <button
-              onClick={printGasPdf}
+              onClick={() => printGasPdf(false)}
               style={{
                 marginTop: 14,
                 padding: "10px 14px",
@@ -7029,8 +7071,9 @@ border: "1px solid #bfd8f6",
                 width: "100%",
               }}
             >
-              Crea PDF Gas
+              Crea PDF semplificato
             </button>
+          <button type="button" onClick={() => printGasPdf(true)} style={{ marginTop: 10, padding: "12px 14px", borderRadius: 8, background: "#2563eb", color: "white", border: "none", cursor: "pointer", width: "100%", fontWeight: 800 }}>Crea PDF dettagliato</button>
 
             {canUseProvvigioni && (
               <button
