@@ -1258,6 +1258,7 @@ function googleCalendarMonthRange(monthKey: string) {
 type RecruitingSection =
   | "contacts"
   | "external_contacts"
+  | "all_contacts"
   | "calendar"
   | "todos"
   | "map"
@@ -1331,6 +1332,7 @@ export default function Recruiting({
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
+  const [generalContactsSearch,setGeneralContactsSearch]=useState("");
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [hrStatusSyncItems, setHrStatusSyncItems] = useState<
     HrStatusSyncItem[]
@@ -7372,6 +7374,7 @@ export default function Recruiting({
           {[
             ["contacts", "CONTATTI", "CONTATTI"],
             ["external_contacts", "CONTATTI ESTERNI", "ESTERNI"],
+            ["all_contacts", "CONTATTI GENERALE", "TUTTI"],
             ["calendar", "CALENDARIO", "CALENDARIO"],
             ["todos", "☑ COSE DA FARE", "☑ DA FARE"],
             ["map", "MAPPA", "MAPPA"],
@@ -7514,6 +7517,20 @@ export default function Recruiting({
         </div>
       )}
 
+      {section === "all_contacts" && !contactsOnly && (
+        <div style={{...cardStyle,marginTop:12}}>
+          <h3 style={{marginTop:0}}>CONTATTI GENERALE</h3>
+          <p style={{color:"#475569"}}>Tutti i contatti e i contatti esterni in un unico elenco. Seleziona un nominativo per aprire la sua scheda originale.</p>
+          <input style={{width:"100%",padding:12,border:"1px solid #cbd5e1",borderRadius:10,boxSizing:"border-box"}} placeholder="Cerca nome, telefono, email, azienda o zona..." value={generalContactsSearch} onChange={e=>setGeneralContactsSearch(e.target.value)} />
+          <div style={{marginTop:10,fontWeight:700}}>{allCandidates.filter(c=>[c.fullName,c.phone,c.email,c.companyName,c.operationalZone].join(" ").toLocaleLowerCase("it").includes(generalContactsSearch.toLocaleLowerCase("it"))).length} contatti trovati</div>
+          <div style={{display:"grid",gap:8,marginTop:12}}>
+            {allCandidates.filter(c=>[c.fullName,c.phone,c.email,c.companyName,c.operationalZone].join(" ").toLocaleLowerCase("it").includes(generalContactsSearch.toLocaleLowerCase("it"))).sort((a,b)=>a.fullName.localeCompare(b.fullName,"it")).map(c=><button key={c.id} type="button" onClick={()=>openFullContactDetails(c.id)} style={{...buttonStyle,textAlign:"left",background:"white",border:"1px solid #cbd5e1",padding:12,borderRadius:10,display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+              <span><strong>{c.fullName||"Senza nome"}</strong><span style={{display:"block",fontSize:13,color:"#475569"}}>{[c.companyName,c.phone,c.email,c.operationalZone].filter(Boolean).join(" · ")}</span></span>
+              <span style={{color:c.contactScope==="external"?"#9a3412":"#1d4ed8",fontWeight:800}}>{c.contactScope==="external"?"ESTERNO":"CONTATTO"}</span>
+            </button>)}
+          </div>
+        </div>
+      )}
       {section === "external_contacts" && !contactsOnly && (
         <Recruiting
           initialSection="contacts"
