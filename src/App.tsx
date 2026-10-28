@@ -3224,8 +3224,8 @@ function calcEnergia(
   const H37 = H35 + H36;
   const H41 = H22 + H25 + H24 + H28 + H29 + H30 + H37 + H38 - H39 + H40;
 
-  const risparmioFattura = isSi(d.confrontoFlag) ? n(d.confrontoValore) - H41 : 0;
-  const risparmioAnnuo = isSi(d.confrontoFlag) ? (risparmioFattura * 12) / mesi : 0;
+  const risparmioFattura = n(d.confrontoValore) !== 0 ? n(d.confrontoValore) - H41 : 0;
+  const risparmioAnnuo = n(d.confrontoValore) !== 0 ? (risparmioFattura * 12) / mesi : 0;
 
   return {
     H22_base,
@@ -3399,10 +3399,10 @@ function calcGas(
       ? n(d.bonusValore)
       : 0;
   const H37 = H24 + H29 + H34 + H35 - H36;
-  const risparmioFattura = isSi(d.confrontoFlag)
+  const risparmioFattura = n(d.confrontoValore) !== 0
     ? n(d.confrontoValore) - H37
     : 0;
-  const risparmioAnnuo = isSi(d.confrontoFlag)
+  const risparmioAnnuo = n(d.confrontoValore) !== 0
     ? (risparmioFattura / mesi) * 12
     : 0;
 
@@ -4420,7 +4420,7 @@ function Energia({
         </div>
 
         ${
-          isSi(s.confrontoFlag)
+          Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0
             ? `
         <div class="savings">
           <div class="savings-row">
@@ -4443,7 +4443,7 @@ function Energia({
       .filter(Boolean)
       .join(" ");
     const brochureIsDomestic = isDomesticEnergyType(s.tipo);
-    const brochureHasComparison = isSi(s.confrontoFlag);
+    const brochureHasComparison = Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0;
     const brochureSaving = Number(r.risparmioAnnuo) || 0;
     const brochureTotal = Number(r.H41) || 0;
     const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
@@ -4889,6 +4889,11 @@ return (
 )}
 </div>
 
+<div style={{border:"1px solid #cbd5e1",borderRadius:8,padding:10,background:"#fff",minWidth:isMobile?"100%":220,boxSizing:"border-box"}}>
+  <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Confronto fornitore precedente (€)</div>
+  <input type="number" step="any" value={s.confrontoValore} onChange={e=>{set("confrontoValore",e.target.value);set("confrontoFlag",Number(e.target.value)!==0?"SI":"NO");}} placeholder="0 = disattivo" style={{width:"100%",boxSizing:"border-box",padding:"9px 10px",border:"1px solid #cbd5e1",borderRadius:7,fontSize:16}}/>
+  <small style={{color:"#64748b"}}>{Number(String(s.confrontoValore||"0").replace(",","."))!==0?"Confronto attivo":"Confronto disattivo"}</small>
+</div>
               <div style={{ minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined }}>
   <div
     style={{
@@ -5388,13 +5393,6 @@ Base suggerito
             }}
           >
             {toggleAmount(
-              "Confronto Fornitore Precedente",
-              s.confrontoFlag,
-              (v) => set("confrontoFlag", v),
-              s.confrontoValore,
-              (v) => set("confrontoValore", v)
-            )}
-            {toggleAmount(
               "Ricalcoli/Sconti",
               s.ricalcoloFlag,
               (v) => set("ricalcoloFlag", v),
@@ -5528,7 +5526,7 @@ Base suggerito
 
           {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
 
-          {isSi(s.confrontoFlag) &&
+          {Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0 &&
             previewBox(
               <>
                 {row("Risparmio in fattura", money(r.risparmioFattura))}
@@ -6381,7 +6379,7 @@ function Gas({
         </div>
 
         ${
-          isSi(s.confrontoFlag)
+          Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0
             ? `
         <div class="savings">
           <div class="savings-row">
@@ -6404,7 +6402,7 @@ function Gas({
       .filter(Boolean)
       .join(" ");
     const brochureIsDomestic = String(s.uso || "").toUpperCase().includes("DOMEST");
-    const brochureHasComparison = isSi(s.confrontoFlag);
+    const brochureHasComparison = Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0;
     const brochureSaving = Number(r.risparmioAnnuo) || 0;
     const brochureTotal = Number(r.H37) || 0;
     const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
@@ -6777,6 +6775,11 @@ border: "1px solid #bfd8f6",
           </>
         )}
   
+        <div style={{marginBottom:12,maxWidth:340}}><div style={{border:"1px solid #cbd5e1",borderRadius:8,padding:10,background:"#fff",minWidth:isMobile?"100%":220,boxSizing:"border-box"}}>
+  <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Confronto fornitore precedente (€)</div>
+  <input type="number" step="any" value={s.confrontoValore} onChange={e=>{set("confrontoValore",e.target.value);set("confrontoFlag",Number(e.target.value)!==0?"SI":"NO");}} placeholder="0 = disattivo" style={{width:"100%",boxSizing:"border-box",padding:"9px 10px",border:"1px solid #cbd5e1",borderRadius:7,fontSize:16}}/>
+  <small style={{color:"#64748b"}}>{Number(String(s.confrontoValore||"0").replace(",","."))!==0?"Confronto attivo":"Confronto disattivo"}</small>
+</div></div>
         {sectionCard(
           "rete",
           <span
@@ -7066,13 +7069,6 @@ border: "1px solid #bfd8f6",
                 s.overrideAcciseValore,
                 (v) => set("overrideAcciseValore", v)
               )}
-              {toggleAmount(
-                "Confronto fornitore precedente",
-                s.confrontoFlag,
-                (v) => set("confrontoFlag", v),
-                s.confrontoValore,
-                (v) => set("confrontoValore", v)
-              )}
               {s.uso === "DOMESTICO" &&
                 toggleAmount(
                   "Bonus sociale",
@@ -7167,7 +7163,7 @@ border: "1px solid #bfd8f6",
   
             {previewBox(<>{row("Totale preventivo", money(r.H37), true, 16)}</>, "#93c5fd")}
   
-            {isSi(s.confrontoFlag) &&
+            {Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0 &&
               previewBox(
                 <>
                   {row("Risparmio fattura", money(r.risparmioFattura))}
