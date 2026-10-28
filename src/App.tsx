@@ -2530,7 +2530,7 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
         overlay.setAttribute("aria-label", "Anteprima " + title);
         overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#0f172ae8;display:flex;flex-direction:column;";
         const header = document.createElement("div");
-        header.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:#fff;color:#0f172a;font-weight:800;";
+        header.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;background:#fff;color:#0f172a;font-weight:800;flex-wrap:wrap;";
         const heading = document.createElement("span");
         heading.textContent = "Anteprima PDF " + (detailed ? "dettagliato" : "semplificato") + " — " + title;
         const close = document.createElement("button");
@@ -2541,27 +2541,52 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
         const zoomControls = document.createElement("div");
         zoomControls.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;";
         let zoom = 100;
+        let fitWidth = Math.max(260, Math.min(700, window.innerWidth - 32));
         const zoomLabel = document.createElement("span");
         zoomLabel.style.cssText = "min-width:48px;text-align:center;font-size:13px;";
         const pageImages: HTMLImageElement[] = [];
         const updateZoom = () => {
           zoomLabel.textContent = zoom + "%";
-          pageImages.forEach(img => { img.style.width = (700 * zoom / 100) + "px"; img.style.maxWidth = "none"; });
+          pageImages.forEach(img => { img.style.width = (fitWidth * zoom / 100) + "px"; img.style.maxWidth = "none"; });
         };
+        const setZoom = (next: number) => { zoom = Math.max(40, Math.min(400, Math.round(next))); updateZoom(); };
         const zoomButton = (label: string, action: () => void) => {
           const button = document.createElement("button");
           button.type = "button"; button.textContent = label;
           button.style.cssText = "border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;padding:7px 10px;cursor:pointer;font-weight:800;";
           button.onclick = action; zoomControls.appendChild(button);
         };
-        zoomButton("−", () => { zoom = Math.max(40, zoom - 25); updateZoom(); });
+        zoomButton("−", () => { setZoom(zoom - 25); });
         zoomControls.appendChild(zoomLabel);
-        zoomButton("+", () => { zoom = Math.min(300, zoom + 25); updateZoom(); });
-        zoomButton("100%", () => { zoom = 100; updateZoom(); });
+        zoomButton("+", () => { setZoom(zoom + 25); });
+        zoomButton("100%", () => { setZoom(100); });
         header.append(heading, zoomControls, close);
         const scroll = document.createElement("div");
-        scroll.style.cssText = "flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px;";
+        scroll.style.cssText = "flex:1;min-height:0;overflow:auto;padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px;touch-action:pan-x pan-y;";
         // L'anteprima usa le stesse pagine renderizzate del file generato.
+        scroll.addEventListener("wheel", (event) => {
+          event.preventDefault();
+          setZoom(zoom + (event.deltaY < 0 ? 10 : -10));
+        }, { passive: false });
+        let pinchDistance = 0;
+        let pinchZoom = 100;
+        scroll.addEventListener("touchstart", (event) => {
+          if (event.touches.length === 2) {
+            pinchDistance = Math.hypot(event.touches[0].clientX-event.touches[1].clientX,event.touches[0].clientY-event.touches[1].clientY);
+            pinchZoom = zoom;
+          }
+        }, { passive: true });
+        scroll.addEventListener("touchmove", (event) => {
+          if (event.touches.length === 2 && pinchDistance > 0) {
+            event.preventDefault();
+            const distance = Math.hypot(event.touches[0].clientX-event.touches[1].clientX,event.touches[0].clientY-event.touches[1].clientY);
+            setZoom(pinchZoom * distance / pinchDistance);
+          }
+        }, { passive: false });
+        scroll.addEventListener("touchend", (event) => { if (event.touches.length < 2) pinchDistance = 0; });
+        const resizePreview = () => { fitWidth = Math.max(260, Math.min(700, window.innerWidth - 32)); updateZoom(); };
+        window.addEventListener("resize", resizePreview);
+        close.onclick = () => { window.removeEventListener("resize", resizePreview); overlay.remove(); };
         workingCanvases.forEach((canvas) => {
           const img = document.createElement("img");
           img.src = canvas.toDataURL("image/jpeg", quality);
