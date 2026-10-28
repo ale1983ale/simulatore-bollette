@@ -8044,6 +8044,21 @@ function Listini({
   const [draftGasOffers, setDraftGasOffers] = useState<GasOffer[]>(() => cloneGasOffers(gasOffers));
   const [draftOfferVisibility, setDraftOfferVisibility] = useState<OfferVisibilitySettings>({ ...offerVisibility });
   const [draftGasAcciseSettings, setDraftGasAcciseSettings] = useState<GasAcciseSettings>(() => ({ ...gasAcciseSettings }));
+  type CaptionGroup = { id: number; text: string; offers: string[] };
+  const buildCaptionGroups = (rows: Array<{nome:string;frasePdfDomestico?:string;frasePdfBusiness?:string}>) => {
+    const groups: CaptionGroup[] = [];
+    for (const row of rows) {
+      const value = row.frasePdfDomestico || row.frasePdfBusiness || "";
+      if (!value) continue;
+      let group = groups.find(g => g.text === value);
+      if (!group) { group = {id:groups.length+1,text:value,offers:[]}; groups.push(group); }
+      group.offers.push(row.nome);
+    }
+    return groups;
+  };
+  const [energyCaptions,setEnergyCaptions] = useState<CaptionGroup[]>(()=>buildCaptionGroups(energyOffers));
+  const [gasCaptions,setGasCaptions] = useState<CaptionGroup[]>(()=>buildCaptionGroups(gasOffers));
+  const [nextCaptionId,setNextCaptionId] = useState(1000);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draggingEnergyIndex, setDraggingEnergyIndex] = useState<number | null>(null);
@@ -8053,6 +8068,8 @@ function Listini({
     if (dirty) return;
     setDraftEnergyOffers(cloneEnergyOffers(energyOffers));
     setDraftGasOffers(cloneGasOffers(gasOffers));
+    setEnergyCaptions(buildCaptionGroups(energyOffers));
+    setGasCaptions(buildCaptionGroups(gasOffers));
     setDraftOfferVisibility({ ...offerVisibility });
     setDraftGasAcciseSettings({ ...gasAcciseSettings });
   }, [energyOffers, gasOffers, gasAcciseSettings, offerVisibility, dirty]);
@@ -8216,6 +8233,10 @@ function Listini({
     markDirty();
   };
 
+  const applyCaptions = <T extends {nome:string;frasePdfDomestico?:string;frasePdfBusiness?:string}>(rows:T[],groups:CaptionGroup[]):T[] => rows.map(row => {
+    const group = groups.find(g => g.offers.includes(row.nome));
+    return {...row,frasePdfDomestico:group?.text || "",frasePdfBusiness:group?.text || ""};
+  });
   const saveListini = async () => {
     for (const offer of draftEnergyOffers) {
       if (!balancedCustomerGroups(offer.nome)) continue;
@@ -8229,7 +8250,7 @@ function Listini({
       }
     }
     setSaving(true);
-    const normalizedEnergyOffers = draftEnergyOffers
+    const normalizedEnergyOffers = applyCaptions(draftEnergyOffers,energyCaptions)
       .filter((offer) => !["+BILANCIATA AD HOC", "+ BILANCIATA AD HOC"].includes(
         normalizeOfferName(offer.nome).replace(/\s+/g, " ")
       ))
@@ -8242,7 +8263,7 @@ function Listini({
 
     const payload = [
       { key: "energyOffers", value_json: normalizedEnergyOffers },
-      { key: "gasOffers", value_json: draftGasOffers },
+      { key: "gasOffers", value_json: applyCaptions(draftGasOffers,gasCaptions) },
       { key: "offerVisibility", value_json: draftOfferVisibility },
       { key: "gasAcciseSettings", value_json: draftGasAcciseSettings },
     ];
@@ -8258,7 +8279,7 @@ function Listini({
     setSaving(false);
 
     setEnergyOffers(cloneEnergyOffers(normalizedEnergyOffers));
-    setGasOffers(cloneGasOffers(draftGasOffers));
+    setGasOffers(cloneGasOffers(applyCaptions(draftGasOffers,gasCaptions)));
     setOfferVisibility({ ...draftOfferVisibility });
     setGasAcciseSettings({ ...draftGasAcciseSettings });
     setDraftEnergyOffers(cloneEnergyOffers(normalizedEnergyOffers));
@@ -8352,32 +8373,6 @@ function Listini({
         </p>
       </div>
 
-      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:16}}>
-        <h2 style={{marginTop:0,fontSize:18}}>FRASI PDF PER OFFERTA</h2>
-        <p style={{fontSize:12,color:"#64748b"}}>Massimo 100 caratteri, spazi inclusi. Due righe nel PDF. Premi Salva listini per confermare.</p>
-        {draftEnergyOffers.map((offer,index)=>(
-          <div key={"e"+index} style={{padding:10,borderBottom:"1px solid #eee"}}>
-            <b>{offer.nome} · LUCE</b>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
-              {(["frasePdfDomestico","frasePdfBusiness"] as const).map(field=><label key={field}>{field==="frasePdfDomestico"?"Domestico":"Business"}
-                <textarea maxLength={100} rows={2} value={offer[field]||""} onChange={e=>{setDraftEnergyOffers(prev=>prev.map((o,i)=>i===index?{...o,[field]:e.target.value.slice(0,100)}:o));markDirty();}} style={{...inputStyle,display:"block"}}/>
-                <small>{(offer[field]||"").length} / 100</small>
-              </label>)}
-            </div>
-          </div>
-        ))}
-        {draftGasOffers.map((offer,index)=>(
-          <div key={"g"+index} style={{padding:10,borderBottom:"1px solid #eee"}}>
-            <b>{offer.nome} · GAS</b>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
-              {(["frasePdfDomestico","frasePdfBusiness"] as const).map(field=><label key={field}>{field==="frasePdfDomestico"?"Domestico":"Business"}
-                <textarea maxLength={100} rows={2} value={offer[field]||""} onChange={e=>{setDraftGasOffers(prev=>prev.map((o,i)=>i===index?{...o,[field]:e.target.value.slice(0,100)}:o));markDirty();}} style={{...inputStyle,display:"block"}}/>
-                <small>{(offer[field]||"").length} / 100</small>
-              </label>)}
-            </div>
-          </div>
-        ))}
-      </div>
       <div
         style={{
           background: "white",
@@ -8914,6 +8909,33 @@ function Listini({
             </tbody>
           </table>
         </div>
+      </div>
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:16}}>
+        <h2 style={{marginTop:0,fontSize:18}}>DIDASCALIE PDF</h2>
+        <p style={{fontSize:12,color:"#64748b"}}>Associa ogni didascalia a una o più CTE. La stessa CTE non può essere scelta in due didascalie. Massimo 100 caratteri.</p>
+        {([{title:"LUCE",offers:draftEnergyOffers,groups:energyCaptions,setGroups:setEnergyCaptions},{title:"GAS",offers:draftGasOffers,groups:gasCaptions,setGroups:setGasCaptions}] as const).map(section=>(
+          <div key={section.title} style={{marginTop:18,padding:12,background:"#f8fafc",borderRadius:10}}>
+            <h3 style={{marginTop:0}}>{section.title}</h3>
+            {section.groups.map(group=>(
+              <div key={group.id} style={{background:"white",padding:12,borderRadius:10,marginBottom:10,border:"1px solid #dbe4ee"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
+                  <label style={{fontSize:12,fontWeight:700}}>Didascalia
+                    <textarea rows={2} maxLength={100} value={group.text} onChange={e=>{section.setGroups(prev=>prev.map(g=>g.id===group.id?{...g,text:e.target.value.slice(0,100)}:g));markDirty();}} style={{...inputStyle,display:"block",marginTop:5}}/>
+                    <small>{group.text.length} / 100</small>
+                  </label>
+                  <label style={{fontSize:12,fontWeight:700}}>CTE associate (selezione multipla)
+                    <select multiple size={Math.min(5,Math.max(2,section.offers.length))} value={group.offers} onChange={e=>{const selected=Array.from(e.target.selectedOptions).map(o=>o.value);section.setGroups(prev=>prev.map(g=>g.id===group.id?{...g,offers:selected}:g));markDirty();}} style={{...inputStyle,display:"block",marginTop:5}}>
+                      {section.offers.filter(o=>group.offers.includes(o.nome)||!section.groups.some(g=>g.id!==group.id&&g.offers.includes(o.nome))).map(o=><option key={o.nome} value={o.nome}>{o.nome}</option>)}
+                    </select>
+                    <small>Ctrl/Cmd per selezionare più CTE</small>
+                  </label>
+                </div>
+                <button type="button" onClick={()=>{section.setGroups(prev=>prev.filter(g=>g.id!==group.id));markDirty();}} style={{marginTop:8,color:"#b91c1c"}}>Elimina didascalia</button>
+              </div>
+            ))}
+            <button type="button" onClick={()=>{section.setGroups(prev=>[...prev,{id:nextCaptionId,text:"",offers:[]}]);setNextCaptionId(n=>n+1);markDirty();}} style={{padding:"9px 14px",background:section.title==="LUCE"?"#f97316":"#0284c7",color:"white",border:0,borderRadius:8,fontWeight:800}}>+ AGGIUNGI DIDASCALIA</button>
+          </div>
+        ))}
       </div>
     </div>
   );
