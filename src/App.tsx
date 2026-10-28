@@ -4739,7 +4739,7 @@ return (
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto auto",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(4,minmax(0,1fr))",
               alignItems: "stretch",
               gap: 12,
               marginBottom: 12,
@@ -6681,7 +6681,7 @@ function Gas({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "1fr auto auto auto",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(4,minmax(0,1fr))",
                 alignItems: "stretch",
                 gap: 12,
                 marginBottom: 12,
