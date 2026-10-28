@@ -4470,17 +4470,21 @@ function Energia({
           <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#ff6a00">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
           <div style="width:160px;border-left:1px solid #cbd5e1;padding-left:14px;font-size:11px;line-height:1.9">✓ Prezzi trasparenti<br/>✓ Gestione semplice<br/>✓ Condizioni chiare</div>
         </div>
-        ${brochureHasComparison ? `
-          <div style="margin-top:11px;border-radius:12px;background:linear-gradient(90deg,#e4f9e9,#f4fff6);padding:15px 18px;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:45px;color:#148c35">●</span>
-            <div><div style="font-size:15px;font-weight:900;color:#147b2e">IL TUO RISPARMIO ANNUO</div><div style="font-size:35px;font-weight:900;color:#086823">${money(brochureSaving)}</div></div>
-            <div style="font-size:24px;font-weight:900;background:#169b39;color:white;border-radius:40px;padding:9px 13px">${brochureSavingPercent}%</div>
-          </div>
-          <div style="margin-top:12px;display:flex;gap:15px">
-            <div style="width:54%;background:#fff;border-radius:12px;padding:10px"><b style="font-size:13px">Confronto spesa</b><div style="height:100px;display:flex;align-items:end;justify-content:space-evenly;border-bottom:1px solid #cbd5e1;margin-top:5px"><div style="width:68px;height:85px;background:#94a3b8;border-radius:5px 5px 0 0"></div><div style="width:68px;height:${Math.max(8,Math.min(85,85*(brochureTotal / (brochureCurrent || 1))))}px;background:#ff6a00;border-radius:5px 5px 0 0"></div></div><div style="display:flex;justify-content:space-around;font-size:10px;margin-top:4px"><span>Attuale</span><span>Previsione</span></div></div>
-            <div style="flex:1;background:#f1f7fc;border-radius:12px;padding:12px;font-size:11px"><b style="font-size:13px">I tuoi vantaggi</b><div style="margin-top:8px">✓ Maggiore chiarezza</div><div style="margin-top:8px">✓ Una scelta consapevole</div><div style="margin-top:8px">✓ Gestione semplice</div></div>
-          </div>` : `<div style="margin-top:14px;background:#fff0e1;border-radius:12px;padding:20px;font-size:14px;font-weight:700">Una scelta trasparente, con tutti i dettagli economici nella seconda pagina.</div>`}
-        <div style="margin-top:12px;background:linear-gradient(90deg,#fff0e1,#fff);border-radius:12px;border-left:5px solid #ff6a00;padding:13px;font-size:13px;font-weight:800">Più valore ${brochureIsDomestic ? "alla tua casa" : "al tuo business"}, oggi e domani.</div>
+        ${brochureHasComparison && brochureSaving > 0 ? `
+          <div style="margin-top:11px;border-radius:12px;background:linear-gradient(90deg,#dcfce7,#f0fdf4);padding:13px 17px;display:flex;align-items:center;gap:16px">
+            <span style="font-size:43px" aria-hidden="true">🐷</span>
+            <div style="flex:1"><div style="font-size:15px;font-weight:900;color:#166534">IL TUO RISPARMIO ANNUO</div><div style="font-size:33px;font-weight:900;color:#14532d">${money(brochureSaving)}</div></div>
+            <div style="font-size:23px;font-weight:900;background:#16a34a;color:#fff;border-radius:40px;padding:9px 13px">${brochureSavingPercent}%</div>
+          </div>` : ``}
+        <div style="margin-top:12px;display:flex;gap:13px;align-items:stretch">
+          ${brochureHasComparison ? `<div style="width:49%;background:#f8fafc;border-radius:12px;padding:12px"><b style="font-size:14px">Confronto spesa annuale</b><div style="height:105px;display:flex;align-items:end;justify-content:space-evenly;border-bottom:1px solid #cbd5e1;margin-top:8px"><div style="width:65px;height:90px;background:#94a3b8;border-radius:5px 5px 0 0"></div><div style="width:65px;height:${Math.max(8,Math.min(90,90*(brochureTotal / (brochureCurrent || 1))))}px;background:#ff6a00;border-radius:5px 5px 0 0"></div></div><div style="display:flex;justify-content:space-around;font-size:10px;margin-top:5px"><span>Spesa attuale</span><span>Spesa prevista</span></div></div>` : ``}
+          <div style="flex:1;background:#f1f7fc;border-radius:12px;padding:12px 16px;font-size:11px"><b style="font-size:15px">I tuoi vantaggi</b><div style="margin-top:9px">🏠 <b>Più valore ${brochureIsDomestic ? "alla tua casa" : "al tuo business"}</b></div><div style="margin-top:9px">📄 <b>Condizioni chiare e trasparenti</b><div style="padding-left:24px">Senza sorprese</div></div><div style="margin-top:9px">🌿 <b>Un ambiente più sostenibile</b></div><div style="margin-top:9px">⚙️ <b>Gestione semplice</b><div style="padding-left:24px">Tutto a portata di mano</div></div></div>
+        </div>
+        <div style="margin-top:13px;display:flex;align-items:center;gap:15px;background:linear-gradient(90deg,#eff6ff,#fff4e8);border-radius:13px;padding:14px 18px;min-height:65px">
+          <span style="font-size:39px;line-height:1" aria-hidden="true">💡</span>
+          <div style="font-size:15px;font-weight:850;color:#142b4b">Una scelta conveniente oggi,<br/>più valore ${brochureIsDomestic ? "alla tua casa" : "al tuo business"} domani.</div>
+          <span style="margin-left:auto;font-size:35px" aria-hidden="true">${brochureIsDomestic ? "🏡" : "🏢"}</span>
+        </div>
       </div>`;
     const detailedHtml = html.replace('class="page"', 'class="page detail-sheet" style="--accent:#f97316"');
     printHtmlDocument(
