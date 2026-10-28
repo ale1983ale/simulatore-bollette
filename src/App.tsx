@@ -82,6 +82,8 @@ type ProvvigioniOfferType = "STANDARD" | "UNICA" | "SPECIAL";
 
 type EnergyOffer = {
   nome: string;
+  frasePdfDomestico?: string;
+  frasePdfBusiness?: string;
   canone: number;
   spread: number;
   maggiorazioneCapacityMarket: number;
@@ -97,6 +99,8 @@ type GasCustomerGroup = "DOMESTICO" | "BUSINESS";
 
 type GasOffer = {
   nome: string;
+  frasePdfDomestico?: string;
+  frasePdfBusiness?: string;
   canone: number;
   spread: number;
   quotaVariabile: number;
@@ -4445,7 +4449,7 @@ function Energia({
     const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
     const brochureSavingPercent = brochureHasComparison && brochureCurrent > 0
       ? Math.round((Number(r.risparmioFattura) || 0) / brochureCurrent * 100) : 0;
-    const brochureOfferDescription = ""; // Testo gestito nei Listini: non inventare una descrizione.
+    const brochureOfferDescription = (energyOffers.find((offer) => offer.nome === s.offerta)?.[brochureIsDomestic ? "frasePdfDomestico" : "frasePdfBusiness"] || "").slice(0,100);
     const detailedSummary = `
       <div class="page" style="height:870px;box-sizing:border-box;padding:10px 12px;color:#10213d;overflow:hidden;font-family:Arial,sans-serif">
         <div style="height:204px;position:relative;overflow:hidden;background:linear-gradient(110deg,#fff 0%,#fff0e1 85%);border-radius:12px">
@@ -4467,7 +4471,7 @@ function Energia({
           <div style="border-radius:12px;padding:12px 10px;background:#ff6a00;color:white"><div style="font-size:10px">SPESA PREVISTA</div><b style="font-size:20px">${money(brochureTotal)}</b></div>
         </div>
         <div style="margin-top:8px;background:#fff0e1;border-radius:12px;padding:12px 15px;display:flex;gap:14px;min-height:60px">
-          <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#ff6a00">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
+          <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#ff6a00">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px;max-height:30px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
           <div style="width:160px;border-left:1px solid #cbd5e1;padding-left:14px;font-size:11px;line-height:1.9">✓ Prezzi trasparenti<br/>✓ Gestione semplice<br/>✓ Condizioni chiare</div>
         </div>
         ${brochureHasComparison && brochureSaving > 0 ? `
@@ -6406,7 +6410,7 @@ function Gas({
     const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
     const brochureSavingPercent = brochureHasComparison && brochureCurrent > 0
       ? Math.round((Number(r.risparmioFattura) || 0) / brochureCurrent * 100) : 0;
-    const brochureOfferDescription = ""; // Testo gestito nei Listini: non inventare una descrizione.
+    const brochureOfferDescription = (gasOffers.find((offer) => offer.nome === s.offerta)?.[brochureIsDomestic ? "frasePdfDomestico" : "frasePdfBusiness"] || "").slice(0,100);
     const detailedSummary = `
       <div class="page" style="height:870px;padding:12px 12px;color:#10213d;overflow:hidden;font-family:Arial,sans-serif">
         <div style="height:235px;position:relative;overflow:hidden;background:linear-gradient(110deg,#fff 0%,#eaf5ff 85%);border-radius:12px">
@@ -6428,7 +6432,7 @@ function Gas({
           <div style="border-radius:12px;padding:12px 10px;background:#1479bb;color:white"><div style="font-size:10px">SPESA PREVISTA</div><b style="font-size:20px">${money(brochureTotal)}</b></div>
         </div>
         <div style="margin-top:11px;background:#eaf5ff;border-radius:12px;padding:12px 15px;display:flex;gap:14px;min-height:75px">
-          <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#1479bb">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
+          <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#1479bb">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px;max-height:30px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
           <div style="width:160px;border-left:1px solid #cbd5e1;padding-left:14px;font-size:11px;line-height:1.9">✓ Prezzi trasparenti<br/>✓ Gestione semplice<br/>✓ Condizioni chiare</div>
         </div>
         ${brochureHasComparison ? `
@@ -8348,6 +8352,32 @@ function Listini({
         </p>
       </div>
 
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:16}}>
+        <h2 style={{marginTop:0,fontSize:18}}>FRASI PDF PER OFFERTA</h2>
+        <p style={{fontSize:12,color:"#64748b"}}>Massimo 100 caratteri, spazi inclusi. Due righe nel PDF. Premi Salva listini per confermare.</p>
+        {draftEnergyOffers.map((offer,index)=>(
+          <div key={"e"+index} style={{padding:10,borderBottom:"1px solid #eee"}}>
+            <b>{offer.nome} · LUCE</b>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
+              {(["frasePdfDomestico","frasePdfBusiness"] as const).map(field=><label key={field}>{field==="frasePdfDomestico"?"Domestico":"Business"}
+                <textarea maxLength={100} rows={2} value={offer[field]||""} onChange={e=>{setDraftEnergyOffers(prev=>prev.map((o,i)=>i===index?{...o,[field]:e.target.value.slice(0,100)}:o));markDirty();}} style={{...inputStyle,display:"block"}}/>
+                <small>{(offer[field]||"").length} / 100</small>
+              </label>)}
+            </div>
+          </div>
+        ))}
+        {draftGasOffers.map((offer,index)=>(
+          <div key={"g"+index} style={{padding:10,borderBottom:"1px solid #eee"}}>
+            <b>{offer.nome} · GAS</b>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}>
+              {(["frasePdfDomestico","frasePdfBusiness"] as const).map(field=><label key={field}>{field==="frasePdfDomestico"?"Domestico":"Business"}
+                <textarea maxLength={100} rows={2} value={offer[field]||""} onChange={e=>{setDraftGasOffers(prev=>prev.map((o,i)=>i===index?{...o,[field]:e.target.value.slice(0,100)}:o));markDirty();}} style={{...inputStyle,display:"block"}}/>
+                <small>{(offer[field]||"").length} / 100</small>
+              </label>)}
+            </div>
+          </div>
+        ))}
+      </div>
       <div
         style={{
           background: "white",
