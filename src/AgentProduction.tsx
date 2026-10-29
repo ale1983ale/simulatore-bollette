@@ -1,3 +1,4 @@
+import Insoluti from "./Insoluti";
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabase";
 
@@ -90,12 +91,13 @@ export default function AgentProduction({ token }: { token: string }) {
  const recessTotals={count:recessi.length,luce:recessi.filter(r=>String(r.commodity).toUpperCase()==="LUCE").length,gas:recessi.filter(r=>String(r.commodity).toUpperCase()==="GAS").length,consumo:recessi.reduce((n,r)=>n+Number(r.consumo||0),0),recovered:recessi.filter(r=>r.recuperato).length};
  const totalProd=produzione.reduce((n,r)=>n+Number(r.in_attivazione_count||0),0);
  const totalRecessi=recessi.length;
+ if(tab==="INSOLUTI")return <section style={{padding:14,background:"#f8fafc",borderRadius:18}}><button type="button" onClick={()=>setTab("RECESSI")} style={{padding:"10px 14px",borderRadius:10,border:"1px solid #cbd5e1",background:"white",cursor:"pointer",marginBottom:12}}>← PRODUZIONE / RECESSI</button><Insoluti token={token}/></section>;
  return <section className="agent-production" style={{padding:"clamp(12px,2vw,24px)",background:"#f8fafc",borderRadius:18,minWidth:0,border:"1px solid #e2e8f0"}}>
   <h2 style={{fontWeight:900,color:"#0f172a",letterSpacing:"-.03em",margin:"0 0 18px"}}>📊 DATI PRODUZIONE</h2>
   {error&&<p role="alert" style={{color:"#b91c1c"}}>{error}</p>}
   {loading&&<p>Caricamento dati…</p>}
   {data&&<>
-   <nav style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{["RECESSI","PRODUZIONE","ATTIVO PRODUZIONE","DETTAGLIO RECESSI"].map(t=><button key={t} onClick={()=>{setTab(t);if(t==="DETTAGLIO RECESSI")setSelectedRecessMonth("");}} style={{padding:"13px 18px",borderRadius:12,border:tab===t?"1px solid #f97316":"1px solid #cbd5e1",fontWeight:900,cursor:"pointer",background:tab===t?"#0f172a":"white",color:tab===t?"white":"#334155",boxShadow:tab===t?"0 5px 16px #0f172a24":"0 1px 3px #0f172a0d"}}>{t}</button>)}</nav>
+   <nav style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>{["RECESSI","PRODUZIONE","ATTIVO PRODUZIONE","DETTAGLIO RECESSI","INSOLUTI"].map(t=><button key={t} onClick={()=>{setTab(t);if(t==="DETTAGLIO RECESSI")setSelectedRecessMonth("");}} style={{padding:"13px 18px",borderRadius:12,border:tab===t?"1px solid #f97316":"1px solid #cbd5e1",fontWeight:900,cursor:"pointer",background:tab===t?"#0f172a":"white",color:tab===t?"white":"#334155",boxShadow:tab===t?"0 5px 16px #0f172a24":"0 1px 3px #0f172a0d"}}>{t}</button>)}</nav>
    <div style={{display:"flex",flexWrap:"wrap",gap:14,alignItems:"end",marginBottom:18,padding:16,background:"white",border:"1px solid #e2e8f0",borderRadius:14,boxShadow:"0 2px 8px #0f172a0a"}}>
     <label>Dal mese<input aria-label="Dal mese" type="month" value={from} onChange={e=>setFrom(e.target.value)} style={{display:"block",padding:9}}/></label>
     <label>Al mese<input aria-label="Al mese" type="month" value={to} onChange={e=>setTo(e.target.value)} style={{display:"block",padding:9}}/></label>
