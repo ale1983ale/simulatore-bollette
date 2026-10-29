@@ -4473,7 +4473,7 @@ function Energia({
             ? `
         <div class="savings">
           <div class="savings-row">
-            <span>Risparmio in fattura</span>
+            <span>${energyMonths(s.fatturazione) === 1 ? "Risparmio mensile" : "Risparmio in fattura"}</span>
             <strong>${money(r.risparmioFattura)}</strong>
           </div>
           <div class="savings-row">
@@ -5583,7 +5583,7 @@ Base suggerito
           {Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0 &&
             previewBox(
               <>
-                {row("Risparmio in fattura", money(r.risparmioFattura))}
+                {row(energyMonths(s.fatturazione) === 1 ? "Risparmio mensile" : "Risparmio in fattura", money(r.risparmioFattura))}
                 {row("Risparmio annuo", money(r.risparmioAnnuo))}
               </>
             )}
@@ -6437,7 +6437,7 @@ function Gas({
             ? `
         <div class="savings">
           <div class="savings-row">
-            <span>Risparmio fattura</span>
+            <span>${gasMonths(s.fatturazione) === 1 ? "Risparmio mensile" : "Risparmio in fattura"}</span>
             <strong>${money(r.risparmioFattura)}</strong>
           </div>
           <div class="savings-row">
@@ -7224,7 +7224,7 @@ border: "1px solid #bfd8f6",
             {Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0 &&
               previewBox(
                 <>
-                  {row("Risparmio fattura", money(r.risparmioFattura))}
+                  {row(gasMonths(s.fatturazione) === 1 ? "Risparmio mensile" : "Risparmio in fattura", money(r.risparmioFattura))}
                   {row("Risparmio annuo", money(r.risparmioAnnuo))}
                 </>
               )}
