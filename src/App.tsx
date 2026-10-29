@@ -4469,7 +4469,7 @@ function Energia({
         </div>
 
         ${
-          Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0
+          Number(String(s.confrontoValore || "0").trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) !== 0
             ? `
         <div class="savings">
           <div class="savings-row">
@@ -4493,10 +4493,10 @@ function Energia({
       .join(" ");
     const brochureIsDomestic = isDomesticEnergyType(s.tipo);
     const brochureIsCondominium = /CONDOMIN/i.test(String(s.offerta || "")) || /CONDOMIN/i.test(String(s.tipo || ""));
-    const brochureHasComparison = Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0;
+    const brochureHasComparison = Number(String(s.confrontoValore || "0").trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) !== 0;
     const brochureSaving = Number(r.risparmioAnnuo) || 0;
     const brochureTotal = Number(r.H41) || 0;
-    const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
+    const brochureCurrent = brochureHasComparison ? Number(String(s.confrontoValore).trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) || 0 : 0;
     const brochureSavingPercent = brochureHasComparison && brochureCurrent > 0
       ? Math.round((Number(r.risparmioFattura) || 0) / brochureCurrent * 100) : 0;
     const brochureOfferDescription = (energyOffers.find((offer) => offer.nome === s.offerta)?.[brochureIsDomestic ? "frasePdfDomestico" : "frasePdfBusiness"] || "").slice(0,100);
@@ -4524,7 +4524,7 @@ function Energia({
           <div style="flex:1"><div style="font-size:11px;font-weight:800">LA NOSTRA PROPOSTA</div><div style="font-size:20px;font-weight:900;color:#ff6a00">${s.offerta || "-"}</div><div style="font-size:11px;line-height:1.35;margin-top:4px;max-height:30px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${brochureOfferDescription || "Condizioni economiche dettagliate nella pagina seguente."}</div></div>
           <div style="width:160px;border-left:1px solid #cbd5e1;padding-left:14px;font-size:11px;line-height:1.9">✓ Prezzi trasparenti<br/>✓ Gestione semplice<br/>✓ Condizioni chiare</div>
         </div>
-        ${brochureHasComparison && brochureSaving > 0 ? `
+        ${brochureHasComparison ? `
           <div style="margin-top:8px;border-radius:12px;background:linear-gradient(90deg,#dcfce7,#f0fdf4);padding:9px 14px;display:flex;align-items:center;gap:16px">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:#bbf7d0;color:#166534" aria-hidden="true"><svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7c1.2 1 2 2.5 2 4.5 0 2.1-.8 3.6-2.5 4.7L18 20h-3l-.5-2H9l-.5 2h-3L5 16.7C3.8 15.7 3 14.1 3 12c0-1.1.3-2.1.8-3L2 7l3.6.6A8.6 8.6 0 0 1 12 5c1.4 0 2.7.3 3.8.9L19 5v2Z"/><path d="M9 8h5"/><circle cx="17" cy="11" r=".7" fill="currentColor" stroke="none"/><path d="M3 12H1"/></svg></span>
             <div style="flex:1"><div style="font-size:15px;font-weight:900;color:#166534">IL TUO RISPARMIO ANNUO</div><div style="font-size:33px;font-weight:900;color:#14532d">${money(brochureSaving)}</div></div>
@@ -5580,7 +5580,7 @@ Base suggerito
 
           {previewBox(<>{row("Totale preventivo", money(r.H41), true, 16)}</>, "#fdba74")}
 
-          {Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0 &&
+          {Number(String(s.confrontoValore || "0").trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) !== 0 &&
             previewBox(
               <>
                 {row(energyMonths(s.fatturazione) === 1 ? "Risparmio mensile" : "Risparmio in fattura", money(r.risparmioFattura))}
@@ -6433,7 +6433,7 @@ function Gas({
         </div>
 
         ${
-          Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0
+          Number(String(s.confrontoValore || "0").trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) !== 0
             ? `
         <div class="savings">
           <div class="savings-row">
@@ -6457,10 +6457,10 @@ function Gas({
       .join(" ");
     const brochureIsDomestic = String(s.uso || "").toUpperCase().includes("DOMEST");
     const brochureIsCondominium = /CONDOMIN/i.test(String(s.offerta || "")) || /CONDOMIN/i.test(String(s.uso || ""));
-    const brochureHasComparison = Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0;
+    const brochureHasComparison = Number(String(s.confrontoValore || "0").trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) !== 0;
     const brochureSaving = Number(r.risparmioAnnuo) || 0;
     const brochureTotal = Number(r.H37) || 0;
-    const brochureCurrent = brochureHasComparison ? Number(s.confrontoValore) || 0 : 0;
+    const brochureCurrent = brochureHasComparison ? Number(String(s.confrontoValore).trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) || 0 : 0;
     const brochureSavingPercent = brochureHasComparison && brochureCurrent > 0
       ? Math.round((Number(r.risparmioFattura) || 0) / brochureCurrent * 100) : 0;
     const brochureOfferDescription = (gasOffers.find((offer) => offer.nome === s.offerta)?.[brochureIsDomestic ? "frasePdfDomestico" : "frasePdfBusiness"] || "").slice(0,100);
@@ -6481,7 +6481,7 @@ function Gas({
         </div>
         <div style="display:grid;grid-template-columns:${brochureHasComparison ? "1fr 1fr 1fr" : "1fr 1fr"};gap:10px;margin-top:9px">
           <div style="border-radius:12px;padding:12px 10px;background:#f3f7fc;border:1px solid #e5edf5"><div style="font-size:10px">⚡ CONSUMO</div><b style="font-size:20px">${r.consumoTotale.toLocaleString("it-IT")} Smc</b></div>
-          ${brochureHasComparison && brochureSaving > 0 ? `<div style="border-radius:12px;padding:12px 10px;background:#f3f7fc;border:1px solid #e5edf5"><div style="font-size:10px">SPESA ATTUALE</div><b style="font-size:20px">${money(brochureCurrent)}</b></div>` : ``}
+          ${brochureHasComparison ? `<div style="border-radius:12px;padding:12px 10px;background:#f3f7fc;border:1px solid #e5edf5"><div style="font-size:10px">SPESA ATTUALE</div><b style="font-size:20px">${money(brochureCurrent)}</b></div>` : ``}
           <div style="border-radius:12px;padding:12px 10px;background:#1479bb;color:white"><div style="font-size:10px">SPESA PREVISTA</div><b style="font-size:20px">${money(brochureTotal)}</b></div>
         </div>
         <div style="margin-top:8px;background:#eaf5ff;border-radius:12px;padding:12px 15px;display:flex;gap:14px;min-height:60px">
@@ -7221,7 +7221,7 @@ border: "1px solid #bfd8f6",
   
             {previewBox(<>{row("Totale preventivo", money(r.H37), true, 16)}</>, "#93c5fd")}
   
-            {Number(String(s.confrontoValore || "0").replace(",", ".")) !== 0 &&
+            {Number(String(s.confrontoValore || "0").trim().replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) !== 0 &&
               previewBox(
                 <>
                   {row(gasMonths(s.fatturazione) === 1 ? "Risparmio mensile" : "Risparmio in fattura", money(r.risparmioFattura))}
