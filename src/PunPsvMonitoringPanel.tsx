@@ -177,7 +177,9 @@ export default function PunPsvMonitoringPanel({rows}: {rows: MarketRow[]}) {
       setLastCheck(now.toLocaleString("it-IT"));
       void refresh();void refreshMonthly();void refreshPunProvisional();void refreshPsvPublished();
     };
-    check();
+    // Aggiorna immediatamente i dati a ogni apertura della scheda, anche fuori dalla fascia oraria del controllo periodico.
+    setLastCheck(new Date().toLocaleString("it-IT"));
+    void refresh();void refreshMonthly();void refreshPunProvisional();void refreshPsvPublished();
     const interval=window.setInterval(check,60*1000);
     const onFocus=()=>check();
     window.addEventListener("focus",onFocus);
