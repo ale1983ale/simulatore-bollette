@@ -1940,16 +1940,21 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
           Puoi selezionare e caricare più file insieme. Il mese di riferimento viene dalla data nella colonna NOTA_RECESSO (es. NOTIFICA SW OUT_31/10/2026 = OTTOBRE 2026). La data di validità resta separata. I recessi dello stesso cliente e POD/PDR nello stesso mese di Nota recesso vengono deduplicati.
         </div>
 
-        <input
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          multiple
-          disabled={parsing || saving}
-          onChange={(event) => {
-            void onChooseFiles(event.target.files || undefined);
-            event.currentTarget.value = "";
-          }}
-        />
+        <label style={{display:"inline-flex",alignItems:"center",gap:10,padding:"12px 18px",borderRadius:12,background:parsing||saving?"#94a3b8":"#0f172a",color:"white",fontWeight:850,cursor:parsing||saving?"not-allowed":"pointer",boxShadow:"0 4px 12px #0f172a22",border:"1px solid #334155"}}>
+          <span aria-hidden="true">📤</span> SELEZIONA FILE EXCEL / CSV
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            multiple
+            disabled={parsing || saving}
+            aria-label="Seleziona file recessi"
+            style={{position:"absolute",width:1,height:1,opacity:0,overflow:"hidden"}}
+            onChange={(event) => {
+              void onChooseFiles(event.target.files || undefined);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
 
         {parsing && (
           <div style={{ marginTop: 10, fontWeight: 700 }}>
