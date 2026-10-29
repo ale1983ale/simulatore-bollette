@@ -7057,7 +7057,7 @@ export default function Recruiting({
 
         .recruiting-contact-list-header {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
+          grid-template-columns: minmax(0, 1fr);
           align-items: start;
           gap: 10px;
           margin-bottom: 8px;
@@ -7066,10 +7066,13 @@ export default function Recruiting({
 
         .recruiting-contact-list-controls {
           display: grid;
-          gap: 7px;
+          gap: 10px;
           width: 100%;
           min-width: 0;
         }
+
+        .recruiting-contact-list-controls label > span,
+        .recruiting-contact-list-controls > div > span { font-size: 11px; }
 
         .recruiting-contact-list-controls details,
         .recruiting-contact-list-controls summary {
@@ -8625,7 +8628,7 @@ export default function Recruiting({
                   <label
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "78px minmax(205px, 1fr)",
+                      gridTemplateColumns: "minmax(0, 1fr)",
                       alignItems: "center",
                       gap: 7,
                       fontSize: 11,
@@ -8644,7 +8647,7 @@ export default function Recruiting({
                       style={{
                         ...inputStyle,
                         width: "100%",
-                        minWidth: 205,
+                        minWidth: 0,
                         padding: "7px 9px",
                         fontSize: 12,
                         fontWeight: 800,
@@ -8669,7 +8672,7 @@ export default function Recruiting({
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "78px minmax(205px, 1fr)",
+                      gridTemplateColumns: "minmax(0, 1fr)",
                       alignItems: "start",
                       gap: 7,
                       fontSize: 11,
@@ -8683,7 +8686,7 @@ export default function Recruiting({
                       style={{
                         position: "relative",
                         width: "100%",
-                        minWidth: 205,
+                        minWidth: 0,
                         border: "1px solid #cbd5e1",
                         borderRadius: 9,
                         background: "#fff",
@@ -8958,6 +8961,7 @@ export default function Recruiting({
                                   fontSize: 12,
                                   fontWeight: 700,
                                   gridColumn: "1 / -1",
+                                  gridRow: 1,
                                   textAlign: "center",
                                   justifySelf: "center",
                                 }}
