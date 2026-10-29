@@ -7043,6 +7043,42 @@ export default function Recruiting({
           opacity: 0.18;
         }
 
+        .recruiting-nav-bar {
+          display: flex !important;
+          flex-direction: column;
+          align-items: stretch !important;
+          gap: 9px !important;
+          width: 100%;
+          min-width: 0;
+        }
+        .recruiting-nav-group {
+          display: grid !important;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px !important;
+          width: 100%;
+          min-width: 0;
+          margin-left: 0 !important;
+        }
+        .recruiting-nav-group:last-child {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          padding-top: 9px;
+          border-top: 1px solid #cbd5e1;
+        }
+        .recruiting-nav-button {
+          width: 100% !important;
+          min-width: 0 !important;
+          min-height: 48px !important;
+          padding: 9px 5px !important;
+          font-size: 11px !important;
+          line-height: 1.15 !important;
+          white-space: normal !important;
+          overflow-wrap: anywhere;
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          gap: 3px;
+        }
         .recruiting-contact-layout {
           display: grid;
           grid-template-columns: minmax(290px, 38%) minmax(0, 1fr);
@@ -7239,34 +7275,9 @@ export default function Recruiting({
             min-height: 42px;
           }
 
-          .recruiting-nav-bar {
-            display: grid !important;
-            grid-template-columns:
-              minmax(0, 1.02fr)
-              minmax(0, .86fr)
-              minmax(0, .78fr)
-              minmax(0, .70fr)
-              minmax(0, .92fr)
-              minmax(0, 1.18fr) !important;
-            gap: 4px !important;
-            width: 100%;
-            min-width: 0;
-          }
-
-          .recruiting-nav-group {
-            display: contents !important;
-          }
-
-          .recruiting-nav-button {
-            min-width: 0 !important;
-            width: 100% !important;
-            padding: 7px 4px !important;
-            min-height: 38px !important;
-            font-size: 9.5px !important;
-            line-height: 1.05 !important;
-            border-radius: 8px !important;
-            white-space: nowrap !important;
-          }
+          .recruiting-nav-group { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          .recruiting-nav-group:last-child { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .recruiting-nav-button { min-height: 44px !important; font-size: 10px !important; padding: 8px 4px !important; white-space: normal !important; }
 
           .recruiting-nav-label-desktop {
             display: none !important;
