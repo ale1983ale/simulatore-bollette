@@ -4473,8 +4473,8 @@ function Energia({
             ? `
         <div class="savings">
           <div class="savings-row">
-            <span>Risparmio mensile</span>
-            <strong>${money(r.risparmioFattura / energyMonths(s.fatturazione))}</strong>
+            <span>Risparmio in fattura</span>
+            <strong>${money(r.risparmioFattura)}</strong>
           </div>
           <div class="savings-row">
             <span>Risparmio annuale</span>
