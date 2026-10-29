@@ -471,6 +471,7 @@ export default function ActiveProduction() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={()=>{setPeriodSelected("ALL");setPeriodsSelected([]);setCustomStart("");setCustomEnd("");setAgentSelected("");setAgentsSelected([]);setAgentQuery("");setAgentDropdownOpen(false);}} style={{border:"1px solid #cbd5e1",borderRadius:10,padding:"10px 16px",background:"#f1f5f9",color:"#0f172a",fontWeight:850,cursor:"pointer",boxShadow:"0 2px 6px #0f172a0a"}}>↺ AZZERA FILTRI</button>
             <button className="ap-refresh-button" type="button" onClick={() => void reload()} disabled={loading}
               style={{ border: "1px solid #0f2d69", borderRadius: 9,
                 background: "white", color: "#0f2d69", padding: "9px 14px", fontWeight: 900 }}>
