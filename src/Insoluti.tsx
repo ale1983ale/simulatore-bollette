@@ -7,6 +7,7 @@ const MONTHS=["GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO","LUGLIO","
 const css={padding:"10px 13px",borderRadius:9,border:"1px solid #cbd5e1",background:"white",fontWeight:800,cursor:"pointer"} as const;
 const euro=(n:number)=>Number(n||0).toLocaleString("it-IT",{style:"currency",currency:"EUR"});
 const norm=(v:unknown)=>String(v??"").trim();
+const amountFromRow=(r:Record<string,unknown>)=>{const key=Object.keys(r).find(k=>k.trim().toUpperCase()==="IMPORTO_NON_PAGATO");const value=norm(key?r[key]:0);const normalized=value.includes(",")?value.replace(/\\./g,"").replace(",","."):value;return Number(normalized)||0;};
 const fileLabel=(p:string)=>`SCADENZE ${MONTHS[Number(p.slice(5,7))-1]||p} ${p.slice(0,4)}`;
 const periodFromFile=(name:string)=>{const upper=name.toUpperCase();const monthIndex=MONTHS.findIndex(m=>upper.includes(m));const year=upper.match(/20\d{2}/)?.[0];const numeric=upper.match(/(?:^|\D)(20\d{2})[-_. ](0?[1-9]|1[0-2])(?:\D|$)/);if(numeric)return `${numeric[1]}-${numeric[2].padStart(2,"0")}`;return monthIndex>=0&&year?`${year}-${String(monthIndex+1).padStart(2,"0")}`:"";};
 function parseDate(v:unknown):string{
@@ -36,7 +37,7 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
  if(enteredPeriod===null)throw new Error("Importazione annullata");
  const filePeriod=enteredPeriod.trim();
  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(filePeriod))throw new Error("Periodo file non valido: usa AAAA-MM");
- const parsed=rows.filter(r=>norm(r.CD_CLIENTE)&&norm(r.NUM_FATTURA)).map(r=>{const date=parseDate(r.DATA_SCADENZA_FATTURA||r.DATA_SCADENZA_RATA);if(!date)return null;const month=filePeriod;const key=[kind,norm(r.CD_CLIENTE),norm(r.NUM_FATTURA),norm(r.CD_PUNTO),norm(r.POD)].join("|").toUpperCase();return {dedup_key:key,commodity:kind,period:month,scadenza:date,agente:norm(r.AGENZIA),cliente:norm(r.RAGIONE_SOCIALE),codice_cliente:norm(r.CD_CLIENTE),fattura:norm(r.NUM_FATTURA),punto:norm(r.CD_PUNTO),pod_pdr:norm(r.POD),importo:Number(r.IMPORTO_NON_PAGATO)||0,telefono:norm(r.NUMERO_TELF),email:norm(r.EMAIL_CLIENTE),indirizzo:norm(r.INDIRIZZO_FORN),raw:r};}).filter(Boolean);
+ const parsed=rows.filter(r=>norm(r.CD_CLIENTE)&&norm(r.NUM_FATTURA)).map(r=>{const date=parseDate(r.DATA_SCADENZA_FATTURA||r.DATA_SCADENZA_RATA);if(!date)return null;const month=filePeriod;const key=[kind,norm(r.CD_CLIENTE),norm(r.NUM_FATTURA),norm(r.CD_PUNTO),norm(r.POD)].join("|").toUpperCase();return {dedup_key:key,commodity:kind,period:month,scadenza:date,agente:norm(r.AGENZIA),cliente:norm(r.RAGIONE_SOCIALE),codice_cliente:norm(r.CD_CLIENTE),fattura:norm(r.NUM_FATTURA),punto:norm(r.CD_PUNTO),pod_pdr:norm(r.POD),importo:amountFromRow(r),telefono:norm(r.NUMERO_TELF),email:norm(r.EMAIL_CLIENTE),indirizzo:norm(r.INDIRIZZO_FORN),raw:r};}).filter(Boolean);
  if(!parsed.length)throw new Error("Nessuna riga valida in "+file.name);
  const unique=Array.from(new Map(parsed.map(row=>[(row as {dedup_key:string}).dedup_key,row])).values());
  for(let j=0;j<unique.length;j+=150){const {data,error}=await supabase.rpc("insoluti_admin_import",{p_session_token:token,p_rows:unique.slice(j,j+150)});if(error)throw error;totalImported+=Number(data||0);}
