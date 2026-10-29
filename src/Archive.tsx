@@ -1926,87 +1926,11 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
         </div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          flexWrap: "wrap",
-        }}
-        className="ge-archive-main-tabs"
-      >
-        <button
-          type="button"
-          onClick={() => setArchiveSection("recessi")}
-          style={{
-            padding: "10px 18px",
-            borderRadius: 9,
-            border: archiveSection === "recessi" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            background: archiveSection === "recessi" ? "#0f172a" : "white",
-            color: archiveSection === "recessi" ? "white" : "#0f172a",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          RECESSI
-        </button>
-
-        <button type="button" onClick={() => setArchiveSection("insoluti")} style={{padding:"10px 18px",borderRadius:9,border:archiveSection==="insoluti"?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection==="insoluti"?"#0f172a":"white",color:archiveSection==="insoluti"?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>💶 INSOLUTI</button>
-        <button
-          type="button"
-          onClick={() => setArchiveSection("produzione")}
-          style={{
-            padding: "10px 18px",
-            borderRadius: 9,
-            border: archiveSection === "produzione" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            background: archiveSection === "produzione" ? "#0f172a" : "white",
-            color: archiveSection === "produzione" ? "white" : "#0f172a",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          PRODUZIONE
-        </button>
-
-<button
-          type="button"
-          onClick={() => setArchiveSection("attivo")}
-          style={{
-            padding: "10px 18px",
-            borderRadius: 9,
-            border: archiveSection === "attivo" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-            background: archiveSection === "attivo" ? "#0f172a" : "white",
-            color: archiveSection === "attivo" ? "white" : "#0f172a",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          ATTIVO PRODUZIONE
-        </button>
-
-        {reportAdminPanel && (
-          <button
-            type="button"
-            onClick={() => setArchiveSection("reportAdmin")}
-            style={{
-              padding: "10px 18px",
-              borderRadius: 9,
-              border: archiveSection === "reportAdmin" ? "1px solid #0f172a" : "1px solid #cbd5e1",
-              background: archiveSection === "reportAdmin" ? "#0f172a" : "white",
-              color: archiveSection === "reportAdmin" ? "white" : "#0f172a",
-              fontWeight: 900,
-              cursor: "pointer",
-            }}
-          >
-            REPORT ADMIN
-          </button>
-        )}
-
-
-
+      <div className="ge-archive-main-tabs" style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,width:"100%"}}>
+        {([["recessi","RECESSI"],["insoluti","💶 INSOLUTI"],["produzione","PRODUZIONE"],["attivo","ATTIVO PRODUZIONE"],...(reportAdminPanel?[["reportAdmin","REPORT ADMIN"]]:[])] as [string,string][]).map(([key,label])=><button key={key} type="button" onClick={()=>setArchiveSection(key as typeof archiveSection)} style={{width:"100%",minWidth:0,minHeight:46,padding:"10px 8px",borderRadius:11,border:archiveSection===key?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection===key?"#0f172a":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:850,fontSize:13,lineHeight:1.25,cursor:"pointer",boxShadow:archiveSection===key?"0 3px 8px #0f172a22":"none"}}>{label}</button>)}
       </div>
-
-      {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div className="ge-archive-sub-tabs" style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-        {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{padding:"9px 15px",borderRadius:9,border:"1px solid #cbd5e1",background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>{label}</button>)}
+      {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div className="ge-archive-sub-tabs" style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,width:"100%"}}>
+        {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{width:"100%",minWidth:0,minHeight:44,padding:"9px 8px",borderRadius:10,border:"1px solid "+(archiveSection===key?"#1d4ed8":"#cbd5e1"),background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontSize:12,fontWeight:850,lineHeight:1.25,cursor:"pointer"}}>{label}</button>)}
       </div>}
       {archiveSection === "insoluti" ? (<Insoluti token={adminToken} isAdmin />) : archiveSection === "recessi" ? (
         <>
