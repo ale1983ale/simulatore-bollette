@@ -7102,14 +7102,16 @@ export default function Recruiting({
 
         .recruiting-candidate-card {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(150px, 185px);
+          grid-template-columns: minmax(0, 1fr);
           gap: 10px;
           align-items: center;
           min-width: 0;
         }
 
         .recruiting-status-column {
-          align-self: stretch;
+          width: 100%;
+          max-width: 300px;
+          align-self: center;
           display: flex;
           flex-direction: column;
           justify-content: center;
@@ -8832,58 +8834,6 @@ export default function Recruiting({
                       }}
                     >
                       <div style={{ minWidth: 0, paddingRight: 38 }}>
-                        <button
-                          type="button"
-                          title={
-                            candidate.isFavorite
-                              ? "Rimuovi dai preferiti"
-                              : "Aggiungi ai preferiti"
-                          }
-                          aria-label={
-                            candidate.isFavorite
-                              ? `Rimuovi ${candidate.fullName} dai preferiti`
-                              : `Aggiungi ${candidate.fullName} ai preferiti`
-                          }
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void toggleCandidateFavorite(candidate);
-                          }}
-                          style={{
-                            position: "absolute",
-                            top: 7,
-                            right: 7,
-                            zIndex: 3,
-                            width: 32,
-                            height: 32,
-                            padding: 0,
-                            borderRadius: 999,
-                            border: candidate.isFavorite
-                              ? "1px solid #f59e0b"
-                              : "1px solid #cbd5e1",
-                            background: candidate.isFavorite
-                              ? "#fef3c7"
-                              : "#ffffff",
-                            color: candidate.isFavorite
-                              ? "#d97706"
-                              : "#94a3b8",
-                            fontSize: 20,
-                            lineHeight: 1,
-                            cursor: "pointer",
-                            display: "grid",
-                            placeItems: "center",
-                            boxShadow: "0 2px 7px rgba(15,23,42,.08)",
-                          }}
-                        >
-                          {candidate.isFavorite ? "★" : "☆"}
-                        </button>
-                        <button type="button"
-                          title={candidate.isHighlighted?"Rimuovi evidenza temporanea":"Evidenzia temporaneamente"}
-                          aria-label={(candidate.isHighlighted?"Rimuovi fulmine da ":"Aggiungi fulmine a ")+candidate.fullName}
-                          onClick={event=>{event.stopPropagation();void toggleCandidateHighlight(candidate);}}
-                          style={{position:"absolute",top:7,right:45,zIndex:3,width:32,height:32,padding:0,borderRadius:999,border:candidate.isHighlighted?"1px solid #7c3aed":"1px solid #cbd5e1",background:candidate.isHighlighted?"#ede9fe":"#fff",color:candidate.isHighlighted?"#7c3aed":"#94a3b8",fontSize:19,cursor:"pointer"}}>
-                          ⚡
-                        </button>
-
                         <div
                           style={{
                             fontWeight: 700,
@@ -8924,10 +8874,79 @@ export default function Recruiting({
 
                         <div
                           style={{
+                            marginTop: 4,
+                            fontSize: 12,
+                            fontWeight: 700,
+                          }}
+                        >
+                          Settore energia:{" "}
+                          {candidate.sectorEnergy
+                            ? `SI${candidate.companyName ? ` · ${candidate.companyName}` : ""}`
+                            : `NO${candidate.sectorOther ? ` · ${candidate.sectorOther}` : ""}`}
+                        </div>
+                      </div>
+
+                      <div className="recruiting-candidate-footer" onClick={event=>event.stopPropagation()} style={{gridColumn:"1 / -1",display:"flex",alignItems:"center",justifyContent:"center",flexWrap:"wrap",gap:8,paddingTop:10,borderTop:"1px solid #e2e8f0",minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"center",flexWrap:"wrap",gap:7}}>
+                                                  <button
+                          type="button"
+                          title={
+                            candidate.isFavorite
+                              ? "Rimuovi dai preferiti"
+                              : "Aggiungi ai preferiti"
+                          }
+                          aria-label={
+                            candidate.isFavorite
+                              ? `Rimuovi ${candidate.fullName} dai preferiti`
+                              : `Aggiungi ${candidate.fullName} ai preferiti`
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void toggleCandidateFavorite(candidate);
+                          }}
+                          style={{
+                            position: "static",
+                            
+                            
+                            zIndex: 3,
+                            width: 32,
+                            height: 32,
+                            padding: 0,
+                            borderRadius: 999,
+                            border: candidate.isFavorite
+                              ? "1px solid #f59e0b"
+                              : "1px solid #cbd5e1",
+                            background: candidate.isFavorite
+                              ? "#fef3c7"
+                              : "#ffffff",
+                            color: candidate.isFavorite
+                              ? "#d97706"
+                              : "#94a3b8",
+                            fontSize: 20,
+                            lineHeight: 1,
+                            cursor: "pointer",
+                            display: "grid",
+                            placeItems: "center",
+                            boxShadow: "0 2px 7px rgba(15,23,42,.08)",
+                          }}
+                        >
+                          {candidate.isFavorite ? "★" : "☆"}
+                        </button>
+                        <button type="button"
+                          title={candidate.isHighlighted?"Rimuovi evidenza temporanea":"Evidenzia temporaneamente"}
+                          aria-label={(candidate.isHighlighted?"Rimuovi fulmine da ":"Aggiungi fulmine a ")+candidate.fullName}
+                          onClick={event=>{event.stopPropagation();void toggleCandidateHighlight(candidate);}}
+                          style={{position:"static",zIndex:3,width:32,height:32,padding:0,borderRadius:999,border:candidate.isHighlighted?"1px solid #7c3aed":"1px solid #cbd5e1",background:candidate.isHighlighted?"#ede9fe":"#fff",color:candidate.isHighlighted?"#7c3aed":"#94a3b8",fontSize:19,cursor:"pointer"}}>
+                          ⚡
+                        </button>
+
+
+                                                  <div
+                          style={{
                             display: "flex",
                             alignItems: "center",
                             gap: 7,
-                            marginTop: 5,
+                            marginTop: 0,
                             flexWrap: "wrap",
                           }}
                         >
@@ -9027,20 +9046,8 @@ export default function Recruiting({
                           </button>
                         </div>
 
-                        <div
-                          style={{
-                            marginTop: 4,
-                            fontSize: 12,
-                            fontWeight: 700,
-                          }}
-                        >
-                          Settore energia:{" "}
-                          {candidate.sectorEnergy
-                            ? `SI${candidate.companyName ? ` · ${candidate.companyName}` : ""}`
-                            : `NO${candidate.sectorOther ? ` · ${candidate.sectorOther}` : ""}`}
-                        </div>
-                      </div>
 
+                        </div>
                       <div
                         className="recruiting-status-column"
                         onClick={(event) => event.stopPropagation()}
@@ -9379,6 +9386,7 @@ export default function Recruiting({
                             )}
                           </div>
                         )}
+                      </div>
                       </div>
                     </div>
                   );
