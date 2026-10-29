@@ -33,7 +33,7 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
  const enteredPeriod=window.prompt("Periodo GENERALE del file "+file.name+" (AAAA-MM). Le date delle singole fatture rimarranno invariate.",suggestedPeriod);
  if(enteredPeriod===null)throw new Error("Importazione annullata");
  const filePeriod=enteredPeriod.trim();
- if(!/^20\\d{2}-(0[1-9]|1[0-2])$/.test(filePeriod))throw new Error("Periodo file non valido: usa AAAA-MM");
+ if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(filePeriod))throw new Error("Periodo file non valido: usa AAAA-MM");
  const parsed=rows.filter(r=>norm(r.CD_CLIENTE)&&norm(r.NUM_FATTURA)).map(r=>{const date=parseDate(r.DATA_SCADENZA_FATTURA||r.DATA_SCADENZA_RATA);if(!date)return null;const month=filePeriod;const key=[kind,norm(r.CD_CLIENTE),norm(r.NUM_FATTURA),norm(r.CD_PUNTO),norm(r.POD)].join("|").toUpperCase();return {dedup_key:key,commodity:kind,period:month,scadenza:date,agente:norm(r.AGENZIA),cliente:norm(r.RAGIONE_SOCIALE),codice_cliente:norm(r.CD_CLIENTE),fattura:norm(r.NUM_FATTURA),punto:norm(r.CD_PUNTO),pod_pdr:norm(r.POD),importo:Number(r.IMPORTO_NON_PAGATO)||0,telefono:norm(r.NUMERO_TELF),email:norm(r.EMAIL_CLIENTE),indirizzo:norm(r.INDIRIZZO_FORN),raw:r};}).filter(Boolean);
  if(!parsed.length)throw new Error("Nessuna riga valida in "+file.name);
  const unique=Array.from(new Map(parsed.map(row=>[(row as {dedup_key:string}).dedup_key,row])).values());
