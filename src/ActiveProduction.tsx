@@ -111,6 +111,7 @@ export default function ActiveProduction() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [agentQuery,setAgentQuery]=useState("");
+  const [agentDropdownOpen,setAgentDropdownOpen]=useState(false);
   const [agentSelected, setAgentSelected] = useState<string>("");
   const [agentsSelected,setAgentsSelected]=useState<string[]>([]);
   const [periodsSelected,setPeriodsSelected]=useState<string[]>([]);
@@ -512,19 +513,20 @@ export default function ActiveProduction() {
           </label>
           <details style={{position:"relative",gridColumn:"1 / -1",border:"1px solid #cbd5e1",borderRadius:9,padding:10,background:"white"}}><summary style={{cursor:"pointer",fontWeight:850,fontSize:12}}>PERIODI DI PRODUZIONE · {periodsSelected.length?periodsSelected.length+" selezionati":"Tutti / periodo corrente"} ▾</summary><div style={{maxHeight:230,overflowY:"auto",display:"grid",gap:8,paddingTop:10}}><button type="button" onClick={()=>setPeriodsSelected([])} style={{padding:6}}>AZZERA SELEZIONE</button>{validPeriods.map(p=><label key={p.key} style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={periodsSelected.includes(p.key)} onChange={e=>setPeriodsSelected(current=>e.target.checked?[...current,p.key]:current.filter(x=>x!==p.key))}/>{p.label}</label>)}</div></details>
           <details style={{position:"relative",gridColumn:"1 / -1",border:"1px solid #cbd5e1",borderRadius:9,padding:10,background:"white"}}><summary style={{cursor:"pointer",fontWeight:850,fontSize:12}}>AGENTI · {agentsSelected.length?agentsSelected.length+" selezionati":"Tutti gli agenti"} ▾</summary><div style={{maxHeight:230,overflowY:"auto",display:"grid",gap:8,paddingTop:10}}><button type="button" onClick={()=>{setAgentsSelected([]);setAgentSelected("");}} style={{padding:6}}>TUTTI GLI AGENTI</button>{agentOptions.map(a=><label key={a.key} style={{display:"flex",alignItems:"center",gap:8}}><input type="checkbox" checked={agentsSelected.includes(a.key)} onChange={e=>{setAgentSelected("");setAgentsSelected(current=>e.target.checked?[...current,a.key]:current.filter(x=>x!==a.key));}}/>{a.name}</label>)}</div></details>
-          <label style={{fontSize:12,fontWeight:850,gridColumn:"1 / -1"}}>🔎 CERCA AGENTE
-            <input list="active-production-agent-suggestions" placeholder="Digita lettere del nome agente..." value={agentQuery} onChange={e=>{const value=e.target.value;setAgentQuery(value);const match=agentOptions.find(a=>a.name===value);setAgentSelected(match?.key||"");}} style={{...field,marginTop:5}}/>
-            <datalist id="active-production-agent-suggestions">{agentOptions.filter(a=>a.name.toLocaleLowerCase("it").includes(agentQuery.toLocaleLowerCase("it"))).slice(0,70).map(a=><option key={a.key} value={a.name}/>)}</datalist>
-          </label>
-          <label style={{ fontSize: 12, fontWeight: 850 }}>
-            SINGOLO AGENTE
-            <select style={{ ...field, marginTop: 5 }} value={selectedAgent}
-              onChange={(e) => setAgentSelected(e.target.value)}>
-              <option value="">TUTTI GLI AGENTI</option>
-              {agentOptions.map((agent) =>
-                <option key={agent.key} value={agent.key}>{agent.name}</option>)}
-            </select>
-          </label>
+          <div style={{position:"relative",gridColumn:"1 / -1",maxWidth:460}}>
+            <div style={{fontSize:12,fontWeight:850,color:"#334155",marginBottom:7}}>SINGOLO AGENTE</div>
+            <button type="button" aria-expanded={agentDropdownOpen} onClick={()=>setAgentDropdownOpen(v=>!v)} style={{...field,width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,textAlign:"left",borderRadius:12,background:"white",cursor:"pointer",boxShadow:"0 2px 7px #0f172a0a"}}>
+              <span>{agentOptions.find(a=>a.key===selectedAgent)?.name||"TUTTI GLI AGENTI"}</span><span style={{color:"#64748b"}}>⌄</span>
+            </button>
+            {agentDropdownOpen&&<div style={{position:"absolute",zIndex:30,top:"100%",left:0,right:0,marginTop:6,padding:10,background:"white",border:"1px solid #cbd5e1",borderRadius:14,boxShadow:"0 14px 36px #0f172a26"}}>
+              <input autoFocus aria-label="Cerca agente nell'elenco" placeholder="🔎 Cerca agente..." value={agentQuery} onChange={e=>setAgentQuery(e.target.value)} style={{...field,width:"100%",boxSizing:"border-box",borderRadius:10,marginBottom:8}}/>
+              <div style={{maxHeight:250,overflowY:"auto",display:"grid",gap:3}}>
+                <button type="button" onClick={()=>{setAgentSelected("");setAgentQuery("");setAgentDropdownOpen(false);}} style={{padding:"10px 12px",border:0,borderRadius:9,background:!selectedAgent?"#eff6ff":"white",color:"#1e3a8a",textAlign:"left",cursor:"pointer",fontWeight:800}}>TUTTI GLI AGENTI</button>
+                {agentOptions.filter(a=>a.name.toLocaleLowerCase("it").includes(agentQuery.toLocaleLowerCase("it"))).map(a=><button type="button" key={a.key} onClick={()=>{setAgentSelected(a.key);setAgentsSelected([]);setAgentQuery("");setAgentDropdownOpen(false);}} style={{padding:"10px 12px",border:0,borderRadius:9,background:selectedAgent===a.key?"#eff6ff":"white",color:"#0f172a",textAlign:"left",cursor:"pointer",fontWeight:selectedAgent===a.key?850:600}}>{a.name}</button>)}
+                {!agentOptions.some(a=>a.name.toLocaleLowerCase("it").includes(agentQuery.toLocaleLowerCase("it")))&&<div style={{padding:10,color:"#64748b"}}>Nessun agente trovato</div>}
+              </div>
+            </div>}
+          </div>
         </div>
         {customMode && (
           <div className="ap-calendar-panel">
