@@ -27,7 +27,11 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
  const filtered=useMemo(()=>items.filter(i=>(!period||i.period===period)&&(!agent||i.agente===agent)&&(!commodity||i.commodity===commodity)&&(!search||[i.cliente,i.agente,i.fattura,i.pod_pdr,i.codice_cliente].join(" ").toLowerCase().includes(search.toLowerCase()))),[items,period,agent,commodity,search]);
  const total=filtered.reduce((a,i)=>a+Number(i.importo||0),0);
  const update=async(i:Item,field:"avvertito"|"pagato"|"note",value:string)=>{setBusy(true);const {error}=await supabase.rpc("insoluti_set_status",{p_session_token:token,p_is_admin:isAdmin,p_id:i.id,p_field:field,p_value:value});if(error)setMessage(error.message);else{setItems(prev=>prev.map(x=>x.id===i.id?{...x,[field]:field==="note"?value:value==="true"}:x));if(field==="note")setModal(null);}setBusy(false);};
- const importFiles=async(files:FileList|null)=>{if(!files?.length)return;setBusy(true);setMessage("");let totalImported=0;try{
+
+ const [notifyOpen,setNotifyOpen]=useState(false),[notifyPeriod,setNotifyPeriod]=useState(""),[notifyAgents,setNotifyAgents]=useState<string[]>([]),[notifyImported,setNotifyImported]=useState<string[]>([]);
+ const notifyCandidates=useMemo(()=>Array.from(new Set(items.filter(i=>!notifyPeriod||i.period===notifyPeriod).map(i=>i.agente).filter(Boolean))).sort((a,b)=>a.localeCompare(b,"it")),[items,notifyPeriod]);
+ const openNotify=(p="")=>{setNotifyPeriod(p||period||"");setNotifyImported([]);setNotifyAgents([]);setNotifyOpen(true);};
+ const importFiles=async(files:FileList|null)=>{if(!files?.length)return;setBusy(true);setMessage("");let totalImported=0;const importedAgents=new Set<string>();let lastPeriod="";try{
  for(const file of Array.from(files)){const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});const rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:true});
  const kind=/GAS/i.test(file.name)?"GAS":/ENERGIA|LUCE/i.test(file.name)?"LUCE":/\-G\b/i.test(rows.map(r=>norm(r.NUM_FATTURA)).join(" "))?"GAS":"LUCE";
  const inferredPeriod=periodFromFile(file.name);
@@ -40,14 +44,23 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
  const parsed=rows.filter(r=>norm(r.CD_CLIENTE)&&norm(r.NUM_FATTURA)).map(r=>{const date=parseDate(r.DATA_SCADENZA_FATTURA||r.DATA_SCADENZA_RATA);if(!date)return null;const month=filePeriod;const key=[kind,norm(r.CD_CLIENTE),norm(r.NUM_FATTURA),norm(r.CD_PUNTO),norm(r.POD)].join("|").toUpperCase();return {dedup_key:key,commodity:kind,period:month,scadenza:date,agente:norm(r.AGENZIA),cliente:norm(r.RAGIONE_SOCIALE),codice_cliente:norm(r.CD_CLIENTE),fattura:norm(r.NUM_FATTURA),punto:norm(r.CD_PUNTO),pod_pdr:norm(r.POD),importo:amountFromRow(r),telefono:norm(r.NUMERO_TELF),email:norm(r.EMAIL_CLIENTE),indirizzo:norm(r.INDIRIZZO_FORN),raw:r};}).filter(Boolean);
  if(!parsed.length)throw new Error("Nessuna riga valida in "+file.name);
  const unique=Array.from(new Map(parsed.map(row=>[(row as {dedup_key:string}).dedup_key,row])).values());
+ unique.forEach(row=>{const a=String((row as {agente:string}).agente||"").trim();if(a)importedAgents.add(a);});lastPeriod=filePeriod;
  for(let j=0;j<unique.length;j+=150){const {data,error}=await supabase.rpc("insoluti_admin_import",{p_session_token:token,p_rows:unique.slice(j,j+150)});if(error)throw error;totalImported+=Number(data||0);}
- }setMessage(`Importazione completata: ${totalImported} righe elaborate. Stati e note già salvati conservati.`);await load();
+ }setMessage(`Importazione completata: ${totalImported} righe elaborate. Stati e note già salvati conservati.`);await load();setNotifyPeriod(lastPeriod);setNotifyImported([...importedAgents]);setNotifyAgents([...importedAgents]);setNotifyOpen(true);
  }catch(e){setMessage("Importazione interrotta: "+String((e as Error).message||e));}finally{setBusy(false);}};
  return <div style={{display:"grid",gap:14,color:"#0f172a"}}>
   <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:16,padding:18}}>
    <h2 style={{margin:"0 0 8px"}}>💶 INSOLUTI</h2><p style={{margin:"0 0 14px",color:"#64748b"}}>Scadenze per agente · Luce ⚡ e Gas 🔥 · Stati AVVERTITO / PAGATO e note</p>
    {isAdmin&&<button type="button" onClick={()=>{setDeleteOpen(true);setSelectedFiles([]);}} style={{...css,background:"#fff1f2",color:"#be123c",borderColor:"#fecdd3",marginRight:9,marginBottom:12}}>🗑 ELIMINA FILE</button>}
    {isAdmin&&<label style={{display:"inline-block",...css,background:"#0f172a",color:"white",marginBottom:12}}>📤 IMPORTA FILE EXCEL LUCE / GAS <input type="file" multiple accept=".xlsx,.xls" disabled={busy} onChange={e=>{void importFiles(e.target.files);e.target.value="";}} style={{display:"none"}}/></label>}
+   {isAdmin&&<button type="button" onClick={()=>openNotify()} style={{...css,background:"#eff6ff",color:"#1d4ed8",borderColor:"#bfdbfe",marginLeft:9,marginBottom:12}}>✉ INVIO NOTIFICA INSOLUTI</button>}
+   {notifyOpen&&isAdmin&&<div style={{border:"1px solid #bfdbfe",borderRadius:14,padding:16,marginBottom:14,background:"#f8fbff",display:"grid",gap:10}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}><strong>✉ Invio notifica insoluti</strong><button type="button" style={css} onClick={()=>setNotifyOpen(false)}>✕</button></div>
+    <label>Periodo di scadenza <select style={css} value={notifyPeriod} onChange={e=>{setNotifyPeriod(e.target.value);setNotifyImported([]);setNotifyAgents([]);}}><option value="">Tutti i periodi</option>{periods.map(p=><option key={p} value={p}>{fileLabel(p)}</option>)}</select></label>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={css} onClick={()=>setNotifyAgents(notifyImported.length?notifyImported:notifyCandidates)}>Seleziona tutti</button><button type="button" style={css} onClick={()=>setNotifyAgents([])}>Deseleziona</button></div>
+    <div style={{maxHeight:230,overflowY:"auto",display:"grid",gap:7}}>{notifyCandidates.filter(a=>!notifyImported.length||notifyImported.includes(a)).map(a=><label key={a} style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={notifyAgents.includes(a)} onChange={e=>setNotifyAgents(prev=>e.target.checked?[...prev,a]:prev.filter(x=>x!==a))}/>{a}</label>)}</div>
+    <div style={{color:"#64748b",fontSize:13}}>Agenti selezionati: {notifyAgents.length}. L'invio email richiede ancora il collegamento sicuro al servizio notifiche; nessun messaggio viene spedito da questa schermata.</div>
+   </div>}
    {message&&<div style={{padding:10,background:"#f1f5f9",borderRadius:9,marginBottom:12}}>{message}</div>}
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:12,alignItems:"end",marginBottom:14,padding:14,borderRadius:14,background:"#f8fafc",border:"1px solid #e2e8f0"}}>
     <div style={{display:"grid",gap:6,minWidth:0}}><label style={{fontSize:11,fontWeight:900,color:"#64748b",letterSpacing:".05em"}}>PERIODO DI RIFERIMENTO</label><select style={{...css,width:"100%",minHeight:44,boxSizing:"border-box",fontSize:13}} value={period} onChange={e=>{setPeriodTouched(true);setPeriod(e.target.value);}}><option value="">TUTTE LE SCADENZE</option>{periods.map(p=><option key={p} value={p}>SCADENZA {MONTHS[Number(p.slice(5,7))-1]} {p.slice(0,4)}</option>)}</select></div>
