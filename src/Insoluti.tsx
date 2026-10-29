@@ -7,6 +7,8 @@ const MONTHS=["GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO","LUGLIO","
 const css={padding:"10px 13px",borderRadius:9,border:"1px solid #cbd5e1",background:"white",fontWeight:800,cursor:"pointer"} as const;
 const euro=(n:number)=>Number(n||0).toLocaleString("it-IT",{style:"currency",currency:"EUR"});
 const norm=(v:unknown)=>String(v??"").trim();
+const fileLabel=(p:string)=>`SCADENZE ${MONTHS[Number(p.slice(5,7))-1]||p} ${p.slice(0,4)}`;
+const periodFromFile=(name:string)=>{const upper=name.toUpperCase();const monthIndex=MONTHS.findIndex(m=>upper.includes(m));const year=upper.match(/20\d{2}/)?.[0];const numeric=upper.match(/(?:^|\D)(20\d{2})[-_. ](0?[1-9]|1[0-2])(?:\D|$)/);if(numeric)return `${numeric[1]}-${numeric[2].padStart(2,"0")}`;return monthIndex>=0&&year?`${year}-${String(monthIndex+1).padStart(2,"0")}`:"";};
 function parseDate(v:unknown):string{
  if(typeof v==="number"){const d=XLSX.SSF.parse_date_code(v);if(d)return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;}
  if(v instanceof Date&&!isNaN(v.getTime()))return v.toISOString().slice(0,10);
@@ -14,7 +16,7 @@ function parseDate(v:unknown):string{
  return /^\d{4}-\d\d-\d\d/.test(t)?t.slice(0,10):"";
 }
 export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:boolean}){
- const [items,setItems]=useState<Item[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[period,setPeriod]=useState(""),[agent,setAgent]=useState(""),[commodity,setCommodity]=useState(""),[search,setSearch]=useState(""),[modal,setModal]=useState<Item|null>(null),[modalMode,setModalMode]=useState<"scheda"|"note">("scheda"),[note,setNote]=useState("");
+ const [items,setItems]=useState<Item[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[period,setPeriod]=useState(""),[agent,setAgent]=useState(""),[agentSearch,setAgentSearch]=useState(""),[commodity,setCommodity]=useState(""),[search,setSearch]=useState(""),[modal,setModal]=useState<Item|null>(null),[modalMode,setModalMode]=useState<"scheda"|"note">("scheda"),[note,setNote]=useState("");
  const load=async()=>{if(!token)return;setLoading(true);const {data,error}=await supabase.rpc(isAdmin?"insoluti_admin_list":"insoluti_agent_list",{p_session_token:token});if(error)setMessage(error.message);else setItems((data||[]) as Item[]);setLoading(false);};
  useEffect(()=>{void load();},[token,isAdmin]);
  const periods=useMemo(()=>Array.from(new Set(items.map(i=>i.period))).sort().reverse(),[items]);
@@ -25,7 +27,14 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
  const importFiles=async(files:FileList|null)=>{if(!files?.length)return;setBusy(true);setMessage("");let totalImported=0;try{
  for(const file of Array.from(files)){const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});const rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:true});
  const kind=/GAS/i.test(file.name)?"GAS":/ENERGIA|LUCE/i.test(file.name)?"LUCE":/\-G\b/i.test(rows.map(r=>norm(r.NUM_FATTURA)).join(" "))?"GAS":"LUCE";
- const parsed=rows.filter(r=>norm(r.CD_CLIENTE)&&norm(r.NUM_FATTURA)).map(r=>{const date=parseDate(r.DATA_SCADENZA_FATTURA||r.DATA_SCADENZA_RATA);if(!date)return null;const month=date.slice(0,7);const key=[kind,norm(r.CD_CLIENTE),norm(r.NUM_FATTURA),norm(r.CD_PUNTO),norm(r.POD)].join("|").toUpperCase();return {dedup_key:key,commodity:kind,period:month,scadenza:date,agente:norm(r.AGENZIA),cliente:norm(r.RAGIONE_SOCIALE),codice_cliente:norm(r.CD_CLIENTE),fattura:norm(r.NUM_FATTURA),punto:norm(r.CD_PUNTO),pod_pdr:norm(r.POD),importo:Number(r.IMPORTO_NON_PAGATO)||0,telefono:norm(r.NUMERO_TELF),email:norm(r.EMAIL_CLIENTE),indirizzo:norm(r.INDIRIZZO_FORN),raw:r};}).filter(Boolean);
+ const inferredPeriod=periodFromFile(file.name);
+ const validDates=rows.map(r=>parseDate(r.DATA_SCADENZA_FATTURA||r.DATA_SCADENZA_RATA)).filter(Boolean);
+ const suggestedPeriod=inferredPeriod||(validDates.length?validDates.slice().sort()[Math.floor(validDates.length/2)].slice(0,7):"");
+ const enteredPeriod=window.prompt("Periodo GENERALE del file "+file.name+" (AAAA-MM). Le date delle singole fatture rimarranno invariate.",suggestedPeriod);
+ if(enteredPeriod===null)throw new Error("Importazione annullata");
+ const filePeriod=enteredPeriod.trim();
+ if(!/^20\\d{2}-(0[1-9]|1[0-2])$/.test(filePeriod))throw new Error("Periodo file non valido: usa AAAA-MM");
+ const parsed=rows.filter(r=>norm(r.CD_CLIENTE)&&norm(r.NUM_FATTURA)).map(r=>{const date=parseDate(r.DATA_SCADENZA_FATTURA||r.DATA_SCADENZA_RATA);if(!date)return null;const month=filePeriod;const key=[kind,norm(r.CD_CLIENTE),norm(r.NUM_FATTURA),norm(r.CD_PUNTO),norm(r.POD)].join("|").toUpperCase();return {dedup_key:key,commodity:kind,period:month,scadenza:date,agente:norm(r.AGENZIA),cliente:norm(r.RAGIONE_SOCIALE),codice_cliente:norm(r.CD_CLIENTE),fattura:norm(r.NUM_FATTURA),punto:norm(r.CD_PUNTO),pod_pdr:norm(r.POD),importo:Number(r.IMPORTO_NON_PAGATO)||0,telefono:norm(r.NUMERO_TELF),email:norm(r.EMAIL_CLIENTE),indirizzo:norm(r.INDIRIZZO_FORN),raw:r};}).filter(Boolean);
  if(!parsed.length)throw new Error("Nessuna riga valida in "+file.name);
  const unique=Array.from(new Map(parsed.map(row=>[(row as {dedup_key:string}).dedup_key,row])).values());
  for(let j=0;j<unique.length;j+=150){const {data,error}=await supabase.rpc("insoluti_admin_import",{p_session_token:token,p_rows:unique.slice(j,j+150)});if(error)throw error;totalImported+=Number(data||0);}
@@ -38,17 +47,17 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
    {message&&<div style={{padding:10,background:"#f1f5f9",borderRadius:9,marginBottom:12}}>{message}</div>}
    <div style={{display:"flex",gap:9,flexWrap:"wrap",marginBottom:12}}>
     <select style={css} value={period} onChange={e=>setPeriod(e.target.value)}><option value="">TUTTE LE SCADENZE</option>{periods.map(p=><option key={p} value={p}>SCADENZA {MONTHS[Number(p.slice(5,7))-1]} {p.slice(0,4)}</option>)}</select>
-    {isAdmin&&<select style={css} value={agent} onChange={e=>setAgent(e.target.value)}><option value="">TUTTI GLI AGENTI</option>{agents.map(a=><option key={a}>{a}</option>)}</select>}
-    <select style={css} value={commodity} onChange={e=>setCommodity(e.target.value)}><option value="">LUCE + GAS</option><option value="LUCE">⚡ LUCE</option><option value="GAS">🔥 GAS</option></select>
+    {isAdmin&&<div style={{display:"grid",gap:4,minWidth:210,flex:"1 1 210px"}}><input style={{...css,width:"100%",boxSizing:"border-box"}} value={agentSearch} onChange={e=>{setAgentSearch(e.target.value);setAgent("");}} placeholder="🔎 Cerca agente scrivendo..."/><select style={{...css,width:"100%"}} value={agent} onChange={e=>setAgent(e.target.value)}><option value="">TUTTI GLI AGENTI</option>{agents.filter(a=>a.toLocaleLowerCase("it").includes(agentSearch.toLocaleLowerCase("it"))).map(a=><option key={a} value={a}>{a}</option>)}</select></div>}
+    <div style={{display:"flex",gap:5,alignItems:"center"}}>{([["","TUTTE"],["LUCE","⚡ LUCE"],["GAS","🔥 GAS"]] as const).map(([v,label])=><button type="button" key={v} onClick={()=>setCommodity(v)} style={{...css,background:commodity===v?"#0f172a":"white",color:commodity===v?"white":v==="LUCE"?"#c2410c":v==="GAS"?"#0369a1":"#334155",borderColor:commodity===v?"#0f172a":"#cbd5e1"}}>{label}</button>)}</div>
     <input placeholder="Cerca cliente, agente, POD/PDR, fattura..." style={{...css,flex:"1 1 240px"}} value={search} onChange={e=>setSearch(e.target.value)}/>
     <button style={css} onClick={()=>void load()} disabled={loading}>↻ AGGIORNA</button>
    </div>
    <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>{[["PRATICHE",filtered.length],["IMPORTO INSOLUTO",euro(total)],["AVVERTITI",filtered.filter(i=>i.avvertito).length],["PAGATI",filtered.filter(i=>i.pagato).length]].map(([name,value])=><div key={name} style={{background:"#f8fafc",border:"1px solid #e2e8f0",padding:12,borderRadius:12,minWidth:120,flex:"1 1 120px"}}><div style={{fontSize:11,fontWeight:800,color:"#64748b"}}>{name}</div><strong style={{fontSize:19}}>{value}</strong></div>)}</div>
   </div>
   <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:16,padding:14,overflowX:"auto"}}>
-   {loading?<p>Caricamento…</p>:!filtered.length?<p>Nessun insoluto presente per i filtri selezionati.</p>:<table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:900}}><thead><tr style={{background:"#e2e8f0"}}>{["TIPO","SCADENZA","AGENTE","CLIENTE / FATTURA","POD / PDR","IMPORTO","AVVERTITO","PAGATO","SCHEDA","NOTE"].map(x=><th key={x} style={{padding:10,textAlign:"left"}}>{x}</th>)}</tr></thead><tbody>{filtered.map(i=><tr key={i.id} style={{borderBottom:"1px solid #e2e8f0",background:i.pagato?"#f0fdf4":"white"}}>
+   {loading?<p>Caricamento…</p>:!filtered.length?<p>Nessun insoluto presente per i filtri selezionati.</p>:<table style={{width:"100%",borderCollapse:"collapse",fontSize:13,minWidth:900}}><thead><tr style={{background:"#e2e8f0"}}>{["TIPO","SCADENZA","FILE","AGENTE","CLIENTE / FATTURA","POD / PDR","IMPORTO","AVVERTITO","PAGATO","SCHEDA","NOTE"].map(x=><th key={x} style={{padding:10,textAlign:"left"}}>{x}</th>)}</tr></thead><tbody>{filtered.map(i=><tr key={i.id} style={{borderBottom:"1px solid #e2e8f0",background:i.pagato?"#f0fdf4":"white"}}>
     <td style={{padding:9,color:i.commodity==="LUCE"?"#ea580c":"#0284c7",fontWeight:900}}>{i.commodity==="LUCE"?"⚡":"🔥"} {i.commodity}</td>
-    <td style={{padding:9,whiteSpace:"nowrap"}}><b>SCADENZA {MONTHS[Number(i.period.slice(5,7))-1]}</b><div>{i.scadenza?.split("-").reverse().join("/")}</div></td>
+    <td style={{padding:9,whiteSpace:"nowrap"}}><b>SCADENZA {MONTHS[Number(i.period.slice(5,7))-1]}</b><div>{i.scadenza?.split("-").reverse().join("/")}</div></td><td style={{padding:9,whiteSpace:"nowrap",fontWeight:800}}>{fileLabel(i.period)}</td>
     <td style={{padding:9}}>{i.agente}</td><td style={{padding:9}}><b>{i.cliente}</b><div style={{color:"#64748b"}}>{i.fattura}</div></td>
     <td style={{padding:9}}>{i.pod_pdr}</td><td style={{padding:9,fontWeight:900,whiteSpace:"nowrap"}}>{euro(i.importo)}</td>
     {(["avvertito","pagato"] as const).map(f=><td key={f} style={{padding:8}}><button disabled={busy} onClick={()=>void update(i,f,String(!i[f]))} style={{...css,background:i[f]?"#dcfce7":"white",color:i[f]?"#166534":"#334155",borderColor:i[f]?"#86efac":"#cbd5e1"}}>{i[f]?"✓":"○"} {f.toUpperCase()}</button></td>)}
