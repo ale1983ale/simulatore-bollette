@@ -1,3 +1,4 @@
+import Insoluti from "./Insoluti";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./supabase";
@@ -940,7 +941,7 @@ function MultiSelectFilter({
   );
 }
 
-export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?: React.ReactNode }) {
+export default function Archive({ reportAdminPanel = null, adminToken = "" }: { reportAdminPanel?: React.ReactNode; adminToken?: string }) {
   const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [rows, setRows] = useState<RecessoRow[]>([]);
   const [excludedGeneralAgents,setExcludedGeneralAgents]=useState<Set<string>>(()=>new Set());
@@ -963,11 +964,11 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
   const [saving, setSaving] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
-  type ArchiveSection = "recessi" | "dettaglioProduzione" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone";
+  type ArchiveSection = "recessi" | "dettaglioProduzione" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone" | "insoluti";
   const [archiveSection, setArchiveSection] = useState<ArchiveSection>(() => {
     const value = window.sessionStorage.getItem("ge_archive_section");
     return value === "produzione" || value === "dettaglioProduzione" || value === "attivo" || value === "dettaglioRecessi" ||
-      value === "reportAdmin" ? value : "recessi";
+      value === "reportAdmin" || value === "insoluti" ? value : "recessi";
   });
   useEffect(() => {
     window.sessionStorage.setItem("ge_archive_section", archiveSection);
@@ -1949,6 +1950,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
           RECESSI
         </button>
 
+        <button type="button" onClick={() => setArchiveSection("insoluti")} style={{padding:"10px 18px",borderRadius:9,border:archiveSection==="insoluti"?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection==="insoluti"?"#0f172a":"white",color:archiveSection==="insoluti"?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>💶 INSOLUTI</button>
         <button
           type="button"
           onClick={() => setArchiveSection("produzione")}
@@ -2006,7 +2008,7 @@ export default function Archive({ reportAdminPanel = null }: { reportAdminPanel?
       {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div className="ge-archive-sub-tabs" style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
         {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{padding:"9px 15px",borderRadius:9,border:"1px solid #cbd5e1",background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:900,cursor:"pointer"}}>{label}</button>)}
       </div>}
-      {archiveSection === "recessi" ? (
+      {archiveSection === "insoluti" ? (<Insoluti token={adminToken} isAdmin />) : archiveSection === "recessi" ? (
         <>
       <div style={cardStyle}>
         <h3 style={{ marginTop: 0 }}>RECESSI · Carica file</h3>
