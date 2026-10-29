@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useState} from "react";
 import * as XLSX from "xlsx";
-import {supabase} from "./supabase";
+import {supabase,supabaseAnonKey,supabaseUrl} from "./supabase";
 
 type Item={id:number;dedup_key:string;commodity:"LUCE"|"GAS";period:string;scadenza:string;agente:string;cliente:string;codice_cliente:string;fattura:string;punto:string;pod_pdr:string;importo:number;telefono:string;email:string;indirizzo:string;avvertito:boolean;pagato:boolean;note:string;raw?:Record<string,unknown>};
 const MONTHS=["GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO","LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"];
@@ -30,6 +30,8 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
 
  const [notifyOpen,setNotifyOpen]=useState(false),[notifyPeriod,setNotifyPeriod]=useState(""),[notifyAgents,setNotifyAgents]=useState<string[]>([]),[notifyImported,setNotifyImported]=useState<string[]>([]);
  const notifyCandidates=useMemo(()=>Array.from(new Set(items.filter(i=>!notifyPeriod||i.period===notifyPeriod).map(i=>i.agente).filter(Boolean))).sort((a,b)=>a.localeCompare(b,"it")),[items,notifyPeriod]);
+ const [sending,setSending]=useState(false),[sendResult,setSendResult]=useState("");
+ const sendNotify=async()=>{if(!notifyPeriod||!notifyAgents.length)return;if(!window.confirm("Inviare le notifiche ai "+notifyAgents.length+" agenti selezionati?"))return;setSending(true);setSendResult("");try{const response=await fetch(supabaseUrl+"/functions/v1/insoluti-email-notify",{method:"POST",headers:{"Content-Type":"application/json",apikey:supabaseAnonKey,Authorization:"Bearer "+supabaseAnonKey},body:JSON.stringify({action:"send",session_token:token,agents:notifyAgents,period:notifyPeriod})});const result=await response.json();if(!response.ok||!result.ok)throw new Error(result.error||"Invio non riuscito");setSendResult("Email inviate: "+result.success_count+"; errori: "+result.failure_count);}catch(error){setSendResult(String((error as Error).message||error));}finally{setSending(false);}};
  const openNotify=(p="")=>{setNotifyPeriod(p||period||"");setNotifyImported([]);setNotifyAgents([]);setNotifyOpen(true);};
  const importFiles=async(files:FileList|null)=>{if(!files?.length)return;setBusy(true);setMessage("");let totalImported=0;const importedAgents=new Set<string>();let lastPeriod="";try{
  for(const file of Array.from(files)){const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});const rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(wb.Sheets[wb.SheetNames[0]],{defval:"",raw:true});
@@ -59,7 +61,7 @@ export default function Insoluti({token,isAdmin=false}:{token:string;isAdmin?:bo
     <label>Periodo di scadenza <select style={css} value={notifyPeriod} onChange={e=>{setNotifyPeriod(e.target.value);setNotifyImported([]);setNotifyAgents([]);}}><option value="">Tutti i periodi</option>{periods.map(p=><option key={p} value={p}>{fileLabel(p)}</option>)}</select></label>
     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" style={css} onClick={()=>setNotifyAgents(notifyImported.length?notifyImported:notifyCandidates)}>Seleziona tutti</button><button type="button" style={css} onClick={()=>setNotifyAgents([])}>Deseleziona</button></div>
     <div style={{maxHeight:230,overflowY:"auto",display:"grid",gap:7}}>{notifyCandidates.filter(a=>!notifyImported.length||notifyImported.includes(a)).map(a=><label key={a} style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={notifyAgents.includes(a)} onChange={e=>setNotifyAgents(prev=>e.target.checked?[...prev,a]:prev.filter(x=>x!==a))}/>{a}</label>)}</div>
-    <div style={{color:"#64748b",fontSize:13}}>Agenti selezionati: {notifyAgents.length}. L'invio email richiede ancora il collegamento sicuro al servizio notifiche; nessun messaggio viene spedito da questa schermata.</div>
+    <div style={{color:"#64748b",fontSize:13}}>Agenti selezionati: {notifyAgents.length}</div><button type="button" disabled={sending||!notifyAgents.length||!notifyPeriod} onClick={()=>void sendNotify()} style={{...css,background:"#2563eb",color:"white"}}>{sending?"INVIO IN CORSO...":"✉ CONFERMA E INVIA"}</button>{sendResult&&<div role="status">{sendResult}</div>}
    </div>}
    {message&&<div style={{padding:10,background:"#f1f5f9",borderRadius:9,marginBottom:12}}>{message}</div>}
    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:12,alignItems:"end",marginBottom:14,padding:14,borderRadius:14,background:"#f8fafc",border:"1px solid #e2e8f0"}}>
