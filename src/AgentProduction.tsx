@@ -16,7 +16,7 @@ const field = (row: Item, key: string) => row[key] == null || row[key] === "" ? 
 
 export default function AgentProduction({ token }: { token: string }) {
  const [data,setData]=useState<Data|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true);
- const [tab,setTab]=useState("RECESSI"),[selectedRecessMonth,setSelectedRecessMonth]=useState(""),[search,setSearch]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[commodity,setCommodity]=useState("TUTTE");
+ const [tab,setTab]=useState(()=>typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("section")==="insoluti"?"INSOLUTI":"RECESSI"),[selectedRecessMonth,setSelectedRecessMonth]=useState(""),[search,setSearch]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[commodity,setCommodity]=useState("TUTTE");
  const [detailSort,setDetailSort]=useState("month"),[detailSortAsc,setDetailSortAsc]=useState(false);
  const [detail,setDetail]=useState<Item|null>(null),[detailMode,setDetailMode]=useState<"scheda"|"note">("scheda"),[note,setNote]=useState(""),[recovered,setRecovered]=useState(false),[saving,setSaving]=useState(false),[message,setMessage]=useState("");
  const refresh=async()=>{setLoading(true);setError("");const {data:result,error:failure}=await supabase.rpc("agent_production_data",{p_session_token:token});if(failure)setError(failure.message);else setData(result as Data);setLoading(false);};
