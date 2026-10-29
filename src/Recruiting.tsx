@@ -7110,8 +7110,9 @@ export default function Recruiting({
 
         .recruiting-status-column {
           width: 100%;
-          max-width: 300px;
+          max-width: 100%;
           align-self: center;
+          align-items: center;
           display: flex;
           flex-direction: column;
           justify-content: center;
@@ -7119,7 +7120,7 @@ export default function Recruiting({
         }
 
         .recruiting-status-menu {
-          width: 100%;
+          width: min(100%, 260px);
           position: relative;
         }
 
@@ -8886,8 +8887,8 @@ export default function Recruiting({
                         </div>
                       </div>
 
-                      <div className="recruiting-candidate-footer" onClick={event=>event.stopPropagation()} style={{gridColumn:"1 / -1",display:"flex",alignItems:"center",justifyContent:"center",flexWrap:"wrap",gap:8,paddingTop:10,borderTop:"1px solid #e2e8f0",minWidth:0}}>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"center",flexWrap:"wrap",gap:7}}>
+                      <div className="recruiting-candidate-footer" onClick={event=>event.stopPropagation()} style={{gridColumn:"1 / -1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,paddingTop:12,borderTop:"1px solid #e2e8f0",minWidth:0}}>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(5,32px)",justifyContent:"center",alignItems:"center",gap:8,maxWidth:"100%"}}>
                                                   <button
                           type="button"
                           title={
@@ -8943,11 +8944,7 @@ export default function Recruiting({
 
                                                   <div
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 7,
-                            marginTop: 0,
-                            flexWrap: "wrap",
+                            display: "contents",
                           }}
                         >
                           {candidate.phone ? (
@@ -8960,6 +8957,9 @@ export default function Recruiting({
                                   textDecoration: "underline",
                                   fontSize: 12,
                                   fontWeight: 700,
+                                  gridColumn: "1 / -1",
+                                  textAlign: "center",
+                                  justifySelf: "center",
                                 }}
                               >
                                 {candidate.phone}
