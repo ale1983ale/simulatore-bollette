@@ -21,6 +21,7 @@ import {
   adminAgentSetProvvigioniVisibility,
   getAgentPasswordResetProfile,
   completeAgentPasswordReset,
+  changeAgentPassword,
 } from "./agentSecurity";
 import Recruiting from "./Recruiting";
 import {getRecruitingCrmStatus,syncRecruitingCrmNow,type RecruitingCrmStatus} from "./crmIntegration";
@@ -13728,9 +13729,11 @@ function AdminDashboard({
 function AgentDashboard({
   navigate,
   productionAllowed,
+  onChangePassword,
 }: {
   navigate: DashboardNavigate;
   productionAllowed: boolean;
+  onChangePassword: () => void;
 }) {
   return (
     <div className="ge-dashboard ge-dashboard--agent">
@@ -13798,6 +13801,7 @@ function AgentDashboard({
             onClick={() => navigate("agentProduction")}
           />
         )}
+        <DashboardCard title="CAMBIA PASSWORD" description="Aggiorna la password del tuo accesso." icon="🔐" className="ge-card-agent-dashboard-report" compact spanMobile onClick={onChangePassword} />
       </div>
     </div>
   );
@@ -13952,6 +13956,26 @@ export default function App() {
     try{if(service==="crm")await syncRecruitingCrmNow();else await syncRecruitingPerformaNow();setIntegrationNotice("Sincronizzazione "+(service==="crm"?"CRM":"HR")+" completata.");setIntegrationAlert(null);await refreshIntegrationStatus();}
     catch(error){const message=String((error as Error).message||error);setIntegrationNotice(message);setIntegrationAlert({service,message});}
     finally{setIntegrationBusy(null);}
+  };
+  const [agentPasswordOpen,setAgentPasswordOpen]=useState(false);
+  const [agentPasswordCurrent,setAgentPasswordCurrent]=useState("");
+  const [agentPasswordNew,setAgentPasswordNew]=useState("");
+  const [agentPasswordConfirm,setAgentPasswordConfirm]=useState("");
+  const [agentPasswordError,setAgentPasswordError]=useState("");
+  const [agentPasswordSaving,setAgentPasswordSaving]=useState(false);
+  const submitAgentPassword=async()=>{
+    setAgentPasswordError("");
+    if(agentPasswordNew.length<8){setAgentPasswordError("La nuova password deve contenere almeno 8 caratteri.");return;}
+    if(agentPasswordNew!==agentPasswordConfirm){setAgentPasswordError("Le nuove password non coincidono.");return;}
+    if(!agentSession?.username)return;
+    setAgentPasswordSaving(true);
+    try{
+      await changeAgentPassword({username:agentSession.username,currentPassword:agentPasswordCurrent,newPassword:agentPasswordNew});
+      setAgentPasswordOpen(false);setAgentPasswordCurrent("");setAgentPasswordNew("");setAgentPasswordConfirm("");
+      await agentLogout();setAgentSession(null);setTab("report");
+      alert("Password aggiornata. Accedi di nuovo con la nuova password.");
+    }catch(e){setAgentPasswordError(String((e as Error).message||e));}
+    finally{setAgentPasswordSaving(false);}
   };
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const browserHistoryReadyRef = useRef(false);
@@ -16833,7 +16857,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
   adminSession ? (
     renderAdminContent()
   ) : (
-    <AgentDashboard navigate={navigateTo} productionAllowed={agentProductionAllowed} />
+    <AgentDashboard navigate={navigateTo} productionAllowed={agentProductionAllowed} onChangePassword={()=>setAgentPasswordOpen(true)} />
   )
 ) : tab === "municipalOffers" ? (
   <MunicipalOffers />
@@ -18522,6 +18546,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           renderAdminContent()
         )}
 {integrationAlert&&<div style={{position:"fixed",inset:0,zIndex:99998,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Sincronizzazione interrotta" style={{width:"min(470px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Sincronizzazione {integrationAlert.service.toUpperCase()} non riuscita</h2><p>{integrationAlert.message}</p><button type="button" onClick={()=>{setIntegrationAlert(null);navigate("recruitingCrm");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>APRI GESTIONE SINCRONIZZAZIONI</button><button type="button" onClick={()=>setIntegrationAlert(null)} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
+{agentPasswordOpen&&agentSession&&<div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="dialog" aria-modal="true" aria-label="Cambia password" style={{background:"white",borderRadius:18,padding:24,width:"min(430px,100%)",boxShadow:"0 20px 70px #0004",display:"grid",gap:12}}><h2 style={{margin:0}}>🔐 Cambia password</h2>{([["Password attuale",agentPasswordCurrent,setAgentPasswordCurrent],["Nuova password",agentPasswordNew,setAgentPasswordNew],["Conferma nuova password",agentPasswordConfirm,setAgentPasswordConfirm]] as const).map(([label,value,setter])=><label key={label} style={{display:"grid",gap:5,fontWeight:700}}>{label}<input type="password" autoComplete="new-password" value={value} onChange={e=>setter(e.target.value)} style={{padding:12,border:"1px solid #cbd5e1",borderRadius:10}}/></label>)}{agentPasswordError&&<p role="alert" style={{color:"#b91c1c"}}>{agentPasswordError}</p>}<button type="button" disabled={agentPasswordSaving} onClick={()=>void submitAgentPassword()} style={{padding:12,background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:800,cursor:"pointer"}}>SALVA NUOVA PASSWORD</button><button type="button" onClick={()=>setAgentPasswordOpen(false)} style={{padding:10,border:0,background:"transparent",cursor:"pointer"}}>Annulla</button></div></div>}
 {googleDisconnected&&<div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Collegamento Google interrotto" style={{width:"min(460px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Collegamento Google interrotto</h2><p>{googleDisconnected}</p><button type="button" onClick={()=>{setGoogleDisconnected("");navigate("calendarAdmin");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>🔗 COLLEGA GOOGLE</button><button type="button" onClick={()=>setGoogleDisconnected("")} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
 </div>
 );
