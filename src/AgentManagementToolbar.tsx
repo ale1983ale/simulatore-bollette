@@ -11,7 +11,12 @@ const buttonBase: React.CSSProperties = {
   fontWeight: 950,
   cursor: "pointer",
   fontSize: 14,
-  whiteSpace: "nowrap",
+  whiteSpace: "normal",
+  width: "100%",
+  minWidth: 0,
+  minHeight: 48,
+  lineHeight: 1.2,
+  textAlign: "center",
 };
 
 function isSuperAdmin() {
@@ -66,10 +71,10 @@ export default function AgentManagementToolbar({
     <div
       className="agent-management-toolbar"
       style={{
-        display: "flex",
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
         gap: 10,
-        flexWrap: "wrap",
-        alignItems: "center",
+        alignItems: "stretch",
         padding: 12,
         background: "white",
         border: "1px solid #e2e8f0",
