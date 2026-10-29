@@ -23,6 +23,8 @@ import {
   completeAgentPasswordReset,
 } from "./agentSecurity";
 import Recruiting from "./Recruiting";
+import {getRecruitingCrmStatus,syncRecruitingCrmNow,type RecruitingCrmStatus} from "./crmIntegration";
+import {getRecruitingPerformaStatus,syncRecruitingPerformaNow,type RecruitingPerformaStatus} from "./performaIntegration";
 import Appointments from "./Appointments";
 import RecruitingManagement from "./RecruitingManagement";
 import UnifiedAgentManagement from "./UnifiedAgentManagement";
@@ -13925,6 +13927,32 @@ export default function App() {
     const timer=window.setInterval(()=>void check(),5*60*1000);
     return()=>{active=false;window.clearInterval(timer);};
   },[adminSession?.token]);
+  const [integrationStatus,setIntegrationStatus]=useState<{crm:RecruitingCrmStatus|null;hr:RecruitingPerformaStatus|null}>({crm:null,hr:null});
+  const [integrationAlert,setIntegrationAlert]=useState<{service:"crm"|"hr";message:string}|null>(null);
+  const [integrationBusy,setIntegrationBusy]=useState<"crm"|"hr"|null>(null);
+  const [integrationNotice,setIntegrationNotice]=useState("");
+  const refreshIntegrationStatus=async()=>{
+    const [crm,hr]=await Promise.allSettled([getRecruitingCrmStatus(),getRecruitingPerformaStatus()]);
+    const c=crm.status==="fulfilled"?crm.value:null,h=hr.status==="fulfilled"?hr.value:null;
+    setIntegrationStatus({crm:c,hr:h});
+    if(c?.configured&&c.last_sync_error)setIntegrationAlert({service:"crm",message:c.last_sync_error});
+    else if(h?.configured&&(h.needs_reconnect||h.last_sync_error))setIntegrationAlert({service:"hr",message:h.last_sync_error||"Collegamento HR da ripristinare"});
+    else if(c||h)setIntegrationAlert(null);
+  };
+  useEffect(()=>{
+    if(!adminSession?.token)return;
+    void refreshIntegrationStatus();
+    const timer=window.setInterval(()=>void refreshIntegrationStatus(),5*60*1000);
+    const onError=(event:Event)=>{const detail=(event as CustomEvent<{service:string;message:string}>).detail;if(detail?.service==="crm"||detail?.service==="performa")setIntegrationAlert({service:detail.service==="crm"?"crm":"hr",message:detail.message||"Sincronizzazione non riuscita"});};
+    window.addEventListener("ge:integration-disconnected",onError);
+    return()=>{window.clearInterval(timer);window.removeEventListener("ge:integration-disconnected",onError);};
+  },[adminSession?.token]);
+  const runIntegrationSync=async(service:"crm"|"hr")=>{
+    setIntegrationBusy(service);setIntegrationNotice("");
+    try{if(service==="crm")await syncRecruitingCrmNow();else await syncRecruitingPerformaNow();setIntegrationNotice("Sincronizzazione "+(service==="crm"?"CRM":"HR")+" completata.");setIntegrationAlert(null);await refreshIntegrationStatus();}
+    catch(error){const message=String((error as Error).message||error);setIntegrationNotice(message);setIntegrationAlert({service,message});}
+    finally{setIntegrationBusy(null);}
+  };
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const browserHistoryReadyRef = useRef(false);
   const browserHistoryPopRef = useRef(false);
@@ -15198,8 +15226,8 @@ useEffect(() => {
       variant: "database",
     },
     recruitingCrm: {
-      title: "GESTIONE CRM",
-      subtitle: "Configura e sincronizza il CRM aziendale.",
+      title: "GESTIONE SINCRONIZZAZIONI",
+      subtitle: "Controlla e sincronizza CRM, HR e Google.",
       icon: "⚙",
       variant: "database",
     },
@@ -15739,7 +15767,7 @@ const renderAdminContent = () => {
               ...(tab === "recruitingCrm" ? activeBtn : {}),
             }}
           >
-            GESTIONE CRM
+            GESTIONE SINCRONIZZAZIONI
           </button>
         </div>
       )}
@@ -16014,6 +16042,25 @@ const renderAdminContent = () => {
 
       {tab === "recruitingCrm" && (
         <div style={{ width: "100%", minWidth: 0 }}>
+          <section style={{padding:20,marginBottom:18,background:"#f8fafc",border:"1px solid #dbe3ee",borderRadius:18}}>
+            <h2 style={{margin:"0 0 8px",color:"#0f172a"}}>🔄 GESTIONE SINCRONIZZAZIONI</h2>
+            <p style={{color:"#64748b",margin:"0 0 16px"}}>Controllo automatico ogni 5 minuti. Le sincronizzazioni già programmate sul server restano attive.</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:12}}>
+              {(["crm","hr"] as const).map(service=>{const data=service==="crm"?integrationStatus.crm:integrationStatus.hr;const last=data?.last_sync_at;const error=data?.last_sync_error;const configured=Boolean(data?.configured);return <div key={service} style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:16,display:"grid",gap:10}}>
+                <strong style={{fontSize:17}}>{service==="crm"?"🗂️ CRM":"👥 HR · Performa"}</strong>
+                <span style={{color:!configured?"#64748b":error?"#b91c1c":"#15803d",fontWeight:700}}>{!data?"Stato da verificare":!configured?"Non configurato":error?"Sincronizzazione non riuscita":"Configurato"}</span>
+                <span style={{fontSize:13,color:"#475569"}}>Ultima sincronizzazione riuscita: <strong>{last?new Date(last).toLocaleString("it-IT"):"Non disponibile"}</strong></span>
+                {error&&<span style={{color:"#b91c1c",fontSize:12}}>{error}</span>}
+                <button type="button" disabled={integrationBusy!==null} onClick={()=>void runIntegrationSync(service)} style={{padding:"11px 14px",border:0,borderRadius:10,background:"#2563eb",color:"white",fontWeight:750,cursor:"pointer"}}>{integrationBusy===service?"SINCRONIZZAZIONE...":"↻ SINCRONIZZA "+service.toUpperCase()}</button>
+              </div>;})}
+              <div style={{background:"white",border:"1px solid #e2e8f0",borderRadius:14,padding:16,display:"grid",gap:10}}>
+                <strong style={{fontSize:17}}>🔗 Google</strong>
+                <span style={{fontSize:13,color:"#475569"}}>Controllo automatico della connessione ogni 5 minuti.</span>
+                <button type="button" onClick={()=>navigate("calendarAdmin")} style={{padding:"11px 14px",border:0,borderRadius:10,background:"#2563eb",color:"white",fontWeight:750,cursor:"pointer"}}>GESTISCI GOOGLE</button>
+              </div>
+            </div>
+            <div style={{marginTop:12,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}><button type="button" onClick={()=>void refreshIntegrationStatus()} style={{padding:"9px 14px",border:"1px solid #cbd5e1",borderRadius:9,background:"white",cursor:"pointer"}}>↻ AGGIORNA STATI</button>{integrationNotice&&<span role="status">{integrationNotice}</span>}</div>
+          </section>
           <Recruiting
             initialSection="crm_management"
             hideNavigation
@@ -18474,6 +18521,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         ) : (
           renderAdminContent()
         )}
+{integrationAlert&&<div style={{position:"fixed",inset:0,zIndex:99998,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Sincronizzazione interrotta" style={{width:"min(470px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Sincronizzazione {integrationAlert.service.toUpperCase()} non riuscita</h2><p>{integrationAlert.message}</p><button type="button" onClick={()=>{setIntegrationAlert(null);navigate("recruitingCrm");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>APRI GESTIONE SINCRONIZZAZIONI</button><button type="button" onClick={()=>setIntegrationAlert(null)} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
 {googleDisconnected&&<div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Collegamento Google interrotto" style={{width:"min(460px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Collegamento Google interrotto</h2><p>{googleDisconnected}</p><button type="button" onClick={()=>{setGoogleDisconnected("");navigate("calendarAdmin");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>🔗 COLLEGA GOOGLE</button><button type="button" onClick={()=>setGoogleDisconnected("")} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
 </div>
 );
