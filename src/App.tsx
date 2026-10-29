@@ -13892,6 +13892,7 @@ export default function App() {
     if (requestedTab === "report") {
       return "report";
     }
+    if (requestedTab === "agentProduction" && new URLSearchParams(window.location.search).get("section")==="insoluti") return "agentProduction";
 
     // Un ricaricamento esplicito mantiene la scheda principale corrente.
     // All'apertura normale dell'app resta invece la dashboard.
