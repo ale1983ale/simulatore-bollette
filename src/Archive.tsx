@@ -2396,14 +2396,14 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
                     <td style={{ padding: 9 }}>{row.commodity}</td>
                     <td style={{ padding: 9 }}>{row.consumo === null ? "—" : row.consumo.toLocaleString("it-IT")}</td>
                     <td style={{ padding: 9 }}>{geo.provinceLabel || geo.provinceCode || "—"}</td>
-                    <td style={{ padding: 9, whiteSpace:"nowrap" }}>
+                    <td style={{ padding: 9, minWidth:340, whiteSpace:"nowrap" }}><div style={{display:"inline-flex",alignItems:"center",gap:6,flexWrap:"nowrap",whiteSpace:"nowrap"}}>
                       <button type="button" onClick={()=>setDetailModal(row)} style={{border:"1px solid #bfdbfe",borderRadius:8,padding:"7px 10px",background:"#eff6ff",color:"#1d4ed8",fontWeight:800,cursor:"pointer"}}>SCHEDA</button>
-                      <button type="button" onClick={()=>{setDetailNotesRow(row);setDetailNotesText(detailNotes[row.id]||"");}} style={{marginLeft:6,border:"1px solid #fed7aa",borderRadius:8,padding:"7px 10px",background:"#fff7ed",color:"#c2410c",fontWeight:800,cursor:"pointer"}}>📝 NOTE{detailNotes[row.id]?" ●":""}</button>
-                      <label style={{display:"inline-flex",alignItems:"center",gap:5,marginLeft:9,padding:"7px 9px",borderRadius:8,background:detailRecovered[row.id]?"#16a34a":"#f1f5f9",color:detailRecovered[row.id]?"white":"#334155",fontWeight:850,cursor:detailRecovering?"wait":"pointer"}}>
+                      <button type="button" onClick={()=>{setDetailNotesRow(row);setDetailNotesText(detailNotes[row.id]||"");}} style={{border:"1px solid #fed7aa",borderRadius:8,padding:"7px 10px",background:"#fff7ed",color:"#c2410c",fontWeight:800,cursor:"pointer"}}>📝 NOTE{detailNotes[row.id]?" ●":""}</button>
+                      <label style={{display:"inline-flex",alignItems:"center",gap:5,padding:"7px 9px",borderRadius:8,background:detailRecovered[row.id]?"#16a34a":"#f1f5f9",color:detailRecovered[row.id]?"white":"#334155",fontWeight:850,cursor:detailRecovering?"wait":"pointer"}}>
                         <input type="checkbox" checked={Boolean(detailRecovered[row.id])} disabled={Boolean(detailRecovering)}
                           onChange={e=>void toggleDetailRecovered(row,e.target.checked)} style={{width:17,height:17,accentColor:"#15803d"}}/>
                         RECUPERATO
-                      </label>
+                      </label></div>
                     </td>
                   </tr>
                 </React.Fragment>;
