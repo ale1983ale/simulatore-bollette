@@ -13905,6 +13905,8 @@ export default function App() {
 
     return "dashboard";
   });
+  const [googleDisconnected,setGoogleDisconnected]=useState("");
+  useEffect(()=>{const onDisconnect=(event:Event)=>setGoogleDisconnected((event as CustomEvent<{message?:string}>).detail?.message||"Collegamento Google non disponibile.");window.addEventListener("ge-google-disconnected",onDisconnect);return()=>window.removeEventListener("ge-google-disconnected",onDisconnect);},[]);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const browserHistoryReadyRef = useRef(false);
   const browserHistoryPopRef = useRef(false);
@@ -18454,6 +18456,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         ) : (
           renderAdminContent()
         )}
+{googleDisconnected&&<div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Collegamento Google interrotto" style={{width:"min(460px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Collegamento Google interrotto</h2><p>{googleDisconnected}</p><button type="button" onClick={()=>{setGoogleDisconnected("");navigate("calendarAdmin");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>🔗 COLLEGA GOOGLE</button><button type="button" onClick={()=>setGoogleDisconnected("")} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
 </div>
 );
 }
