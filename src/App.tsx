@@ -2154,15 +2154,15 @@ function sanitizeFileName(name: string) {
   return cleaned || "Cliente";
 }
 
-function printHtmlDocument(title: string, html: string, fileName?: string, detailed = false, preview = false) {
+function printHtmlDocument(title: string, html: string, fileName?: string, detailed = false, preview = false, share = false) {
   const androidFiles = (window as any).AndroidFiles;
   const useNativePdf =
-    !preview && Boolean(androidFiles && typeof androidFiles.savePdf === "function");
+    !preview && !share && Boolean(androidFiles && typeof androidFiles.savePdf === "function");
 
   let renderFrame: HTMLIFrameElement | null = null;
   let win: Window | null = null;
 
-  if (useNativePdf || preview) {
+  if (useNativePdf || preview || share) {
     renderFrame = document.createElement("iframe");
     renderFrame.setAttribute("aria-hidden", "true");
     renderFrame.style.position = "fixed";
@@ -2517,6 +2517,25 @@ function printHtmlDocument(title: string, html: string, fileName?: string, detai
         quality = Math.max(0.42, Math.min(quality, 0.56) - 0.015);
         pdf = buildPdf(workingCanvases, quality);
         blob = pdf.output("blob");
+      }
+
+      if (share) {
+        try {
+          const file = new File([blob], finalFileName + ".pdf", { type: "application/pdf" });
+          if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+            await navigator.share({ files: [file], title });
+          } else {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url; link.download = finalFileName + ".pdf";
+            document.body.appendChild(link); link.click(); link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+            alert("Condivisione diretta non supportata: PDF scaricato. Puoi condividerlo dall'app File.");
+          }
+        } catch (error) {
+          if ((error as Error)?.name !== "AbortError") console.error("PDF SHARE ERROR:", error);
+        } finally { renderFrame?.remove(); }
+        return;
       }
 
       if (preview) {
@@ -4213,7 +4232,7 @@ function Energia({
     textAlign: "right",
   };
 
-  const printEnergyPdf = (detailed = false, preview = false) => {
+  const printEnergyPdf = (detailed = false, preview = false, share = false) => {
     if (r.isBalanced && !r.balancedFixedReady) {
       alert("Completa prima il PREZZO FISSO bilanciato delle fasce con consumo. Il PDF non può essere generato con importi incompleti.");
       return;
@@ -4546,7 +4565,8 @@ function Energia({
       detailed ? detailedSummary + detailedHtml : html,
       `${energyFileName} - Energia${detailed ? " - Dettagliato" : ""}`,
       detailed,
-      preview
+      preview,
+      share
     );
 };
 
@@ -5598,6 +5618,9 @@ Base suggerito
               style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#f8fafc", color: "#0f172a", border: "1px solid #94a3b8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
+            <button type="button" onClick={() => printEnergyPdf(false, false, true)} title="Condividi PDF semplificato" aria-label="Condividi PDF semplificato" style={{width:52,flexShrink:0,borderRadius:8,background:"#f0fdf4",color:"#15803d",border:"1px solid #86efac",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>
+            </button>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "stretch" }}>
             <button type="button" onClick={() => printEnergyPdf(true)}
@@ -5608,6 +5631,9 @@ Base suggerito
               title="Anteprima PDF dettagliato" aria-label="Anteprima PDF dettagliato"
               style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#fff", color: "#f97316", border: "1px solid #f97316", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button type="button" onClick={() => printEnergyPdf(true, false, true)} title="Condividi PDF dettagliato" aria-label="Condividi PDF dettagliato" style={{width:52,flexShrink:0,borderRadius:8,background:"#f0fdf4",color:"#15803d",border:"1px solid #86efac",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>
             </button>
           </div>
 
@@ -6267,7 +6293,7 @@ function Gas({
     textAlign: "right",
   };
 
-  const printGasPdf = (detailed = false, preview = false) => {
+  const printGasPdf = (detailed = false, preview = false, share = false) => {
     const periodo = [s.periodo1, s.periodo2, s.periodo3, s.periodo4].filter(Boolean).join(" / ") || "-";
     const blue = "#2563eb";
     const green = "#16a34a";
@@ -6506,7 +6532,8 @@ function Gas({
       detailed ? detailedSummary + detailedHtml : html,
       `${gasFileName} - Gas${detailed ? " - Dettagliato" : ""}`,
       detailed,
-      preview
+      preview,
+      share
     );
   };
 
@@ -7239,6 +7266,9 @@ border: "1px solid #bfd8f6",
               style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#f8fafc", color: "#0f172a", border: "1px solid #94a3b8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
+            <button type="button" onClick={() => printGasPdf(false, false, true)} title="Condividi PDF semplificato" aria-label="Condividi PDF semplificato" style={{width:52,flexShrink:0,borderRadius:8,background:"#f0fdf4",color:"#15803d",border:"1px solid #86efac",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>
+            </button>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "stretch" }}>
             <button type="button" onClick={() => printGasPdf(true)}
@@ -7249,6 +7279,9 @@ border: "1px solid #bfd8f6",
               title="Anteprima PDF dettagliato" aria-label="Anteprima PDF dettagliato"
               style={{ width: 52, flexShrink: 0, borderRadius: 8, background: "#fff", color: "#2563eb", border: "1px solid #2563eb", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button type="button" onClick={() => printGasPdf(true, false, true)} title="Condividi PDF dettagliato" aria-label="Condividi PDF dettagliato" style={{width:52,flexShrink:0,borderRadius:8,background:"#f0fdf4",color:"#15803d",border:"1px solid #86efac",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5"/><path d="M5 13v7h14v-7"/></svg>
             </button>
           </div>
 
