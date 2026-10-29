@@ -13907,6 +13907,24 @@ export default function App() {
   });
   const [googleDisconnected,setGoogleDisconnected]=useState("");
   useEffect(()=>{const onDisconnect=(event:Event)=>setGoogleDisconnected((event as CustomEvent<{message?:string}>).detail?.message||"Collegamento Google non disponibile.");window.addEventListener("ge-google-disconnected",onDisconnect);return()=>window.removeEventListener("ge-google-disconnected",onDisconnect);},[]);
+  useEffect(()=>{
+    const sessionToken=String(adminSession?.token||"");
+    if(!sessionToken){setGoogleDisconnected("");return;}
+    let active=true;
+    const check=async()=>{
+      try{
+        const response=await fetch(supabaseUrl+"/functions/v1/google-calendar-oauth",{method:"POST",headers:{"Content-Type":"application/json",apikey:supabaseAnonKey,Authorization:"Bearer "+supabaseAnonKey},body:JSON.stringify({action:"connection_health",session_token:sessionToken})});
+        if(!response.ok)return;
+        const data=await response.json();
+        if(!active||typeof data.connected!=="boolean")return;
+        if(data.connected)setGoogleDisconnected("");
+        else setGoogleDisconnected(data.reason==="missing"?"Account Google non collegato. Collega Google per utilizzare calendario, Drive e invio email.":"La connessione Google è scaduta o revocata. Ricollega Google per ripristinare i servizi.");
+      }catch{/* problemi temporanei di rete non significano revoca Google */}
+    };
+    void check();
+    const timer=window.setInterval(()=>void check(),5*60*1000);
+    return()=>{active=false;window.clearInterval(timer);};
+  },[adminSession?.token]);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const browserHistoryReadyRef = useRef(false);
   const browserHistoryPopRef = useRef(false);
