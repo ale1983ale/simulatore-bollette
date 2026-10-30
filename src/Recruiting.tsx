@@ -8556,12 +8556,13 @@ export default function Recruiting({
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "baseline",
-                      gap: 9,
-                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: 7,
+                      minWidth: 0,
+                      flexWrap: "nowrap",
                     }}
                   >
-                    <h3 style={{ marginTop: 0, marginBottom: 0 }}>
+                    <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: "clamp(15px, 4vw, 21px)", whiteSpace: "nowrap" }}>
                       Lista nominativi
                     </h3>
                     <span
@@ -8575,8 +8576,7 @@ export default function Recruiting({
                         ? `${filteredCandidates.length} SU ${candidates.length}`
                         : candidates.length}
                     </span>
-                  </div>
-
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:"auto",flexShrink:0}}>
                   <button
                     type="button"
                     title={
@@ -8633,6 +8633,9 @@ export default function Recruiting({
                     style={{width:36,height:36,padding:0,borderRadius:999,border:highlightFilter==="SI"?"2px solid #7c3aed":"1px solid #cbd5e1",background:highlightFilter==="SI"?"#ede9fe":"#fff",color:highlightFilter==="SI"?"#7c3aed":"#94a3b8",fontSize:22,cursor:"pointer",display:"grid",placeItems:"center"}}>
                     ⚡
                   </button>
+                  </div>
+                  </div>
+
                 </div>
 
                 <div className="recruiting-contact-list-controls">
