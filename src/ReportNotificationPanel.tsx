@@ -590,17 +590,18 @@ export default function ReportNotificationPanel({
 
         <div
           style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+            gap: 10,
             marginTop: 12,
+            alignItems: "stretch",
           }}
         >
           <button
             type="button"
             disabled={busy}
             onClick={() => void saveTemplate(true)}
-            style={{ ...button, background: "#dbeafe", color: "#1d4ed8" }}
+            style={{ ...button, width: "100%", minWidth: 0, minHeight: 46, whiteSpace: "normal", textAlign: "center", background: "#dbeafe", color: "#1d4ed8" }}
           >
             SALVA COME NUOVO
           </button>
@@ -608,7 +609,7 @@ export default function ReportNotificationPanel({
             type="button"
             disabled={busy || !selectedTemplateId}
             onClick={() => void saveTemplate(false)}
-            style={{ ...button, background: "#e0f2fe", color: "#0369a1" }}
+            style={{ ...button, width: "100%", minWidth: 0, minHeight: 46, whiteSpace: "normal", textAlign: "center", background: "#e0f2fe", color: "#0369a1" }}
           >
             AGGIORNA MODELLO
           </button>
@@ -616,7 +617,7 @@ export default function ReportNotificationPanel({
             type="button"
             disabled={busy || !selectedTemplateId}
             onClick={() => void deleteTemplate()}
-            style={{ ...button, background: "#fee2e2", color: "#991b1b" }}
+            style={{ ...button, width: "100%", minWidth: 0, minHeight: 46, whiteSpace: "normal", textAlign: "center", background: "#fee2e2", color: "#991b1b" }}
           >
             ELIMINA MODELLO
           </button>
@@ -626,7 +627,11 @@ export default function ReportNotificationPanel({
             onClick={() => void sendNotification()}
             style={{
               ...button,
-              marginLeft: "auto",
+              width: "100%",
+              minWidth: 0,
+              minHeight: 46,
+              whiteSpace: "normal",
+              textAlign: "center",
               background: "#16a34a",
               color: "white",
               borderColor: "#16a34a",
