@@ -12038,6 +12038,9 @@ function ReportAdmin({
                         {summaryPeriodLabel}
                         {" · "}
                         {agentDetailReports.length} REPORT
+                        {group.latestReportDate && (
+                          <>{" · Ultimo report: "}{new Date(String(group.latestReportDate).slice(0,10)+"T12:00:00").toLocaleDateString("it-IT")}</>
+                        )}
                       </div>
                     </div>
 
