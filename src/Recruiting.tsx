@@ -8902,7 +8902,7 @@ export default function Recruiting({
                       </div>
 
                       <div className="recruiting-candidate-footer" onClick={event=>event.stopPropagation()} style={{gridColumn:"1 / -1",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,paddingTop:12,borderTop:"1px solid #e2e8f0",minWidth:0}}>
-                        <div style={{display:"grid",gridTemplateColumns:"repeat(5,32px)",justifyContent:"center",alignItems:"center",gap:8,maxWidth:"100%"}}>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(6,minmax(0,32px))",justifyContent:"center",alignItems:"center",columnGap:6,rowGap:8,maxWidth:"100%",width:"100%",boxSizing:"border-box"}}>
                                                   <button
                           type="button"
                           title={
