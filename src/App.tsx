@@ -13912,10 +13912,10 @@ export default function App() {
     return "dashboard";
   });
   const [googleDisconnected,setGoogleDisconnected]=useState("");
-  useEffect(()=>{const onDisconnect=(event:Event)=>setGoogleDisconnected((event as CustomEvent<{message?:string}>).detail?.message||"Collegamento Google non disponibile.");window.addEventListener("ge-google-disconnected",onDisconnect);return()=>window.removeEventListener("ge-google-disconnected",onDisconnect);},[]);
+  useEffect(()=>{const onDisconnect=(event:Event)=>{if(adminProfile?.role==="super_admin")setGoogleDisconnected((event as CustomEvent<{message?:string}>).detail?.message||"Collegamento Google non disponibile.");};window.addEventListener("ge-google-disconnected",onDisconnect);return()=>window.removeEventListener("ge-google-disconnected",onDisconnect);},[adminProfile?.role]);
   useEffect(()=>{
     const sessionToken=String(adminSession?.token||"");
-    if(!sessionToken){setGoogleDisconnected("");return;}
+    if(!sessionToken||adminProfile?.role!=="super_admin"){setGoogleDisconnected("");return;}
     let active=true;
     const check=async()=>{
       try{
@@ -13930,7 +13930,7 @@ export default function App() {
     void check();
     const timer=window.setInterval(()=>void check(),5*60*1000);
     return()=>{active=false;window.clearInterval(timer);};
-  },[adminSession?.token]);
+  },[adminSession?.token,adminProfile?.role]);
   const [integrationStatus,setIntegrationStatus]=useState<{crm:RecruitingCrmStatus|null;hr:RecruitingPerformaStatus|null}>({crm:null,hr:null});
   const [integrationAlert,setIntegrationAlert]=useState<{service:"crm"|"hr";message:string}|null>(null);
   const [integrationBusy,setIntegrationBusy]=useState<"crm"|"hr"|null>(null);
@@ -18547,7 +18547,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         )}
 {integrationAlert&&<div style={{position:"fixed",inset:0,zIndex:99998,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Sincronizzazione interrotta" style={{width:"min(470px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Sincronizzazione {integrationAlert.service.toUpperCase()} non riuscita</h2><p>{integrationAlert.message}</p><button type="button" onClick={()=>{setIntegrationAlert(null);navigate("recruitingCrm");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>APRI GESTIONE SINCRONIZZAZIONI</button><button type="button" onClick={()=>setIntegrationAlert(null)} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
 {agentPasswordOpen&&agentSession&&<div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="dialog" aria-modal="true" aria-label="Cambia password" style={{background:"white",borderRadius:18,padding:24,width:"min(430px,100%)",boxShadow:"0 20px 70px #0004",display:"grid",gap:12}}><h2 style={{margin:0}}>🔐 Cambia password</h2>{([["Password attuale",agentPasswordCurrent,setAgentPasswordCurrent],["Nuova password",agentPasswordNew,setAgentPasswordNew],["Conferma nuova password",agentPasswordConfirm,setAgentPasswordConfirm]] as const).map(([label,value,setter])=><label key={label} style={{display:"grid",gap:5,fontWeight:700}}>{label}<input type="password" autoComplete="new-password" value={value} onChange={e=>setter(e.target.value)} style={{padding:12,border:"1px solid #cbd5e1",borderRadius:10}}/></label>)}{agentPasswordError&&<p role="alert" style={{color:"#b91c1c"}}>{agentPasswordError}</p>}<button type="button" disabled={agentPasswordSaving} onClick={()=>void submitAgentPassword()} style={{padding:12,background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:800,cursor:"pointer"}}>SALVA NUOVA PASSWORD</button><button type="button" onClick={()=>setAgentPasswordOpen(false)} style={{padding:10,border:0,background:"transparent",cursor:"pointer"}}>Annulla</button></div></div>}
-{googleDisconnected&&<div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Collegamento Google interrotto" style={{width:"min(460px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Collegamento Google interrotto</h2><p>{googleDisconnected}</p><button type="button" onClick={()=>{setGoogleDisconnected("");navigate("calendarAdmin");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>🔗 COLLEGA GOOGLE</button><button type="button" onClick={()=>setGoogleDisconnected("")} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
+{isSuperAdmin&&googleDisconnected&&<div style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:16}}><div role="alertdialog" aria-modal="true" aria-label="Collegamento Google interrotto" style={{width:"min(460px,100%)",padding:26,borderRadius:18,background:"white",boxShadow:"0 20px 80px #0004",textAlign:"center"}}><div style={{fontSize:34}}>⚠️</div><h2>Collegamento Google interrotto</h2><p>{googleDisconnected}</p><button type="button" onClick={()=>{setGoogleDisconnected("");navigate("calendarAdmin");}} style={{padding:"13px 20px",background:"#2563eb",color:"white",border:0,borderRadius:10,fontWeight:700,cursor:"pointer",width:"100%"}}>🔗 COLLEGA GOOGLE</button><button type="button" onClick={()=>setGoogleDisconnected("")} style={{marginTop:12,padding:10,background:"transparent",border:0,cursor:"pointer"}}>Chiudi</button></div></div>}
 </div>
 );
 }
