@@ -8829,7 +8829,7 @@ export default function Recruiting({
                       className="recruiting-candidate-card"
                       style={{
                         position: "relative",
-                        textAlign: "left",
+                        textAlign: "center",
                         border: `${candidate.waitingRoomNew ? 8 : 6}px solid ${statusStyle.border}`,
                         background: candidate.status === "KO"
                           ? "#fee2e2"
@@ -8851,7 +8851,7 @@ export default function Recruiting({
                         lineHeight: 1.35,
                       }}
                     >
-                      <div style={{ minWidth: 0, paddingRight: 38 }}>
+                      <div style={{ minWidth: 0, paddingRight: 0, textAlign: "center" }}>
                         <div
                           style={{
                             fontWeight: 700,
