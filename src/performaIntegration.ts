@@ -98,3 +98,23 @@ export async function syncRecruitingPerformaNow() {
 export async function disconnectRecruitingPerforma() {
   return callPerforma("disconnect");
 }
+
+export type PerformaCvRecord = {
+  source_candidate_id: string;
+  document_id: string;
+  document_path: string;
+  phone: string;
+  email: string;
+};
+
+export async function listRecruitingPerformaCvs(): Promise<PerformaCvRecord[]> {
+  const data = await callPerforma("cv_list");
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function getRecruitingPerformaCvUrl(sourceCandidateId: string, download = false): Promise<string> {
+  const data = await callPerforma(download ? "cv_download" : "cv_preview", {
+    source_candidate_id: sourceCandidateId,
+  });
+  return String(data?.url || "");
+}
