@@ -15468,6 +15468,15 @@ export default function Recruiting({
                 style={{ ...buttonStyle, minWidth: 45 }}>+</button>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" style={{ ...buttonStyle, background: "#2563eb", color: "white", fontWeight: 900, padding: 12 }}
+                onClick={() => {
+                  window.sessionStorage.setItem("ge_calendar_open_date", activeReminder.eventDate);
+                  setCalendarMonth(activeReminder.eventDate.slice(0, 7));
+                  setCalendarDate(activeReminder.eventDate);
+                  setCalendarOriginFilters(["APP", "CRM", "EXTERNAL", "GOOGLE"]);
+                  setSection("calendar");
+                  setActiveReminder(null);
+                }}>📅 APRI</button>
               <button type="button" style={{ ...buttonStyle, flex: 1, background: "#f97316", color: "white" }}
                 onClick={() => {
                   snoozedUntilRef.current[activeReminder.id] = Date.now() + snoozeMinutes * 60000;
