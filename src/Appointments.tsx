@@ -588,6 +588,34 @@ export default function Appointments({
     );
   }, [events, crmEvents]);
 
+  // Sync future calendar entries to Android's native reminder scheduler.
+  useEffect(() => {
+    const bridge = (window as any).AndroidReminders;
+    if (!bridge || typeof bridge.schedule !== "function") return;
+    const now = Date.now();
+    const active = new Set<string>();
+    for (const item of unified) {
+      const event = item.source === "recruiting" ? item.recruiting : item.crm;
+      if (item.source === "recruiting" && item.recruiting.completed) continue;
+      const start = new Date(`${item.date}T${item.time || "00:00"}:00`).getTime();
+      if (!Number.isFinite(start) || start <= now || start > now + 30 * 86400000) continue;
+      const id = item.key;
+      active.add(id);
+      const title = item.source === "recruiting"
+        ? `${EVENT_LABELS[item.recruiting.eventType]} · ${candidateMap.get(item.recruiting.candidateId || "")?.fullName || "Recruiting"}`
+        : crmClientName(item.crm);
+      const detail = `${formatShortDate(item.date)} ore ${item.time} · Apri Calendario`;
+      try { bridge.schedule(id, title, detail, Math.max(now + 1000, start - 15 * 60000)); }
+      catch (error) { console.warn("Android reminder", error); }
+    }
+    // Remove previously scheduled appointments that no longer exist.
+    try {
+      const previous: string[] = JSON.parse(localStorage.getItem("ge:android-reminder-ids") || "[]");
+      previous.filter(id => !active.has(id)).forEach(id => bridge.cancel(id));
+      localStorage.setItem("ge:android-reminder-ids", JSON.stringify([...active]));
+    } catch (error) { console.warn("Android reminder sync", error); }
+  }, [unified, candidateMap]);
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("it");
     const today = localDateKey();
