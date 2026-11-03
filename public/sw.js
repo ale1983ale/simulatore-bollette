@@ -111,3 +111,39 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch {
+    payload = { body: event.data ? event.data.text() : "" };
+  }
+  const title = String(payload.title || "Promemoria calendario");
+  const body = String(payload.body || "Hai un appuntamento in programma.");
+  const eventDate = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.date || "")) ? payload.date : "";
+  event.waitUntil(self.registration.showNotification(title, {
+    body,
+    icon: "/pwa-icon-192-v2.png",
+    badge: "/pwa-icon-192-v2.png",
+    tag: String(payload.tag || "recruiting-calendar-reminder"),
+    renotify: true,
+    data: { url: "/#recruiting", date: eventDate },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const data = event.notification.data || {};
+  event.waitUntil((async () => {
+    const url = new URL("/", self.location.origin);
+    url.hash = "recruiting";
+    if (data.date) url.searchParams.set("calendar_date", data.date);
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if (new URL(client.url).origin === self.location.origin) {
+        await client.navigate(url.href);
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow(url.href);
+  })());
+});
