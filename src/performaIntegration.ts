@@ -118,3 +118,17 @@ export async function getRecruitingPerformaCvUrl(sourceCandidateId: string, down
   });
   return String(data?.url || "");
 }
+
+export async function getRecruitingPerformaCvBlob(sourceCandidateId: string): Promise<Blob> {
+  const sessionToken = await getAdminSessionToken();
+  const response = await fetch(PERFORMA_SYNC_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: supabaseAnonKey },
+    body: JSON.stringify({ action: "cv_file", session_token: sessionToken, source_candidate_id: sourceCandidateId }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.error || "Impossibile caricare il curriculum.");
+  }
+  return response.blob();
+}
