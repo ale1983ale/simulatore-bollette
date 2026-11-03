@@ -7,7 +7,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import androidx.core.app.NotificationCompat;
 
 public class ReminderReceiver extends BroadcastReceiver {
     public static final String CHANNEL = "gestione_energia_appuntamenti";
@@ -28,11 +27,11 @@ public class ReminderReceiver extends BroadcastReceiver {
         PendingIntent pending = PendingIntent.getActivity(context, id == null ? 0 : id.hashCode(), open,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         int notificationId = id == null ? 1 : id.hashCode();
-        android.app.Notification notification = new NotificationCompat.Builder(context, CHANNEL)
+        android.app.Notification notification = new android.app.Notification.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle(title).setContentText(detail == null ? "" : detail)
-            .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true)
-            .setContentIntent(pending).addAction(android.R.drawable.ic_menu_view, "APRI", pending).build();
+            .setAutoCancel(true)
+            .setContentIntent(pending).addAction(new android.app.Notification.Action.Builder(android.R.drawable.ic_menu_view, "APRI", pending).build()).build();
         try { manager.notify(notificationId, notification); }
         catch (SecurityException ignored) { }
     }
