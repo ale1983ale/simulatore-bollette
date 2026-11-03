@@ -1,6 +1,11 @@
 package it.piuenergia.simulatore;
 
 import android.app.Activity;
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.graphics.Color;
@@ -30,6 +35,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQUEST = 7001;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 7002;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +66,10 @@ public class MainActivity extends Activity {
 
         webView.addJavascriptInterface(new ContactsBridge(), "AndroidContacts");
         webView.addJavascriptInterface(new PdfBridge(), "AndroidFiles");
+        webView.addJavascriptInterface(new ReminderBridge(), "AndroidReminders");
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+        }
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -475,6 +485,36 @@ public class MainActivity extends Activity {
                     }
                 }).start();
             });
+        }
+    }
+
+
+    private class ReminderBridge {
+        @JavascriptInterface public boolean schedule(String id, String title, String detail, long triggerAtMillis) {
+            if (!bridgeAllowed() || id == null || id.isEmpty() || triggerAtMillis <= System.currentTimeMillis()) return false;
+            try {
+                Intent intent = new Intent(MainActivity.this, ReminderReceiver.class);
+                intent.putExtra("id", id);
+                intent.putExtra("title", title);
+                intent.putExtra("detail", detail);
+                PendingIntent pending = PendingIntent.getBroadcast(MainActivity.this, id.hashCode(), intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                AlarmManager alarms = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pending);
+                return true;
+            } catch (Exception error) { return false; }
+        }
+
+        @JavascriptInterface public boolean cancel(String id) {
+            if (!bridgeAllowed() || id == null || id.isEmpty()) return false;
+            Intent intent = new Intent(MainActivity.this, ReminderReceiver.class);
+            PendingIntent pending = PendingIntent.getBroadcast(MainActivity.this, id.hashCode(), intent,
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+            if (pending != null) {
+                ((AlarmManager) getSystemService(Context.ALARM_SERVICE)).cancel(pending);
+                pending.cancel();
+            }
+            return true;
         }
     }
 
