@@ -9476,7 +9476,7 @@ export default function Recruiting({
                               display: "flex", alignItems: "flex-start", gap: 7 }}>
                             <span aria-hidden="true" style={{ color: "#4f46e5", fontSize: 15 }}>▤</span>
                             <div style={{ flex: 1, minWidth: 0, color: "#1e293b", fontSize: 11, lineHeight: 1.4 }}>
-                              <strong>Ultima nota: </strong>
+                              <strong>Ultima nota ({note.noteDate ? note.noteDate.slice(0, 10).split("-").reverse().join("/") : "data non disponibile"}): </strong>
                               <span style={expanded ? { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } : {
                                 display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
                                 overflow: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap"
