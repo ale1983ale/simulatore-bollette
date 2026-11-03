@@ -1419,8 +1419,21 @@ export default function Recruiting({
   const [activeReminder, setActiveReminder] = useState<RecruitingEvent | null>(null);
   const [snoozeMinutes, setSnoozeMinutes] = useState(5);
   const [reminderRevision, setReminderRevision] = useState(0);
-  const snoozedUntilRef = useRef<Record<string, number>>({});
-  const notifiedReminderIdsRef = useRef<Set<string>>(new Set());
+  const reminderStorageKey = "ge_recruiting_reminders_v2";
+  const reminderSavedRef = useRef<{ dismissed: string[]; snoozed: Record<string, number> }>((() => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem("ge_recruiting_reminders_v2") || "{}");
+      return { dismissed: Array.isArray(parsed.dismissed) ? parsed.dismissed : [],
+        snoozed: parsed.snoozed && typeof parsed.snoozed === "object" ? parsed.snoozed : {} };
+    } catch { return { dismissed: [], snoozed: {} }; }
+  })());
+  const saveReminderState = () => {
+    const saved = reminderSavedRef.current;
+    saved.dismissed = saved.dismissed.slice(-500);
+    try { window.localStorage.setItem(reminderStorageKey, JSON.stringify(saved)); } catch {}
+  };
+  const snoozedUntilRef = useRef<Record<string, number>>(reminderSavedRef.current.snoozed);
+  const notifiedReminderIdsRef = useRef<Set<string>>(new Set(reminderSavedRef.current.dismissed));
 
   useEffect(() => {
     const check = () => {
@@ -1428,11 +1441,16 @@ export default function Recruiting({
       for (const event of events) {
         if (event.completed || !event.eventTime || !event.eventDate) continue;
         const eventAt = new Date(event.eventDate + "T" + event.eventTime).getTime();
-        if (!Number.isFinite(eventAt) || now > eventAt + 60 * 60000) continue;
+        if (!Number.isFinite(eventAt) || now >= eventAt) continue;
         const due = snoozedUntilRef.current[event.id] ??
           (eventAt - (event.reminderMinutes ?? 15) * 60000);
         if (now < due || notifiedReminderIdsRef.current.has(event.id)) continue;
+        // Non riproporre eventi il cui avviso è già scaduto da oltre 2 minuti,
+        // tranne quando è stato rimandato esplicitamente.
+        if (!snoozedUntilRef.current[event.id] && now - due > 2 * 60000) continue;
         notifiedReminderIdsRef.current.add(event.id);
+        reminderSavedRef.current.dismissed.push(event.id);
+        saveReminderState();
         setActiveReminder(current => current || event);
         setSnoozeMinutes(5);
         if (typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -15480,7 +15498,10 @@ export default function Recruiting({
               <button type="button" style={{ ...buttonStyle, flex: 1, background: "#f97316", color: "white" }}
                 onClick={() => {
                   snoozedUntilRef.current[activeReminder.id] = Date.now() + snoozeMinutes * 60000;
+                  reminderSavedRef.current.snoozed[activeReminder.id] = snoozedUntilRef.current[activeReminder.id];
+                  reminderSavedRef.current.dismissed = reminderSavedRef.current.dismissed.filter(id => id !== activeReminder.id);
                   notifiedReminderIdsRef.current.delete(activeReminder.id);
+                  saveReminderState();
                   setActiveReminder(null);
                   setReminderRevision(v => v + 1);
                 }}>RIMANDA</button>
