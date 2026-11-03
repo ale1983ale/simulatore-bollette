@@ -1651,6 +1651,13 @@ export default function Recruiting({
     return data;
   };
   const enableCalendarPush = async () => {
+    const native = (window as any).AndroidReminders;
+    if (native && typeof native.schedule === "function") {
+      setPushStatus("enabled");
+      setPushMessage("Promemoria Android disponibili. Controlla che le notifiche siano autorizzate nelle impostazioni dell'app. Gli avvisi sono programmati sul dispositivo, non tramite push remoto.");
+      return;
+    }
+
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
       setPushStatus("unsupported");
       setPushMessage("Questo browser non supporta le notifiche push.");
@@ -5090,6 +5097,22 @@ export default function Recruiting({
         reminderMinutes: activityReminderMinutes,
       });
       if (!eventId) return;
+
+      const native = (window as any).AndroidReminders;
+      if (native && activityDate && activityTime) {
+        const start = new Date(`${activityDate}T${activityTime}:00`).getTime();
+        const reminderAt = start - activityReminderMinutes * 60000;
+        if (Number.isFinite(reminderAt) && reminderAt > Date.now()) {
+          try {
+            native.schedule(
+              `recruiting:${eventId}`,
+              `${EVENT_LABELS[activityType]} · ${selectedCandidate.fullName}`,
+              `${activityDate} ore ${activityTime} · Calendario`,
+              reminderAt
+            );
+          } catch (error) { console.warn("Promemoria Android", error); }
+        }
+      }
 
       setActivityCandidateId(selectedCandidate.id);
       setActivityType("CHIAMARE");
