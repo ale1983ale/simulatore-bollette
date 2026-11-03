@@ -1650,6 +1650,49 @@ export default function Recruiting({
     if (!response.ok) throw new Error(data.error || "Errore servizio push");
     return data;
   };
+  useEffect(() => {
+    let cancelled = false;
+    const refreshPushStatus = async () => {
+      const native = (window as any).AndroidReminders;
+      if (native && typeof native.schedule === "function") {
+        if (!cancelled) {
+          setPushStatus("enabled");
+          setPushMessage("Promemoria Android gestiti dall'app. Verifica il permesso nelle impostazioni Android.");
+        }
+        return;
+      }
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        if (!cancelled) {
+          setPushStatus("unsupported");
+          setPushMessage("Le notifiche push non sono supportate da questa versione dell'APK.");
+        }
+        return;
+      }
+      if (Notification.permission === "denied") {
+        if (!cancelled) {
+          setPushStatus("error");
+          setPushMessage("Notifiche bloccate: autorizzale nelle impostazioni Android.");
+        }
+        return;
+      }
+      if (Notification.permission !== "granted") return;
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        if (cancelled || !subscription) return;
+        await pushApi("subscribe", { subscription: subscription.toJSON() });
+        if (!cancelled) {
+          setPushStatus("enabled");
+          setPushMessage("Notifiche push già attive su questo dispositivo.");
+        }
+      } catch {
+        if (!cancelled) setPushMessage("Non è stato possibile verificare la registrazione push.");
+      }
+    };
+    void refreshPushStatus();
+    return () => { cancelled = true; };
+  }, []);
+
   const enableCalendarPush = async () => {
     const native = (window as any).AndroidReminders;
     if (native && typeof native.schedule === "function") {
@@ -10730,10 +10773,16 @@ export default function Recruiting({
                       </div>
 
                       <div style={{ marginTop: 10, padding: 10, border: "1px solid #fdba74", borderRadius: 10, background: "#fff7ed" }}>
-                        <button type="button" disabled={pushStatus === "busy"} onClick={() => void enableCalendarPush()}
-                          style={{ ...buttonStyle, background: "#0f766e", color: "white" }}>
-                          {pushStatus === "busy" ? "ATTIVAZIONE..." : pushStatus === "enabled" ? "✓ PUSH ANDROID ATTIVE" : "🔔 ATTIVA NOTIFICHE PUSH ANDROID"}
-                        </button>
+                        {pushStatus === "enabled" ? (
+                          <div style={{ fontWeight: 800, color: "#0f766e" }}>✓ NOTIFICHE ATTIVE</div>
+                        ) : pushStatus === "unsupported" ? (
+                          <div style={{ fontWeight: 700, color: "#9a3412" }}>Notifiche non disponibili in questo APK</div>
+                        ) : (
+                          <button type="button" disabled={pushStatus === "busy"} onClick={() => void enableCalendarPush()}
+                            style={{ ...buttonStyle, background: "#0f766e", color: "white" }}>
+                            {pushStatus === "busy" ? "ATTIVAZIONE..." : "🔔 ATTIVA NOTIFICHE PUSH ANDROID"}
+                          </button>
+                        )}
                         <div style={{ fontSize: 12, marginTop: 6 }}>
                           {pushMessage || "Attiva una volta per ricevere avvisi anche con la webapp chiusa."}
                         </div>
