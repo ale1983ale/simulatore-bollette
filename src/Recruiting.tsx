@@ -12,6 +12,7 @@ declare global {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRecruitingContext, type RecruitingContext } from "./recruitingClient";
+import { listRecruitingPerformaCvs, getRecruitingPerformaCvUrl, type PerformaCvRecord } from "./performaIntegration";
 import { ITALIAN_REGIONS, normalizeItalianRegion } from "./recruitingData";
 import { italianProvinceFullName } from "./italianProvinces";
 import RecruitingManagement from "./RecruitingManagement";
@@ -1332,6 +1333,35 @@ export default function Recruiting({
 
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
+  const [performaCvs, setPerformaCvs] = useState<PerformaCvRecord[]>([]);
+  const [cvPopup, setCvPopup] = useState<{ sourceId: string; name: string; url: string } | null>(null);
+  const [cvLoading, setCvLoading] = useState(false);
+  const normalizeCvPhone = (value: string) => String(value || "").replace(/\D/g, "").replace(/^39(?=\d{9,10}$)/, "");
+  const findCvForContact = (contact: { phone: string; email: string }) =>
+    performaCvs.find(cv =>
+      (normalizeCvPhone(contact.phone).length >= 9 && normalizeCvPhone(cv.phone) === normalizeCvPhone(contact.phone)) ||
+      (Boolean(contact.email) && Boolean(cv.email) && cv.email.trim().toLowerCase() === contact.email.trim().toLowerCase())
+    );
+  const showCv = async (sourceId: string, name: string) => {
+    setCvLoading(true);
+    try {
+      const url = await getRecruitingPerformaCvUrl(sourceId);
+      if (!url) throw new Error("Nessun collegamento al curriculum.");
+      setCvPopup({ sourceId, name, url });
+    } catch (error: any) {
+      setMessage("Impossibile aprire il CV: " + (error?.message || error));
+    } finally { setCvLoading(false); }
+  };
+  useEffect(() => {
+    let active = true;
+    const refresh = () => { void listRecruitingPerformaCvs().then(items => {
+      if (active) setPerformaCvs(items);
+    }).catch(() => {}); };
+    refresh();
+    const interval = window.setInterval(refresh, 300000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, []);
+
   const [notes, setNotes] = useState<ContactNote[]>([]);
   const [hrStatusSyncItems, setHrStatusSyncItems] = useState<
     HrStatusSyncItem[]
@@ -9428,6 +9458,15 @@ export default function Recruiting({
                   <div style={cardStyle}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                       <h3 style={{ margin: 0 }}>Scheda contatto</h3>
+                      {findCvForContact(selectedCandidate) && (
+                        <button type="button" disabled={cvLoading}
+                          title="Visualizza curriculum allegato"
+                          onClick={() => { const cv = findCvForContact(selectedCandidate); if (cv) void showCv(cv.source_candidate_id, selectedCandidate.fullName); }}
+                          style={{ ...buttonStyle, padding: "7px 11px", background: "#e0f2fe", color: "#0369a1", border: "1px solid #7dd3fc" }}>
+                          📎 CV
+                        </button>
+                      )}
+
 
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button
@@ -14381,6 +14420,15 @@ export default function Recruiting({
                       <strong style={{ fontSize: 16 }}>
                         {incoming.fullName}
                       </strong>
+                      {performaCvs.some(cv => cv.source_candidate_id === incoming.sourceCandidateId) && (
+                        <button type="button" disabled={cvLoading}
+                          title="Curriculum allegato al nominativo in arrivo"
+                          onClick={() => void showCv(incoming.sourceCandidateId, incoming.fullName)}
+                          style={{ ...buttonStyle, marginLeft: 8, padding: "5px 9px", background: "#e0f2fe", color: "#0369a1" }}>
+                          📎 CV
+                        </button>
+                      )}
+
                       <div
                         style={{
                           marginTop: 4,
@@ -15286,6 +15334,27 @@ export default function Recruiting({
         </div>
       )}
 
+      {cvPopup && (
+        <div className="recruiting-modal-backdrop" onClick={() => setCvPopup(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", justifyContent: "center", alignItems: "center", background: "rgba(15,23,42,.7)", padding: 12 }}>
+          <div onClick={event => event.stopPropagation()}
+            style={{ width: "min(980px,100%)", height: "min(90vh,900px)", background: "white", borderRadius: 14, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px #0005" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: 12, borderBottom: "1px solid #cbd5e1" }}>
+              <strong style={{ flex: 1 }}>📎 CV · {cvPopup.name}</strong>
+              <button type="button" onClick={() => window.open(cvPopup.url, "_blank", "noopener,noreferrer")}>APRI ↗</button>
+              <button type="button" onClick={async () => {
+                try {
+                  const url = await getRecruitingPerformaCvUrl(cvPopup.sourceId, true);
+                  if (navigator.share) await navigator.share({ title: "Curriculum " + cvPopup.name, url });
+                  else { await navigator.clipboard.writeText(url); setMessage("Link CV copiato (valido 5 minuti)."); }
+                } catch (error: any) { if (error?.name !== "AbortError") setMessage("Condivisione non riuscita: " + (error?.message || error)); }
+              }}>CONDIVIDI</button>
+              <button type="button" aria-label="Chiudi" onClick={() => setCvPopup(null)}>✕</button>
+            </div>
+            <iframe title={"Curriculum " + cvPopup.name} src={cvPopup.url} style={{ width: "100%", flex: 1, border: 0 }} />
+          </div>
+        </div>
+      )}
       {deleteCandidatePromptOpen && selectedCandidate && (
         <div
           className="recruiting-modal-backdrop"
