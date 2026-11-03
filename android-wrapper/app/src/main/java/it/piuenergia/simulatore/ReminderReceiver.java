@@ -1,0 +1,39 @@
+package it.piuenergia.simulatore;
+
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import androidx.core.app.NotificationCompat;
+
+public class ReminderReceiver extends BroadcastReceiver {
+    public static final String CHANNEL = "gestione_energia_appuntamenti";
+
+    @Override public void onReceive(Context context, Intent intent) {
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel channel = new NotificationChannel(CHANNEL, "Promemoria appuntamenti", NotificationManager.IMPORTANCE_HIGH);
+            manager.createNotificationChannel(channel);
+        }
+        String id = intent.getStringExtra("id");
+        String title = intent.getStringExtra("title");
+        String detail = intent.getStringExtra("detail");
+        if (title == null || title.isEmpty()) title = "Appuntamento";
+        Intent open = new Intent(context, MainActivity.class);
+        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        open.putExtra("reminder_id", id);
+        PendingIntent pending = PendingIntent.getActivity(context, id == null ? 0 : id.hashCode(), open,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        int notificationId = id == null ? 1 : id.hashCode();
+        android.app.Notification notification = new NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setContentTitle(title).setContentText(detail == null ? "" : detail)
+            .setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true)
+            .setContentIntent(pending).addAction(android.R.drawable.ic_menu_view, "APRI", pending).build();
+        try { manager.notify(notificationId, notification); }
+        catch (SecurityException ignored) { }
+    }
+}
