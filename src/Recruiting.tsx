@@ -2781,6 +2781,19 @@ export default function Recruiting({
     [notes]
   );
 
+  const [expandedLatestNoteIds, setExpandedLatestNoteIds] = useState<Set<string>>(() => new Set());
+  const latestNoteByCandidateId = useMemo(() => {
+    const latest = new Map<string, ContactNote>();
+    for (const note of notes) {
+      if (!note.noteText?.trim()) continue;
+      const previous = latest.get(note.candidateId);
+      if (!previous || (note.noteDate + "|" + note.createdAt) > (previous.noteDate + "|" + previous.createdAt)) {
+        latest.set(note.candidateId, note);
+      }
+    }
+    return latest;
+  }, [notes]);
+
   const lastNoteSortKeyByCandidateId = useMemo(() => {
     const latest = new Map<string, string>();
 
@@ -9453,6 +9466,36 @@ export default function Recruiting({
                         )}
                       </div>
                       </div>
+                      {latestNoteByCandidateId.get(candidate.id) && (() => {
+                        const note = latestNoteByCandidateId.get(candidate.id)!;
+                        const expanded = expandedLatestNoteIds.has(candidate.id);
+                        return (
+                          <div onClick={event => event.stopPropagation()}
+                            style={{ minWidth: 0, marginTop: 5, padding: "7px 9px", background: "#eef2ff",
+                              border: "1px solid #c7d2fe", borderRadius: 8, textAlign: "left",
+                              display: "flex", alignItems: "flex-start", gap: 7 }}>
+                            <span aria-hidden="true" style={{ color: "#4f46e5", fontSize: 15 }}>▤</span>
+                            <div style={{ flex: 1, minWidth: 0, color: "#1e293b", fontSize: 11, lineHeight: 1.4 }}>
+                              <strong>Ultima nota: </strong>
+                              <span style={expanded ? { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } : {
+                                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                                overflow: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap"
+                              }}>{note.noteText}</span>
+                            </div>
+                            <button type="button" aria-label={expanded ? "Riduci nota" : "Espandi nota"}
+                              title={expanded ? "Mostra solo due righe" : "Leggi tutta la nota"}
+                              onClick={event => { event.stopPropagation(); setExpandedLatestNoteIds(previous => {
+                                const next = new Set(previous);
+                                if (next.has(candidate.id)) next.delete(candidate.id); else next.add(candidate.id);
+                                return next;
+                              }); }}
+                              style={{ border: 0, background: "#dbeafe", color: "#1d4ed8", borderRadius: 7,
+                                cursor: "pointer", padding: "3px 7px", flexShrink: 0, fontWeight: 900 }}>
+                              {expanded ? "⌃" : "⌄"}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
