@@ -6740,7 +6740,7 @@ function Gas({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(4,minmax(0,1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 145px), 1fr))",
                 alignItems: "stretch",
                 gap: 12,
                 marginBottom: 12,
