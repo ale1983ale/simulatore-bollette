@@ -1,3 +1,5 @@
+import { getAdminSessionToken } from "./adminSecurity";
+import { supabaseUrl } from "./supabase";
 import { confirmAction } from "./confirmAction";
 import RecruitingCvMobilePreview from "./RecruitingCvMobilePreview";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -1635,6 +1637,48 @@ export default function Recruiting({
   const [activityTime, setActivityTime] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
   const [activityReminderMinutes, setActivityReminderMinutes] = useState(15);
+  const [pushStatus, setPushStatus] = useState<"idle"|"busy"|"enabled"|"unsupported"|"error">("idle");
+  const [pushMessage, setPushMessage] = useState("");
+  const pushApi = async (action: string, payload: Record<string, unknown> = {}) => {
+    const token = action === "public-key" ? "" : await getAdminSessionToken();
+    const response = await fetch(supabaseUrl + "/functions/v1/recruiting-calendar-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Errore servizio push");
+    return data;
+  };
+  const enableCalendarPush = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setPushStatus("unsupported");
+      setPushMessage("Questo browser non supporta le notifiche push.");
+      return;
+    }
+    setPushStatus("busy");
+    try {
+      const { publicKey } = await pushApi("public-key");
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Autorizza le notifiche nelle impostazioni del browser.");
+      const registration = await navigator.serviceWorker.ready;
+      const decode = (key: string) => {
+        const padded = key.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(key.length / 4) * 4, "=");
+        return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+      };
+      const existing = await registration.pushManager.getSubscription();
+      const subscription = existing || await registration.pushManager.subscribe({
+        userVisibleOnly: true, applicationServerKey: decode(publicKey),
+      });
+      await pushApi("subscribe", { subscription: subscription.toJSON() });
+      setPushStatus("enabled");
+      setPushMessage("Notifiche Android attivate su questo dispositivo.");
+    } catch (error: any) {
+      setPushStatus("error");
+      setPushMessage(error?.message || "Impossibile attivare le notifiche.");
+    }
+  };
+
 
   const [calendarMonth, setCalendarMonth] = useState(localMonthKey());
   useEffect(() => {
@@ -10672,6 +10716,16 @@ export default function Recruiting({
                         <div>
                           <label style={labelStyle}>Ora</label>
                           <input type="time" value={activityTime} onChange={(e) => setActivityTime(e.target.value)} style={inputStyle} />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: 10, padding: 10, border: "1px solid #fdba74", borderRadius: 10, background: "#fff7ed" }}>
+                        <button type="button" disabled={pushStatus === "busy"} onClick={() => void enableCalendarPush()}
+                          style={{ ...buttonStyle, background: "#0f766e", color: "white" }}>
+                          {pushStatus === "busy" ? "ATTIVAZIONE..." : pushStatus === "enabled" ? "✓ PUSH ANDROID ATTIVE" : "🔔 ATTIVA NOTIFICHE PUSH ANDROID"}
+                        </button>
+                        <div style={{ fontSize: 12, marginTop: 6 }}>
+                          {pushMessage || "Attiva una volta per ricevere avvisi anche con la webapp chiusa."}
                         </div>
                       </div>
 
