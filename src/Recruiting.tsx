@@ -10578,20 +10578,7 @@ export default function Recruiting({
                                         flexWrap: "wrap",
                                       }}
                                     >
-                                      <strong>
-                                        {formatDate(note.noteDate)}
-                                      </strong>
-                                      {note.calledByMe && (
-                                        <span
-                                          style={{
-                                            color: "#6d28d9",
-                                            fontSize: 12,
-                                            fontWeight: 900,
-                                          }}
-                                        >
-                                          ALESSIO CEDRONI DICE:
-                                        </span>
-                                      )}
+                                      <strong>Ultima nota ({formatDate(note.noteDate)}):</strong>
                                     </div>
 
                                     <div
@@ -14085,18 +14072,7 @@ export default function Recruiting({
                         flexWrap: "wrap",
                       }}
                     >
-                      <strong>{formatDate(note.noteDate)}</strong>
-                      {note.calledByMe && (
-                        <span
-                          style={{
-                            color: "#6d28d9",
-                            fontSize: 12,
-                            fontWeight: 900,
-                          }}
-                        >
-                          ALESSIO CEDRONI DICE:
-                        </span>
-                      )}
+                      <strong>Ultima nota ({formatDate(note.noteDate)}):</strong>
                     </div>
                     <div
                       style={{
