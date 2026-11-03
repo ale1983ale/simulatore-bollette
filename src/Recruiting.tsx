@@ -1,4 +1,5 @@
 import { confirmAction } from "./confirmAction";
+import RecruitingCvMobilePreview from "./RecruitingCvMobilePreview";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 declare global {
@@ -15392,8 +15393,8 @@ export default function Recruiting({
                 setCvZoom(Math.max(1, Math.min(4, cvPinchStartZoom.current * distance / cvPinchDistance.current)));
               }}
               onTouchEnd={() => { cvPinchDistance.current = null; }}>
-              <iframe title={"Curriculum " + cvPopup.name} src={cvPopup.url}
-                style={{ display: "block", width: (cvZoom * 100) + "%", height: Math.max(650, 820 * cvZoom), border: 0, transformOrigin: "top left" }} />
+              {window.matchMedia("(max-width: 700px)").matches ? <RecruitingCvMobilePreview sourceId={cvPopup.sourceId} zoom={cvZoom} /> : <iframe title={"Curriculum " + cvPopup.name} src={cvPopup.url}
+                style={{ display: "block", width: (cvZoom * 100) + "%", height: Math.max(650, 820 * cvZoom), border: 0, transformOrigin: "top left" }} />}
             </div>
           </div>
         </div>
