@@ -206,6 +206,7 @@ type RecruitingEvent = {
   candidateId: string | null;
   eventDate: string;
   eventTime: string;
+  reminderMinutes: number;
   eventType: EventType;
   customType: string;
   notes: string;
@@ -1001,6 +1002,7 @@ function eventFromRow(row: any): RecruitingEvent {
     candidateId: row.candidate_id ? String(row.candidate_id) : null,
     eventDate: String(row.event_date || ""),
     eventTime: String(row.event_time || ""),
+    reminderMinutes: Number(row.reminder_minutes ?? 15),
     eventType: String(row.event_type || "CHIAMARE") as EventType,
     customType: String(row.custom_type || ""),
     notes: String(row.notes || ""),
@@ -1414,6 +1416,39 @@ export default function Recruiting({
       return "default";
     });
   const [events, setEvents] = useState<RecruitingEvent[]>([]);
+  const [activeReminder, setActiveReminder] = useState<RecruitingEvent | null>(null);
+  const [snoozeMinutes, setSnoozeMinutes] = useState(5);
+  const [reminderRevision, setReminderRevision] = useState(0);
+  const snoozedUntilRef = useRef<Record<string, number>>({});
+  const notifiedReminderIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const check = () => {
+      const now = Date.now();
+      for (const event of events) {
+        if (event.completed || !event.eventTime || !event.eventDate) continue;
+        const eventAt = new Date(event.eventDate + "T" + event.eventTime).getTime();
+        if (!Number.isFinite(eventAt) || now > eventAt + 60 * 60000) continue;
+        const due = snoozedUntilRef.current[event.id] ??
+          (eventAt - (event.reminderMinutes ?? 15) * 60000);
+        if (now < due || notifiedReminderIdsRef.current.has(event.id)) continue;
+        notifiedReminderIdsRef.current.add(event.id);
+        setActiveReminder(current => current || event);
+        setSnoozeMinutes(5);
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          try { new Notification("Promemoria calendario", {
+            body: EVENT_LABELS[event.eventType] + " · " + event.eventDate + " " + event.eventTime,
+            icon: "/pwa-icon-192-v2.png", tag: "calendar-" + event.id
+          }); } catch {}
+        }
+        break;
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 15000);
+    return () => window.clearInterval(timer);
+  }, [events, reminderRevision]);
+
   const [crmCalendarEvents, setCrmCalendarEvents] = useState<
     CrmCalendarEvent[]
   >([]);
@@ -1581,6 +1616,7 @@ export default function Recruiting({
   const [activityDate, setActivityDate] = useState(localDateKey());
   const [activityTime, setActivityTime] = useState("");
   const [activityNotes, setActivityNotes] = useState("");
+  const [activityReminderMinutes, setActivityReminderMinutes] = useState(15);
 
   const [calendarMonth, setCalendarMonth] = useState(localMonthKey());
   useEffect(() => {
@@ -1842,7 +1878,7 @@ export default function Recruiting({
         .order("created_at", { ascending: true }),
       active.client
         .from("recruiting_events")
-        .select("id,candidate_id,event_date,event_time,event_type,custom_type,notes,completed,google_sync_status,google_sync_error,google_synced_at,source_type,source_external_id,source_external_calendar_id")
+        .select("id,candidate_id,event_date,event_time,reminder_minutes,event_type,custom_type,notes,completed,google_sync_status,google_sync_error,google_synced_at,source_type,source_external_id,source_external_calendar_id")
         .order("event_date", { ascending: true })
         .order("event_time", { ascending: true }),
       active.client
@@ -4927,6 +4963,7 @@ export default function Recruiting({
     date,
     time,
     notesText,
+    reminderMinutes = 15,
   }: {
     candidateId: string | null;
     type: EventType;
@@ -4934,6 +4971,7 @@ export default function Recruiting({
     date: string;
     time: string;
     notesText: string;
+    reminderMinutes?: number;
   }) => {
     if (!ctx) return null;
     if (!date) {
@@ -4952,6 +4990,7 @@ export default function Recruiting({
         candidate_id: candidateId,
         event_date: date,
         event_time: time || null,
+        reminder_minutes: reminderMinutes,
         event_type: type,
         custom_type: type === "ALTRO" ? customType.trim() : "",
         notes: notesText.trim(),
@@ -4986,6 +5025,7 @@ export default function Recruiting({
         date: activityDate,
         time: activityTime,
         notesText: activityNotes,
+        reminderMinutes: activityReminderMinutes,
       });
       if (!eventId) return;
 
@@ -4995,6 +5035,7 @@ export default function Recruiting({
       setActivityDate(localDateKey());
       setActivityTime("");
       setActivityNotes("");
+      setActivityReminderMinutes(15);
       await loadAll(ctx || undefined);
       setMessage("Attività aggiunta al calendario.");
     } catch (error: any) {
@@ -10616,6 +10657,21 @@ export default function Recruiting({
                         </div>
                       </div>
 
+                      <div style={{ marginTop: 10 }}>
+                        <label style={labelStyle}>Avvisami prima dell'evento</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <button type="button" aria-label="Riduci anticipo di 15 minuti"
+                            onClick={() => setActivityReminderMinutes(v => Math.max(0, v - 15))}
+                            style={{ ...buttonStyle, minWidth: 38, background: "#ffedd5", color: "#9a3412" }}>−</button>
+                          <strong style={{ minWidth: 105, textAlign: "center" }}>{activityReminderMinutes >= 60
+                            ? Math.floor(activityReminderMinutes / 60) + " h " + (activityReminderMinutes % 60 ? activityReminderMinutes % 60 + " min" : "")
+                            : activityReminderMinutes + " minuti"}</strong>
+                          <button type="button" aria-label="Aumenta anticipo di 15 minuti"
+                            onClick={() => setActivityReminderMinutes(v => Math.min(1440, v + 15))}
+                            style={{ ...buttonStyle, minWidth: 38, background: "#ffedd5", color: "#9a3412" }}>+</button>
+                        </div>
+                      </div>
+
                       <div style={{ marginTop: 9 }}>
                         <label style={labelStyle}>Note attività</label>
                         <textarea value={activityNotes} onChange={(e) => setActivityNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
@@ -15394,6 +15450,37 @@ export default function Recruiting({
         </div>
       )}
 
+      {activeReminder && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100001, background: "rgba(15,23,42,.65)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div role="alertdialog" aria-modal="true" aria-label="Promemoria calendario"
+            style={{ width: "min(440px,100%)", borderRadius: 16, background: "white", padding: 22,
+              boxShadow: "0 25px 70px #0005", display: "grid", gap: 13 }}>
+            <strong style={{ fontSize: 20 }}>🔔 Promemoria calendario</strong>
+            <div style={{ fontWeight: 800 }}>{EVENT_LABELS[activeReminder.eventType]}</div>
+            <div>{activeReminder.eventDate.split("-").reverse().join("/")} · {activeReminder.eventTime}</div>
+            {activeReminder.notes && <div style={{ whiteSpace: "pre-wrap" }}>{activeReminder.notes}</div>}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+              <button type="button" onClick={() => setSnoozeMinutes(v => Math.max(5, v - 5))}
+                style={{ ...buttonStyle, minWidth: 45 }}>−</button>
+              <strong>Rimanda di {snoozeMinutes} minuti</strong>
+              <button type="button" onClick={() => setSnoozeMinutes(v => Math.min(180, v + 5))}
+                style={{ ...buttonStyle, minWidth: 45 }}>+</button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" style={{ ...buttonStyle, flex: 1, background: "#f97316", color: "white" }}
+                onClick={() => {
+                  snoozedUntilRef.current[activeReminder.id] = Date.now() + snoozeMinutes * 60000;
+                  notifiedReminderIdsRef.current.delete(activeReminder.id);
+                  setActiveReminder(null);
+                  setReminderRevision(v => v + 1);
+                }}>RIMANDA</button>
+              <button type="button" style={{ ...buttonStyle, flex: 1 }}
+                onClick={() => { setActiveReminder(null); }}>CHIUDI</button>
+            </div>
+          </div>
+        </div>
+      )}
       {cvPopup && (
         <div className="recruiting-modal-backdrop" onClick={() => setCvPopup(null)}
           style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", justifyContent: "center", alignItems: "center", background: "rgba(15,23,42,.7)", padding: 12 }}>
