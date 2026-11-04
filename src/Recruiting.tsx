@@ -13582,7 +13582,7 @@ export default function Recruiting({
                       )}
                       {!address && !mapUrl && zone && (
                         <div style={{ fontSize: 12, marginTop: 5, color: "#475569" }}>Località indicata: {zone}</div>
-                      )
+                      )}
                     </div>
 
                     <div>
