@@ -1074,6 +1074,28 @@ function openCrmMap(url: string) {
   }
 }
 
+function crmAddress(event: CrmCalendarEvent): string {
+  const lines = crmTextLines(event);
+  for (const line of lines) {
+    const labeled = line.match(/(?:^|\\b)(?:indirizzo|sede appuntamento|luogo appuntamento|ubicazione|via|viale|piazza|corso|strada|località)\\s*[:\\-]?\\s*(.{5,180})/i);
+    if (labeled) {
+      const value = /^(via|viale|piazza|corso|strada|località)\\b/i.test(line)
+        ? line : labeled[1];
+      const cleaned = value.replace(/https?:\\/\\/\\S+/gi, "").trim();
+      if (cleaned.length >= 5) return cleaned;
+    }
+  }
+  const url = crmMapUrl(event);
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      const query = parsed.searchParams.get("query") || parsed.searchParams.get("q") || parsed.searchParams.get("destination");
+      if (query && !/^https?:/i.test(query)) return query;
+    } catch {}
+  }
+  return "";
+}
+
 function crmMapUrl(event: CrmCalendarEvent) {
   const raw = `${event.notes || ""}\n${event.title || ""}`.replace(
     /&amp;/gi,
@@ -13465,7 +13487,10 @@ export default function Recruiting({
                 crmZone(crmDetailEvent) ||
                 crmResolvedZones[crmDetailEvent.crmEventId] ||
                 crmZoneHint(crmDetailEvent);
-              const mapUrl = crmMapUrl(crmDetailEvent);
+              const address = crmAddress(crmDetailEvent);
+              const mapUrl = crmMapUrl(crmDetailEvent) || (address
+                ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address)
+                : "");
               const phones = crmPhoneNumbers(crmDetailEvent);
 
               return (
@@ -13544,6 +13569,10 @@ export default function Recruiting({
                     <div>
                       <div style={labelStyle}>Zona</div>
                       <strong>{zone || "—"}</strong>
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={labelStyle}>Indirizzo appuntamento</div>
+                      <strong style={{ overflowWrap: "anywhere" }}>{address || "Non indicato nel CRM"}</strong>
                     </div>
 
                     <div>
