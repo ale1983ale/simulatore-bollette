@@ -13574,7 +13574,15 @@ export default function Recruiting({
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
                       <div style={labelStyle}>Indirizzo appuntamento</div>
-                      <strong style={{ overflowWrap: "anywhere" }}>{address || "Non indicato nel CRM"}</strong>
+                      <strong style={{ overflowWrap: "anywhere" }}>{address || "Via e numero civico non presenti nel CRM"}</strong>
+                      {!address && mapUrl && (
+                        <div style={{ fontSize: 12, marginTop: 5, color: "#475569" }}>
+                          Il CRM contiene un link alla posizione: usa il pulsante MAPPA o COPIA LINK.
+                        </div>
+                      )}
+                      {!address && !mapUrl && zone && (
+                        <div style={{ fontSize: 12, marginTop: 5, color: "#475569" }}>Località indicata: {zone}</div>
+                      )
                     </div>
 
                     <div>
@@ -13663,19 +13671,24 @@ export default function Recruiting({
                     )}
 
                     {mapUrl && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openCrmMap(mapUrl)
-                        }
-                        style={{
-                          ...buttonStyle,
-                          background: "#ea580c",
-                          color: "white",
-                        }}
-                      >
-                        MAPPA
-                      </button>
+                      <>
+                        <button type="button" onClick={() => openCrmMap(mapUrl)}
+                          style={{ ...buttonStyle, background: "#ea580c", color: "white" }}>MAPPA</button>
+                        <button type="button" onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(mapUrl);
+                            setMessage("Link Google Maps copiato: incollalo in Chrome o Google Maps.");
+                          } catch {
+                            window.prompt("Copia il link della mappa:", mapUrl);
+                          }
+                        }} style={{ ...buttonStyle, background: "#dbeafe", color: "#1d4ed8" }}>
+                          📋 COPIA LINK MAPPA
+                        </button>
+                        <a href={mapUrl} target="_self" rel="noreferrer"
+                          style={{ fontWeight: 800, color: "#2563eb", padding: "10px 6px", overflowWrap: "anywhere" }}>
+                          APRI LINK GOOGLE MAPS
+                        </a>
+                      </>
                     )}
 
                     {phones.map((phone) => (
