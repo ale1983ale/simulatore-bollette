@@ -1059,6 +1059,21 @@ const CRM_PROVINCE_CODES = new Set(
   )
 );
 
+function openCrmMap(url: string) {
+  if (!url) return;
+  // A normal _blank popup is not reliably handed to Android Maps by APK WebViews.
+  // Prefer the native bridge when present; otherwise navigate the current view.
+  const native = (window as any).AndroidExternalLinks;
+  if (native && typeof native.open === "function") {
+    try { native.open(url); return; } catch { /* use browser fallback */ }
+  }
+  if (/Android/i.test(navigator.userAgent)) {
+    window.location.assign(url);
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
 function crmMapUrl(event: CrmCalendarEvent) {
   const raw = `${event.notes || ""}\n${event.title || ""}`.replace(
     /&amp;/gi,
@@ -11919,11 +11934,7 @@ export default function Recruiting({
                                     type="button"
                                     onClick={(clickEvent) => {
                                       clickEvent.stopPropagation();
-                                      window.open(
-                                        mapUrl,
-                                        "_blank",
-                                        "noopener,noreferrer"
-                                      );
+                                      openCrmMap(mapUrl);
                                     }}
                                     style={{
                                       border: 0,
@@ -13624,11 +13635,7 @@ export default function Recruiting({
                       <button
                         type="button"
                         onClick={() =>
-                          window.open(
-                            mapUrl,
-                            "_blank",
-                            "noopener,noreferrer"
-                          )
+                          openCrmMap(mapUrl)
                         }
                         style={{
                           ...buttonStyle,
