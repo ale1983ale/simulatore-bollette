@@ -1077,12 +1077,14 @@ function openCrmMap(url: string) {
 function crmAddress(event: CrmCalendarEvent): string {
   const lines = crmTextLines(event);
   for (const line of lines) {
-    const labeled = line.match(/(?:^|\\b)(?:indirizzo|sede appuntamento|luogo appuntamento|ubicazione|via|viale|piazza|corso|strada|località)\\s*[:\\-]?\\s*(.{5,180})/i);
+    const labeled = line.match(/(?:indirizzo|sede appuntamento|luogo appuntamento|ubicazione)\s*[:\-]\s*(.{5,180})/i);
     if (labeled) {
-      const value = /^(via|viale|piazza|corso|strada|località)\\b/i.test(line)
-        ? line : labeled[1];
-      const cleaned = value.replace(/https?:\\/\\/\\S+/gi, "").trim();
-      if (cleaned.length >= 5) return cleaned;
+      const value = labeled[1].split("http")[0].trim();
+      if (value.length >= 5) return value;
+    }
+    if (/^(via|viale|piazza|corso|strada|località)\s+/i.test(line)) {
+      const value = line.split("http")[0].trim();
+      if (value.length >= 5) return value;
     }
   }
   const url = crmMapUrl(event);
@@ -1090,7 +1092,7 @@ function crmAddress(event: CrmCalendarEvent): string {
     try {
       const parsed = new URL(url);
       const query = parsed.searchParams.get("query") || parsed.searchParams.get("q") || parsed.searchParams.get("destination");
-      if (query && !/^https?:/i.test(query)) return query;
+      if (query && !query.startsWith("http")) return query;
     } catch {}
   }
   return "";
