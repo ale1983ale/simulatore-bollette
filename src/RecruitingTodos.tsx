@@ -82,11 +82,20 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
   const [diaryUploading,setDiaryUploading]=useState(false);
   useEffect(()=>{if(!diaryContactMenuOpen)return;const close=(e:MouseEvent)=>{if(diaryContactMenuRef.current&&!diaryContactMenuRef.current.contains(e.target as Node))setDiaryContactMenuOpen(false);};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close);},[diaryContactMenuOpen]);
   const diaryContacts=[...contacts].sort((a,b)=>a.name.localeCompare(b.name,"it",{sensitivity:"base"}));
-  const diaryGroups=Object.values(diaryItems.reduce((acc:Record<string,{key:string;name:string;items:any[]}>,item:any)=>{
+  const [showDoneDiaryNotes,setShowDoneDiaryNotes]=useState(false);
+  const diaryChronological=(a:any,b:any)=>new Date(b.created_at||0).getTime()-new Date(a.created_at||0).getTime();
+  const groupDiaryNotes=(notes:any[])=>Object.values(notes.reduce((acc:Record<string,{key:string;name:string;items:any[]}>,item:any)=>{
     const key=item.linked_kind&&item.linked_id?item.linked_kind+":"+item.linked_id:"generic";
     if(!acc[key])acc[key]={key,name:item.linked_name||"APPUNTI GENERICI",items:[]};
     acc[key].items.push(item);return acc;
-  },{})).sort((a,b)=>a.name.localeCompare(b.name,"it",{sensitivity:"base"}));
+  },{})).map(group=>({...group,items:group.items.sort(diaryChronological)}))
+    .sort((a,b)=>diaryChronological(a.items[0],b.items[0]));
+  const diaryActiveGroups=groupDiaryNotes(diaryItems.filter(item=>!item.completed));
+  const diaryDoneGroups=groupDiaryNotes(diaryItems.filter(item=>item.completed));
+  const diaryGroups=[
+    ...diaryActiveGroups,
+    ...(showDoneDiaryNotes?diaryDoneGroups.map(group=>({...group,key:"done-"+group.key})):[])
+  ];
   const addDiaryFiles=async(files:FileList|null)=>{
     if(!files?.length)return;
     const selected=Array.from(files);
@@ -434,8 +443,12 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       </div>
       {message&&<p role="status" style={{color:message.startsWith("✓")?"#15803d":"#b91c1c"}}>{message}</p>}
       <div className="ge-diary-list" style={{display:"grid",gap:12,marginTop:16}}>
-        <h3>☷ APPUNTI INSERITI</h3>
-        {diaryGroups.map(group=><article className="ge-diary-group" key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
+        <h3>☷ APPUNTI INSERITI · DAL PIÙ RECENTE</h3>
+        {diaryGroups.map((group,index)=><React.Fragment key={group.key}>
+          {index===diaryActiveGroups.length && showDoneDiaryNotes && (
+            <h3 style={{margin:"16px 0 4px",color:"#64748b"}}>✓ APPUNTI FATTI · DAL PIÙ RECENTE</h3>
+          )}
+          <article className="ge-diary-group" key={group.key} style={{border:"1px solid #cbd5e1",borderRadius:14,padding:14,background:"#fff"}}>
           <h4 style={{margin:"0 0 12px",color:"#1d4ed8",fontSize:17}}>{group.name} <span style={{fontSize:12,color:"#64748b"}}>({group.items.length} note)</span></h4>{group.items[0]?.linked_kind==="candidate" && group.items[0]?.linked_id && onOpenLinkedContact && <button type="button" style={{...linkStyle,marginBottom:12}} onClick={()=>onOpenLinkedContact("candidate",String(group.items[0].linked_id))}>↗ APRI SCHEDA CONTATTO</button>}
           <div style={{display:"grid",gap:10}}>{group.items.map(item=><section className="ge-diary-note" key={item.id} id={"diary-note-"+item.id} style={{background:item.completed?"#f1f5f9":"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12}}>
             <small style={{color:"#64748b"}}>{new Date(item.created_at).toLocaleString("it-IT")}</small>
@@ -464,8 +477,14 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
               <button style={{...action,color:"#b91c1c"}} onClick={()=>void diaryAction(item,"delete")}>ELIMINA</button>
             </div>
           </section>)}</div>
-        </article>)}
-        {!diaryGroups.length&&<p>Nessun appunto presente.</p>}
+        </article></React.Fragment>)}
+        {!diaryActiveGroups.length&&<p>Nessun appunto da fare.</p>}
+        {diaryDoneGroups.length>0&&(
+          <button type="button" style={{...action,background:"#e0f2fe",color:"#075985",justifySelf:"start",marginTop:12}}
+            onClick={()=>setShowDoneDiaryNotes(value=>!value)}>
+            {showDoneDiaryNotes?"▲ NASCONDI APPUNTI FATTI":"▼ SCOPRI APPUNTI FATTI"} ({diaryItems.filter(item=>item.completed).length})
+          </button>
+        )}
       </div>
     </div>}
     {subtab==="todo"&&<div className="ge-todo-panel">
