@@ -15684,11 +15684,15 @@ export default function Recruiting({
               }} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 10, border: "1px solid #86efac", background: "#f0fdf4", color: "#166534", fontWeight: 800, cursor: "pointer" }}>
                 ↗ CONDIVIDI
               </button>
+              {window.matchMedia("(max-width: 700px)").matches && (
+                <>
               <button type="button" aria-label="Riduci zoom" onClick={() => setCvZoom(z => Math.max(1, z - 0.25))}
                 style={{ borderRadius: 9, padding: "8px 10px", border: "1px solid #cbd5e1", background: "#f8fafc" }}>−</button>
               <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: "center" }}>{Math.round(cvZoom * 100)}%</span>
               <button type="button" aria-label="Aumenta zoom" onClick={() => setCvZoom(z => Math.min(4, z + 0.25))}
                 style={{ borderRadius: 9, padding: "8px 10px", border: "1px solid #cbd5e1", background: "#f8fafc" }}>+</button>
+                </>
+              )}
               <button type="button" aria-label="Chiudi" onClick={() => setCvPopup(null)}
                 style={{ borderRadius: 9, padding: "8px 12px", border: "1px solid #fecaca", background: "#fff1f2", color: "#be123c", fontWeight: 800 }}>✕</button>
             </div>
