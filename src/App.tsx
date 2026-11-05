@@ -6157,13 +6157,17 @@ function Gas({
     r.spreadEff,
   ]);
 
-  const gasMonthOptions = mesiOrdinati
-    .filter((m) => !isFixedCompetenceMonth(m.mese))
-    .filter((m) => gasFixedMode || Boolean(m.psv && m.psv !== 0))
-    .map((m) => m.mese);
+  const gasMonthOptions = gasFixedMode
+    ? [
+        s.uso === "DOMESTICO" ? "FISSO DOMESTICO" : "FISSO BUSINESS",
+        "FISSO AD HOC",
+      ]
+    : mesiOrdinati
+        .filter((m) => !isFixedCompetenceMonth(m.mese))
+        .filter((m) => Boolean(m.psv && m.psv !== 0))
+        .map((m) => m.mese);
 
-  const gasSecondaryMonthOptions =
-    gasMonthOptions;
+  const gasSecondaryMonthOptions = gasMonthOptions;
 
   const set = (k: string, v: string) => {
     setLastGasInputAt(Date.now());
