@@ -444,6 +444,12 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
       {message&&<p role="status" style={{color:message.startsWith("✓")?"#15803d":"#b91c1c"}}>{message}</p>}
       <div className="ge-diary-list" style={{display:"grid",gap:12,marginTop:16}}>
         <h3>☷ APPUNTI INSERITI · DAL PIÙ RECENTE</h3>
+        {diaryDoneGroups.length>0&&(
+          <button type="button" style={{...action,background:"#e0f2fe",color:"#075985",justifySelf:"start",marginTop:12}}
+            onClick={()=>setShowDoneDiaryNotes(value=>!value)}>
+            {showDoneDiaryNotes?"▲ NASCONDI APPUNTI FATTI":"▼ SCOPRI APPUNTI FATTI"} ({diaryItems.filter(item=>item.completed).length})
+          </button>
+        )}
         {diaryGroups.map((group,index)=><React.Fragment key={group.key}>
           {index===diaryActiveGroups.length && showDoneDiaryNotes && (
             <h3 style={{margin:"16px 0 4px",color:"#64748b"}}>✓ APPUNTI FATTI · DAL PIÙ RECENTE</h3>
@@ -479,12 +485,7 @@ export default function RecruitingTodos({ ctx, contacts, draft, onDraftConsumed,
           </section>)}</div>
         </article></React.Fragment>)}
         {!diaryActiveGroups.length&&<p>Nessun appunto da fare.</p>}
-        {diaryDoneGroups.length>0&&(
-          <button type="button" style={{...action,background:"#e0f2fe",color:"#075985",justifySelf:"start",marginTop:12}}
-            onClick={()=>setShowDoneDiaryNotes(value=>!value)}>
-            {showDoneDiaryNotes?"▲ NASCONDI APPUNTI FATTI":"▼ SCOPRI APPUNTI FATTI"} ({diaryItems.filter(item=>item.completed).length})
-          </button>
-        )}
+
       </div>
     </div>}
     {subtab==="todo"&&<div className="ge-todo-panel">
