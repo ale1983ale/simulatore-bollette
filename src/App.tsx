@@ -4889,6 +4889,7 @@ return (
     {field("Mono mese 1", s.monoMese1, (v) => set("monoMese1", v), "number")}
   </div>
 
+  {energyMonths(s.fatturazione) >= 2 && (
   <div
     style={{
       border: "1px solid #cbd5e1",
@@ -4932,6 +4933,7 @@ return (
     {field("F3 mese 2", s.f3Mese2, (v) => set("f3Mese2", v), "number")}
     {field("Mono mese 2", s.monoMese2, (v) => set("monoMese2", v), "number")}
   </div>
+  )}
 </div>
 
 <div
@@ -6815,6 +6817,7 @@ border: "1px solid #bfd8f6",
     {field("Consumo 1", s.consumo1, (v) => set("consumo1", v), "number")}
   </div>
 
+  {gasMonths(s.fatturazione) >= 2 && (
   <div
     style={{
       border: "1px solid #cbd5e1",
@@ -6830,7 +6833,9 @@ border: "1px solid #bfd8f6",
     {selectField("Mese 2", s.periodo2, (v) => set("periodo2", v), ["", ...gasSecondaryMonthOptions])}
     {field("Consumo 2", s.consumo2, (v) => set("consumo2", v), "number")}
   </div>
+  )}
 
+  {gasMonths(s.fatturazione) >= 3 && (
   <div
     style={{
       border: "1px solid #cbd5e1",
@@ -6846,7 +6851,9 @@ border: "1px solid #bfd8f6",
     {selectField("Mese 3", s.periodo3, (v) => set("periodo3", v), ["", ...gasSecondaryMonthOptions])}
     {field("Consumo 3", s.consumo3, (v) => set("consumo3", v), "number")}
   </div>
+  )}
 
+  {gasMonths(s.fatturazione) >= 4 && (
   <div
     style={{
       border: "1px solid #cbd5e1",
@@ -6862,6 +6869,7 @@ border: "1px solid #bfd8f6",
     {selectField("Mese 4", s.periodo4, (v) => set("periodo4", v), ["", ...gasSecondaryMonthOptions])}
     {field("Consumo 4", s.consumo4, (v) => set("consumo4", v), "number")}
   </div>
+  )}
 </div>
             </div>
           </>
