@@ -7,6 +7,8 @@ export type DispCpRow = {
   tide: number | null;
   cpMarket: number | null;
   businessTotale: number | null;
+  capacityOver55Peak?: number | null;
+  capacityOver55OffPeak?: number | null;
   cdispDomestico: number | null;
   status: string;
   sourceTide?: string;
@@ -40,6 +42,8 @@ function makeFallback(
     tide,
     cpMarket,
     businessTotale,
+    capacityOver55Peak: anno === 2026 && meseNumero >= 10 ? 0.065000 : null,
+    capacityOver55OffPeak: anno === 2026 && meseNumero >= 10 ? 0.003423 : null,
     cdispDomestico,
     status: "STORICO PRECARICATO",
     sourceTide: "TERNA",
@@ -83,6 +87,24 @@ export const INITIAL_AUTO_DISP_CP_ROWS: DispCpRow[] = [
     row[4] === null ? null : Number(row[4])
   )
 );
+
+/** Tariffa per POD con potenza disponibile >55 kW (BT o MT).
+ * Il CP Market non può essere appiattito senza conoscere i kWh di picco.
+ * Restituisce null quando mancano dati necessari, anziché fatturare zero.
+ */
+export function dispCapacityOver55Cost(
+  row: DispCpRow | undefined,
+  peakKwh: number,
+  offPeakKwh: number
+): number | null {
+  if (!row || row.tide == null ||
+      row.capacityOver55Peak == null || row.capacityOver55OffPeak == null ||
+      !Number.isFinite(peakKwh) || !Number.isFinite(offPeakKwh) ||
+      peakKwh < 0 || offPeakKwh < 0) return null;
+  return Number(((peakKwh + offPeakKwh) * row.tide +
+    peakKwh * row.capacityOver55Peak +
+    offPeakKwh * row.capacityOver55OffPeak).toFixed(6));
+}
 
 export function isDomesticEnergyType(type: string) {
   return [
@@ -149,6 +171,8 @@ export async function fetchDispCapacityRows(force = false): Promise<{
             row.cpMarket === null || row.cpMarket === undefined
               ? null
               : Number(row.cpMarket),
+          capacityOver55Peak: Number(row.capacityOver55Peak ?? (Number(row.anno) === 2026 && Number(row.meseNumero) >= 10 ? 0.065 : NaN)),
+          capacityOver55OffPeak: Number(row.capacityOver55OffPeak ?? (Number(row.anno) === 2026 && Number(row.meseNumero) >= 10 ? 0.003423 : NaN)),
           businessTotale:
             row.businessTotale === null ||
             row.businessTotale === undefined
@@ -174,6 +198,15 @@ export async function fetchDispCapacityRows(force = false): Promise<{
     : [];
 
   const initial = rows.length ? rows : INITIAL_AUTO_DISP_CP_ROWS;
+  // Conserva i valori Q4 anche quando l'API restituisce uno storico parziale.
+  for (const fallback of INITIAL_AUTO_DISP_CP_ROWS.filter(r => r.anno === 2026 && r.meseNumero >= 10)) {
+    const existing = initial.find(r => r.anno === fallback.anno && r.meseNumero === fallback.meseNumero);
+    if (!existing) initial.push({ ...fallback });
+    else {
+      existing.capacityOver55Peak = fallback.capacityOver55Peak;
+      existing.capacityOver55OffPeak = fallback.capacityOver55OffPeak;
+    }
+  }
   const [saved, syncHistory] = await Promise.all([
     supabase.from("disp_capacity_auto_rates")
       .select("anno,mese_numero,tide,cp_market,cdisp_domestico,tide_source,cp_source,cdisp_source,checked_at"),
