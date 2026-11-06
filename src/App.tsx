@@ -4063,7 +4063,7 @@ function Energia({
     if (!dispCpAutoMode) return;
     setS((prev) => ({
       ...prev,
-      dispacciamentoCapacityMarket: String(r.dispCpBase || 0),
+      dispacciamentoCapacityMarket: Number.isFinite(r.dispCpBase) ? String(r.dispCpBase) : "",
     }));
   }, [r.dispCpBase, dispCpAutoMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -5003,7 +5003,7 @@ Base suggerito
       fontWeight:700
     }}
   >
-    {numFormat(r.dispCpBase,6)}
+    {Number.isFinite(r.dispCpBase) ? numFormat(r.dispCpBase,6) : "Dato non disponibile"}
   </div>
 
   <button
@@ -5012,7 +5012,7 @@ Base suggerito
    setDispCpAutoMode(true);
    set(
      "dispacciamentoCapacityMarket",
-     String(r.dispCpBase)
+     Number.isFinite(r.dispCpBase) ? String(r.dispCpBase) : ""
    );
  }}
  style={{
