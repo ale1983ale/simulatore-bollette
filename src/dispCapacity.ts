@@ -122,8 +122,9 @@ export function dispCapacityRate(
   const value = isDomesticEnergyType(type)
     ? row.cdispDomestico
     : row.businessTotale;
+  if (value === null || value === undefined) return Number.NaN;
   const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
+  return Number.isFinite(number) ? number : Number.NaN;
 }
 
 export function normalizeDispMonthLabel(value: string) {
@@ -197,12 +198,16 @@ export async function fetchDispCapacityRows(force = false): Promise<{
         )
     : [];
 
-  const initial = rows.length ? rows : INITIAL_AUTO_DISP_CP_ROWS;
+  const initial = rows.length ? rows : INITIAL_AUTO_DISP_CP_ROWS.map(row => ({ ...row }));
   // Conserva i valori Q4 anche quando l'API restituisce uno storico parziale.
   for (const fallback of INITIAL_AUTO_DISP_CP_ROWS.filter(r => r.anno === 2026 && r.meseNumero >= 10)) {
     const existing = initial.find(r => r.anno === fallback.anno && r.meseNumero === fallback.meseNumero);
     if (!existing) initial.push({ ...fallback });
     else {
+      // API may return a placeholder Q4 row with nulls; keep validated local BT rates.
+      if (existing.tide == null) existing.tide = fallback.tide;
+      if (existing.cpMarket == null) existing.cpMarket = fallback.cpMarket;
+      if (existing.businessTotale == null) existing.businessTotale = fallback.businessTotale;
       existing.capacityOver55Peak = fallback.capacityOver55Peak;
       existing.capacityOver55OffPeak = fallback.capacityOver55OffPeak;
     }
