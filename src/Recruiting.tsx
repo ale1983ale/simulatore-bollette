@@ -3,6 +3,7 @@ import { supabaseUrl } from "./supabase";
 import { confirmAction } from "./confirmAction";
 import RecruitingCvMobilePreview from "./RecruitingCvMobilePreview";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 
 declare global {
   interface Window {
@@ -1375,6 +1376,17 @@ export default function Recruiting({
     useState(false);
   const [googleExternalError, setGoogleExternalError] = useState("");
 
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportSelected, setExportSelected] = useState<Set<string>>(() => new Set());
+  const [exportNotesSelected, setExportNotesSelected] = useState<Set<string>>(() => new Set());
+  const [exportExpanded, setExportExpanded] = useState<Set<string>>(() => new Set());
+  const [exportSearch, setExportSearch] = useState("");
+  const [exportHistory, setExportHistory] = useState<Record<string, string[]>>({});
+  const exportStorageKey = `recruiting-export-history-${ctx?.ownerKey || "default"}`;
+  useEffect(() => {
+    try { setExportHistory(JSON.parse(localStorage.getItem(exportStorageKey) || "{}")); }
+    catch { setExportHistory({}); }
+  }, [exportStorageKey]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
   const [performaCvs, setPerformaCvs] = useState<PerformaCvRecord[]>([]);
@@ -3004,6 +3016,51 @@ export default function Recruiting({
     }
     return byCandidate;
   }, [notes]);
+
+  const exportCandidates = useMemo(() => filteredCandidates
+    .filter(c => !exportSearch.trim() || [c.fullName,c.operationalZone,c.region,c.phone,c.email,c.status,c.referrer,c.forwardedTo].some(v => String(v || "").toLocaleLowerCase("it").includes(exportSearch.toLocaleLowerCase("it"))))
+    .slice().sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))), [filteredCandidates,exportSearch]);
+  const exportNotesByCandidate = useMemo(() => {
+    const grouped = new Map<string,ContactNote[]>();
+    for(const note of notes) {
+      if(!note.noteText?.trim()) continue;
+      grouped.set(note.candidateId,[...(grouped.get(note.candidateId)||[]),note]);
+    }
+    grouped.forEach(items => items.sort((a,b) => (b.noteDate+"|"+b.createdAt).localeCompare(a.noteDate+"|"+a.createdAt)));
+    return grouped;
+  },[notes]);
+  const toggleExportCandidate = (id:string) => setExportSelected(prev => {
+    const next=new Set(prev); if(next.has(id)) next.delete(id); else next.add(id); return next;
+  });
+  const generateRecruitingExcel = () => {
+    const chosen = exportCandidates.filter(c => exportSelected.has(c.id));
+    // Include selected contacts hidden by current filters as well.
+    const allChosen = [...chosen,...candidates.filter(c => exportSelected.has(c.id) && !chosen.some(x=>x.id===c.id))];
+    if(!allChosen.length) { alert("Seleziona almeno un nominativo."); return; }
+    const rows = allChosen.map(c => ({
+      gruppo: c.operationalZone || c.region || "",
+      nominativo: c.fullName,
+      telefono: c.phone || "",
+      email: c.email || "",
+      comune: c.operationalZone || "",
+      stato_label: c.status || "",
+      note: (exportNotesByCandidate.get(c.id)||[])
+        .filter(n => exportNotesSelected.has(n.id))
+        .map(n => n.noteText.trim()).join(" "),
+    }));
+    const ws=XLSX.utils.json_to_sheet(rows,{header:["gruppo","nominativo","telefono","email","comune","stato_label","note"]});
+    ws["!cols"]=[{wch:20},{wch:32},{wch:20},{wch:34},{wch:25},{wch:23},{wch:85}];
+    ws["!autofilter"]={ref:`A1:G${rows.length+1}`};
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Nominativi");
+    const stamp=new Date();
+    const day=stamp.toLocaleDateString("it-IT");
+    XLSX.writeFile(wb,`Report_nominativi_HR_${stamp.toISOString().slice(0,10)}.xlsx`);
+    const next={...exportHistory};
+    for(const c of allChosen) next[c.id]=[...new Set([...(next[c.id]||[]),day])];
+    setExportHistory(next);
+    try {localStorage.setItem(exportStorageKey,JSON.stringify(next));}catch{}
+    setExportOpen(false);
+  };
 
   const filteredCandidates = useMemo(() => {
     const everywhereWords = normalizeFilterValue(everywhereFilter).split(/\s+/).filter(Boolean);
@@ -8797,6 +8854,52 @@ export default function Recruiting({
             </div>
           )}
 
+      {exportOpen && (
+        <div style={{position:"fixed",inset:0,zIndex:150000,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:12}}>
+          <div style={{background:"white",borderRadius:16,width:"min(1150px,100%)",maxHeight:"94vh",display:"flex",flexDirection:"column",padding:18,gap:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+              <h2 style={{margin:0}}>Export nominativi HR</h2>
+              <button type="button" onClick={()=>setExportOpen(false)}>✕ Chiudi</button>
+            </div>
+            <div style={{fontSize:13,color:"#475569"}}>I filtri attivi nella lista nominativi sono applicati anche qui. Ordine cronologico dal più recente. Seleziona i nominativi e le singole note da esportare.</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <input value={exportSearch} onChange={e=>setExportSearch(e.target.value)} placeholder="Ricerca nome, stato, zona, email, DM..." style={{flex:"1 1 260px",padding:10,border:"1px solid #cbd5e1",borderRadius:8}} />
+              <button type="button" onClick={()=>setExportSelected(prev=>new Set([...prev,...exportCandidates.map(c=>c.id)]))}>Seleziona filtrati</button>
+              <button type="button" onClick={()=>setExportSelected(prev=>{const next=new Set(prev);exportCandidates.forEach(c=>next.delete(c.id));return next;})}>Deseleziona filtrati</button>
+            </div>
+            <div style={{overflowY:"auto",flex:1,minHeight:120,border:"1px solid #e2e8f0",borderRadius:10}}>
+              {exportCandidates.map(c=>{
+                const cn=exportNotesByCandidate.get(c.id)||[];
+                const chosen=exportSelected.has(c.id);
+                const expanded=exportExpanded.has(c.id);
+                return <div key={c.id} style={{borderBottom:"1px solid #e2e8f0",padding:12,background:chosen?"#f0fdf4":"white"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                    <input type="checkbox" checked={chosen} onChange={()=>toggleExportCandidate(c.id)} aria-label={`Esporta ${c.fullName}`}/>
+                    <strong>{c.fullName}</strong>
+                    <span style={{fontSize:12,color:"#64748b"}}>{c.createdAt?.slice(0,10)} · {c.region} · {c.operationalZone} · {c.status}</span>
+                    {!!exportHistory[c.id]?.length && <span style={{color:"#b45309",fontSize:12,fontWeight:700}}>Già esportato: {exportHistory[c.id].join(", ")}</span>}
+                    {chosen && cn.length>0 && <button type="button" onClick={()=>setExportExpanded(prev=>{const next=new Set(prev);if(next.has(c.id))next.delete(c.id);else next.add(c.id);return next;})}>{expanded?"Nascondi note":`Scegli note (${cn.length})`}</button>}
+                  </div>
+                  {chosen && expanded && <div style={{padding:"10px 0 0 28px",display:"grid",gap:8}}>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button type="button" onClick={()=>setExportNotesSelected(prev=>new Set([...prev,...cn.map(n=>n.id)]))}>Seleziona tutte le note</button>
+                      <button type="button" onClick={()=>setExportNotesSelected(prev=>{const next=new Set(prev);cn.forEach(n=>next.delete(n.id));return next;})}>Deseleziona note</button>
+                    </div>
+                    {cn.map(n=><label key={n.id} style={{display:"flex",alignItems:"start",gap:8,fontSize:13}}>
+                      <input type="checkbox" checked={exportNotesSelected.has(n.id)} onChange={()=>setExportNotesSelected(prev=>{const next=new Set(prev);if(next.has(n.id))next.delete(n.id);else next.add(n.id);return next;})}/>
+                      <span><span style={{color:"#64748b"}}>{n.noteDate}: </span>{n.noteText}</span>
+                    </label>)}
+                  </div>}
+                </div>;
+              })}
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <strong>{exportSelected.size} nominativi selezionati</strong>
+              <button type="button" onClick={generateRecruitingExcel} disabled={!exportSelected.size} style={{background:"#15803d",color:"white",border:0,borderRadius:9,padding:"12px 20px",fontWeight:800,opacity:exportSelected.size?1:.5}}>GENERA EXCEL</button>
+            </div>
+          </div>
+        </div>
+      )}
           <div className="recruiting-contact-layout">
             <div
               className="recruiting-contact-list-card"
@@ -8819,6 +8922,10 @@ export default function Recruiting({
                       flexWrap: "nowrap",
                     }}
                   >
+                    <button type="button" onClick={() => setExportOpen(true)}
+                      style={{background:"#15803d",color:"#fff",border:0,borderRadius:9,padding:"9px 14px",fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>
+                      📊 EXPORT
+                    </button>
                     <h3 style={{ marginTop: 0, marginBottom: 0, fontSize: "clamp(15px, 4vw, 21px)", whiteSpace: "nowrap" }}>
                       Lista nominativi
                     </h3>
