@@ -1378,22 +1378,29 @@ export default function Recruiting({
 
   const [exportOpen, setExportOpen] = useState(false);
   const [reportManagerOpen, setReportManagerOpen] = useState(false);
-  const [exportReports, setExportReports] = useState<Array<{id:string;createdAt:string;candidateIds:string[]}>>([]);
+  const [exportReports, setExportReports] = useState<Array<{id:string;createdAt:string;candidateIds:string[];noteIds:string[]}>>([]);
   const [exportSelected, setExportSelected] = useState<Set<string>>(() => new Set());
   const [exportNotesSelected, setExportNotesSelected] = useState<Set<string>>(() => new Set());
   const [exportExpanded, setExportExpanded] = useState<Set<string>>(() => new Set());
   const [exportSearch, setExportSearch] = useState("");
-  const [exportHistory, setExportHistory] = useState<Record<string, string[]>>({});
-  const exportStorageKey = `recruiting-export-history-${ctx?.ownerKey || "default"}`;
-  const reportStorageKey = `recruiting-export-reports-${ctx?.ownerKey || "default"}`;
-  useEffect(() => {
-    try { setExportHistory(JSON.parse(localStorage.getItem(exportStorageKey) || "{}")); }
-    catch { setExportHistory({}); }
-  }, [exportStorageKey]);
-  useEffect(() => {
-    try { const stored=JSON.parse(localStorage.getItem(reportStorageKey)||"[]");setExportReports(Array.isArray(stored)?stored:[]); }
-    catch {setExportReports([]);}
-  },[reportStorageKey]);
+  const [exportHistory, setExportHistory] = useState<Record<string,string[]>>({});
+  const [reportsLoading,setReportsLoading] = useState(false);
+  const refreshExportReports = async () => {
+    if(!ctx) return;
+    setReportsLoading(true);
+    const {data,error}=await ctx.client.from("recruiting_hr_export_reports")
+      .select("id,created_at,candidate_ids,note_ids").eq("owner_key",ctx.ownerKey)
+      .order("created_at",{ascending:false});
+    setReportsLoading(false);
+    if(error){setMessage("Impossibile caricare i report HR da Supabase: "+error.message);return;}
+    const reports=(data||[]).map(r=>({id:r.id,createdAt:r.created_at,candidateIds:r.candidate_ids||[],noteIds:r.note_ids||[]}));
+    setExportReports(reports);
+    const history:Record<string,string[]>={};
+    for(const r of reports) for(const id of r.candidateIds)
+      history[id]=[...new Set([...(history[id]||[]),new Date(r.createdAt).toLocaleDateString("it-IT")])];
+    setExportHistory(history);
+  };
+  useEffect(()=>{if(ctx) void refreshExportReports();},[ctx]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
   const [performaCvs, setPerformaCvs] = useState<PerformaCvRecord[]>([]);
@@ -3377,7 +3384,7 @@ export default function Recruiting({
   const toggleExportCandidate = (id:string) => setExportSelected(prev => {
     const next=new Set(prev); if(next.has(id)) next.delete(id); else next.add(id); return next;
   });
-  const generateRecruitingExcel = () => {
+  const generateRecruitingExcel = async () => {
     const chosen = exportCandidates.filter(c => exportSelected.has(c.id));
     // Include selected contacts hidden by current filters as well.
     const allChosen = [...chosen,...candidates.filter(c => exportSelected.has(c.id) && !chosen.some(x=>x.id===c.id))];
@@ -3399,33 +3406,24 @@ export default function Recruiting({
     const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Nominativi");
     const stamp=new Date();
     const day=stamp.toLocaleDateString("it-IT");
+    if(!ctx){alert("Connessione Supabase non disponibile.");return;}
+    const {error}=await ctx.client.from("recruiting_hr_export_reports").insert({
+      owner_key:ctx.ownerKey,candidate_ids:allChosen.map(c=>c.id),
+      note_ids:[...exportNotesSelected].filter(id=>allChosen.some(c=>(exportNotesByCandidate.get(c.id)||[]).some(n=>n.id===id)))
+    });
+    if(error){alert("Report NON registrato: "+error.message+" — esportazione annullata.");return;}
     XLSX.writeFile(wb,`Report_nominativi_HR_${stamp.toISOString().slice(0,10)}.xlsx`);
-    const report={id:`${stamp.getTime()}-${Math.random().toString(36).slice(2,8)}`,createdAt:stamp.toISOString(),candidateIds:allChosen.map(c=>c.id)};
-    const reportsNext=[report,...exportReports];
-    setExportReports(reportsNext);
-    try {localStorage.setItem(reportStorageKey,JSON.stringify(reportsNext));}catch{}
-    const next={...exportHistory};
-    for(const c of allChosen) next[c.id]=[...new Set([...(next[c.id]||[]),day])];
-    setExportHistory(next);
-    try {localStorage.setItem(exportStorageKey,JSON.stringify(next));}catch{}
+    await refreshExportReports();
     setExportOpen(false);
   };
 
-  const deleteExportReport = (reportId:string) => {
+  const deleteExportReport = async (reportId:string) => {
     const report=exportReports.find(r=>r.id===reportId);
-    if(!report || !window.confirm(`Eliminare il report del ${new Date(report.createdAt).toLocaleString("it-IT")} e rimuovere i relativi flag dai nominativi, salvo che risultino in altri report?`)) return;
-    const remaining=exportReports.filter(r=>r.id!==reportId);
-    const next={...exportHistory};
-    const day=new Date(report.createdAt).toLocaleDateString("it-IT");
-    for(const id of report.candidateIds){
-      // Preserve the flag when another report on the same date includes the contact.
-      if(!remaining.some(r=>r.candidateIds.includes(id) && new Date(r.createdAt).toLocaleDateString("it-IT")===day)){
-        const dates=(next[id]||[]).filter(d=>d!==day);
-        if(dates.length) next[id]=dates; else delete next[id];
-      }
-    }
-    setExportReports(remaining);setExportHistory(next);
-    try {localStorage.setItem(reportStorageKey,JSON.stringify(remaining));localStorage.setItem(exportStorageKey,JSON.stringify(next));}catch{}
+    if(!report || !ctx || !window.confirm(`Eliminare il report del ${new Date(report.createdAt).toLocaleString("it-IT")}? I flag rimarranno solo per gli altri report.`))return;
+    const {error}=await ctx.client.from("recruiting_hr_export_reports").delete()
+      .eq("id",reportId).eq("owner_key",ctx.ownerKey);
+    if(error){alert("Eliminazione non riuscita: "+error.message);return;}
+    await refreshExportReports();
   };
   const lockCurrentCandidateListOrder = () => {
     setLockedCandidateOrder(
@@ -8889,7 +8887,7 @@ export default function Recruiting({
               <button type="button" onClick={()=>setReportManagerOpen(false)}>✕ Chiudi</button>
             </div>
             <p style={{fontSize:13,color:"#64748b"}}>Eliminando un report vengono rimossi i suoi flag dai contatti. I nominativi presenti anche in altri report restano segnalati. Il file Excel già scaricato non viene eliminato.</p>
-            {!exportReports.length && <p>Nessun report registrato su questo dispositivo.</p>}
+            {!exportReports.length && <p>Nessun report registrato su Supabase.</p>}
             {exportReports.map(r=><div key={r.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"12px 0",borderBottom:"1px solid #e2e8f0"}}>
               <div><strong>{new Date(r.createdAt).toLocaleString("it-IT")}</strong><div style={{fontSize:13,color:"#64748b"}}>{r.candidateIds.length} nominativi</div></div>
               <button type="button" onClick={()=>deleteExportReport(r.id)} style={{color:"#b91c1c",border:"1px solid #fecaca",borderRadius:8,padding:"9px 12px",background:"#fff7f7"}}>Elimina report</button>
@@ -8966,7 +8964,7 @@ export default function Recruiting({
                       flexWrap: "nowrap",
                     }}
                   >
-                    <button type="button" onClick={() => setExportOpen(true)}
+                    <button type="button" onClick={() => {void refreshExportReports();setExportOpen(true);}}
                       style={{background:"#15803d",color:"#fff",border:0,borderRadius:9,padding:"9px 14px",fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>
                       📊 EXPORT
                     </button>
