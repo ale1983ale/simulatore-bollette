@@ -3017,51 +3017,6 @@ export default function Recruiting({
     return byCandidate;
   }, [notes]);
 
-  const exportCandidates = useMemo(() => filteredCandidates
-    .filter(c => !exportSearch.trim() || [c.fullName,c.operationalZone,c.region,c.phone,c.email,c.status,c.referrer,c.forwardedTo].some(v => String(v || "").toLocaleLowerCase("it").includes(exportSearch.toLocaleLowerCase("it"))))
-    .slice().sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))), [filteredCandidates,exportSearch]);
-  const exportNotesByCandidate = useMemo(() => {
-    const grouped = new Map<string,ContactNote[]>();
-    for(const note of notes) {
-      if(!note.noteText?.trim()) continue;
-      grouped.set(note.candidateId,[...(grouped.get(note.candidateId)||[]),note]);
-    }
-    grouped.forEach(items => items.sort((a,b) => (b.noteDate+"|"+b.createdAt).localeCompare(a.noteDate+"|"+a.createdAt)));
-    return grouped;
-  },[notes]);
-  const toggleExportCandidate = (id:string) => setExportSelected(prev => {
-    const next=new Set(prev); if(next.has(id)) next.delete(id); else next.add(id); return next;
-  });
-  const generateRecruitingExcel = () => {
-    const chosen = exportCandidates.filter(c => exportSelected.has(c.id));
-    // Include selected contacts hidden by current filters as well.
-    const allChosen = [...chosen,...candidates.filter(c => exportSelected.has(c.id) && !chosen.some(x=>x.id===c.id))];
-    if(!allChosen.length) { alert("Seleziona almeno un nominativo."); return; }
-    const rows = allChosen.map(c => ({
-      gruppo: c.operationalZone || c.region || "",
-      nominativo: c.fullName,
-      telefono: c.phone || "",
-      email: c.email || "",
-      comune: c.operationalZone || "",
-      stato_label: c.status || "",
-      note: (exportNotesByCandidate.get(c.id)||[])
-        .filter(n => exportNotesSelected.has(n.id))
-        .map(n => n.noteText.trim()).join(" "),
-    }));
-    const ws=XLSX.utils.json_to_sheet(rows,{header:["gruppo","nominativo","telefono","email","comune","stato_label","note"]});
-    ws["!cols"]=[{wch:20},{wch:32},{wch:20},{wch:34},{wch:25},{wch:23},{wch:85}];
-    ws["!autofilter"]={ref:`A1:G${rows.length+1}`};
-    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Nominativi");
-    const stamp=new Date();
-    const day=stamp.toLocaleDateString("it-IT");
-    XLSX.writeFile(wb,`Report_nominativi_HR_${stamp.toISOString().slice(0,10)}.xlsx`);
-    const next={...exportHistory};
-    for(const c of allChosen) next[c.id]=[...new Set([...(next[c.id]||[]),day])];
-    setExportHistory(next);
-    try {localStorage.setItem(exportStorageKey,JSON.stringify(next));}catch{}
-    setExportOpen(false);
-  };
-
   const filteredCandidates = useMemo(() => {
     const everywhereWords = normalizeFilterValue(everywhereFilter).split(/\s+/).filter(Boolean);
     const nameNeedle = normalizeFilterValue(nameFilter);
@@ -3399,6 +3354,51 @@ export default function Recruiting({
     favoriteFilter,
     calledByMeFilter,
   ]);
+
+  const exportCandidates = useMemo(() => filteredCandidates
+    .filter(c => !exportSearch.trim() || [c.fullName,c.operationalZone,c.region,c.phone,c.email,c.status,c.referrer,c.forwardedTo].some(v => String(v || "").toLocaleLowerCase("it").includes(exportSearch.toLocaleLowerCase("it"))))
+    .slice().sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))), [filteredCandidates,exportSearch]);
+  const exportNotesByCandidate = useMemo(() => {
+    const grouped = new Map<string,ContactNote[]>();
+    for(const note of notes) {
+      if(!note.noteText?.trim()) continue;
+      grouped.set(note.candidateId,[...(grouped.get(note.candidateId)||[]),note]);
+    }
+    grouped.forEach(items => items.sort((a,b) => (b.noteDate+"|"+b.createdAt).localeCompare(a.noteDate+"|"+a.createdAt)));
+    return grouped;
+  },[notes]);
+  const toggleExportCandidate = (id:string) => setExportSelected(prev => {
+    const next=new Set(prev); if(next.has(id)) next.delete(id); else next.add(id); return next;
+  });
+  const generateRecruitingExcel = () => {
+    const chosen = exportCandidates.filter(c => exportSelected.has(c.id));
+    // Include selected contacts hidden by current filters as well.
+    const allChosen = [...chosen,...candidates.filter(c => exportSelected.has(c.id) && !chosen.some(x=>x.id===c.id))];
+    if(!allChosen.length) { alert("Seleziona almeno un nominativo."); return; }
+    const rows = allChosen.map(c => ({
+      gruppo: c.operationalZone || c.region || "",
+      nominativo: c.fullName,
+      telefono: c.phone || "",
+      email: c.email || "",
+      comune: c.operationalZone || "",
+      stato_label: c.status || "",
+      note: (exportNotesByCandidate.get(c.id)||[])
+        .filter(n => exportNotesSelected.has(n.id))
+        .map(n => n.noteText.trim()).join(" "),
+    }));
+    const ws=XLSX.utils.json_to_sheet(rows,{header:["gruppo","nominativo","telefono","email","comune","stato_label","note"]});
+    ws["!cols"]=[{wch:20},{wch:32},{wch:20},{wch:34},{wch:25},{wch:23},{wch:85}];
+    ws["!autofilter"]={ref:`A1:G${rows.length+1}`};
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Nominativi");
+    const stamp=new Date();
+    const day=stamp.toLocaleDateString("it-IT");
+    XLSX.writeFile(wb,`Report_nominativi_HR_${stamp.toISOString().slice(0,10)}.xlsx`);
+    const next={...exportHistory};
+    for(const c of allChosen) next[c.id]=[...new Set([...(next[c.id]||[]),day])];
+    setExportHistory(next);
+    try {localStorage.setItem(exportStorageKey,JSON.stringify(next));}catch{}
+    setExportOpen(false);
+  };
 
   const lockCurrentCandidateListOrder = () => {
     setLockedCandidateOrder(
