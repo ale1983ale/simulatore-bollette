@@ -30,7 +30,7 @@ function makeFallback(
   meseNumero: number,
   tide: number,
   cpMarket: number,
-  cdispDomestico: number
+  cdispDomestico: number | null
 ): DispCpRow {
   const businessTotale = Number((tide + cpMarket).toFixed(6));
   return {
@@ -70,13 +70,17 @@ export const INITIAL_AUTO_DISP_CP_ROWS: DispCpRow[] = [
   [2026,7,0.010501,0.024466,0.038464],
   [2026,8,0.010501,0.006288,0.018468],
   [2026,9,0.010501,0.003197,0.015068],
+  // IV trimestre 2026: TIDE e capacity BT fino a 55 kW; la quota domestica separata resta da convalidare.
+  [2026,10,0.009888,0.003423,null],
+  [2026,11,0.009888,0.003423,null],
+  [2026,12,0.009888,0.009243,null],
 ].map((row) =>
   makeFallback(
     Number(row[0]),
     Number(row[1]),
     Number(row[2]),
     Number(row[3]),
-    Number(row[4])
+    row[4] === null ? null : Number(row[4])
   )
 );
 
