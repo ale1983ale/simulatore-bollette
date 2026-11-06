@@ -1377,16 +1377,23 @@ export default function Recruiting({
   const [googleExternalError, setGoogleExternalError] = useState("");
 
   const [exportOpen, setExportOpen] = useState(false);
+  const [reportManagerOpen, setReportManagerOpen] = useState(false);
+  const [exportReports, setExportReports] = useState<Array<{id:string;createdAt:string;candidateIds:string[]}>>([]);
   const [exportSelected, setExportSelected] = useState<Set<string>>(() => new Set());
   const [exportNotesSelected, setExportNotesSelected] = useState<Set<string>>(() => new Set());
   const [exportExpanded, setExportExpanded] = useState<Set<string>>(() => new Set());
   const [exportSearch, setExportSearch] = useState("");
   const [exportHistory, setExportHistory] = useState<Record<string, string[]>>({});
   const exportStorageKey = `recruiting-export-history-${ctx?.ownerKey || "default"}`;
+  const reportStorageKey = `recruiting-export-reports-${ctx?.ownerKey || "default"}`;
   useEffect(() => {
     try { setExportHistory(JSON.parse(localStorage.getItem(exportStorageKey) || "{}")); }
     catch { setExportHistory({}); }
   }, [exportStorageKey]);
+  useEffect(() => {
+    try { const stored=JSON.parse(localStorage.getItem(reportStorageKey)||"[]");setExportReports(Array.isArray(stored)?stored:[]); }
+    catch {setExportReports([]);}
+  },[reportStorageKey]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
   const [performaCvs, setPerformaCvs] = useState<PerformaCvRecord[]>([]);
@@ -3393,6 +3400,10 @@ export default function Recruiting({
     const stamp=new Date();
     const day=stamp.toLocaleDateString("it-IT");
     XLSX.writeFile(wb,`Report_nominativi_HR_${stamp.toISOString().slice(0,10)}.xlsx`);
+    const report={id:`${stamp.getTime()}-${Math.random().toString(36).slice(2,8)}`,createdAt:stamp.toISOString(),candidateIds:allChosen.map(c=>c.id)};
+    const reportsNext=[report,...exportReports];
+    setExportReports(reportsNext);
+    try {localStorage.setItem(reportStorageKey,JSON.stringify(reportsNext));}catch{}
     const next={...exportHistory};
     for(const c of allChosen) next[c.id]=[...new Set([...(next[c.id]||[]),day])];
     setExportHistory(next);
@@ -3400,6 +3411,22 @@ export default function Recruiting({
     setExportOpen(false);
   };
 
+  const deleteExportReport = (reportId:string) => {
+    const report=exportReports.find(r=>r.id===reportId);
+    if(!report || !window.confirm(`Eliminare il report del ${new Date(report.createdAt).toLocaleString("it-IT")} e rimuovere i relativi flag dai nominativi, salvo che risultino in altri report?`)) return;
+    const remaining=exportReports.filter(r=>r.id!==reportId);
+    const next={...exportHistory};
+    const day=new Date(report.createdAt).toLocaleDateString("it-IT");
+    for(const id of report.candidateIds){
+      // Preserve the flag when another report on the same date includes the contact.
+      if(!remaining.some(r=>r.candidateIds.includes(id) && new Date(r.createdAt).toLocaleDateString("it-IT")===day)){
+        const dates=(next[id]||[]).filter(d=>d!==day);
+        if(dates.length) next[id]=dates; else delete next[id];
+      }
+    }
+    setExportReports(remaining);setExportHistory(next);
+    try {localStorage.setItem(reportStorageKey,JSON.stringify(remaining));localStorage.setItem(exportStorageKey,JSON.stringify(next));}catch{}
+  };
   const lockCurrentCandidateListOrder = () => {
     setLockedCandidateOrder(
       filteredCandidates.map((candidate) => candidate.id)
@@ -8854,11 +8881,28 @@ export default function Recruiting({
             </div>
           )}
 
+      {reportManagerOpen && (
+        <div style={{position:"fixed",inset:0,zIndex:160000,background:"rgba(15,23,42,.7)",display:"grid",placeItems:"center",padding:12}}>
+          <div style={{background:"white",borderRadius:14,width:"min(760px,100%)",maxHeight:"85vh",overflowY:"auto",padding:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
+              <h2 style={{margin:0}}>Gestione report HR</h2>
+              <button type="button" onClick={()=>setReportManagerOpen(false)}>✕ Chiudi</button>
+            </div>
+            <p style={{fontSize:13,color:"#64748b"}}>Eliminando un report vengono rimossi i suoi flag dai contatti. I nominativi presenti anche in altri report restano segnalati. Il file Excel già scaricato non viene eliminato.</p>
+            {!exportReports.length && <p>Nessun report registrato su questo dispositivo.</p>}
+            {exportReports.map(r=><div key={r.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"12px 0",borderBottom:"1px solid #e2e8f0"}}>
+              <div><strong>{new Date(r.createdAt).toLocaleString("it-IT")}</strong><div style={{fontSize:13,color:"#64748b"}}>{r.candidateIds.length} nominativi</div></div>
+              <button type="button" onClick={()=>deleteExportReport(r.id)} style={{color:"#b91c1c",border:"1px solid #fecaca",borderRadius:8,padding:"9px 12px",background:"#fff7f7"}}>Elimina report</button>
+            </div>)}
+          </div>
+        </div>
+      )}
       {exportOpen && (
         <div style={{position:"fixed",inset:0,zIndex:150000,background:"rgba(15,23,42,.65)",display:"grid",placeItems:"center",padding:12}}>
           <div style={{background:"white",borderRadius:16,width:"min(1150px,100%)",maxHeight:"94vh",display:"flex",flexDirection:"column",padding:18,gap:12}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}>
               <h2 style={{margin:0}}>Export nominativi HR</h2>
+              <button type="button" onClick={()=>setReportManagerOpen(true)} style={{marginLeft:"auto",padding:"9px 12px",borderRadius:8,border:"1px solid #cbd5e1",fontWeight:700}}>GESTIONE REPORT</button>
               <button type="button" onClick={()=>setExportOpen(false)}>✕ Chiudi</button>
             </div>
             <div style={{fontSize:13,color:"#475569"}}>I filtri attivi nella lista nominativi sono applicati anche qui. Ordine cronologico dal più recente. Seleziona i nominativi e le singole note da esportare.</div>
