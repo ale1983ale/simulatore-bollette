@@ -122,7 +122,8 @@ function qFor(year, month) {
   if (year === 2026) {
     if (month <= 3) return Q1_2026;
     if (month <= 6) return Q2_2026;
-    if (month <= 9) return Q3_2026;
+    // ARERA 343/2026/R/com: Q4 ASOS/ARIM unchanged from Q3.
+    if (month <= 12) return Q3_2026;
   }
   return null;
 }
@@ -134,7 +135,7 @@ function round6(v) {
 function buildRows() {
   const rows = [];
   for (const year of [2025, 2026]) {
-    const lastMonth = year === 2026 ? 9 : 12;
+    const lastMonth = 12;
     for (let month = 1; month <= lastMonth; month += 1) {
       const q = qFor(year, month);
       if (!q) continue;
