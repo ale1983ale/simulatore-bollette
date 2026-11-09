@@ -92,6 +92,25 @@ public class MainActivity extends Activity {
                     }
                     return true;
                 }
+                String host = uri.getHost();
+                if ("geo".equalsIgnoreCase(scheme) ||
+                    ("https".equalsIgnoreCase(scheme) && host != null &&
+                     (host.equalsIgnoreCase("maps.google.com") ||
+                      host.equalsIgnoreCase("www.google.com") && uri.getPath() != null &&
+                          uri.getPath().startsWith("/maps") ||
+                      host.equalsIgnoreCase("www.google.com") && "/url".equals(uri.getPath()) ||
+                      host.equalsIgnoreCase("maps.app.goo.gl") ||
+                      host.equalsIgnoreCase("goo.gl") && uri.getPath() != null &&
+                          uri.getPath().startsWith("/maps")))) {
+                    try {
+                        Intent mapIntent = new Intent(Intent.ACTION_VIEW, uri);
+                        mapIntent.addCategory(Intent.CATEGORY_BROWSABLE);
+                        startActivity(mapIntent);
+                    } catch (Exception error) {
+                        Toast.makeText(MainActivity.this, "Impossibile aprire Google Maps.", Toast.LENGTH_LONG).show();
+                    }
+                    return true;
+                }
                 if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
                     return false;
                 }
