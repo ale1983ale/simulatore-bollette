@@ -23,6 +23,9 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceError;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.Toast;
 import android.util.Base64;
 
@@ -33,6 +36,8 @@ import java.util.ArrayList;
 
 public class MainActivity extends Activity {
     private WebView webView;
+    private boolean pageLoaded = false;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ValueCallback<Uri[]> filePathCallback;
     private static final int FILE_CHOOSER_REQUEST = 7001;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 7002;
@@ -72,6 +77,20 @@ public class MainActivity extends Activity {
         }
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                pageLoaded = true;
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                if (request.isForMainFrame()) {
+                    Toast.makeText(MainActivity.this, "Errore caricamento: " + error.getDescription(), Toast.LENGTH_LONG).show();
+                }
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(
                 WebView view,
@@ -157,11 +176,14 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (savedInstanceState == null) {
-            webView.loadUrl(BuildConfig.APP_URL);
-        } else {
-            webView.restoreState(savedInstanceState);
-        }
+        // Avoid restoring a stale renderer state that can show a blank page.
+        webView.loadUrl(BuildConfig.APP_URL);
+        mainHandler.postDelayed(() -> {
+            if (!pageLoaded && webView != null) {
+                Toast.makeText(MainActivity.this, "Caricamento lento: riprovo...", Toast.LENGTH_LONG).show();
+                webView.reload();
+            }
+        }, 12000);
     }
 
     private boolean bridgeAllowed() {
