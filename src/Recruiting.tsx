@@ -1062,16 +1062,18 @@ const CRM_PROVINCE_CODES = new Set(
 
 function openCrmMap(url: string) {
   if (!url) return;
-  // A normal _blank popup is not reliably handed to Android Maps by APK WebViews.
-  // Prefer the native bridge when present; otherwise navigate the current view.
+  // Never navigate the CRM WebView away from the application.
+  // Android APKs should hand Maps links to their native external-link bridge.
   const native = (window as any).AndroidExternalLinks;
   if (native && typeof native.open === "function") {
-    try { native.open(url); return; } catch { /* use browser fallback */ }
+    try { native.open(url); return; } catch { /* fall back to external window */ }
   }
-  if (/Android/i.test(navigator.userAgent)) {
-    window.location.assign(url);
-  } else {
-    window.open(url, "_blank", "noopener,noreferrer");
+  // A separate browsing context allows Android WebView hosts configured for
+  // external links to dispatch Google Maps without replacing the CRM screen.
+  const popup = window.open(url, "_blank", "noopener,noreferrer");
+  if (!popup && !/Android/i.test(navigator.userAgent)) {
+    // Desktop browser popup blockers: retain an accessible manual link in CRM.
+    window.open(url, "_blank");
   }
 }
 
