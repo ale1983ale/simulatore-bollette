@@ -4231,7 +4231,10 @@ function Energia({
     borderRadius: 10,
     padding: "8px 12px",
     background: "#f8fafc",
-    minWidth: isMobile ? 0 : 170,
+    minWidth: 0,
+    width: "100%",
+    boxSizing: "border-box",
+    overflowWrap: "anywhere",
     textAlign: "right",
   };
 
