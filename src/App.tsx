@@ -16518,7 +16518,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
             style={{
               position: "absolute",
               zIndex: 19,
-              right: 142,
+              right: 204,
               bottom: 11,
               display: "flex",
               alignItems: "center",
@@ -16648,7 +16648,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           <button type="button" title={`Note HR da leggere: ${waitingRoomHrNoteCount}`}
             aria-label={`Apri nuove note HR: ${waitingRoomHrNoteCount}`}
             onClick={() => { navigateTo("recruitingWaiting"); }}
-            style={{position:"absolute",zIndex:20,right:105,bottom:9,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5,minWidth:58,height:29,padding:"0 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.9)",background:waitingRoomHrNoteCount>0?"#16a34a":"#fff",color:waitingRoomHrNoteCount>0?"#fff":"#334155",fontWeight:800,cursor:"pointer"}}>
+            style={{position:"absolute",zIndex:20,right:142,bottom:11,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5,minWidth:52,height:34,padding:"0 8px",borderRadius:999,border:"1px solid rgba(255,255,255,.9)",background:waitingRoomHrNoteCount>0?"#16a34a":"#fff",color:waitingRoomHrNoteCount>0?"#fff":"#334155",fontWeight:800,cursor:"pointer"}}>
             <span aria-hidden="true">✉</span><span>{waitingRoomHrNoteCount}</span>
           </button>
         )}
