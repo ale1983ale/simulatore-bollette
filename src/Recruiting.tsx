@@ -1925,6 +1925,22 @@ export default function Recruiting({
   const [newHrNoteAlerts, setNewHrNoteAlerts] = useState<Array<{id:string;candidateName:string;date:string;text:string}>>([]);
   const [existingHrNoteAlerts, setExistingHrNoteAlerts] = useState<Array<{id:string;candidateId:string;candidateName:string;date:string;text:string;createdAt:string}>>([]);
   const seenHrAlertIdsRef = useRef<Set<string> | null>(null);
+  const [markingHrAlerts, setMarkingHrAlerts] = useState(false);
+  const markAllExistingHrAlertsRead = async () => {
+    if (!ctx || markingHrAlerts || !existingHrNoteAlerts.length) return;
+    setMarkingHrAlerts(true);
+    try {
+      const ids = existingHrNoteAlerts.map(note => note.id);
+      const { error } = await ctx.client.from("recruiting_hr_note_alerts")
+        .update({read_at:new Date().toISOString()}).in("id",ids);
+      if (error) throw error;
+      setExistingHrNoteAlerts(previous => previous.filter(note => !ids.includes(note.id)));
+    } catch (error:any) {
+      setMessage("Errore nel segnare tutte le note come lette: " + (error?.message || String(error)));
+    } finally {
+      setMarkingHrAlerts(false);
+    }
+  };
   const markExistingHrAlertRead = async (id: string) => {
     if (!ctx) return;
     const { error } = await ctx.client.from("recruiting_hr_note_alerts").update({read_at:new Date().toISOString()}).eq("id",id);
@@ -14921,12 +14937,17 @@ export default function Recruiting({
 
               {existingHrNoteAlerts.length > 0 && (
                 <div style={{border:"2px solid #f59e0b",background:"#fffbeb",borderRadius:12,padding:12,marginBottom:12}}>
-                  <strong style={{color:"#92400e"}}>NUOVE NOTE HR SU CANDIDATI GIÀ IMPORTATI ({existingHrNoteAlerts.length})</strong>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",marginBottom:4}}>
+                    <strong style={{color:"#92400e"}}>NUOVE NOTE HR SU CANDIDATI GIÀ IMPORTATI ({existingHrNoteAlerts.length})</strong>
+                    <button type="button" disabled={markingHrAlerts} onClick={()=>void markAllExistingHrAlertsRead()} style={{background:"#15803d",color:"#fff",border:"none",borderRadius:999,padding:"9px 16px",fontWeight:700,cursor:markingHrAlerts?"wait":"pointer",boxShadow:"0 2px 6px #14532d22"}}>
+                      ✓ {markingHrAlerts ? "Salvataggio..." : "Segna tutte come lette"}
+                    </button>
+                  </div>
                   {[...existingHrNoteAlerts].sort((a,b)=>a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt) || a.candidateName.localeCompare(b.candidateName,"it")).map(note=>(
                     <div key={note.id} style={{borderTop:"1px solid #fcd34d",paddingTop:10,marginTop:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                         <strong>{note.candidateName} · {formatDate(note.date)}</strong>
-                        <button type="button" onClick={()=>void markExistingHrAlertRead(note.id)}>Segna come letta</button>
+                        <button type="button" disabled={markingHrAlerts} onClick={()=>void markExistingHrAlertRead(note.id)} style={{background:"#2563eb",color:"#fff",border:"none",borderRadius:999,padding:"7px 13px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Segna come letta</button>
                       </div>
                       <div style={{whiteSpace:"pre-wrap",fontSize:13,marginTop:6}}>{note.text}</div>
                     </div>
