@@ -14922,7 +14922,7 @@ export default function Recruiting({
               {existingHrNoteAlerts.length > 0 && (
                 <div style={{border:"2px solid #f59e0b",background:"#fffbeb",borderRadius:12,padding:12,marginBottom:12}}>
                   <strong style={{color:"#92400e"}}>NUOVE NOTE HR SU CANDIDATI GIÀ IMPORTATI ({existingHrNoteAlerts.length})</strong>
-                  {existingHrNoteAlerts.map(note=>(
+                  {[...existingHrNoteAlerts].sort((a,b)=>a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt) || a.candidateName.localeCompare(b.candidateName,"it")).map(note=>(
                     <div key={note.id} style={{borderTop:"1px solid #fcd34d",paddingTop:10,marginTop:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                         <strong>{note.candidateName} · {formatDate(note.date)}</strong>
