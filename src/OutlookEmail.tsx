@@ -2171,12 +2171,15 @@ export default function OutlookEmail() {
                 </button>
                 {excelZipStatus && <div role="status" aria-live="polite" style={{marginTop:10,fontSize:13,fontWeight:700,color:excelZipStatus.startsWith("Errore") || excelZipStatus.startsWith("Nessun") ? "#b91c1c" : "#166534"}}>{excelZipStatus}</div>}
               </section>
-              <section style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:14}}>
-                <div style={{fontWeight:900,color:"#334155",fontSize:15,marginBottom:12}}>✉️ EMAIL E PACCHETTI DI INVIO</div>
-                <div style={{display:"flex",gap:9,flexWrap:"wrap",alignItems:"center"}}>
-                  <button type="button" data-android-package-download="true" onClick={() => void createAndroidPackage()} style={{...button,background:"#0f766e",color:"#fff",borderRadius:12,padding:"10px 14px"}}>📦 Pacchetto Android</button>
-                  <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{...button,background:"#16a34a",color:"#fff",borderRadius:12,padding:"10px 14px",opacity:busy || splitBusy || !readyRows.length ? .55 : 1}}>{busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.ZIP)`}</button>
-                  <button onClick={() => { setSubject(""); setBody(""); setNotice(""); setAndroidPackageStatus(null); }} style={{...button,background:"#e2e8f0",borderRadius:12,padding:"10px 14px"}}>Pulisci messaggio</button>
+              <section style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:14,minWidth:0}}>
+                <div style={{fontWeight:900,color:"#334155",fontSize:15,marginBottom:5}}>✉️ EMAIL E PACCHETTI DI INVIO</div>
+                <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>Strumenti per preparare e inviare le email</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 230px), 1fr))",gap:10,width:"100%"}}>
+                  <button type="button" data-android-package-download="true" onClick={() => void createAndroidPackage()} style={{...button,background:"#0f766e",color:"#fff",borderRadius:12,padding:"13px 12px",width:"100%",minWidth:0,whiteSpace:"normal",textAlign:"center",fontSize:14,lineHeight:1.35}}>📦 Pacchetto Android</button>
+                  <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{...button,background:"#16a34a",color:"#fff",borderRadius:12,padding:"13px 12px",width:"100%",minWidth:0,whiteSpace:"normal",textAlign:"center",fontSize:14,lineHeight:1.35,opacity:busy || splitBusy || !readyRows.length ? .55 : 1}}>{busy ? "Creo il pacchetto..." : `📩 Scarica ${readyRows.length || ""} bozze Outlook (.ZIP)`}</button>
+                </div>
+                <div style={{borderTop:"1px solid #e2e8f0",marginTop:14,paddingTop:12}}>
+                  <button onClick={() => { setSubject(""); setBody(""); setNotice(""); setAndroidPackageStatus(null); }} style={{...button,background:"#e2e8f0",color:"#334155",borderRadius:10,padding:"10px 14px",fontSize:13,width:"100%",maxWidth:260,whiteSpace:"normal"}}>🧹 Pulisci messaggio</button>
                 </div>
               </section>
             </div>
