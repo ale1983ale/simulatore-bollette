@@ -14539,7 +14539,7 @@ export default function App() {
         if (!cancelled) {
           setWaitingRoomIncomingCount(incomingCount);
           setWaitingRoomOutgoingCount(outgoingCount);
-          setWaitingRoomHrNoteCount((hrAlertsResult.data || []).filter((note: any) => { const text = String(note.note_text || "").split(/alessio\\s+cedroni\\s+dice\\s*[:：-]?/i)[0].trim(); return !!text && !/^alessio\\s+cedroni\\s*[:：-]/i.test(text); }).length);
+          setWaitingRoomHrNoteCount((hrAlertsResult.data || []).filter((note: any) => { const text = String(note.note_text || "").split(/alessio\\s+cedroni\\s+dice\\s*[:：-]?/i)[0].trim(); return !!text && !/^alessio\\s+cedroni\\s*(?:dice\\s*)?[:：-]/i.test(text); }).length);
         }
       } catch (error) {
         console.error("WAITING ROOM COUNT ERROR:", error);
