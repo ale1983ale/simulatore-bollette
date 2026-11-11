@@ -16510,6 +16510,10 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </button>
         )}
 
+        <style>{`@media (max-width: 700px) {
+          .ge-brand-quick-actions { right: 170px !important; gap: 5px !important; }
+          .ge-brand-hr-message { right: 115px !important; }
+        }`}</style>
         {adminSession && (canAdminAccessTab(adminProfile, "calendarAdmin") ||
           canAdminAccessTab(adminProfile, "recruiting") ||
           canAdminAccessTab(adminProfile, "email")) && (
@@ -16645,7 +16649,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
         )}
 
         {adminProfile?.role === "super_admin" && (
-          <button type="button" title={`Note HR da leggere: ${waitingRoomHrNoteCount}`}
+          <button type="button" className="ge-brand-hr-message" title={`Note HR da leggere: ${waitingRoomHrNoteCount}`}
             aria-label={`Apri nuove note HR: ${waitingRoomHrNoteCount}`}
             onClick={() => { navigateTo("recruitingWaiting"); }}
             style={{position:"absolute",zIndex:20,right:142,bottom:11,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5,minWidth:52,height:34,padding:"0 8px",borderRadius:999,border:"1px solid rgba(255,255,255,.9)",background:waitingRoomHrNoteCount>0?"#16a34a":"#fff",color:waitingRoomHrNoteCount>0?"#fff":"#334155",fontWeight:800,cursor:"pointer"}}>
