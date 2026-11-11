@@ -1346,6 +1346,43 @@ export default function OutlookEmail() {
     setNotice(keys.length+" file non abbinati assegnati a "+email+".");
   };
 
+  // Download all individual Excel workbooks without requiring any email fields.
+  const [excelZipBusy, setExcelZipBusy] = useState(false);
+  const downloadSplitExcelZip = async () => {
+    if (excelZipBusy || splitBusy) return;
+    const sourceFiles = fileMode === "single"
+      ? [...generatedByAgency.values(), ...(nonAssignedFile ? [nonAssignedFile] : [])]
+      : files;
+    const excelFiles = sourceFiles.filter(file => /\\.(xlsx|xls)$/i.test(file.name));
+    if (!excelFiles.length) {
+      setNotice("Nessun file Excel diviso disponibile. Carica il file e attendi la suddivisione.");
+      return;
+    }
+    setExcelZipBusy(true);
+    setNotice("");
+    try {
+      const zip = new JSZip();
+      const usedNames = new Set<string>();
+      for (const file of excelFiles) {
+        const dot = file.name.lastIndexOf(".");
+        const base = sanitizeFileName(dot >= 0 ? file.name.slice(0,dot) : file.name) || "Excel";
+        const ext = dot >= 0 ? file.name.slice(dot) : ".xlsx";
+        let name = base + ext;
+        let suffix = 2;
+        while (usedNames.has(name.toLowerCase())) name = base + "_" + suffix++ + ext;
+        usedNames.add(name.toLowerCase());
+        zip.file(name, file);
+      }
+      const blob = await zip.generateAsync({type:"blob"});
+      await downloadZipBlob(blob, "FILE_EXCEL_DIVISI_" + new Date().toISOString().slice(0,10) + ".zip");
+      setNotice("Scaricato ZIP con " + excelFiles.length + " file Excel separati. Nessuna email necessaria.");
+    } catch (error:any) {
+      setNotice("Errore download Excel divisi: " + (error?.message || String(error)));
+    } finally {
+      setExcelZipBusy(false);
+    }
+  };
+
   const createLocalDrafts = async () => {
     setNotice("");
     if (!subject.trim()) return setNotice("Inserisci l'oggetto della mail.");
@@ -2124,10 +2161,23 @@ export default function OutlookEmail() {
               </div>
             )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingBottom: 30, flexWrap: "wrap" }}>
-              <button onClick={() => { setSubject(""); setBody(""); setNotice(""); setAndroidPackageStatus(null); }} style={{ ...button, background: "#e2e8f0" }}>Pulisci messaggio</button>
-              <button type="button" data-android-package-download="true" onClick={() => void createAndroidPackage()} style={{ ...button, background: "#0f766e", color: "white" }}>📦 Scarica pacchetto Android</button>
-              <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{ ...button, background: "#16a34a", color: "white", opacity: busy || splitBusy || !readyRows.length ? 0.55 : 1 }}>{busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.zip)`}</button>
+            <div style={{display:"grid",gap:14,margin:"20px 0 28px"}}>
+              <section style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:16,padding:14}}>
+                <div style={{fontWeight:900,color:"#1e40af",fontSize:15,marginBottom:5}}>📊 DOWNLOAD FILE EXCEL</div>
+                <div style={{fontSize:12,color:"#475569",marginBottom:12}}>Scarica tutti i file Excel separati in un unico ZIP, senza compilare oggetto o messaggio email.</div>
+                <button type="button" onClick={()=>void downloadSplitExcelZip()} disabled={excelZipBusy || splitBusy || !files.length}
+                  style={{...button,background:"#1d4ed8",color:"#fff",borderRadius:12,padding:"12px 16px",width:"100%",maxWidth:440,opacity:excelZipBusy || splitBusy || !files.length ? .6 : 1}}>
+                  {excelZipBusy ? "Preparazione ZIP..." : "📦 Scarica file divisi (.ZIP)"}
+                </button>
+              </section>
+              <section style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:14}}>
+                <div style={{fontWeight:900,color:"#334155",fontSize:15,marginBottom:12}}>✉️ EMAIL E PACCHETTI DI INVIO</div>
+                <div style={{display:"flex",gap:9,flexWrap:"wrap",alignItems:"center"}}>
+                  <button type="button" data-android-package-download="true" onClick={() => void createAndroidPackage()} style={{...button,background:"#0f766e",color:"#fff",borderRadius:12,padding:"10px 14px"}}>📦 Pacchetto Android</button>
+                  <button disabled={busy || splitBusy || !readyRows.length} onClick={createLocalDrafts} style={{...button,background:"#16a34a",color:"#fff",borderRadius:12,padding:"10px 14px",opacity:busy || splitBusy || !readyRows.length ? .55 : 1}}>{busy ? "Creo il pacchetto..." : `Scarica ${readyRows.length || ""} bozze Outlook (.ZIP)`}</button>
+                  <button onClick={() => { setSubject(""); setBody(""); setNotice(""); setAndroidPackageStatus(null); }} style={{...button,background:"#e2e8f0",borderRadius:12,padding:"10px 14px"}}>Pulisci messaggio</button>
+                </div>
+              </section>
             </div>
             {androidPackageStatus && (
               <div
