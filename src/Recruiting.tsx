@@ -1926,7 +1926,7 @@ export default function Recruiting({
   const visibleHrNoteText = (text: string) => {
     // HR appends the user's own notes after this marker: only preceding text is new.
     const preceding = String(text || "").split(/alessio\\s+cedroni\\s+dice\\s*[:：-]?/i)[0].trim();
-    if (!preceding || /^alessio\\s+cedroni\\s*[:：-]/i.test(preceding)) return "";
+    if (!preceding || /^alessio\\s+cedroni\\s*(?:dice\\s*)?[:：-]/i.test(preceding) || /^alessio\\s+cedroni\\s+-/i.test(preceding)) return "";
     return preceding;
   };
   const [existingHrNoteAlerts, setExistingHrNoteAlerts] = useState<Array<{id:string;candidateId:string;candidateName:string;date:string;text:string;createdAt:string}>>([]);
