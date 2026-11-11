@@ -14960,7 +14960,11 @@ export default function Recruiting({
                     <div key={note.id} style={{borderTop:"1px solid #fcd34d",paddingTop:10,marginTop:10}}>
                       <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                         <strong>{note.candidateName} · {formatDate(note.date)}</strong>
-                        <button type="button" disabled={markingHrAlerts} onClick={()=>void markExistingHrAlertRead(note.id)} style={{background:"#2563eb",color:"#fff",border:"none",borderRadius:999,padding:"7px 13px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Segna come letta</button>
+                        <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+                          <button type="button" onClick={()=>void navigator.clipboard.writeText(visibleHrNoteText(note.text)).then(()=>setMessage("Nota copiata negli appunti.")).catch(()=>setMessage("Impossibile copiare la nota."))} style={{background:"#fff",color:"#1d4ed8",border:"1px solid #93c5fd",borderRadius:999,padding:"7px 13px",fontSize:12,fontWeight:700,cursor:"pointer"}}>📋 Copia</button>
+                          <button type="button" onClick={()=>{if(note.candidateId){openFullContactDetails(note.candidateId);}else{setMessage("Scheda contatto non collegata a questa nota.");}}} style={{background:"#0f766e",color:"#fff",border:"none",borderRadius:999,padding:"7px 13px",fontSize:12,fontWeight:700,cursor:"pointer"}}>↗ Scheda contatto</button>
+                          <button type="button" disabled={markingHrAlerts} onClick={()=>void markExistingHrAlertRead(note.id)} style={{background:"#2563eb",color:"#fff",border:"none",borderRadius:999,padding:"7px 13px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>✓ Segna come letta</button>
+                        </div>
                       </div>
                       <div style={{whiteSpace:"pre-wrap",fontSize:13,marginTop:6}}>{visibleHrNoteText(note.text)}</div>
                     </div>
