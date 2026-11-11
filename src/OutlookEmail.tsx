@@ -1348,18 +1348,20 @@ export default function OutlookEmail() {
 
   // Download all individual Excel workbooks without requiring any email fields.
   const [excelZipBusy, setExcelZipBusy] = useState(false);
+  const [excelZipStatus, setExcelZipStatus] = useState("");
   const downloadSplitExcelZip = async () => {
-    if (excelZipBusy || splitBusy) return;
+    if (excelZipBusy) return;
+    if (splitBusy) { setExcelZipStatus("Attendi: la suddivisione Excel è ancora in corso."); return; }
     const sourceFiles = fileMode === "single"
       ? [...generatedByAgency.values(), ...(nonAssignedFile ? [nonAssignedFile] : [])]
       : files;
     const excelFiles = sourceFiles.filter(file => /\\.(xlsx|xls)$/i.test(file.name));
     if (!excelFiles.length) {
-      setNotice("Nessun file Excel diviso disponibile. Carica il file e attendi la suddivisione.");
+      setExcelZipStatus("Nessun file Excel diviso disponibile. Carica il file e attendi la suddivisione.");
       return;
     }
     setExcelZipBusy(true);
-    setNotice("");
+    setExcelZipStatus("Preparazione dello ZIP con " + excelFiles.length + " file Excel...");
     try {
       const zip = new JSZip();
       const usedNames = new Set<string>();
@@ -1374,10 +1376,10 @@ export default function OutlookEmail() {
         zip.file(name, file);
       }
       const blob = await zip.generateAsync({type:"blob"});
-      await downloadZipBlob(blob, "FILE_EXCEL_DIVISI_" + new Date().toISOString().slice(0,10) + ".zip");
-      setNotice("Scaricato ZIP con " + excelFiles.length + " file Excel separati. Nessuna email necessaria.");
+      const destination = await downloadZipBlob(blob, "FILE_EXCEL_DIVISI_" + new Date().toISOString().slice(0,10) + ".zip");
+      setExcelZipStatus(destination === "native" ? "Download richiesto all’app Android: controlla la cartella Download." : "Download avviato: controlla i download del browser. File Excel inclusi: " + excelFiles.length);
     } catch (error:any) {
-      setNotice("Errore download Excel divisi: " + (error?.message || String(error)));
+      setExcelZipStatus("Errore download Excel divisi: " + (error?.message || String(error)));
     } finally {
       setExcelZipBusy(false);
     }
@@ -2165,10 +2167,11 @@ export default function OutlookEmail() {
               <section style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:16,padding:14}}>
                 <div style={{fontWeight:900,color:"#1e40af",fontSize:15,marginBottom:5}}>📊 DOWNLOAD FILE EXCEL</div>
                 <div style={{fontSize:12,color:"#475569",marginBottom:12}}>Scarica tutti i file Excel separati in un unico ZIP, senza compilare oggetto o messaggio email.</div>
-                <button type="button" onClick={()=>void downloadSplitExcelZip()} disabled={excelZipBusy || splitBusy || !files.length}
-                  style={{...button,background:"#1d4ed8",color:"#fff",borderRadius:12,padding:"12px 16px",width:"100%",maxWidth:440,opacity:excelZipBusy || splitBusy || !files.length ? .6 : 1}}>
+                <button type="button" onClick={()=>void downloadSplitExcelZip()} disabled={excelZipBusy || splitBusy}
+                  style={{...button,background:"#1d4ed8",color:"#fff",borderRadius:12,padding:"12px 16px",width:"100%",maxWidth:440,opacity:excelZipBusy || splitBusy ? .6 : 1}}>
                   {excelZipBusy ? "Preparazione ZIP..." : "📦 Scarica file divisi (.ZIP)"}
                 </button>
+                {excelZipStatus && <div role="status" aria-live="polite" style={{marginTop:10,fontSize:13,fontWeight:700,color:excelZipStatus.startsWith("Errore") || excelZipStatus.startsWith("Nessun") ? "#b91c1c" : "#166534"}}>{excelZipStatus}</div>}
               </section>
               <section style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:16,padding:14}}>
                 <div style={{fontWeight:900,color:"#334155",fontSize:15,marginBottom:12}}>✉️ EMAIL E PACCHETTI DI INVIO</div>
