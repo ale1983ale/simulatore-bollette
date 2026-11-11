@@ -13873,6 +13873,7 @@ export default function App() {
     useState(0);
   const [waitingRoomOutgoingCount, setWaitingRoomOutgoingCount] =
     useState(0);
+  const [waitingRoomHrNoteCount, setWaitingRoomHrNoteCount] = useState(0);
 
   const [punPsvRows, setPunPsvRows] = useState<PunPsvRow[]>(INITIAL_PUN_PSV_ROWS);
   const [selectedPunPsvMonth, setSelectedPunPsvMonth] = useState<string>("DICEMBRE 2026");
@@ -14491,6 +14492,7 @@ export default function App() {
     if (!adminSession || !adminProfile) {
       setWaitingRoomIncomingCount(0);
       setWaitingRoomOutgoingCount(0);
+      setWaitingRoomHrNoteCount(0);
       return;
     }
 
@@ -14504,6 +14506,7 @@ export default function App() {
           incomingResult,
           notesResult,
           statusResult,
+          hrAlertsResult,
         ] = await Promise.all([
           ctx.client
             .from("recruiting_hr_incoming_candidates")
@@ -14516,12 +14519,13 @@ export default function App() {
           ctx.client
             .from("recruiting_hr_status_sync_queue")
             .select("id", { count: "exact", head: true }),
+          ctx.client.from("recruiting_hr_note_alerts").select("id,note_text").is("read_at",null),
         ]);
 
         const firstError =
           incomingResult.error ||
           notesResult.error ||
-          statusResult.error;
+          statusResult.error || hrAlertsResult.error;
 
         if (firstError) throw firstError;
 
@@ -14535,6 +14539,7 @@ export default function App() {
         if (!cancelled) {
           setWaitingRoomIncomingCount(incomingCount);
           setWaitingRoomOutgoingCount(outgoingCount);
+          setWaitingRoomHrNoteCount((hrAlertsResult.data || []).filter((note: any) => { const text = String(note.note_text || "").split(/alessio\\s+cedroni\\s+dice\\s*[:：-]?/i)[0].trim(); return !!text && !/^alessio\\s+cedroni\\s*[:：-]/i.test(text); }).length);
         }
       } catch (error) {
         console.error("WAITING ROOM COUNT ERROR:", error);
@@ -16639,6 +16644,14 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
           </div>
         )}
 
+        {adminProfile?.role === "super_admin" && (
+          <button type="button" title={`Note HR da leggere: ${waitingRoomHrNoteCount}`}
+            aria-label={`Apri nuove note HR: ${waitingRoomHrNoteCount}`}
+            onClick={() => { navigateTo("recruitingWaiting"); }}
+            style={{position:"absolute",zIndex:20,right:105,bottom:9,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:5,minWidth:58,height:29,padding:"0 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.9)",background:waitingRoomHrNoteCount>0?"#16a34a":"#fff",color:waitingRoomHrNoteCount>0?"#fff":"#334155",fontWeight:800,cursor:"pointer"}}>
+            <span aria-hidden="true">✉</span><span>{waitingRoomHrNoteCount}</span>
+          </button>
+        )}
         {adminProfile?.role === "super_admin" && (
           <button
             type="button"
