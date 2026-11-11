@@ -3380,7 +3380,7 @@ export default function Recruiting({
       const previous = latestNoteByCandidate.get(note.candidateId) || "";
       if (date > previous) latestNoteByCandidate.set(note.candidateId, date);
     }
-    const activityDate = (candidate: Contact) => [
+    const activityDate = (candidate: Candidate) => [
       String(candidate.createdAt || ""),
       String(candidate.updatedAt || ""),
       latestNoteByCandidate.get(candidate.id) || "",
