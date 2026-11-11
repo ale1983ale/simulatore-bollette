@@ -1920,6 +1920,39 @@ export default function Recruiting({
   const candidateMapGeocodingRef = useRef(false);
   const candidateMapFailedZonesRef = useRef<Set<string>>(new Set());
 
+  // Track incoming HR note IDs during this session; existing notes form the baseline.
+  const knownIncomingNoteIdsRef = useRef<Set<string> | null>(null);
+  const [newHrNoteAlerts, setNewHrNoteAlerts] = useState<Array<{id:string;candidateName:string;date:string;text:string}>>([]);
+  const trackNewIncomingHrNotes = (items: HrIncomingCandidate[]) => {
+    const current = new Map<string, {id:string;candidateName:string;date:string;text:string}>();
+    for (const candidate of items) {
+      for (const note of candidate.notes) {
+        current.set(note.id, {id:note.id,candidateName:candidate.fullName,date:note.noteDate,text:note.noteText});
+      }
+    }
+    const known = knownIncomingNoteIdsRef.current;
+    if (known === null) {
+      knownIncomingNoteIdsRef.current = new Set(current.keys());
+      return;
+    }
+    const fresh = [...current.values()].filter(note => !known.has(note.id));
+    current.forEach((_, id) => known.add(id));
+    if (!fresh.length) return;
+    setNewHrNoteAlerts(previous => [...fresh, ...previous].slice(0, 30));
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      try {
+        const first = fresh[0];
+        new Notification(fresh.length === 1 ? `Nuova nota HR: ${first.candidateName}` : `${fresh.length} nuove note HR`, {
+          body: fresh.length === 1 ? `${first.date} · ${first.text.slice(0, 180)}` : fresh.map(item => item.candidateName).slice(0, 3).join(", "),
+          icon: "/pwa-icon-192-v2.png",
+          tag: "recruiting-hr-new-notes",
+        });
+      } catch (error) {
+        console.warn("HR NOTE NOTIFICATION ERROR:", error);
+      }
+    }
+  };
+
   const notifyNewIncomingCandidates = (
     ownerKey: string,
     items: HrIncomingCandidate[]
@@ -2154,6 +2187,7 @@ export default function Recruiting({
         notes: incomingNotesByCandidate.get(String(row.id)) || [],
       }));
 
+    trackNewIncomingHrNotes(nextIncomingCandidates);
     setHrIncomingCandidates(nextIncomingCandidates);
     notifyNewIncomingCandidates(
       active.ownerKey,
@@ -14852,6 +14886,20 @@ export default function Recruiting({
                 )}
               </div>
 
+              {newHrNoteAlerts.length > 0 && (
+                <div style={{border:"2px solid #f59e0b",background:"#fffbeb",borderRadius:12,padding:12,marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                    <strong style={{color:"#92400e"}}>NUOVE NOTE RICEVUTE DA HR ({newHrNoteAlerts.length})</strong>
+                    <button type="button" onClick={()=>setNewHrNoteAlerts([])}>Segna come lette</button>
+                  </div>
+                  {newHrNoteAlerts.map(note => (
+                    <div key={note.id} style={{borderTop:"1px solid #fcd34d",paddingTop:8,marginTop:8,fontSize:13}}>
+                      <strong>{note.candidateName}</strong> · {note.date}
+                      <div style={{whiteSpace:"pre-wrap",marginTop:4}}>{note.text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {hrIncomingCandidates.map((incoming) => (
                 <div
                   key={incoming.id}
