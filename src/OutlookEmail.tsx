@@ -1352,10 +1352,8 @@ export default function OutlookEmail() {
   const downloadSplitExcelZip = async () => {
     if (excelZipBusy) return;
     if (splitBusy) { setExcelZipStatus("Attendi: la suddivisione Excel è ancora in corso."); return; }
-    const sourceFiles = fileMode === "single"
-      ? [...generatedByAgency.values(), ...(nonAssignedFile ? [nonAssignedFile] : [])]
-      : files;
-    const excelFiles = sourceFiles.filter(file => /\\.(xlsx|xls)$/i.test(file.name));
+    const sourceFiles = [...files, ...(nonAssignedFile ? [nonAssignedFile] : [])];
+    const excelFiles = sourceFiles.filter(file => /\.(xlsx|xls)$/i.test(file.name));
     if (!excelFiles.length) {
       setExcelZipStatus("Nessun file Excel diviso disponibile. Carica il file e attendi la suddivisione.");
       return;
