@@ -1923,6 +1923,15 @@ export default function Recruiting({
   // Track incoming HR note IDs during this session; existing notes form the baseline.
   const knownIncomingNoteIdsRef = useRef<Set<string> | null>(null);
   const [newHrNoteAlerts, setNewHrNoteAlerts] = useState<Array<{id:string;candidateName:string;date:string;text:string}>>([]);
+  const [existingHrNoteAlerts, setExistingHrNoteAlerts] = useState<Array<{id:string;candidateId:string;candidateName:string;date:string;text:string;createdAt:string}>>([]);
+  const seenHrAlertIdsRef = useRef<Set<string> | null>(null);
+  const markExistingHrAlertRead = async (id: string) => {
+    if (!ctx) return;
+    const { error } = await ctx.client.from("recruiting_hr_note_alerts").update({read_at:new Date().toISOString()}).eq("id",id);
+    if (error) { setMessage("Errore salvataggio lettura nota HR: " + error.message); return; }
+    setExistingHrNoteAlerts(previous=>previous.filter(note=>note.id!==id));
+  };
+
   const trackNewIncomingHrNotes = (items: HrIncomingCandidate[]) => {
     const current = new Map<string, {id:string;candidateName:string;date:string;text:string}>();
     for (const candidate of items) {
@@ -2134,6 +2143,30 @@ export default function Recruiting({
       if (result.error) throw result.error;
     }
 
+    // Unread alerts are persisted on Supabase and visible across devices.
+    const { data: unreadHrNotes, error: unreadHrNotesError } = await active.client
+      .from("recruiting_hr_note_alerts")
+      .select("id,candidate_id,candidate_name,note_date,note_text,created_at")
+      .is("read_at",null)
+      .order("created_at",{ascending:false});
+    if (unreadHrNotesError) throw unreadHrNotesError;
+    const nextAlerts = (unreadHrNotes || []).map((note:any)=>({
+      id:String(note.id),candidateId:String(note.candidate_id||""),
+      candidateName:String(note.candidate_name||""),date:String(note.note_date||""),
+      text:String(note.note_text||""),createdAt:String(note.created_at||"")
+    }));
+    const previouslySeen = seenHrAlertIdsRef.current;
+    if (previouslySeen && "Notification" in window && Notification.permission === "granted") {
+      const fresh = nextAlerts.filter(note=>!previouslySeen.has(note.id));
+      if (fresh.length) {
+        try { new Notification(fresh.length === 1 ? "Nuova nota HR: " + fresh[0].candidateName : fresh.length + " nuove note HR", {
+          body:fresh.length === 1 ? fresh[0].text.slice(0,160) : fresh.map(note=>note.candidateName).slice(0,3).join(", "),
+          tag:"recruiting-existing-hr-notes"
+        }); } catch {}
+      }
+    }
+    seenHrAlertIdsRef.current = new Set(nextAlerts.map(note=>note.id));
+    setExistingHrNoteAlerts(nextAlerts);
     const nextAllCandidates = (candidatesResult.data || []).map(candidateFromRow);
     const nextCandidates = nextAllCandidates.filter(
       (candidate) => candidate.contactScope === contactScope
@@ -14886,6 +14919,20 @@ export default function Recruiting({
                 )}
               </div>
 
+              {existingHrNoteAlerts.length > 0 && (
+                <div style={{border:"2px solid #f59e0b",background:"#fffbeb",borderRadius:12,padding:12,marginBottom:12}}>
+                  <strong style={{color:"#92400e"}}>NUOVE NOTE HR SU CANDIDATI GIÀ IMPORTATI ({existingHrNoteAlerts.length})</strong>
+                  {existingHrNoteAlerts.map(note=>(
+                    <div key={note.id} style={{borderTop:"1px solid #fcd34d",paddingTop:10,marginTop:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                        <strong>{note.candidateName} · {formatDate(note.date)}</strong>
+                        <button type="button" onClick={()=>void markExistingHrAlertRead(note.id)}>Segna come letta</button>
+                      </div>
+                      <div style={{whiteSpace:"pre-wrap",fontSize:13,marginTop:6}}>{note.text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {newHrNoteAlerts.length > 0 && (
                 <div style={{border:"2px solid #f59e0b",background:"#fffbeb",borderRadius:12,padding:12,marginBottom:12}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
