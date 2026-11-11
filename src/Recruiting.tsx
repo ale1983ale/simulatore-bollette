@@ -1385,6 +1385,7 @@ export default function Recruiting({
   const [exportNotesSelected, setExportNotesSelected] = useState<Set<string>>(() => new Set());
   const [exportExpanded, setExportExpanded] = useState<Set<string>>(() => new Set());
   const [exportSearch, setExportSearch] = useState("");
+  const [exportSortMode, setExportSortMode] = useState<"modified" | "inserted" | "chronological">("modified");
   const [exportHistory, setExportHistory] = useState<Record<string,string[]>>({});
   const [reportsLoading,setReportsLoading] = useState(false);
   const refreshExportReports = async () => {
@@ -3371,9 +3372,29 @@ export default function Recruiting({
     calledByMeFilter,
   ]);
 
-  const exportCandidates = useMemo(() => filteredCandidates
-    .filter(c => !exportSearch.trim() || [c.fullName,c.operationalZone,c.region,c.phone,c.email,c.status,c.referrer,c.forwardedTo].some(v => String(v || "").toLocaleLowerCase("it").includes(exportSearch.toLocaleLowerCase("it"))))
-    .slice().sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))), [filteredCandidates,exportSearch]);
+  const exportCandidates = useMemo(() => {
+    const latestNoteByCandidate = new Map<string, string>();
+    for (const note of notes) {
+      if (!note.noteText?.trim()) continue;
+      const date = String(note.createdAt || note.noteDate || "");
+      const previous = latestNoteByCandidate.get(note.candidateId) || "";
+      if (date > previous) latestNoteByCandidate.set(note.candidateId, date);
+    }
+    const activityDate = (candidate: Contact) => [
+      String(candidate.createdAt || ""),
+      String(candidate.updatedAt || ""),
+      latestNoteByCandidate.get(candidate.id) || "",
+    ].sort().pop() || "";
+    return filteredCandidates
+      .filter(c => !exportSearch.trim() || [c.fullName,c.operationalZone,c.region,c.phone,c.email,c.status,c.referrer,c.forwardedTo].some(v => String(v || "").toLocaleLowerCase("it").includes(exportSearch.toLocaleLowerCase("it"))))
+      .slice()
+      .sort((a,b) => {
+        const aDate = exportSortMode === "modified" ? activityDate(a) : String(a.createdAt || "");
+        const bDate = exportSortMode === "modified" ? activityDate(b) : String(b.createdAt || "");
+        const difference = exportSortMode === "chronological" ? aDate.localeCompare(bDate) : bDate.localeCompare(aDate);
+        return difference || a.fullName.localeCompare(b.fullName, "it");
+      });
+  }, [filteredCandidates, exportSearch, exportSortMode, notes]);
   const exportNotesByCandidate = useMemo(() => {
     const grouped = new Map<string,ContactNote[]>();
     for(const note of notes) {
@@ -8905,9 +8926,17 @@ export default function Recruiting({
               <button type="button" onClick={()=>setReportManagerOpen(true)} style={{marginLeft:"auto",padding:"9px 12px",borderRadius:8,border:"1px solid #cbd5e1",fontWeight:700}}>GESTIONE REPORT</button>
               <button type="button" onClick={()=>setExportOpen(false)}>✕ Chiudi</button>
             </div>
-            <div style={{fontSize:13,color:"#475569"}}>I filtri attivi nella lista nominativi sono applicati anche qui. Ordine cronologico dal più recente. Seleziona i nominativi e le singole note da esportare.</div>
+            <div style={{fontSize:13,color:"#475569"}}>I filtri attivi nella lista nominativi sono applicati anche qui. Seleziona i nominativi e le singole note da esportare.</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               <input value={exportSearch} onChange={e=>setExportSearch(e.target.value)} placeholder="Ricerca nome, stato, zona, email, DM..." style={{flex:"1 1 260px",padding:10,border:"1px solid #cbd5e1",borderRadius:8}} />
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,fontWeight:700,color:"#334155"}}>
+                Ordina per
+                <select value={exportSortMode} onChange={e=>setExportSortMode(e.target.value as "modified" | "inserted" | "chronological")} style={{padding:10,border:"1px solid #cbd5e1",borderRadius:8,background:"#fff",maxWidth:"100%"}}>
+                  <option value="modified">Ultima modifica / nota (più recente)</option>
+                  <option value="inserted">Inserimento (più recente)</option>
+                  <option value="chronological">Cronologico (più vecchio)</option>
+                </select>
+              </label>
               <button type="button" onClick={()=>setExportSelected(prev=>new Set([...prev,...exportCandidates.map(c=>c.id)]))}>Seleziona filtrati</button>
               <button type="button" onClick={()=>setExportSelected(prev=>{const next=new Set(prev);exportCandidates.forEach(c=>next.delete(c.id));return next;})}>Deseleziona filtrati</button>
             </div>
