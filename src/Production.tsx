@@ -685,6 +685,35 @@ export default function Production({ view = "produzione", onOpenDetail, sharedAg
       .sort((a, b) => a.name.localeCompare(b.name, "it"));
   }, [rows]);
 
+  const [archivePreview, setArchivePreview] = useState<{name:string; sheets:{name:string; headers:string[]; rows:string[][]}[]}|null>(null);
+  const [archiveFileBusy, setArchiveFileBusy] = useState("");
+  const fetchArchivedWorkbook = async (name:string) => {
+    const {data,error}=await supabase.from(SOURCE_FILES_TABLE).select("storage_path").eq("file_name",name).maybeSingle();
+    if(error)throw error;
+    if(!data?.storage_path)throw new Error("Originale non disponibile nel cloud per questo file.");
+    const result=await supabase.storage.from(STORAGE_BUCKET).download(data.storage_path);
+    if(result.error)throw result.error;
+    return result.data;
+  };
+  const openArchivedFile = async (name:string,preview:boolean) => {
+    setArchiveFileBusy(name);
+    try{
+      const blob=await fetchArchivedWorkbook(name);
+      if(preview){
+        const workbook=XLSX.read(await blob.arrayBuffer(),{type:"array"});
+        setArchivePreview({name,sheets:workbook.SheetNames.map(sheetName=>{
+          const matrix=XLSX.utils.sheet_to_json<(string|number|null)[]>(workbook.Sheets[sheetName],{header:1,defval:""});
+          return {name:sheetName,headers:(matrix[0]||[]).map(String),rows:matrix.slice(1,101).map(row=>row.map(value=>String(value??"")))};
+        })});
+      }else{
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement("a");link.href=url;link.download=name;document.body.appendChild(link);link.click();link.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),60000);
+      }
+    }catch(err){alert("Impossibile aprire il file: "+(err instanceof Error?err.message:String(err)));}
+    finally{setArchiveFileBusy("");}
+  };
+
   const onChooseFiles = async (files?: FileList | File[]) => {
     const selected = Array.from(files || []);
     if (!selected.length) return;
@@ -1382,6 +1411,13 @@ export default function Production({ view = "produzione", onOpenDetail, sharedAg
               </div>
             )}
 
+            {archivePreview&&<div role="presentation" onClick={()=>setArchivePreview(null)} style={{position:"fixed",inset:0,zIndex:12000,background:"#0f172acc",display:"grid",placeItems:"center",padding:14}}>
+              <div role="dialog" aria-modal="true" aria-label="Anteprima file produzione" onClick={e=>e.stopPropagation()} style={{background:"white",width:"min(1100px,100%)",maxHeight:"90vh",overflow:"auto",padding:18,borderRadius:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center"}}><h3>👁 {archivePreview.name}</h3><button type="button" onClick={()=>setArchivePreview(null)}>✕ CHIUDI</button></div>
+                {archivePreview.sheets.map(sheet=><details key={sheet.name} open style={{marginTop:12}}><summary style={{fontWeight:850}}>{sheet.name} · prime 100 righe</summary><div style={{overflowX:"auto",maxHeight:420}}><table style={{borderCollapse:"collapse",fontSize:12}}><thead><tr>{sheet.headers.map((h,i)=><th key={i} style={{padding:8,border:"1px solid #cbd5e1",background:"#e2e8f0",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead><tbody>{sheet.rows.map((row,i)=><tr key={i}>{sheet.headers.map((_,j)=><td key={j} style={{padding:7,border:"1px solid #e2e8f0",whiteSpace:"nowrap"}}>{row[j]||""}</td>)}</tr>)}</tbody></table></div></details>)}
+                <button type="button" onClick={()=>void openArchivedFile(archivePreview.name,false)} style={{marginTop:14,padding:10}}>📂 APRI FILE COMPLETO</button>
+              </div>
+            </div>}
             {fileStats.length > 0 && (
               <details style={{ marginTop: 16, border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc" }}>
                 <summary style={{ cursor: "pointer", padding: "11px 12px", fontSize: 12, fontWeight: 900, color: "#475569" }}>
@@ -1391,9 +1427,12 @@ export default function Production({ view = "produzione", onOpenDetail, sharedAg
                   {fileStats.map((file) => (
                     <div key={file.name} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", padding: "9px 10px", border: "1px solid #e2e8f0", borderRadius: 8, background: "white" }}>
                       <div><strong>{file.name}</strong><span style={{ color: "#64748b", marginLeft: 8, fontSize: 12 }}>{file.count} righe collegate</span></div>
+                      <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                        <button type="button" disabled={!!archiveFileBusy} onClick={()=>void openArchivedFile(file.name,true)} style={{border:"1px solid #93c5fd",background:"#eff6ff",color:"#1d4ed8",borderRadius:8,padding:"6px 10px",fontWeight:800}}>👁 Anteprima</button>
+                        <button type="button" disabled={!!archiveFileBusy} onClick={()=>void openArchivedFile(file.name,false)} style={{border:"1px solid #86efac",background:"#f0fdf4",color:"#166534",borderRadius:8,padding:"6px 10px",fontWeight:800}}>📂 Apri</button>
                       <button type="button" disabled={saving} onClick={() => void removeFile(file.name)} style={{ border: "1px solid #fecaca", background: "#fff1f2", color: "#b91c1c", borderRadius: 8, padding: "6px 10px", fontWeight: 800 }}>
                         Rimuovi file
-                      </button>
+                      </button></div>
                     </div>
                   ))}
                 </div>
