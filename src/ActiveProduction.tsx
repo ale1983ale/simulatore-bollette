@@ -100,7 +100,7 @@ async function readEntireTable<T>(table: string, columns: string, order: string)
   return result;
 }
 
-export default function ActiveProduction() {
+export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string[]}) {
   const [production, setProduction] = useState<ProductionRecord[]>([]);
   const [recesses, setRecesses] = useState<RecessRecord[]>([]);
   const [excludedAgentKeys, setExcludedAgentKeys] = useState<Set<string>>(() => new Set());
@@ -189,6 +189,7 @@ export default function ActiveProduction() {
     [intervals]
   );
 
+  const matchesSharedAgent=(name:string)=>!sharedAgents.length||sharedAgents.includes(String(name||"").trim().toLocaleUpperCase("it-IT").replace(/\s+/g," "));
   const agentSummaries = useMemo(() => {
     const map = new Map<string, AgentSummary>();
     const ensure = (rawName: string) => {
@@ -199,6 +200,7 @@ export default function ActiveProduction() {
 
     for (const row of production) {
       if (excludedAgentKeys.has(keyForAgent(row.agent_key || row.agente))) continue;
+      if(!matchesSharedAgent(row.agente))continue;
       if (!intervalSet.has(row.period_start + "|" + row.period_end)) continue;
       const commodity = kind(row.commodity);
       if (!commodity) continue;
@@ -212,6 +214,7 @@ export default function ActiveProduction() {
     }
     for (const row of recesses) {
       if (excludedAgentKeys.has(keyForAgent(row.agente))) continue;
+      if(!matchesSharedAgent(row.agente))continue;
       // Anche nel periodo libero, il recesso appartiene al mese di FINE
       // del report Produzione selezionato (es. 11/09-10/10 => ottobre
       // intero, compreso NOTA_RECESSO 31/10).
@@ -229,7 +232,7 @@ export default function ActiveProduction() {
       }
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "it"));
-  }, [production, recesses, excludedAgentKeys, intervalSet, referenceMonths]);
+  }, [production, recesses, excludedAgentKeys, intervalSet, referenceMonths,sharedAgents]);
 
   const agentOptions = useMemo(() => agentSummaries.map((item) => ({
     key: item.key, name: item.name,
