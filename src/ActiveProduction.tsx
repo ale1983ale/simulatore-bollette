@@ -114,6 +114,7 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
   const [agentSelected, setAgentSelected] = useState<string>("");
   const [agentsSelected,setAgentsSelected]=useState<string[]>([]);
   const [periodsSelected,setPeriodsSelected]=useState<string[]>([]);
+  const [showAgentStatistics,setShowAgentStatistics]=useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true); setError("");
@@ -612,10 +613,12 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
             i contratti sono conteggiati, ma il saldo dei {missingTotal === 1 ? "consumi è" : "consumi è"}
             parziale.
           </div>}
+          {!periodsSelected.length&&<button type="button" aria-expanded={showAgentStatistics} onClick={()=>setShowAgentStatistics(v=>!v)} style={{padding:"13px 16px",borderRadius:11,border:"1px solid #93c5fd",background:"#eff6ff",color:"#1e40af",fontWeight:900,cursor:"pointer",textAlign:"left"}}>{showAgentStatistics?"▼ CHIUDI STATISTICHE AGENTI":"▸ APRI STATISTICHE AGENTI"}</button>}
+          {(!periodsSelected.length&&showAgentStatistics)&&<>{gridTable("luce")}{gridTable("gas")}</>}
           <div style={{...card,display:"grid",gap:12}}>
             <h3 style={{margin:0}}>STORICO MENSILE · ATTIVO PRODUZIONE</h3>
             <div style={{fontSize:12,color:"#64748b"}}>Come in Recessi: tutti i mesi disponibili, dal più recente. Seleziona un mese per visualizzare il relativo dettaglio sopra. Produzione e recessi sono conteggiati con gli stessi criteri del confronto.</div>
-            {monthlyHistory.map(({period,month,totals})=><div key={period.key} style={{background:activePeriod===period.key?"#eaf3ff":"#f8fafc",border:"1px solid #dbe5f0",borderRadius:13,padding:12}}>
+            {monthlyHistory.filter(({period})=>!periodsSelected.length||periodsSelected.includes(period.key)).map(({period,month,totals})=><div key={period.key} style={{background:activePeriod===period.key?"#eaf3ff":"#f8fafc",border:"1px solid #dbe5f0",borderRadius:13,padding:12}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:9}}>
                 <strong>{new Date(month+"-01T12:00:00").toLocaleDateString("it-IT",{month:"long",year:"numeric"}).toLocaleUpperCase("it-IT")}</strong>
                 <button type="button" onClick={()=>{setPeriodSelected(period.key);setPeriodsSelected([]);setCustomStart("");setCustomEnd("");window.scrollTo({top:0,behavior:"smooth"});}} style={{padding:"8px 12px",borderRadius:9,border:"1px solid #93c5fd",background:"white",color:"#1d4ed8",fontWeight:850,cursor:"pointer"}}>VEDI PERIODO ↗</button>
@@ -635,10 +638,9 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
                 })}
               </div>
             </div>)}
-            {!monthlyHistory.length&&<p>Nessun periodo di produzione valido disponibile.</p>}
+            {!monthlyHistory.filter(({period})=>!periodsSelected.length||periodsSelected.includes(period.key)).length&&<p>Nessun periodo di produzione valido disponibile per la selezione.</p>}
           </div>
-          {gridTable("luce")}
-          {gridTable("gas")}
+          {!!periodsSelected.length&&<>{gridTable("luce")}{gridTable("gas")}</>}
         </>
       )}
       <div style={{ fontSize: 12, color: "#64748b" }}>
