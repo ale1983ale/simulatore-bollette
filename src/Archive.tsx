@@ -965,37 +965,66 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
   const [exportingPdf, setExportingPdf] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
   type ArchiveSection = "recessi" | "dettaglioProduzione" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone" | "insoluti";
-  // Shared selection is stored in Supabase admin settings, never browser storage.
-  const [sharedAgents,setSharedAgents]=useState<string[]>([]);
+  // Persist only the saved set in Supabase; showing all does not erase it.
+  const [savedSharedAgents,setSavedSharedAgents]=useState<string[]>([]);
+  const [sharedFilterEnabled,setSharedFilterEnabled]=useState(false);
+  const sharedAgents=sharedFilterEnabled?savedSharedAgents:[];
   const [sharedAgentOptions,setSharedAgentOptions]=useState<string[]>([]);
+  const [sharedAgentDraft,setSharedAgentDraft]=useState<string[]>([]);
   const [sharedAgentSearch,setSharedAgentSearch]=useState("");
   const [sharedAgentOpen,setSharedAgentOpen]=useState(false);
   const [sharedAgentReady,setSharedAgentReady]=useState(false);
   const [sharedAgentSaving,setSharedAgentSaving]=useState(false);
-  const sharedAgentKey=(value:string)=>String(value||"").trim().toLocaleUpperCase("it-IT").replace(/\\s+/g," ");
+  const [sharedAgentError,setSharedAgentError]=useState("");
+  const sharedAgentKey=(value:string)=>String(value||"").trim().toLocaleUpperCase("it-IT").replace(/\s+/g," ");
+  const loadEligibleSharedAgents=async()=>{
+    const names=new Map<string,string>();
+    for(const table of ["archive_produzione","archive_recessi"] as const){
+      const columns=table==="archive_produzione"?"agente,in_attivazione_count,in_attivazione_consumo,consumo_totale":"agente,consumo";
+      for(let start=0;;start+=1000){
+        const {data,error}=await supabase.from(table).select(columns).range(start,start+999);
+        if(error)throw error;
+        for(const row of (data||[]) as any[]){
+          const values=table==="archive_produzione"
+            ?[row.in_attivazione_count,row.in_attivazione_consumo,row.consumo_totale]
+            :[row.consumo];
+          if(!values.some(v=>v!==null&&v!==""&&Number(v)>=1))continue;
+          const name=String(row.agente||"").trim();
+          const key=sharedAgentKey(name);
+          if(!key||["AGENTE","SOTTOGR AGENTE","SOTTOGR.AGENTE","TOTALE","TOTALI"].includes(key))continue;
+          if(!names.has(key))names.set(key,name);
+        }
+        if((data||[]).length<1000)break;
+      }
+    }
+    setSharedAgentOptions([...names.values()].sort((a,b)=>a.localeCompare(b,"it")));
+  };
   useEffect(()=>{
     let active=true;
     (async()=>{
-      try {
-        const [saved,agentsResult]=await Promise.all([
-          adminGetSetting("production_shared_agent_filter_v1"),
-          supabase.from("production_agent_zones").select("agente,agent_key")
-        ]);
+      try{
+        const saved=await adminGetSetting("production_shared_agent_filter_v1");
         if(!active)return;
-        setSharedAgents(Array.isArray(saved?.agents)?saved.agents.map(sharedAgentKey):[]);
-        setSharedAgentOptions([...new Set((agentsResult.data||[]).map((x:any)=>String(x.agente||x.agent_key||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"it")));
-        setSharedAgentReady(true);
-      }catch(e){if(active)console.error("Shared production agent filter:",e);}
+        const agents=Array.isArray(saved?.agents)?saved.agents.map(sharedAgentKey):[];
+        setSavedSharedAgents(agents);
+        setSharedAgentDraft(agents);
+        setSharedFilterEnabled(agents.length>0);
+        await loadEligibleSharedAgents();
+        if(active)setSharedAgentReady(true);
+      }catch(e:any){if(active)setSharedAgentError("Errore caricamento filtro: "+(e?.message||e));}
     })();
     return()=>{active=false;};
   },[]);
-  const saveSharedAgents=async(next:string[])=>{
-    const normalized=[...new Set(next.map(sharedAgentKey))];
+  const saveSharedAgents=async()=>{
+    const normalized=[...new Set(sharedAgentDraft.map(sharedAgentKey))];
     setSharedAgentSaving(true);
-    try {
+    try{
       await adminUpsertSettings([{key:"production_shared_agent_filter_v1",value_json:{agents:normalized}}]);
-      setSharedAgents(normalized);
-    }catch(e:any){window.alert("Impossibile salvare il filtro su Supabase: "+(e?.message||e));}
+      setSavedSharedAgents(normalized);
+      setSharedFilterEnabled(normalized.length>0);
+      setSharedAgentOpen(false);
+      setSharedAgentError("");
+    }catch(e:any){setSharedAgentError("Impossibile salvare su Supabase: "+(e?.message||e));}
     finally{setSharedAgentSaving(false);}
   };
   const [archiveSection, setArchiveSection] = useState<ArchiveSection>(() => {
@@ -1968,24 +1997,28 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
         {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{width:"100%",minWidth:0,minHeight:44,padding:"9px 8px",borderRadius:10,border:"1px solid "+(archiveSection===key?"#1d4ed8":"#cbd5e1"),background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontSize:12,fontWeight:850,lineHeight:1.25,cursor:"pointer"}}>{label}</button>)}
       </div>}
       <div style={{...cardStyle,marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
           <strong>FILTRO AGENTI CONDIVISO</strong>
-          <button type="button" onClick={()=>setSharedAgentOpen(v=>!v)} style={{padding:"9px 13px",borderRadius:8,border:"1px solid #94a3b8",background:"#eff6ff",fontWeight:800}}>
-            {sharedAgents.length ? sharedAgents.length+" agenti selezionati" : "Tutti gli agenti"} · MODIFICA
-          </button>
-          {sharedAgents.length>0&&<button type="button" disabled={sharedAgentSaving} onClick={()=>void saveSharedAgents([])}>Mostra tutti</button>}
-          <span style={{fontSize:12,color:"#64748b"}}>{sharedAgentSaving?"Salvataggio su Supabase...":sharedAgentReady?"Filtro applicato a tutte le schede Produzione":"Caricamento filtro condiviso..."}</span>
+          <button type="button" disabled={!savedSharedAgents.length} onClick={()=>setSharedFilterEnabled(true)} style={{padding:"9px 12px",borderRadius:8,background:sharedFilterEnabled?"#0f172a":"white",color:sharedFilterEnabled?"white":"#0f172a",border:"1px solid #94a3b8",fontWeight:800}}>MOSTRA FILTRO</button>
+          <button type="button" onClick={()=>setSharedFilterEnabled(false)} style={{padding:"9px 12px",borderRadius:8,background:!sharedFilterEnabled?"#0f172a":"white",color:!sharedFilterEnabled?"white":"#0f172a",border:"1px solid #94a3b8",fontWeight:800}}>MOSTRA TUTTI</button>
+          <button type="button" onClick={()=>{setSharedAgentDraft(savedSharedAgents);setSharedAgentOpen(v=>!v);if(!sharedAgentOpen)void loadEligibleSharedAgents().catch(e=>setSharedAgentError(String(e)));}} style={{padding:"9px 12px",borderRadius:8,border:"1px solid #94a3b8",background:"#eff6ff",fontWeight:800}}>MODIFICA FILTRO</button>
+          <span style={{fontSize:12,color:"#64748b"}}>{sharedFilterEnabled?savedSharedAgents.length+" agenti nel filtro":"Tutti gli agenti"} · {sharedAgentReady?"Salvato su Supabase":"Caricamento..."}</span>
         </div>
+        {sharedAgentError&&<p style={{color:"#b91c1c"}}>{sharedAgentError}</p>}
         {sharedAgentOpen&&<div style={{marginTop:12}}>
           <input placeholder="Cerca agente..." value={sharedAgentSearch} onChange={e=>setSharedAgentSearch(e.target.value)} style={{...inputStyle,maxWidth:380}}/>
           <div style={{maxHeight:240,overflowY:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:8,marginTop:10}}>
             {sharedAgentOptions.filter(a=>sharedAgentKey(a).includes(sharedAgentKey(sharedAgentSearch))).map(a=>{
               const key=sharedAgentKey(a);
               return <label key={key} style={{display:"flex",alignItems:"center",gap:7,fontSize:13}}>
-                <input type="checkbox" checked={sharedAgents.includes(key)} disabled={sharedAgentSaving}
-                  onChange={e=>void saveSharedAgents(e.target.checked?[...sharedAgents,key]:sharedAgents.filter(v=>v!==key))}/>{a}
+                <input type="checkbox" checked={sharedAgentDraft.includes(key)} disabled={sharedAgentSaving}
+                  onChange={e=>setSharedAgentDraft(prev=>e.target.checked?[...prev,key]:prev.filter(v=>v!==key))}/>{a}
               </label>;
             })}
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            <button type="button" disabled={sharedAgentSaving} onClick={()=>void saveSharedAgents()} style={{padding:"10px 16px",background:"#16a34a",color:"white",border:0,borderRadius:8,fontWeight:800}}>{sharedAgentSaving?"Salvataggio...":"SALVA FILTRO"}</button>
+            <button type="button" onClick={()=>setSharedAgentOpen(false)}>ANNULLA</button>
           </div>
         </div>}
       </div>
