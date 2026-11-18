@@ -165,7 +165,7 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
     : validPeriods.some((x) => x.key === periodSelected)
       ? periodSelected
       : validPeriods[0]?.key || "";
-  const customMode = activePeriod === "CUSTOM";
+  const customMode = activePeriod === "CUSTOM" && periodsSelected.length === 0;
   const customValid = isIsoDate(customStart) && isIsoDate(customEnd) &&
     customStart <= customEnd;
   const currentPeriod = periods.find((x) => x.key === activePeriod);
@@ -532,8 +532,10 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
                 const next = e.target.value;
                 if (next === "CUSTOM") {
                   const initial = currentPeriod || validPeriods[0];
-                  if (!customStart) setCustomStart(initial?.start || "");
-                  if (!customEnd) setCustomEnd(initial?.end || "");
+                  if (!isIsoDate(customStart) || !isIsoDate(customEnd) || customStart > customEnd) {
+                    setCustomStart(initial?.start || "");
+                    setCustomEnd(initial?.end || "");
+                  }
                 }
                 setPeriodSelected(next);
                 setPeriodsSelected([]);
