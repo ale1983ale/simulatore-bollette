@@ -235,9 +235,20 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "it"));
   }, [production, recesses, excludedAgentKeys, intervalSet, referenceMonths,sharedAgents]);
 
-  const agentOptions = useMemo(() => agentSummaries.map((item) => ({
-    key: item.key, name: item.name,
-  })), [agentSummaries]);
+  // Le opzioni del filtro devono restare disponibili anche quando il periodo
+  // selezionato non contiene risultati (o le date libere non sono valide).
+  const agentOptions = useMemo(() => {
+    const names = new Map<string, string>();
+    const add = (name: string, key?: string) => {
+      const id = keyForAgent(key || name);
+      if (!id || excludedAgentKeys.has(id) || !matchesSharedAgent(name)) return;
+      if (!names.has(id)) names.set(id, name.trim().toLocaleUpperCase("it-IT"));
+    };
+    for (const row of production) add(row.agente, row.agent_key);
+    for (const row of recesses) add(row.agente);
+    return [...names].map(([key, name]) => ({key, name}))
+      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+  }, [production, recesses, excludedAgentKeys, sharedAgents]);
 
   const selectedAgentExists = !!agentSelected && agentSummaries.some((a) => a.key === agentSelected);
   const selectedAgent = selectedAgentExists ? agentSelected : "";
