@@ -613,7 +613,7 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
             i contratti sono conteggiati, ma il saldo dei {missingTotal === 1 ? "consumi è" : "consumi è"}
             parziale.
           </div>}
-          {!periodsSelected.length&&<button type="button" aria-expanded={showAgentStatistics} onClick={()=>setShowAgentStatistics(v=>!v)} style={{padding:"13px 16px",borderRadius:11,border:"1px solid #93c5fd",background:"#eff6ff",color:"#1e40af",fontWeight:900,cursor:"pointer",textAlign:"left"}}>{showAgentStatistics?"▼ CHIUDI STATISTICHE AGENTI":"▸ APRI STATISTICHE AGENTI"}</button>}
+          {!periodsSelected.length&&<button type="button" aria-expanded={showAgentStatistics} onClick={()=>setShowAgentStatistics(v=>!v)} style={{padding:"26px 20px",minHeight:126,borderRadius:11,border:"1px solid #93c5fd",background:"#eff6ff",color:"#1e40af",fontWeight:900,fontSize:19,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",width:"100%"}}>{showAgentStatistics?"▼ CHIUDI STATISTICHE AGENTI":"▸ APRI STATISTICHE AGENTI"}</button>}
           {(!periodsSelected.length&&showAgentStatistics)&&<>{gridTable("luce")}{gridTable("gas")}</>}
           <div style={{...card,display:"grid",gap:12}}>
             <h3 style={{margin:0}}>STORICO MENSILE · ATTIVO PRODUZIONE</h3>
