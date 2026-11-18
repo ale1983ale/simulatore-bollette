@@ -2007,7 +2007,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
         {sharedAgentError&&<p style={{color:"#b91c1c"}}>{sharedAgentError}</p>}
         {sharedAgentOpen&&<div style={{marginTop:12}}>
           <input placeholder="Cerca agente..." value={sharedAgentSearch} onChange={e=>setSharedAgentSearch(e.target.value)} style={{...inputStyle,maxWidth:380}}/>
-          <div style={{maxHeight:240,overflowY:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:8,marginTop:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:8,marginTop:10}}>
             {sharedAgentOptions.filter(a=>sharedAgentKey(a).includes(sharedAgentKey(sharedAgentSearch))).map(a=>{
               const key=sharedAgentKey(a);
               return <label key={key} style={{display:"flex",alignItems:"center",gap:7,fontSize:13}}>
