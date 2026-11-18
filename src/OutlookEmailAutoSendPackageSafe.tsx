@@ -508,10 +508,14 @@ export default function OutlookEmailAutoSendPackageSafe() {
     };
 
     const ensureButton = () => {
+      // The cleanup button now includes an emoji: match its label regardless of icon.
+      // Anchor the quick-send button to the email actions section, not the cleanup row.
       const clearButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
-        (button) => button.textContent?.trim() === "Pulisci messaggio" && button.offsetParent !== null
+        (button) => (button.textContent || "").includes("Pulisci messaggio") && button.offsetParent !== null
       );
-      const row = clearButton?.parentElement;
+      const section = clearButton?.closest("section");
+      const row = section?.querySelector<HTMLDivElement>('div[style*="grid-template-columns"]')
+        || clearButton?.parentElement;
       if (!row) return;
       let button = row.querySelector<HTMLButtonElement>('[data-auto-send-outlook="true"]');
       if (!button) {
@@ -528,7 +532,7 @@ export default function OutlookEmailAutoSendPackageSafe() {
         button.style.color = "white";
         button.title = "Prepara il pacchetto Windows: estrai lo ZIP e fai doppio clic su INVIA_EMAIL_OUTLOOK.vbs";
         button.addEventListener("click", () => void makePackage(button!));
-        row.insertBefore(button, row.lastElementChild || null);
+        row.appendChild(button);
       }
     };
 
