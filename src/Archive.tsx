@@ -1682,6 +1682,16 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
     }
   };
 
+  const [recessFilePreview,setRecessFilePreview]=useState<{name:string;rows:RecessoRow[]}|null>(null);
+  const previewRecessFile=(name:string)=>setRecessFilePreview({name,rows:rows.filter(row=>(row.sourceFiles.length?row.sourceFiles:[row.sourceFile]).includes(name))});
+  const openRecessFile=(name:string)=>{
+    // Recessi: ricostruzione dai record archiviati su Supabase; l'originale non è conservato nello Storage.
+    const records=rows.filter(row=>(row.sourceFiles.length?row.sourceFiles:[row.sourceFile]).includes(name));
+    if(!records.length){alert("Nessuna riga disponibile per il file.");return;}
+    const sheet=XLSX.utils.json_to_sheet(records.map(row=>({...row.raw,AGENTE:row.agente,DENOMINAZIONE:row.denominazione,POD_PDR:row.podPdr,CONSUMO:row.consumo})));
+    const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,"Recessi");
+    XLSX.writeFile(book,name.replace(/\.xlsx?$/i,"")+"_archivio.xlsx");
+  };
   const removeFile = async (fileName: string) => {
     if (!window.confirm(`Rimuovere "${fileName}" dall'archivio RECESSI?`)) return;
 
@@ -2150,6 +2160,14 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
           </div>
         )}
 
+        {recessFilePreview&&<div role="presentation" onClick={()=>setRecessFilePreview(null)} style={{position:"fixed",inset:0,zIndex:12000,background:"#0f172acc",display:"grid",placeItems:"center",padding:14}}>
+          <div role="dialog" aria-modal="true" aria-label="Anteprima file recessi" onClick={e=>e.stopPropagation()} style={{background:"white",width:"min(1100px,100%)",maxHeight:"90vh",overflow:"auto",padding:18,borderRadius:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center"}}><h3>👁 {recessFilePreview.name} · {recessFilePreview.rows.length} righe</h3><button type="button" onClick={()=>setRecessFilePreview(null)}>✕ CHIUDI</button></div>
+            <div style={{overflowX:"auto",maxHeight:"65vh"}}><table style={{borderCollapse:"collapse",fontSize:12,width:"100%"}}><thead><tr>{["Luce/Gas","Agente","Cliente","POD/PDR","Data validità","Consumo"].map(h=><th key={h} style={{padding:8,border:"1px solid #cbd5e1",background:"#e2e8f0",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead><tbody>{recessFilePreview.rows.slice(0,150).map(row=><tr key={row.id}>{[row.commodity,row.agente,row.denominazione,row.podPdr,row.validita,String(row.consumo??"")].map((v,i)=><td key={i} style={{padding:7,border:"1px solid #e2e8f0",whiteSpace:"nowrap"}}>{v}</td>)}</tr>)}</tbody></table></div>
+            <p style={{fontSize:12,color:"#64748b"}}>Anteprima delle prime 150 righe archiviate. Apri per esportare tutte le righe.</p>
+            <button type="button" onClick={()=>openRecessFile(recessFilePreview.name)}>📂 APRI EXCEL ARCHIVIATO</button>
+          </div>
+        </div>}
         {fileStats.length > 0 && (
           <details
             style={{
@@ -2195,6 +2213,9 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
                     </span>
                   </div>
 
+                  <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                    <button type="button" onClick={()=>previewRecessFile(file.name)} style={{border:"1px solid #93c5fd",background:"#eff6ff",color:"#1d4ed8",borderRadius:8,padding:"6px 10px",fontWeight:800}}>👁 Anteprima</button>
+                    <button type="button" onClick={()=>openRecessFile(file.name)} style={{border:"1px solid #86efac",background:"#f0fdf4",color:"#166534",borderRadius:8,padding:"6px 10px",fontWeight:800}}>📂 Apri</button>
                   <button
                     type="button"
                     onClick={() => void removeFile(file.name)}
@@ -2210,7 +2231,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
                     }}
                   >
                     Rimuovi file
-                  </button>
+                  </button></div>
                 </div>
               ))}
             </div>
