@@ -511,7 +511,7 @@ function MultiSelectFilter({
   );
 }
 
-export default function Production({ view = "produzione", onOpenDetail }: { view?: "produzione" | "dettaglio" | "zone"; onOpenDetail?:(period:string,commodity:string)=>void }) {
+export default function Production({ view = "produzione", onOpenDetail, sharedAgents=[] }: { view?: "produzione" | "dettaglio" | "zone"; onOpenDetail?:(period:string,commodity:string)=>void; sharedAgents?:string[] }) {
   const [rows, setRows] = useState<ProductionRow[]>([]);
   const [agentZones, setAgentZones] = useState<AgentZone[]>([]);
   const [pendingFiles, setPendingFiles] = useState<ParsedProductionFile[]>([]);
@@ -644,9 +644,11 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
     });
   }, [agentZones, agentZoneFilter]);
 
+  const matchesSharedAgent=(name:string)=>!sharedAgents.length||sharedAgents.includes(String(name||"").trim().toLocaleUpperCase("it-IT").replace(/\s+/g," "));
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       if (includedByAgentKey.get(row.agentKey) === false) return false;
+      if(!matchesSharedAgent(row.agente))return false;
 
       const periodKey = row.periodStart + "|" + row.periodEnd;
       if (periodsSelected.length && !periodsSelected.includes(periodKey)) return false;
@@ -656,7 +658,7 @@ export default function Production({ view = "produzione", onOpenDetail }: { view
       if (zonesSelected.length && !zonesSelected.includes(zone)) return false;
       return true;
     });
-  }, [rows, periodsSelected, commoditiesSelected, agentsSelected, zonesSelected, zoneByAgentKey, includedByAgentKey]);
+  }, [rows, periodsSelected, commoditiesSelected, agentsSelected, zonesSelected, zoneByAgentKey, includedByAgentKey,sharedAgents]);
 
   const totals = useMemo(() => {
     return filteredRows.reduce(
