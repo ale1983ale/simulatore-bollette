@@ -618,22 +618,30 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
           <div style={{...card,display:"grid",gap:12}}>
             <h3 style={{margin:0}}>STORICO MENSILE · ATTIVO PRODUZIONE</h3>
             <div style={{fontSize:12,color:"#64748b"}}>Come in Recessi: tutti i mesi disponibili, dal più recente. Seleziona un mese per visualizzare il relativo dettaglio sopra. Produzione e recessi sono conteggiati con gli stessi criteri del confronto.</div>
-            {monthlyHistory.filter(({period})=>!periodsSelected.length||periodsSelected.includes(period.key)).map(({period,month,totals})=><div key={period.key} style={{background:activePeriod===period.key?"#eaf3ff":"#f8fafc",border:"1px solid #dbe5f0",borderRadius:13,padding:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:9}}>
-                <strong>{new Date(month+"-01T12:00:00").toLocaleDateString("it-IT",{month:"long",year:"numeric"}).toLocaleUpperCase("it-IT")}</strong>
-                <button type="button" onClick={()=>{setPeriodSelected(period.key);setPeriodsSelected([]);setCustomStart("");setCustomEnd("");window.scrollTo({top:0,behavior:"smooth"});}} style={{padding:"8px 12px",borderRadius:9,border:"1px solid #93c5fd",background:"white",color:"#1d4ed8",fontWeight:850,cursor:"pointer"}}>VEDI PERIODO ↗</button>
+            {monthlyHistory.filter(({period})=>!periodsSelected.length||periodsSelected.includes(period.key)).map(({period,month,totals})=><div key={period.key} style={{background:activePeriod===period.key?"#eaf3ff":"#f8fafc",border:"1px solid #dbe5f0",borderRadius:14,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14}}>
+                <strong style={{fontSize:19,color:"#0f172a"}}>{new Date(month+"-01T12:00:00").toLocaleDateString("it-IT",{month:"long",year:"numeric"}).toLocaleUpperCase("it-IT")}</strong>
+                <button type="button" onClick={()=>{setPeriodSelected(period.key);setPeriodsSelected([]);setCustomStart("");setCustomEnd("");window.scrollTo({top:0,behavior:"smooth"});}} style={{padding:"10px 16px",borderRadius:10,border:"1px solid #93c5fd",background:"white",color:"#1d4ed8",fontWeight:850,cursor:"pointer",fontSize:14}}>VEDI PERIODO ↗</button>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,290px),1fr))",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,390px),1fr))",gap:12}}>
                 {(["luce","gas"] as const).map(energy=>{
                   const v=totals[energy],net=v.production.contracts-v.recess.contracts;
-                  return <div key={energy} style={{padding:12,borderRadius:11,border:"1px solid "+(energy==="luce"?"#fed7aa":"#bae6fd"),background:energy==="luce"?"#fff7ed":"#eff9ff"}}>
-                    <strong style={{color:energy==="luce"?"#c2410c":"#0369a1"}}>{energy==="luce"?"⚡ LUCE":"🔥 GAS"}</strong>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8,marginTop:9}}>
-                      <div><div style={{fontSize:10,color:"#64748b",fontWeight:800}}>PRODUZIONE</div><strong>{formatValue(v.production.contracts)}</strong></div>
-                      <div><div style={{fontSize:10,color:"#64748b",fontWeight:800}}>RECESSI</div><strong>{formatValue(v.recess.contracts)}</strong></div>
-                      <div><div style={{fontSize:10,color:"#64748b",fontWeight:800}}>SALDO</div><strong style={{color:net>=0?"#166534":"#b91c1c"}}>{signed(net)}</strong></div>
+                  const unit=energy==="luce"?"kWh":"Smc";
+                  const diff=v.production.consumption-v.recess.consumption;
+                  return <div key={energy} style={{padding:15,borderRadius:12,border:"1px solid "+(energy==="luce"?"#fed7aa":"#bae6fd"),background:"#fff"}}>
+                    <strong style={{fontSize:18,color:energy==="luce"?"#c2410c":"#0369a1"}}>{energy==="luce"?"⚡ LUCE":"🔥 GAS"}</strong>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10,marginTop:12}}>
+                      {(["production","recess"] as const).map(kind=><div key={kind} style={{padding:12,borderRadius:10,background:kind==="production"?"#eefbf3":"#fff0f1",minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:850,color:"#0f172a"}}>{kind==="production"?"PRODUZIONE":"RECESSI"}</div>
+                        <div style={{fontSize:24,fontWeight:900,color:"#0f172a"}}>{formatValue(v[kind].contracts)}</div>
+                        <div style={{fontSize:12,color:"#475569"}}>contratti</div>
+                        <div style={{fontSize:15,fontWeight:850,marginTop:8,overflowWrap:"anywhere"}}>{formatValue(v[kind].consumption,2)} {unit}</div>
+                      </div>)}
                     </div>
-                    <div style={{fontSize:11,color:"#475569",marginTop:8}}>Consumi: {formatValue(v.production.consumption,2)} / {formatValue(v.recess.consumption,2)} · saldo {signed(v.production.consumption-v.recess.consumption,2)} {energy==="luce"?"kWh":"Smc"}</div>
+                    <div style={{display:"flex",gap:14,flexWrap:"wrap",marginTop:13,fontSize:14,fontWeight:850}}>
+                      <span>SALDO CONTRATTI: <span style={{color:net>=0?"#166534":"#b91c1c"}}>{signed(net)}</span></span>
+                      <span>SALDO {unit.toUpperCase()}: <span style={{color:diff>=0?"#166534":"#b91c1c"}}>{signed(diff,2)} {unit}</span></span>
+                    </div>
                   </div>;
                 })}
               </div>
