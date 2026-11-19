@@ -1043,6 +1043,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
   const [detailMonth, setDetailMonth] = useState("");
   const [detailMonths,setDetailMonths]=useState<string[]>([]);
   const [detailCommodity, setDetailCommodity] = useState("");
+  const [detailUsageGroups,setDetailUsageGroups]=useState<string[]>([]);
   const [detailSearch, setDetailSearch] = useState("");
   const [detailExpanded, setDetailExpanded] = useState<string | null>(null);
   const [detailLimit, setDetailLimit] = useState(100);
@@ -1392,6 +1393,11 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
     if (detailMonths.length&&!detailMonths.includes(row.monthKey)) return false;
     if (detailMonth && row.monthKey !== detailMonth) return false;
     if (detailCommodity && !detailCommodity.split(",").includes(row.commodity)) return false;
+    if (detailUsageGroups.length) {
+      const usageCode=String(row.raw?.CD_TP_UTENZA || row.raw?.CD_TP_UTILIZZO || row.tipoCliente || "").trim().toUpperCase();
+      const usageGroup=usageCode==="RES"||usageCode==="CIV"?"RESID":"ALTRI USI";
+      if (!detailUsageGroups.includes(usageGroup)) return false;
+    }
     if (detailSearch) {
       const needle = detailSearch.toLocaleLowerCase("it").trim();
       const haystack = [row.denominazione, row.podPdr, row.agente, row.tipoCliente,
@@ -1414,7 +1420,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
     const comparison = value(a).localeCompare(value(b), "it", { numeric: true, sensitivity: "base" });
     return comparison * (detailSortAsc ? 1 : -1) || a.denominazione.localeCompare(b.denominazione, "it");
   }),
-  [rows, excludedGeneralAgents, detailSourceIds, detailAgent, detailAgents, detailRegion, detailProvince, detailMonth, detailMonths, detailCommodity, detailSearch, detailSort, detailSortAsc]);
+  [rows, excludedGeneralAgents, detailSourceIds, detailAgent, detailAgents, detailRegion, detailProvince, detailMonth, detailMonths, detailCommodity, detailUsageGroups, detailSearch, detailSort, detailSortAsc]);
 
   const filteredRows = useMemo(() => {
     const min = consumptionMin.trim() === "" ? null : Number(consumptionMin.replace(",", "."));
@@ -2468,6 +2474,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
             <label style={{display:"grid",gap:4}}>🔎 CERCA AGENTE<input list="archive-detail-agent-suggestions" value={detailAgent} placeholder="Digita nome agente..." onChange={e=>{setDetailAgent(e.target.value);setDetailLimit(100);}} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #cbd5e1",boxSizing:"border-box"}}/><datalist id="archive-detail-agent-suggestions">{agents.map(a=><option key={a} value={a}/>)}</datalist></label>
             <MultiSelectFilter label="AGENTI" allLabel="Tutti gli agenti" options={agents.map(x=>({value:x,label:x}))} selected={detailAgents} onChange={v=>{setDetailAgents(v);setDetailLimit(100);}} />
             <MultiSelectFilter label="MESI RECESSO" allLabel="Tutti i mesi" options={months.map(x=>({value:x,label:monthLabel(x)}))} selected={detailMonths} onChange={v=>{setDetailMonths(v);setDetailLimit(100);}} />
+            <MultiSelectFilter label="TIPOLOGIA UTENZA" allLabel="TUTTI" options={[{value:"RESID",label:"RESID (RES + CIV)"},{value:"ALTRI USI",label:"ALTRI USI (tutti gli altri codici, anche vuoti)"}]} selected={detailUsageGroups} onChange={v=>{setDetailUsageGroups(v);setDetailLimit(100);}} />
             <label>RICERCA GENERALE<input style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", boxSizing: "border-box" }} placeholder="Cliente, POD/PDR, note..." value={detailSearch} onChange={e => {setDetailSearch(e.target.value);setDetailLimit(100);}} /></label>
             {([
               ["REGIONE", detailRegion, setDetailRegion, regions.map(x=>[x,x])],
@@ -2481,7 +2488,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
-            <button type="button" onClick={()=>{setDetailSearch("");setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity("");setDetailSourceIds(null);setDetailLimit(100);}}
+            <button type="button" onClick={()=>{setDetailSearch("");setDetailAgent("");setDetailRegion("");setDetailProvince("");setDetailMonth("");setDetailCommodity("");setDetailUsageGroups([]);setDetailAgents([]);setDetailMonths([]);setDetailSourceIds(null);setDetailLimit(100);}}
               style={{ padding: "9px 14px", borderRadius: 9, border: "1px solid #cbd5e1", background: "white", cursor: "pointer", fontWeight: 800 }}>AZZERA FILTRI</button>
             <strong>{detailRows.length.toLocaleString("it-IT")} recessi trovati</strong>
             <strong style={{color:"#b45309",background:"#fffbeb",padding:"7px 11px",borderRadius:9,border:"1px solid #fcd34d"}}>⚡ {detailRows.filter(r=>String(r.commodity).toUpperCase()==="LUCE").reduce((total,r)=>total+(Number(r.consumo)||0),0).toLocaleString("it-IT",{maximumFractionDigits:2})} kWh totali</strong>
