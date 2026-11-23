@@ -1,4 +1,5 @@
 import Production from "./Production";
+import ReservedOffersAdmin, {type ReservedOffer} from "./ReservedOffersAdmin";
 import { confirmAction } from "./confirmAction";
 import MunicipalOffers from "./MunicipalOffers";
 import PunPsvMonitoringPanel from "./PunPsvMonitoringPanel";
@@ -85,6 +86,7 @@ type ProvvigioniOfferType = "STANDARD" | "UNICA" | "SPECIAL";
 
 type EnergyOffer = {
   nome: string;
+  priceMode?: "VARIABILE" | "FISSO" | "BILANCIATO";
   frasePdfDomestico?: string;
   frasePdfBusiness?: string;
   canone: number;
@@ -102,6 +104,7 @@ type GasCustomerGroup = "DOMESTICO" | "BUSINESS";
 
 type GasOffer = {
   nome: string;
+  priceMode?: "VARIABILE" | "FISSO" | "BILANCIATO";
   frasePdfDomestico?: string;
   frasePdfBusiness?: string;
   canone: number;
@@ -3536,7 +3539,7 @@ function Energia({
 }) {
   const visibleEnergyOffers = energyOffers.filter((offer) => offer.visibile !== false);
   const hasVisibleBalancedEnergyOffer = visibleEnergyOffers.some(
-    (offer) => energyOfferPriceMode(offer.nome) === "BILANCIATO"
+    (offer) => (offer.priceMode || energyOfferPriceMode(offer.nome)) === "BILANCIATO"
   );
   const allowedEnergyModes: OfferPriceMode[] = [
     "VARIABILE",
@@ -3545,7 +3548,7 @@ function Energia({
       ? ["BILANCIATO" as const] : []),
   ];
   const eligibleEnergyOffers = visibleEnergyOffers.filter((offer) =>
-    allowedEnergyModes.includes(energyOfferPriceMode(offer.nome))
+    allowedEnergyModes.includes((offer.priceMode || energyOfferPriceMode(offer.nome)))
   );
 
   const buildEnergyInitialState = () => ({
@@ -3557,7 +3560,7 @@ function Energia({
     tipo: "BTA2",
     tipologiaOfferta: "VARIABILE",
     offerta:
-      eligibleEnergyOffers.find((offer) => energyOfferPriceMode(offer.nome) === "VARIABILE")?.nome ||
+      eligibleEnergyOffers.find((offer) => (offer.priceMode || energyOfferPriceMode(offer.nome)) === "VARIABILE")?.nome ||
       "",
     mese1: "",
     mese2: "",
@@ -3723,7 +3726,7 @@ function Energia({
     }));
   }, [s.tipologiaOfferta, s.tipo, offerVisibility.energyFixed, offerVisibility.energyBalanced, energyOffers]);
   const fixedModeEnergyOffers = eligibleEnergyOffers.filter(
-    (offer) => energyOfferPriceMode(offer.nome) === activeEnergyMode
+    (offer) => (offer.priceMode || energyOfferPriceMode(offer.nome)) === activeEnergyMode
   );
 
   const selectedEnergyOffer =
@@ -4122,7 +4125,7 @@ function Energia({
 
     const candidateOffers = eligibleEnergyOffers.filter(
       (offer) =>
-        energyOfferPriceMode(offer.nome) === tipologia &&
+        (offer.priceMode || energyOfferPriceMode(offer.nome)) === tipologia &&
         energyOfferAllowsType(offer, s.tipo)
     );
 
@@ -4146,7 +4149,7 @@ function Energia({
         ? "VARIABILE" : activeEnergyMode;
     const candidateOffers = eligibleEnergyOffers.filter(
       (offer) =>
-        energyOfferPriceMode(offer.nome) === nextMode &&
+        (offer.priceMode || energyOfferPriceMode(offer.nome)) === nextMode &&
         energyOfferAllowsType(offer, tipo)
     );
     const nextOffer = candidateOffers.find((offer) => offer.nome === s.offerta)
@@ -5725,11 +5728,11 @@ function Gas({
     "VARIABILE",
     ...(offerVisibility.gasFixed ? ["FISSO" as const] : []),
     ...(offerVisibility.gasBalanced &&
-      visibleGasOffers.some((offer) => gasOfferPriceMode(offer.nome) === "BILANCIATO")
+      visibleGasOffers.some((offer) => (offer.priceMode || gasOfferPriceMode(offer.nome)) === "BILANCIATO")
       ? ["BILANCIATO" as const] : []),
   ];
   const eligibleGasOffers = visibleGasOffers.filter((offer) =>
-    allowedGasModes.includes(gasOfferPriceMode(offer.nome))
+    allowedGasModes.includes((offer.priceMode || gasOfferPriceMode(offer.nome)))
   );
 
   const buildGasInitialState = () => ({
@@ -5740,7 +5743,7 @@ function Gas({
     fatturazione: "MENSILE",
     tipologiaOfferta: "VARIABILE",
     offerta:
-      eligibleGasOffers.find((offer) => gasOfferPriceMode(offer.nome) === "VARIABILE")?.nome ||
+      eligibleGasOffers.find((offer) => (offer.priceMode || gasOfferPriceMode(offer.nome)) === "VARIABILE")?.nome ||
       "",
     periodo1: "",
     periodo2: "",
@@ -5890,7 +5893,7 @@ function Gas({
     }));
   }, [s.tipologiaOfferta, offerVisibility.gasFixed, offerVisibility.gasBalanced, gasOffers]);
   const fixedModeGasOffers = eligibleGasOffers.filter(
-    (offer) => gasOfferPriceMode(offer.nome) === activeGasMode
+    (offer) => (offer.priceMode || gasOfferPriceMode(offer.nome)) === activeGasMode
   );
 
   const selectedGasOffer =
@@ -6206,7 +6209,7 @@ function Gas({
 
     const candidateOffers = eligibleGasOffers.filter(
       (offer) =>
-        gasOfferPriceMode(offer.nome) === tipologia &&
+        (offer.priceMode || gasOfferPriceMode(offer.nome)) === tipologia &&
         gasOfferAllowsUse(offer, s.uso)
     );
 
@@ -8133,6 +8136,7 @@ function Listini({
   setOfferVisibility,
   gasAcciseSettings,
   setGasAcciseSettings,
+  onReservedSaved,
 }: {
   energyOffers: EnergyOffer[];
   setEnergyOffers: React.Dispatch<React.SetStateAction<EnergyOffer[]>>;
@@ -8142,6 +8146,7 @@ function Listini({
   setOfferVisibility: React.Dispatch<React.SetStateAction<OfferVisibilitySettings>>;
   gasAcciseSettings: GasAcciseSettings;
   setGasAcciseSettings: React.Dispatch<React.SetStateAction<GasAcciseSettings>>;
+  onReservedSaved: () => void;
 }) {
   const cloneEnergyOffers = (rows: EnergyOffer[]) => rows.map((row) => ({ ...row }));
   const cloneGasOffers = (rows: GasOffer[]) => rows.map((row) => ({ ...row }));
@@ -9056,6 +9061,7 @@ function Listini({
           </div>
         ))}
       </div>
+      <ReservedOffersAdmin energyOffers={draftEnergyOffers} gasOffers={draftGasOffers} onSaved={onReservedSaved}/>
     </div>
   );
 }
@@ -13852,6 +13858,15 @@ export default function App() {
   const [adminSession, setAdminSession] = useState<AdminProfile | null>(null);
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null);
   const [agentSession, setAgentSession] = useState<any>(null);
+  const [reservedOffers,setReservedOffers] = useState<ReservedOffer[]>([]);
+  const reloadReservedOffers=async()=>{
+    const token=adminSession?.token || agentSession?.token;
+    if(!token){setReservedOffers([]);return;}
+    const {data,error}=await supabase.rpc("reserved_offers_for_session",{p_session_token:token,p_is_admin:Boolean(adminSession?.token)});
+    if(error){console.error("RESERVED OFFERS:",error);setReservedOffers([]);return;}
+    setReservedOffers(Array.isArray(data)?data:[]);
+  };
+  useEffect(()=>{void reloadReservedOffers();},[adminSession?.token,agentSession?.token]);
   const [agentProductionAllowed,setAgentProductionAllowed]=useState(false);
   useEffect(()=>{
     if(!agentSession?.token){setAgentProductionAllowed(false);return;}
@@ -15057,6 +15072,8 @@ const [gasNetworkTariffMeta, setGasNetworkTariffMeta] = useState<GasNetworkTarif
 });
 const [gasNetworkTariffRefreshing, setGasNetworkTariffRefreshing] = useState(false);
 const [energyOffers, setEnergyOffers] = useState<EnergyOffer[]>(INITIAL_ENERGY_OFFERS);
+const reservedEnergyOffers:EnergyOffer[]=reservedOffers.filter(o=>o.commodity==="LUCE").map(o=>({...o.params,nome:o.name,priceMode:o.price_mode,visibile:true,allowedCustomerGroups:o.customer_type==="DOMESTICO"?["DOMESTICI"]:["BTA","MT"]} as EnergyOffer));
+const simulationEnergyOffers=[...energyOffers,...reservedEnergyOffers.filter(o=>!energyOffers.some(x=>x.nome===o.nome))];
 const [offerVisibility, setOfferVisibility] = useState<OfferVisibilitySettings>(DEFAULT_OFFER_VISIBILITY);
 
 const updateMonthlyRow = (
@@ -15080,6 +15097,8 @@ const updateMonthlyRow = (
 };
   
   const [gasOffers, setGasOffers] = useState<GasOffer[]>(INITIAL_GAS_OFFERS);
+const reservedGasOffers:GasOffer[]=reservedOffers.filter(o=>o.commodity==="GAS").map(o=>({...o.params,nome:o.name,priceMode:o.price_mode,visibile:true,allowedCustomerGroups:[o.customer_type]} as GasOffer));
+const simulationGasOffers=[...gasOffers,...reservedGasOffers.filter(o=>!gasOffers.some(x=>x.nome===o.nome))];
   const [gasAcciseSettings, setGasAcciseSettings] = useState<GasAcciseSettings>({
     agevolata: 0.012498,
     nonAgevolata: 0.18,
@@ -16150,6 +16169,7 @@ const renderAdminContent = () => {
           setOfferVisibility={setOfferVisibility}
           gasAcciseSettings={gasAcciseSettings}
           setGasAcciseSettings={setGasAcciseSettings}
+          onReservedSaved={()=>void reloadReservedOffers()}
         />
       )}
 
@@ -16907,7 +16927,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
     />
     <Energia
       punPsvRows={punPsvRows}
-      energyOffers={energyOffers}
+      energyOffers={simulationEnergyOffers}
       dispCpRows={dispCpRows}
       networkTariffRows={networkTariffRows}
       showAgentAssociation={Boolean(adminSession)}
@@ -16926,7 +16946,7 @@ if (hasAgentResetLink || (!agentSession && !adminSession)) {
     />
     <Gas
       punPsvRows={punPsvRows}
-      gasOffers={gasOffers}
+      gasOffers={simulationGasOffers}
       gasAcciseSettings={gasAcciseSettings}
       gasNetworkTariffRows={gasNetworkTariffRows}
       showAgentAssociation={Boolean(adminSession)}
