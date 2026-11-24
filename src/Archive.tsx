@@ -972,7 +972,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
   const [activeFilter,setActiveFilter]=useState("");
   const [editingFilter,setEditingFilter]=useState("");
   const [filterName,setFilterName]=useState("");
-  const [manageFilters,setManageFilters]=useState(false);
+
   const sharedAgents=namedFilters.find(f=>f.id===activeFilter)?.agents||[];
   const [sharedAgentOptions,setSharedAgentOptions]=useState<string[]>([]);
   const [sharedAgentDraft,setSharedAgentDraft]=useState<string[]>([]);
@@ -2026,14 +2026,15 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
           <button disabled={!sharedAgentReady||sharedAgentSaving} style={filterButton(!activeFilter)} onClick={()=>void persistFilters(namedFilters,"")}>MOSTRA TUTTI</button>
 
           <button disabled={!sharedAgentReady||sharedAgentSaving} style={{...filterButton(),background:"#166534",color:"white"}} onClick={()=>editFilter()}>+ NUOVO FILTRO</button>
-          <button style={filterButton()} onClick={()=>setManageFilters(v=>!v)}>GESTISCI FILTRI</button>
+
           <span style={{fontSize:12,color:"#64748b"}}>{sharedAgents.length?sharedAgents.length+" agenti":"Tutti gli agenti"} · {sharedAgentReady?"Supabase":"Caricamento..."}</span>
         </div>
         {sharedAgentError&&<p style={{color:"#b91c1c"}}>{sharedAgentError}</p>}
         <div style={{marginTop:12,display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
-          {namedFilters.map(f=><div key={f.id} style={{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap",padding:7,borderRadius:10,border:activeFilter===f.id?"2px solid #0f172a":"1px solid #cbd5e1",background:activeFilter===f.id?"#e2e8f0":"#f8fafc"}}>
-            <button disabled={sharedAgentSaving} style={{...filterButton(activeFilter===f.id),flex:"1 1 100%",textAlign:"left",overflowWrap:"anywhere"}} onClick={()=>void persistFilters(namedFilters,f.id)}>{f.name} ({f.agents.length})</button>
-            {manageFilters&&<><button style={{...filterButton(),fontSize:10,padding:"4px 7px"}} disabled={sharedAgentSaving} onClick={()=>editFilter(f)}>MODIFICA</button><button style={{...filterButton(),fontSize:10,padding:"4px 7px",color:"#b91c1c"}} disabled={sharedAgentSaving} onClick={()=>{if(window.confirm("Eliminare "+f.name+"?"))void persistFilters(namedFilters.filter(x=>x.id!==f.id),activeFilter===f.id?"":activeFilter);}}>ELIMINA</button></>}
+          {namedFilters.map(f=><div key={f.id} style={{display:"flex",gap:4,alignItems:"center",padding:5,borderRadius:9,border:"1px solid #94a3b8",background:activeFilter===f.id?"#0f172a":"white",color:activeFilter===f.id?"white":"#0f172a"}}>
+            <button disabled={sharedAgentSaving} style={{flex:1,minWidth:0,textAlign:"left",overflowWrap:"anywhere",padding:"8px 6px",border:0,background:"transparent",color:"inherit",fontWeight:800,cursor:"pointer"}} onClick={()=>void persistFilters(namedFilters,f.id)}>{f.name} ({f.agents.length})</button>
+            <button type="button" title="Modifica filtro" aria-label={"Modifica "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:"inherit",cursor:"pointer",display:"flex"}} onClick={()=>editFilter(f)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 3 5 5-12 12-6 1 1-6Z"/><path d="m13 6 5 5"/></svg></button>
+            <button type="button" title="Elimina filtro" aria-label={"Elimina "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:activeFilter===f.id?"#fca5a5":"#b91c1c",cursor:"pointer",display:"flex"}} onClick={()=>{if(window.confirm("Eliminare "+f.name+"?"))void persistFilters(namedFilters.filter(x=>x.id!==f.id),activeFilter===f.id?"":activeFilter);}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
           </div>)}
         </div>
         {sharedAgentOpen&&<div style={{marginTop:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-start"}}>
