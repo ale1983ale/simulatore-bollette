@@ -5,6 +5,7 @@ import { supabase } from "./supabase";
 import { adminGetSetting, adminUpsertSettings } from "./adminSecurity";
 import Production from "./Production";
 import ActiveProduction from "./ActiveProduction";
+import ActivePackage from "./ActivePackage";
 import { getRecruitingContext } from "./recruitingClient";
 import { exportFilteredA4Pdf, pdfNumber, pdfSelection } from "./filteredReportsPdf";
 import { recessNoteText, recessReferenceMonth } from "./recessPeriod";
@@ -941,7 +942,7 @@ function MultiSelectFilter({
   );
 }
 
-export default function Archive({ reportAdminPanel = null, adminToken = "" }: { reportAdminPanel?: React.ReactNode; adminToken?: string }) {
+export default function Archive({ reportAdminPanel = null, adminToken = "", superAdmin = false }: { reportAdminPanel?: React.ReactNode; adminToken?: string; superAdmin?: boolean }) {
   const [storageMode, setStorageMode] = useState<StorageMode>("loading");
   const [rows, setRows] = useState<RecessoRow[]>([]);
   const [excludedGeneralAgents,setExcludedGeneralAgents]=useState<Set<string>>(()=>new Set());
@@ -964,7 +965,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
   const [saving, setSaving] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [lastImportMessage, setLastImportMessage] = useState("");
-  type ArchiveSection = "recessi" | "dettaglioProduzione" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone" | "insoluti";
+  type ArchiveSection = "pacchetto" | "recessi" | "dettaglioProduzione" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone" | "insoluti";
   // Persist only the saved set in Supabase; showing all does not erase it.
   const [savedSharedAgents,setSavedSharedAgents]=useState<string[]>([]);
   const [sharedFilterEnabled,setSharedFilterEnabled]=useState(false);
@@ -1029,7 +1030,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
   };
   const [archiveSection, setArchiveSection] = useState<ArchiveSection>(() => {
     const value = window.sessionStorage.getItem("ge_archive_section");
-    return value === "produzione" || value === "dettaglioProduzione" || value === "attivo" || value === "dettaglioRecessi" ||
+    return (value === "pacchetto" && superAdmin) || value === "produzione" || value === "dettaglioProduzione" || value === "attivo" || value === "dettaglioRecessi" ||
       value === "reportAdmin" || value === "insoluti" ? value : "recessi";
   });
   useEffect(() => {
@@ -2007,7 +2008,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
       </div>
 
       <div className="ge-archive-main-tabs" style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,width:"100%"}}>
-        {([["recessi","RECESSI"],["insoluti","💶 INSOLUTI"],["produzione","PRODUZIONE"],["attivo","ATTIVO PRODUZIONE"],...(reportAdminPanel?[["reportAdmin","REPORT ADMIN"]]:[])] as [string,string][]).map(([key,label])=><button key={key} type="button" onClick={()=>setArchiveSection(key as typeof archiveSection)} style={{width:"100%",minWidth:0,minHeight:46,padding:"10px 8px",borderRadius:11,border:archiveSection===key?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection===key?"#0f172a":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:850,fontSize:13,lineHeight:1.25,cursor:"pointer",boxShadow:archiveSection===key?"0 3px 8px #0f172a22":"none"}}>{label}</button>)}
+        {([["recessi","RECESSI"],["insoluti","💶 INSOLUTI"],["produzione","PRODUZIONE"],["attivo","ATTIVO PRODUZIONE"],...(superAdmin?[["pacchetto","PACCHETTO ATTIVO"]]:[]),...(reportAdminPanel?[["reportAdmin","REPORT ADMIN"]]:[])] as [string,string][]).map(([key,label])=><button key={key} type="button" onClick={()=>setArchiveSection(key as typeof archiveSection)} style={{width:"100%",minWidth:0,minHeight:46,padding:"10px 8px",borderRadius:11,border:archiveSection===key?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection===key?"#0f172a":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:850,fontSize:13,lineHeight:1.25,cursor:"pointer",boxShadow:archiveSection===key?"0 3px 8px #0f172a22":"none"}}>{label}</button>)}
       </div>
       {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div className="ge-archive-sub-tabs" style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,width:"100%"}}>
         {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{width:"100%",minWidth:0,minHeight:44,padding:"9px 8px",borderRadius:10,border:"1px solid "+(archiveSection===key?"#1d4ed8":"#cbd5e1"),background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontSize:12,fontWeight:850,lineHeight:1.25,cursor:"pointer"}}>{label}</button>)}
@@ -2540,6 +2541,8 @@ export default function Archive({ reportAdminPanel = null, adminToken = "" }: { 
           {!detailRows.length && <p>Nessun recesso corrisponde ai filtri selezionati.</p>}
           </>}
         </div>
+      ) : archiveSection === "pacchetto" && superAdmin ? (
+        <ActivePackage token={adminToken}/>
       ) : archiveSection === "attivo" ? (
         <ActiveProduction sharedAgents={sharedAgents} />
       ) : archiveSection === "reportAdmin" && reportAdminPanel ? (
