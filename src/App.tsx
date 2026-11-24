@@ -16003,6 +16003,7 @@ const renderAdminContent = () => {
       {tab === "archive" && (
         <div style={{ width: "100%", minWidth: 0 }}>
           <Archive
+            superAdmin={isSuperAdmin}
             adminToken={adminSession?.token || ""}
             reportAdminPanel={
               canAdminAccessTab(adminProfile, "reportAdmin")
