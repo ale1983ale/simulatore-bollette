@@ -2542,7 +2542,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
           </>}
         </div>
       ) : archiveSection === "pacchetto" && superAdmin ? (
-        <ActivePackage token={adminToken}/>
+        <ActivePackage token={adminToken} sharedAgents={sharedAgents}/>
       ) : archiveSection === "attivo" ? (
         <ActiveProduction sharedAgents={sharedAgents} />
       ) : archiveSection === "reportAdmin" && reportAdminPanel ? (
