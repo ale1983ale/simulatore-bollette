@@ -13371,6 +13371,7 @@ export default function Recruiting({
                   APRI IN GOOGLE
                 </button>
               )}
+              {(()=>{const linked=events.find(e=>e.sourceType==="GOOGLE"&&e.sourceExternalId===googleDetailEvent.id&&e.sourceExternalCalendarId===googleDetailEvent.calendar_id&&e.candidateId);return linked?.candidateId?<button type="button" style={{...buttonStyle,background:"#dbeafe",color:"#1d4ed8"}} onClick={()=>{setGoogleDetailEvent(null);openFullContactDetails(linked.candidateId!);}}>📋 SCHEDA AGENTE</button>:null;})()}
               <button type="button" style={{...buttonStyle,background:"#2563eb",color:"white"}} onClick={()=>{const event=googleDetailEvent;setGoogleDetailEvent(null);void openManual(event);}}>✎ MODIFICA EVENTO</button>
 
               <button type="button"
@@ -14167,9 +14168,7 @@ export default function Recruiting({
                     <button
                       type="button"
                       onClick={() =>
-                        openReadOnlyContact(
-                          eventModalEvent.candidateId
-                        )
+                        openFullContactDetails(eventModalEvent.candidateId!)
                       }
                       style={{
                         ...buttonStyle,
