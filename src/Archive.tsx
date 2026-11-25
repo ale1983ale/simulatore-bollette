@@ -969,11 +969,11 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
   // Persist only the saved set in Supabase; showing all does not erase it.
   type NamedFilter={id:string;name:string;agents:string[]};
   const [namedFilters,setNamedFilters]=useState<NamedFilter[]>([]);
-  const [activeFilter,setActiveFilter]=useState("");
+  const [activeFilters,setActiveFilters]=useState<string[]>([]);
   const [editingFilter,setEditingFilter]=useState("");
   const [filterName,setFilterName]=useState("");
 
-  const sharedAgents=namedFilters.find(f=>f.id===activeFilter)?.agents||[];
+  const sharedAgents=useMemo(()=>[...new Set(namedFilters.filter(f=>activeFilters.includes(f.id)).flatMap(f=>f.agents))],[namedFilters,activeFilters]);
   const [sharedAgentOptions,setSharedAgentOptions]=useState<string[]>([]);
   const [sharedAgentDraft,setSharedAgentDraft]=useState<string[]>([]);
   const [sharedAgentSearch,setSharedAgentSearch]=useState("");
@@ -1013,16 +1013,16 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
         const agents=Array.isArray(saved?.agents)?saved.agents.map(sharedAgentKey):[];
         const filters:NamedFilter[]=Array.isArray(saved?.filters)?saved.filters.filter((f:any)=>f.id&&f.name&&Array.isArray(f.agents)&&f.agents.length).map((f:any)=>({...f,agents:f.agents.map(sharedAgentKey)})):agents.length?[{id:"legacy",name:"FILTRO ESISTENTE",agents}]:[];
         setNamedFilters(filters);
-        setActiveFilter(filters.some(f=>f.id===saved?.activeId)?saved.activeId:(!Array.isArray(saved?.filters)&&agents.length?"legacy":""));
+        setActiveFilters(Array.isArray(saved?.activeIds)?filters.filter(f=>saved.activeIds.includes(f.id)).map(f=>f.id):filters.some(f=>f.id===saved?.activeId)?[saved.activeId]:(!Array.isArray(saved?.filters)&&agents.length?["legacy"]:[]));
         await loadEligibleSharedAgents();
         if(active)setSharedAgentReady(true);
       }catch(e:any){if(active)setSharedAgentError("Errore caricamento filtro: "+(e?.message||e));}
     })();
     return()=>{active=false;};
   },[]);
-  const persistFilters=async(filters:NamedFilter[],selected:string)=>{
+  const persistFilters=async(filters:NamedFilter[],selected:string[])=>{
     setSharedAgentSaving(true);setSharedAgentError("");
-    try{await adminUpsertSettings([{key:"production_shared_agent_filter_v1",value_json:{filters,activeId:selected,agents:filters.find(f=>f.id===selected)?.agents||[]}}]);setNamedFilters(filters);setActiveFilter(selected);return true;}
+    try{await adminUpsertSettings([{key:"production_shared_agent_filter_v1",value_json:{filters,activeIds:selected,activeId:selected[0]||"",agents:[...new Set(filters.filter(f=>selected.includes(f.id)).flatMap(f=>f.agents))]}}]);setNamedFilters(filters);setActiveFilters(selected);return true;}
     catch(e:any){setSharedAgentError("Impossibile salvare su Supabase: "+(e?.message||e));return false;}
     finally{setSharedAgentSaving(false);}
   };
@@ -1032,7 +1032,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
     if(!name||!agents.length){setSharedAgentError("Indica nome e almeno un agente.");return;}
     if(namedFilters.some(f=>f.id!==editingFilter&&f.name.toLowerCase()===name.toLowerCase())){setSharedAgentError("Nome filtro già utilizzato.");return;}
     const id=editingFilter||crypto.randomUUID();const item={id,name,agents};const next=editingFilter?namedFilters.map(f=>f.id===id?item:f):[...namedFilters,item];
-    if(await persistFilters(next,id))setSharedAgentOpen(false);
+    if(await persistFilters(next,[...new Set([...activeFilters,id])]))setSharedAgentOpen(false);
   };
   const filterButton=(selected=false):React.CSSProperties=>({padding:"9px 12px",borderRadius:8,background:selected?"#0f172a":"white",color:selected?"white":"#0f172a",border:"1px solid #94a3b8",fontWeight:800,cursor:"pointer"});
   const [archiveSection, setArchiveSection] = useState<ArchiveSection>(() => {
@@ -2023,7 +2023,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
       <div style={{...cardStyle,marginBottom:12}}>
         <div style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
           <strong>FILTRI AGENTI CONDIVISI</strong>
-          <button disabled={!sharedAgentReady||sharedAgentSaving} style={filterButton(!activeFilter)} onClick={()=>void persistFilters(namedFilters,"")}>MOSTRA TUTTI</button>
+          <button disabled={!sharedAgentReady||sharedAgentSaving} style={filterButton(!activeFilters.length)} onClick={()=>void persistFilters(namedFilters,[])}>MOSTRA TUTTI</button>
 
           <button disabled={!sharedAgentReady||sharedAgentSaving} style={{...filterButton(),background:"#166534",color:"white"}} onClick={()=>editFilter()}>+ NUOVO FILTRO</button>
 
@@ -2031,10 +2031,10 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
         </div>
         {sharedAgentError&&<p style={{color:"#b91c1c"}}>{sharedAgentError}</p>}
         <div style={{marginTop:12,display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
-          {namedFilters.map(f=><div key={f.id} style={{display:"flex",gap:4,alignItems:"center",padding:5,borderRadius:9,border:"1px solid #94a3b8",background:activeFilter===f.id?"#0f172a":"white",color:activeFilter===f.id?"white":"#0f172a"}}>
-            <button disabled={sharedAgentSaving} style={{flex:1,minWidth:0,textAlign:"left",overflowWrap:"anywhere",padding:"8px 6px",border:0,background:"transparent",color:"inherit",fontWeight:800,cursor:"pointer"}} onClick={()=>void persistFilters(namedFilters,f.id)}>{f.name} ({f.agents.length})</button>
+          {namedFilters.map(f=><div key={f.id} style={{display:"flex",gap:4,alignItems:"center",padding:5,borderRadius:9,border:"1px solid #94a3b8",background:activeFilters.includes(f.id)?"#0f172a":"white",color:activeFilters.includes(f.id)?"white":"#0f172a"}}>
+            <button disabled={sharedAgentSaving} style={{flex:1,minWidth:0,textAlign:"left",overflowWrap:"anywhere",padding:"8px 6px",border:0,background:"transparent",color:"inherit",fontWeight:800,cursor:"pointer"}} aria-pressed={activeFilters.includes(f.id)} onClick={()=>void persistFilters(namedFilters,activeFilters.includes(f.id)?activeFilters.filter(id=>id!==f.id):[...activeFilters,f.id])}>{f.name} ({f.agents.length})</button>
             <button type="button" title="Modifica filtro" aria-label={"Modifica "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:"inherit",cursor:"pointer",display:"flex"}} onClick={()=>editFilter(f)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 3 5 5-12 12-6 1 1-6Z"/><path d="m13 6 5 5"/></svg></button>
-            <button type="button" title="Elimina filtro" aria-label={"Elimina "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:activeFilter===f.id?"#fca5a5":"#b91c1c",cursor:"pointer",display:"flex"}} onClick={()=>{if(window.confirm("Eliminare "+f.name+"?"))void persistFilters(namedFilters.filter(x=>x.id!==f.id),activeFilter===f.id?"":activeFilter);}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
+            <button type="button" title="Elimina filtro" aria-label={"Elimina "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:activeFilters.includes(f.id)?"#fca5a5":"#b91c1c",cursor:"pointer",display:"flex"}} onClick={()=>{if(window.confirm("Eliminare "+f.name+"?"))void persistFilters(namedFilters.filter(x=>x.id!==f.id),activeFilters.filter(id=>id!==f.id));}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
           </div>)}
         </div>
         {sharedAgentOpen&&<div style={{marginTop:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-start"}}>
