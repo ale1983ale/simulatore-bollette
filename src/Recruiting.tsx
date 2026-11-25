@@ -23,7 +23,7 @@ import RecruitingManagement from "./RecruitingManagement";
 import RecruitingTodos, { type TodoDraft } from "./RecruitingTodos";
 import {
   deleteGoogleCalendarEvent,
-  listWritableGoogleCalendars, createManualGoogleEvent, type WritableGoogleCalendar,
+  listWritableGoogleCalendars, createManualGoogleEvent, updateManualGoogleEvent, type WritableGoogleCalendar,
   disconnectGoogleCalendar,
   getGoogleCalendarStatus,
   listGoogleCalendarEvents,
@@ -1820,19 +1820,21 @@ export default function Recruiting({
   const [googlePanelOpen, setGooglePanelOpen] = useState(false);
   const [newActivityPanelOpen, setNewActivityPanelOpen] = useState(false);
   const [manualOpen,setManualOpen]=useState(false);
+  const [manualEditing,setManualEditing]=useState<GoogleCalendarExternalEvent|null>(null);
   const [manualCalendars,setManualCalendars]=useState<WritableGoogleCalendar[]>([]);
   const [manualBusy,setManualBusy]=useState(false);
   const [manualError,setManualError]=useState("");
   const [manual,setManual]=useState({calendar_id:"",summary:"",date:localDateKey(),end_date:localDateKey(),start_time:"09:00",end_time:"10:00",all_day:false,location:"",description:""});
-  const openManual=async()=>{
+  const openManual=async(existing?:GoogleCalendarExternalEvent)=>{
+    setManualEditing(existing||null);
     setManualOpen(true);setManualBusy(true);setManualError("");setManualCalendars([]);
-    const date=localDateKey();setManual({calendar_id:"",summary:"",date,end_date:date,start_time:"09:00",end_time:"10:00",all_day:false,location:"",description:""});
-    try{const calendars=await listWritableGoogleCalendars();setManualCalendars(calendars.sort((a,b)=>a.name.localeCompare(b.name,"it")));if(!calendars.length)setManualError("Nessun calendario disponibile in scrittura.");}
+    const date=localDateKey();setManual(existing?{calendar_id:existing.calendar_id,summary:existing.summary,date:existing.start_date,end_date:existing.end_date||existing.start_date,start_time:existing.start_time||"09:00",end_time:existing.end_time||"10:00",all_day:existing.all_day,location:existing.location,description:existing.description}:{calendar_id:"",summary:"",date,end_date:date,start_time:"09:00",end_time:"10:00",all_day:false,location:"",description:""});
+    try{const calendars=await listWritableGoogleCalendars();setManualCalendars(calendars.sort((a,b)=>a.name.localeCompare(b.name,"it")));if(!calendars.length)setManualError("Nessun calendario disponibile in scrittura.");else if(existing&&!calendars.some(c=>c.id===existing.calendar_id))setManualError("Questo evento appartiene a un calendario non modificabile.");}
     catch(e:any){setManualError(e.message||String(e));}finally{setManualBusy(false);}
   };
   const saveManual=async()=>{
     setManualBusy(true);setManualError("");
-    try{await createManualGoogleEvent(manual);setManualOpen(false);setShowFullGoogleCalendar(true);setCalendarOriginFilters(prev=>prev.includes("GOOGLE")?prev:[...prev,"GOOGLE"]);setCalendarMonth(manual.date.slice(0,7));setMessage("Evento creato su Google Calendar.");void loadFullGoogleCalendar(manual.date.slice(0,7));}
+    try{if(manualEditing)await updateManualGoogleEvent(manual,manualEditing.calendar_id,manualEditing.id);else await createManualGoogleEvent(manual);setManualOpen(false);setShowFullGoogleCalendar(true);setCalendarOriginFilters(prev=>prev.includes("GOOGLE")?prev:[...prev,"GOOGLE"]);setCalendarMonth(manual.date.slice(0,7));setMessage(manualEditing?"Evento modificato su Google Calendar.":"Evento creato su Google Calendar.");void loadFullGoogleCalendar(manual.date.slice(0,7));}
     catch(e:any){setManualError(e.message||String(e));}finally{setManualBusy(false);}
   };
   type CalendarOrigin = "APP" | "CRM" | "EXTERNAL" | "GOOGLE";
@@ -11259,7 +11261,7 @@ export default function Recruiting({
               ☑ COSE DA FARE
             </button>
             <button type="button" style={{...buttonStyle,marginLeft:8,background:"#166534",color:"white"}} onClick={()=>void openManual()}>+ NUOVO EVENTO</button>
-            {manualOpen&&<div role="dialog" aria-modal="true" aria-label="Nuovo evento" style={{position:"fixed",inset:0,zIndex:9999,background:"#0f172a88",display:"grid",placeItems:"center",padding:12}}><form onSubmit={e=>{e.preventDefault();void saveManual();}} style={{background:"white",borderRadius:14,padding:20,width:"min(520px,100%)",maxHeight:"90vh",overflowY:"auto",display:"grid",gap:10,boxSizing:"border-box"}}><h2>NUOVO EVENTO</h2>
+            {manualOpen&&<div role="dialog" aria-modal="true" aria-label="Nuovo evento" style={{position:"fixed",inset:0,zIndex:9999,background:"#0f172a88",display:"grid",placeItems:"center",padding:12}}><form onSubmit={e=>{e.preventDefault();void saveManual();}} style={{background:"white",borderRadius:14,padding:20,width:"min(520px,100%)",maxHeight:"90vh",overflowY:"auto",display:"grid",gap:10,boxSizing:"border-box"}}><h2>{manualEditing?"MODIFICA EVENTO":"NUOVO EVENTO"}</h2>
             <label>Titolo<input required maxLength={500} style={{width:"100%",padding:9,boxSizing:"border-box"}} value={manual.summary} onChange={e=>setManual(p=>({...p,summary:e.target.value}))}/></label>
             <label>Sottocalendario Google<select required style={{width:"100%",padding:9}} value={manual.calendar_id} onChange={e=>setManual(p=>({...p,calendar_id:e.target.value}))}><option value="">SELEZIONA SOTTOCALENDARIO</option>{manualCalendars.map(c=><option key={c.id} value={c.id}>{c.name}{c.primary?" (principale)":""}</option>)}</select></label>
             <label>Data inizio<input required type="date" value={manual.date} onChange={e=>setManual(p=>({...p,date:e.target.value,end_date:e.target.value>p.end_date?e.target.value:p.end_date}))}/></label>
@@ -11268,7 +11270,7 @@ export default function Recruiting({
             {!manual.all_day&&<div style={{display:"flex",gap:12,flexWrap:"wrap"}}><label>Ora inizio <input required type="time" value={manual.start_time} onChange={e=>setManual(p=>({...p,start_time:e.target.value}))}/></label><label>Ora fine <input required type="time" value={manual.end_time} onChange={e=>setManual(p=>({...p,end_time:e.target.value}))}/></label></div>}
             <label>Luogo<input style={{width:"100%",padding:9,boxSizing:"border-box"}} value={manual.location} onChange={e=>setManual(p=>({...p,location:e.target.value}))}/></label>
             <label>Descrizione<textarea style={{width:"100%",padding:9,boxSizing:"border-box"}} rows={3} value={manual.description} onChange={e=>setManual(p=>({...p,description:e.target.value}))}/></label>
-            {manualError&&<p role="alert" style={{color:"#b91c1c"}}>{manualError}</p>}<div style={{display:"flex",gap:8}}><button type="submit" disabled={manualBusy||!manual.calendar_id} style={{...buttonStyle,background:"#166534",color:"white"}}>{manualBusy?"ATTENDI...":"SALVA EVENTO"}</button><button type="button" disabled={manualBusy} style={buttonStyle} onClick={()=>setManualOpen(false)}>ANNULLA</button></div></form></div>}
+            {manualError&&<p role="alert" style={{color:"#b91c1c"}}>{manualError}</p>}<div style={{display:"flex",gap:8}}><button type="submit" disabled={manualBusy||!manual.calendar_id||!!(manualEditing&&!manualCalendars.some(c=>c.id===manualEditing.calendar_id))} style={{...buttonStyle,background:"#166534",color:"white"}}>{manualBusy?"ATTENDI...":manualEditing?"SALVA MODIFICHE":"SALVA EVENTO"}</button><button type="button" disabled={manualBusy} style={buttonStyle} onClick={()=>setManualOpen(false)}>ANNULLA</button></div></form></div>}
 
           </div>
           <div
@@ -13366,6 +13368,7 @@ export default function Recruiting({
                   APRI IN GOOGLE
                 </button>
               )}
+              <button type="button" style={{...buttonStyle,background:"#2563eb",color:"white"}} onClick={()=>{const event=googleDetailEvent;setGoogleDetailEvent(null);void openManual(event);}}>✎ MODIFICA EVENTO</button>
 
               <button type="button"
                 onClick={async () => {
