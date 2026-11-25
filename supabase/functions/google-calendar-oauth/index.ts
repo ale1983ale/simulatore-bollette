@@ -1434,6 +1434,37 @@ Deno.serve(async (req: Request) => {
         await getDriveArchiveOwnerAdminId();
       const manager = isDriveManager(viewer);
 
+      if (action.startsWith("drive_presentation_")) {
+        if (!manager) throw new Error("Solo il superadmin può accedere alle presentazioni.");
+        await assertDriveReady(archiveOwnerAdminId);
+        const {data:settings,error:settingsError}=await db.from("provvigioni_drive_config").select("folder_id,folder_name").eq("id",1).maybeSingle();
+        if(settingsError)throw settingsError;
+        if(action==="drive_presentation_config")return json({folder_id:settings?.folder_id||null,folder_name:settings?.folder_name||null});
+        if(action==="drive_presentation_set_folder"){
+          const folderId=String(body?.folder_id||"");
+          if(!folderId)throw new Error("Seleziona una cartella.");
+          const folder=await getDriveItem(archiveOwnerAdminId,folderId,"id,name,mimeType");
+          if(folder?.mimeType!==DRIVE_FOLDER_MIME)throw new Error("Seleziona una cartella Drive valida.");
+          const value={id:1,folder_id:String(folder.id),folder_name:String(folder.name||"Presentazioni"),updated_at:new Date().toISOString()};
+          const {error:saveError}=await db.from("provvigioni_drive_config").upsert(value,{onConflict:"id"});
+          if(saveError)throw saveError;
+          return json({folder_id:value.folder_id,folder_name:value.folder_name});
+        }
+        if(!settings?.folder_id)throw new Error("Seleziona prima la cartella PRESENTAZIONE.");
+        if(action==="drive_presentation_list"){
+          const items=await listDriveFolderItems(archiveOwnerAdminId,String(settings.folder_id));
+          return json({folder_id:settings.folder_id,folder_name:settings.folder_name,items:items.filter((item:any)=>item.mime_type==="application/pdf")});
+        }
+        if(action==="drive_presentation_download"){
+          const fileId=String(body?.file_id||"");
+          if(!fileId)throw new Error("File mancante.");
+          const file=await getDriveItem(archiveOwnerAdminId,fileId,"id,mimeType,parents");
+          if(file?.mimeType!=="application/pdf"||!Array.isArray(file?.parents)||!file.parents.includes(String(settings.folder_id)))throw new Error("PDF non presente nella cartella PRESENTAZIONE.");
+          return await downloadDriveFile(archiveOwnerAdminId,fileId);
+        }
+        throw new Error("Azione presentazione non valida.");
+      }
+
       if (action === "drive_config") {
         const connection = await getConnection(
           archiveOwnerAdminId
@@ -1602,6 +1633,18 @@ Deno.serve(async (req: Request) => {
 
     const admin = await validateAdmin(sessionToken);
 
+    if (action === "connection_health") {
+      const connection = await getConnection(admin.id);
+      if (!connection?.refresh_token) return json({connected:false,reason:"missing"});
+      try {
+        await refreshGoogleToken(admin.id, true);
+        return json({connected:true,email_notifications_ready:hasGmailSendScope(connection.scope)});
+      } catch (error) {
+        const message = String((error as Error)?.message || error);
+        return json({connected:false,reason:"invalid",message});
+      }
+    }
+
     if (action === "status") {
       const connection = await getConnection(admin.id);
       const connected = Boolean(connection?.refresh_token);
@@ -1707,6 +1750,45 @@ Deno.serve(async (req: Request) => {
       }
 
       return json({ connected: false });
+    }
+
+    if (action === "list_writable_calendars") {
+      const calendars: any[] = [];
+      let pageToken = "";
+      do {
+        const url = new URL("https://www.googleapis.com/calendar/v3/users/me/calendarList");
+        url.searchParams.set("minAccessRole","writer");
+        url.searchParams.set("maxResults","250");
+        url.searchParams.set("showHidden","true");
+        if(pageToken) url.searchParams.set("pageToken",pageToken);
+        const response=await googleRequest(admin.id,url.toString());
+        const data=await response.json();
+        if(!response.ok) throw new Error(data?.error?.message||"Impossibile leggere i calendari.");
+        for(const item of data.items||[]) if(!item.deleted && ["owner","writer"].includes(item.accessRole)) calendars.push({id:item.id,name:item.summaryOverride||item.summary||item.id,primary:!!item.primary});
+        pageToken=String(data.nextPageToken||"");
+      }while(pageToken);
+      return json({calendars});
+    }
+    if (action === "create_manual_event") {
+      const calendarId=String(body.calendar_id||"").trim();
+      const summary=String(body.summary||"").trim();
+      const date=String(body.date||"");
+      const endDate=String(body.end_date||date);
+      const start=String(body.start_time||"");
+      const end=String(body.end_time||"");
+      const allDay=body.all_day===true;
+      const validDate=(v:string)=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
+      const validTime=(v:string)=>/^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+      if(!calendarId||!summary||summary.length>500||!validDate(date)||!validDate(endDate)||endDate<date||(!allDay&&(!validTime(start)||!validTime(end)||endDate+"T"+end<=date+"T"+start))) throw new Error("Compila titolo, calendario e intervallo valido.");
+      const access=await googleRequest(admin.id,"https://www.googleapis.com/calendar/v3/users/me/calendarList/"+encodeURIComponent(calendarId));
+      const info=await access.json();
+      if(!access.ok||!["owner","writer"].includes(info.accessRole)) throw new Error("Calendario non disponibile in scrittura.");
+      const nextDay=new Date(Date.parse(endDate)+86400000).toISOString().slice(0,10);
+      const event={summary,description:String(body.description||"").slice(0,20000),location:String(body.location||"").slice(0,1000),start:allDay?{date}:{dateTime:date+"T"+start+":00",timeZone:TIME_ZONE},end:allDay?{date:nextDay}:{dateTime:endDate+"T"+end+":00",timeZone:TIME_ZONE}};
+      const response=await googleRequest(admin.id,"https://www.googleapis.com/calendar/v3/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)});
+      const result=await response.json();
+      if(!response.ok) throw new Error(result?.error?.message||"Creazione evento non riuscita.");
+      return json({id:result.id,calendar_id:calendarId});
     }
 
     if (action === "list_events") {
