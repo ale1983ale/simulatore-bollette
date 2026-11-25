@@ -1990,7 +1990,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
                 : archiveSection === "dettaglioProduzione"
                 ? "DETTAGLIO PRODUZIONE · elenco completo dei report per agente."
                 : archiveSection === "attivo"
-                ? "ATTIVO PRODUZIONE · confronto produzione / recessi per agente."
+                ? "SALDO PRODUZIONE · confronto produzione / recessi per agente."
                 : archiveSection === "dettaglioRecessi"
                 ? "DETTAGLIO RECESSI · elenco completo dei singoli recessi archiviati."
                 : archiveSection === "reportAdmin"
@@ -2015,7 +2015,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
       </div>
 
       <div className="ge-archive-main-tabs" style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,width:"100%"}}>
-        {([["recessi","RECESSI"],["insoluti","💶 INSOLUTI"],["produzione","PRODUZIONE"],["attivo","ATTIVO PRODUZIONE"],...(superAdmin?[["pacchetto","PACCHETTO ATTIVO"]]:[]),...(reportAdminPanel?[["reportAdmin","REPORT ADMIN"]]:[])] as [string,string][]).map(([key,label])=><button key={key} type="button" onClick={()=>setArchiveSection(key as typeof archiveSection)} style={{width:"100%",minWidth:0,minHeight:46,padding:"10px 8px",borderRadius:11,border:archiveSection===key?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection===key?"#0f172a":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:850,fontSize:13,lineHeight:1.25,cursor:"pointer",boxShadow:archiveSection===key?"0 3px 8px #0f172a22":"none"}}>{label}</button>)}
+        {([["recessi","RECESSI"],["insoluti","💶 INSOLUTI"],["produzione","PRODUZIONE"],["attivo","SALDO PRODUZIONE"],...(superAdmin?[["pacchetto","PACCHETTO ATTIVO"]]:[]),...(reportAdminPanel?[["reportAdmin","REPORT ADMIN"]]:[])] as [string,string][]).map(([key,label])=><button key={key} type="button" onClick={()=>setArchiveSection(key as typeof archiveSection)} style={{width:"100%",minWidth:0,minHeight:46,padding:"10px 8px",borderRadius:11,border:archiveSection===key?"1px solid #0f172a":"1px solid #cbd5e1",background:archiveSection===key?"#0f172a":"white",color:archiveSection===key?"white":"#0f172a",fontWeight:850,fontSize:13,lineHeight:1.25,cursor:"pointer",boxShadow:archiveSection===key?"0 3px 8px #0f172a22":"none"}}>{label}</button>)}
       </div>
       {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"||archiveSection==="produzione"||archiveSection==="dettaglioProduzione")&&<div className="ge-archive-sub-tabs" style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8,width:"100%"}}>
         {(archiveSection==="recessi"||archiveSection==="dettaglioRecessi"?([["recessi","RIEPILOGO RECESSI"],["dettaglioRecessi","DETTAGLIO RECESSI"]] as const):([["produzione","RIEPILOGO PRODUZIONE"],["dettaglioProduzione","DETTAGLIO PRODUZIONE"]] as const)).map(([key,label])=><button type="button" key={key} onClick={()=>setArchiveSection(key)} style={{width:"100%",minWidth:0,minHeight:44,padding:"9px 8px",borderRadius:10,border:"1px solid "+(archiveSection===key?"#1d4ed8":"#cbd5e1"),background:archiveSection===key?"#1d4ed8":"white",color:archiveSection===key?"white":"#0f172a",fontSize:12,fontWeight:850,lineHeight:1.25,cursor:"pointer"}}>{label}</button>)}
