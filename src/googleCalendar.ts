@@ -150,3 +150,5 @@ export async function listWritableGoogleCalendars():Promise<WritableGoogleCalend
 export async function createManualGoogleEvent(payload:{calendar_id:string;summary:string;date:string;end_date:string;start_time:string;end_time:string;all_day:boolean;location:string;description:string}){
  return callGoogleCalendar("create_manual_event",payload);
 }
+
+export async function updateManualGoogleEvent(payload:Parameters<typeof createManualGoogleEvent>[0],source:string,id:string){return callGoogleCalendar("update_manual_event",{...payload,source_calendar_id:source,event_id:id});}
