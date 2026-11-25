@@ -1769,7 +1769,7 @@ Deno.serve(async (req: Request) => {
       }while(pageToken);
       return json({calendars});
     }
-    if (action === "create_manual_event") {
+    if (action === "create_manual_event" || action === "update_manual_event") {
       const calendarId=String(body.calendar_id||"").trim();
       const summary=String(body.summary||"").trim();
       const date=String(body.date||"");
@@ -1785,7 +1785,29 @@ Deno.serve(async (req: Request) => {
       if(!access.ok||!["owner","writer"].includes(info.accessRole)) throw new Error("Calendario non disponibile in scrittura.");
       const nextDay=new Date(Date.parse(endDate)+86400000).toISOString().slice(0,10);
       const event={summary,description:String(body.description||"").slice(0,20000),location:String(body.location||"").slice(0,1000),start:allDay?{date}:{dateTime:date+"T"+start+":00",timeZone:TIME_ZONE},end:allDay?{date:nextDay}:{dateTime:endDate+"T"+end+":00",timeZone:TIME_ZONE}};
-      const response=await googleRequest(admin.id,"https://www.googleapis.com/calendar/v3/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)});
+      let response: Response;
+      if(action==="update_manual_event"){
+        const source=String(body.source_calendar_id||"");
+        const id=String(body.event_id||"");
+        if(!source||!id) throw new Error("Evento originale mancante.");
+        const sourceAccess=await googleRequest(admin.id,"https://www.googleapis.com/calendar/v3/users/me/calendarList/"+encodeURIComponent(source));
+        const sourceInfo=await sourceAccess.json();
+        if(!sourceAccess.ok||!["owner","writer"].includes(sourceInfo.accessRole)) throw new Error("Evento originale non modificabile.");
+        const originalUrl="https://www.googleapis.com/calendar/v3/calendars/"+encodeURIComponent(source)+"/events/"+encodeURIComponent(id);
+        const original=await googleRequest(admin.id,originalUrl);
+        const originalData=await original.json();
+        if(!original.ok||originalData.locked||originalData.eventType&&originalData.eventType!=="default") throw new Error("Evento non modificabile dal simulatore.");
+        if(source!==calendarId){
+          if(originalData.recurringEventId||originalData.recurrence) throw new Error("Non è possibile spostare un evento ricorrente dal simulatore.");
+          const moved=await googleRequest(admin.id,originalUrl+"/move?destination="+encodeURIComponent(calendarId),{method:"POST"});
+          const movedData=await moved.json();
+          if(!moved.ok) throw new Error(movedData?.error?.message||"Spostamento non riuscito.");
+          response=await googleRequest(admin.id,"https://www.googleapis.com/calendar/v3/calendars/"+encodeURIComponent(calendarId)+"/events/"+encodeURIComponent(movedData.id||id),{method:"PATCH",body:JSON.stringify(event)});
+          if(!response.ok) throw new Error("Evento spostato nel nuovo calendario, ma modifica dei dettagli non riuscita. Chiudi e aggiorna il calendario prima di riprovare.");
+        }else response=await googleRequest(admin.id,originalUrl,{method:"PATCH",body:JSON.stringify(event)});
+      }else{
+        response=await googleRequest(admin.id,"https://www.googleapis.com/calendar/v3/calendars/"+encodeURIComponent(calendarId)+"/events",{method:"POST",body:JSON.stringify(event)});
+      }
       const result=await response.json();
       if(!response.ok) throw new Error(result?.error?.message||"Creazione evento non riuscita.");
       return json({id:result.id,calendar_id:calendarId});
