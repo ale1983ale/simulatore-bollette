@@ -967,7 +967,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
   const [lastImportMessage, setLastImportMessage] = useState("");
   type ArchiveSection = "pacchetto" | "recessi" | "dettaglioProduzione" | "produzione" | "attivo" | "dettaglioRecessi" | "reportAdmin" | "zone" | "insoluti";
   // Persist only the saved set in Supabase; showing all does not erase it.
-  type NamedFilter={id:string;name:string;agents:string[]};
+  type NamedFilter={id:string;name:string;agents:string[];pinnedAt?:number};
   const [namedFilters,setNamedFilters]=useState<NamedFilter[]>([]);
   const [activeFilters,setActiveFilters]=useState<string[]>([]);
   const [editingFilter,setEditingFilter]=useState("");
@@ -1031,7 +1031,7 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
     const name=filterName.trim();const agents=[...new Set(sharedAgentDraft.map(sharedAgentKey))];
     if(!name||!agents.length){setSharedAgentError("Indica nome e almeno un agente.");return;}
     if(namedFilters.some(f=>f.id!==editingFilter&&f.name.toLowerCase()===name.toLowerCase())){setSharedAgentError("Nome filtro già utilizzato.");return;}
-    const id=editingFilter||crypto.randomUUID();const item={id,name,agents};const next=editingFilter?namedFilters.map(f=>f.id===id?item:f):[...namedFilters,item];
+    const id=editingFilter||crypto.randomUUID();const item={id,name,agents,pinnedAt:namedFilters.find(f=>f.id===id)?.pinnedAt};const next=editingFilter?namedFilters.map(f=>f.id===id?item:f):[...namedFilters,item];
     if(await persistFilters(next,[...new Set([...activeFilters,id])]))setSharedAgentOpen(false);
   };
   const filterButton=(selected=false):React.CSSProperties=>({padding:"9px 12px",borderRadius:8,background:selected?"#0f172a":"white",color:selected?"white":"#0f172a",border:"1px solid #94a3b8",fontWeight:800,cursor:"pointer"});
@@ -2031,9 +2031,9 @@ export default function Archive({ reportAdminPanel = null, adminToken = "", supe
         </div>
         {sharedAgentError&&<p style={{color:"#b91c1c"}}>{sharedAgentError}</p>}
         <div style={{marginTop:12,display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
-          {namedFilters.map(f=><div key={f.id} style={{display:"flex",gap:4,alignItems:"center",padding:5,borderRadius:9,border:"1px solid #94a3b8",background:activeFilters.includes(f.id)?"#0f172a":"white",color:activeFilters.includes(f.id)?"white":"#0f172a"}}>
+          {[...namedFilters].sort((a,b)=>a.pinnedAt&&b.pinnedAt?a.pinnedAt-b.pinnedAt:a.pinnedAt?-1:b.pinnedAt?1:a.name.localeCompare(b.name,"it",{sensitivity:"base"})).map(f=><div key={f.id} style={{display:"flex",gap:4,alignItems:"center",padding:5,borderRadius:9,border:"1px solid #94a3b8",background:activeFilters.includes(f.id)?"#0f172a":"white",color:activeFilters.includes(f.id)?"white":"#0f172a"}}>
             <button disabled={sharedAgentSaving} style={{flex:1,minWidth:0,textAlign:"left",overflowWrap:"anywhere",padding:"8px 6px",border:0,background:"transparent",color:"inherit",fontWeight:800,cursor:"pointer"}} aria-pressed={activeFilters.includes(f.id)} onClick={()=>void persistFilters(namedFilters,activeFilters.includes(f.id)?activeFilters.filter(id=>id!==f.id):[...activeFilters,f.id])}>{f.name} ({f.agents.length})</button>
-            <button type="button" title="Modifica filtro" aria-label={"Modifica "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:"inherit",cursor:"pointer",display:"flex"}} onClick={()=>editFilter(f)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 3 5 5-12 12-6 1 1-6Z"/><path d="m13 6 5 5"/></svg></button>
+            <button type="button" title={f.pinnedAt?"Rimuovi fissaggio":"Fissa filtro"} aria-label={(f.pinnedAt?"Rimuovi fissaggio ":"Fissa ")+f.name} aria-pressed={!!f.pinnedAt} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:f.pinnedAt?"#fef3c7":"transparent",color:f.pinnedAt?"#92400e":"inherit",cursor:"pointer",display:"flex"}} onClick={()=>void persistFilters(namedFilters.map(x=>x.id===f.id?{...x,pinnedAt:x.pinnedAt?undefined:Math.max(Date.now(),...namedFilters.map(y=>y.pinnedAt||0))+1}:x),activeFilters)}><svg width="16" height="16" viewBox="0 0 24 24" fill={f.pinnedAt?"currentColor":"none"} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3l5 5-4 2-3 5v3l-4-4-5-5h3l5-3z"/><path d="m10 14-7 7"/></svg></button><button type="button" title="Modifica filtro" aria-label={"Modifica "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:"inherit",cursor:"pointer",display:"flex"}} onClick={()=>editFilter(f)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 3 5 5-12 12-6 1 1-6Z"/><path d="m13 6 5 5"/></svg></button>
             <button type="button" title="Elimina filtro" aria-label={"Elimina "+f.name} disabled={sharedAgentSaving} style={{border:0,borderRadius:6,padding:6,background:"transparent",color:activeFilters.includes(f.id)?"#fca5a5":"#b91c1c",cursor:"pointer",display:"flex"}} onClick={()=>{if(window.confirm("Eliminare "+f.name+"?"))void persistFilters(namedFilters.filter(x=>x.id!==f.id),activeFilters.filter(id=>id!==f.id));}}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
           </div>)}
         </div>
