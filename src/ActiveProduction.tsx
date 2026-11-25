@@ -330,7 +330,7 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
         })
       );
       await exportFilteredA4Pdf({
-        title: "ATTIVO PRODUZIONE - STORICO",
+        title: "SALDO PRODUZIONE - STORICO",
         subtitle: "Confronto tra produzione, recessi e saldo netto per agente e settore.",
         filename: "ATTIVO_PRODUZIONE_" + periodFile +
           (selectedAgent ? "_" + selectedAgent : "") + ".pdf",
@@ -366,7 +366,7 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
         note: "Saldo = produzione meno recessi. I consumi dei report sono indivisibili: nel periodo libero non sono stimati giorni intermedi. LUCE e GAS sono riportati separatamente.",
       });
     } catch (err) {
-      console.error("PDF ATTIVO PRODUZIONE ERROR", err);
+      console.error("PDF SALDO PRODUZIONE ERROR", err);
       alert("Non è stato possibile esportare il PDF: " +
         (err instanceof Error ? err.message : "Errore sconosciuto"));
     } finally {
@@ -510,7 +510,7 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
       <div className="ap-filters-panel" style={{ ...card, minWidth: 0 }}>
         <div className="ap-title-row" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
-            <h2 style={{ margin: 0 }}>ATTIVO PRODUZIONE</h2>
+            <h2 style={{ margin: 0 }}>SALDO PRODUZIONE</h2>
             <div style={{ color: "#475569", fontSize: 13, marginTop: 5 }}>
               Produzione e recessi confrontati per mese di riferimento. Per i recessi fa fede la data in NOTA_RECESSO.
             </div>
@@ -630,7 +630,7 @@ export default function ActiveProduction({sharedAgents=[]}:{sharedAgents?:string
           {!periodsSelected.length&&<button type="button" aria-expanded={showAgentStatistics} onClick={()=>setShowAgentStatistics(v=>!v)} style={{padding:"26px 20px",minHeight:126,borderRadius:11,border:"1px solid #93c5fd",background:"#eff6ff",color:"#1e40af",fontWeight:900,fontSize:19,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",width:"100%"}}>{showAgentStatistics?"▼ CHIUDI STATISTICHE AGENTI":"▸ APRI STATISTICHE AGENTI"}</button>}
           {(!periodsSelected.length&&showAgentStatistics)&&<>{gridTable("luce")}{gridTable("gas")}</>}
           <div style={{...card,display:"grid",gap:12}}>
-            <h3 style={{margin:0}}>STORICO MENSILE · ATTIVO PRODUZIONE</h3>
+            <h3 style={{margin:0}}>STORICO MENSILE · SALDO PRODUZIONE</h3>
             <div style={{fontSize:12,color:"#64748b"}}>Come in Recessi: tutti i mesi disponibili, dal più recente. Seleziona un mese per visualizzare il relativo dettaglio sopra. Produzione e recessi sono conteggiati con gli stessi criteri del confronto.</div>
             {monthlyHistory.filter(({period})=>!periodsSelected.length||periodsSelected.includes(period.key)).map(({period,month,totals})=><div key={period.key} style={{background:activePeriod===period.key?"#eaf3ff":"#f8fafc",border:"1px solid #dbe5f0",borderRadius:14,padding:16}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap",marginBottom:14}}>
