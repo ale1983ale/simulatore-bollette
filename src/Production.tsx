@@ -48,6 +48,8 @@ type AgentZone = {
   agentKey: string;
   agente: string;
   regione: string;
+  gruppo: string;
+  sottogruppo: string;
   includeInReport: boolean;
 };
 
@@ -555,13 +557,14 @@ export default function Production({ view = "produzione", onOpenDetail, sharedAg
   const fetchAgentZones = async () => {
     const { data, error } = await supabase
       .from(AGENT_ZONE_TABLE)
-      .select("agent_key,agente,regione,include_in_report")
+      .select("agent_key,agente,regione,gruppo,sottogruppo,include_in_report")
       .order("agente", { ascending: true });
     if (error) throw error;
     const loaded = (data || []).map((item: any) => ({
       agentKey: String(item.agent_key || ""),
       agente: String(item.agente || ""),
       regione: String(item.regione || ""),
+      gruppo: String(item.gruppo || ""), sottogruppo: String(item.sottogruppo || ""),
       includeInReport: item.include_in_report !== false,
     }));
     // Proponi la regione da Gestione Agenti solo quando manca nella configurazione salvata.
@@ -1011,6 +1014,7 @@ export default function Production({ view = "produzione", onOpenDetail, sharedAg
         agent_key: agent.agentKey,
         agente: agent.agente,
         regione: agent.regione || null,
+        gruppo: agent.gruppo.trim() || null, sottogruppo: agent.sottogruppo.trim() || null,
         include_in_report: agent.includeInReport,
         updated_at: new Date().toISOString(),
       }));
@@ -1288,6 +1292,7 @@ export default function Production({ view = "produzione", onOpenDetail, sharedAg
                     Recessi/Produz generale
                   </label>
 
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{(["gruppo","sottogruppo"] as const).map(field=><label key={field}>{field.toUpperCase()}<input style={inputStyle} list={"zone-"+field} value={agent[field]} onChange={e=>{const value=e.target.value;setAgentZones(current=>current.map(item=>item.agentKey===agent.agentKey?{...item,[field]:value}:item));setZonesDirty(true);setZoneMessage("");}}/><datalist id={"zone-"+field}>{[...new Set(agentZones.map(item=>item[field]).filter(Boolean))].sort().map(value=><option key={value} value={value}/>)}</datalist></label>)}</div>
                   <select
                     value={agent.regione}
                     onChange={(e) => updateAgentRegion(agent, e.target.value)}
