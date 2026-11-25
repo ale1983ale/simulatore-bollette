@@ -141,3 +141,12 @@ export async function listGoogleCalendarEvents(
     events: GoogleCalendarExternalEvent[];
   };
 }
+
+export type WritableGoogleCalendar={id:string;name:string;primary:boolean};
+export async function listWritableGoogleCalendars():Promise<WritableGoogleCalendar[]> {
+ const result=await callGoogleCalendar("list_writable_calendars");
+ return Array.isArray(result.calendars)?result.calendars:[];
+}
+export async function createManualGoogleEvent(payload:{calendar_id:string;summary:string;date:string;end_date:string;start_time:string;end_time:string;all_day:boolean;location:string;description:string}){
+ return callGoogleCalendar("create_manual_event",payload);
+}
