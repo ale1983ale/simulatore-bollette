@@ -158,6 +158,7 @@ type Candidate = {
   isFavorite: boolean;
   isHighlighted?: boolean;
   missedCall?: boolean;
+  contactMood?: "none" | "happy" | "sad";
 };
 
 type ContactNote = {
@@ -987,6 +988,7 @@ function candidateFromRow(row: any): Candidate {
     isFavorite: Boolean(row.is_favorite),
     isHighlighted: Boolean(row.is_highlighted),
     missedCall: Boolean(row.missed_call),
+    contactMood: row.contact_mood==="happy"?"happy":row.contact_mood==="sad"?"sad":"none",
   };
 }
 
@@ -2136,7 +2138,7 @@ export default function Recruiting({
     ] = await Promise.all([
       active.client
         .from("recruiting_candidates")
-        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,referrer,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new,is_favorite,is_highlighted,missed_call")
+        .select("id,contact_scope,full_name,operational_zone,sector_energy,sector_other,phone,email,company_name,referrer,created_at,updated_at,contact_status,forwarded_to,province_code,region,latitude,longitude,waiting_room_new,is_favorite,is_highlighted,missed_call,contact_mood")
         .order("full_name", { ascending: true }),
       active.client
         .from("recruiting_notes")
@@ -4046,6 +4048,8 @@ export default function Recruiting({
   };
 
   const [missedCallSaving,setMissedCallSaving]=useState(false);
+  const [moodSaving,setMoodSaving]=useState(false);
+  const saveContactMood=async(candidate:Candidate,mood:"none"|"happy"|"sad")=>{if(!ctx||moodSaving)return;setMoodSaving(true);try{const {data,error}=await ctx.client.from("recruiting_candidates").update({contact_mood:mood}).eq("id",candidate.id).eq("owner_key",ctx.ownerKey).select("id").single();if(error||!data)throw error||new Error("Contatto non aggiornato");setCandidates(current=>current.map(item=>item.id===candidate.id?{...item,contactMood:mood}:item));setAllCandidates(current=>current.map(item=>item.id===candidate.id?{...item,contactMood:mood}:item));}catch(error:any){setMessage("Errore nel salvataggio faccina: "+(error?.message||error));}finally{setMoodSaving(false);}};
   const toggleMissedCall=async(candidate:Candidate)=>{if(!ctx||missedCallSaving)return;setMissedCallSaving(true);const next=!candidate.missedCall;try{const {data,error}=await ctx.client.from("recruiting_candidates").update({missed_call:next}).eq("id",candidate.id).eq("owner_key",ctx.ownerKey).select("id").single();if(error||!data)throw error||new Error("Contatto non aggiornato");setCandidates(current=>current.map(item=>item.id===candidate.id?{...item,missedCall:next}:item));setAllCandidates(current=>current.map(item=>item.id===candidate.id?{...item,missedCall:next}:item));}catch(error:any){setMessage("Errore nel salvataggio chiamata senza risposta: "+(error?.message||error));}finally{setMissedCallSaving(false);}};
   const toggleCandidateHighlight=async(candidate:Candidate)=>{
     if(!ctx)return;
@@ -9422,7 +9426,8 @@ export default function Recruiting({
                         lineHeight: 1.35,
                       }}
                     >
-                      <div style={{ minWidth: 0, paddingRight: candidate.missedCall?"min(22%,100px)":0,paddingLeft:candidate.missedCall?"min(22%,100px)":0, textAlign: "center" }}>
+                      <div style={{ minWidth: 0, paddingRight: (candidate.missedCall||candidate.contactMood==="happy"||candidate.contactMood==="sad")?"min(22%,100px)":0,paddingLeft:(candidate.missedCall||candidate.contactMood==="happy"||candidate.contactMood==="sad")?"min(22%,100px)":0, textAlign: "center" }}>
+                        {(candidate.contactMood==="happy"||candidate.contactMood==="sad")&&<div role="img" aria-label={candidate.contactMood==="happy"?"Faccina felice":"Faccina triste"} style={{position:"absolute",top:10,right:12,width:"min(20%,90px)",height:70,display:"grid",placeItems:"center",color:candidate.contactMood==="happy"?"#15803d":"#b91c1c",background:candidate.contactMood==="happy"?"#dcfce7":"#fee2e2",border:"1px solid "+(candidate.contactMood==="happy"?"#86efac":"#fca5a5"),borderRadius:12}}><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="9.5"/><circle cx="8.5" cy="9" r=".8" fill="currentColor"/><circle cx="15.5" cy="9" r=".8" fill="currentColor"/><path d={candidate.contactMood==="happy"?"M7.5 13.5 Q12 20 16.5 13.5":"M7.5 17 Q12 10.5 16.5 17"}/></svg></div>}
                         {candidate.missedCall&&<div role="img" aria-label="Chiamata senza risposta" title="Chiamata senza risposta" style={{position:"absolute",top:10,left:12,width:"min(20%,90px)",height:70,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,color:"#b91c1c",background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:12}}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7c5-5 13-5 18 0l-3 4-4-2V6h-4v3l-4 2z"/><path d="m9 14 6 6m0-6-6 6"/></svg><span style={{fontSize:9,fontWeight:800,lineHeight:1.1}}>NON RISPOSTO</span></div>}
                         <div
                           style={{
@@ -10041,6 +10046,7 @@ export default function Recruiting({
                   <div style={cardStyle}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                       <h3 style={{ margin: 0 }}>Scheda contatto</h3>
+                      <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,fontWeight:700}}>Faccina <select aria-label="Faccina contatto" disabled={moodSaving} value={selectedCandidate.contactMood||"none"} onChange={e=>void saveContactMood(selectedCandidate,e.target.value as "none"|"happy"|"sad")} style={{...inputStyle,width:"auto",color:selectedCandidate.contactMood==="happy"?"#15803d":selectedCandidate.contactMood==="sad"?"#b91c1c":"#475569"}}><option value="none">Nessuna</option><option value="happy">☺ Felice verde</option><option value="sad">☹ Triste rossa</option></select></label>
                       <button type="button" aria-pressed={!!selectedCandidate.missedCall} disabled={missedCallSaving} onClick={()=>void toggleMissedCall(selectedCandidate)} style={{...buttonStyle,background:selectedCandidate.missedCall?"#fee2e2":"#f1f5f9",color:selectedCandidate.missedCall?"#b91c1c":"#475569",border:"1px solid "+(selectedCandidate.missedCall?"#fca5a5":"#cbd5e1"),padding:"8px 12px"}}>☎ Chiamata senza risposta · {selectedCandidate.missedCall?"ATTIVA":"DISATTIVA"}</button>
                       {findCvForContact(selectedCandidate) && (
                         <button type="button" disabled={cvLoading}
