@@ -7555,7 +7555,7 @@ export default function Recruiting({
           min-width: 0 !important;
           min-height: 48px !important;
           padding: 9px 5px !important;
-          font-size: 11px !important;
+          font-size: 14px !important;
           line-height: 1.15 !important;
           white-space: normal !important;
           overflow-wrap: anywhere;
